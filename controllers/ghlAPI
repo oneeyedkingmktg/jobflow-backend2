@@ -1,330 +1,121 @@
-// ============================================================================
-// GoHighLevel API Integration
-// Replaces mailerLiteAPI.js with GHL functionality
-// ============================================================================
-const axios = require('axios');
+// controllers/ghlAPI
+
+const fetch = require('node-fetch');
 const db = require('../config/database');
-const { decryptApiKey } = require('../routes/companies');
 
-const GHL_API_BASE = 'https://rest.gohighlevel.com/v1';
-
-// ============================================================================
-// Get GHL credentials for a company
-// ============================================================================
-async function getCompanyGHLCredentials(companyId) {
-  const result = await db.query(
-    'SELECT ghl_api_key, ghl_location_id, ghl_calendar_id FROM companies WHERE id = $1',
-    [companyId]
-  );
-
-  if (result.rows.length === 0) {
-    throw new Error('Company not found');
-  }
-
-  const company = result.rows[0];
-
-  if (!company.ghl_api_key || !company.ghl_location_id) {
-    throw new Error('GHL credentials not configured for this company');
-  }
-
-  return {
-    apiKey: decryptApiKey(company.ghl_api_key),
-    locationId: company.ghl_location_id,
-    calendarId: company.ghl_calendar_id
-  };
-}
-
-// ============================================================================
-// Make authenticated GHL API request
-// ============================================================================
-async function ghlRequest(method, endpoint, credentials, data = null) {
-  try {
-    const response = await axios({
-      method,
-      url: `${GHL_API_BASE}${endpoint}`,
-      headers: {
-        'Authorization': `Bearer ${credentials.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      data
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error('GHL API Error:', {
-      endpoint,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message
-    });
-    throw new Error(`GHL API error: ${error.response?.data?.message || error.message}`);
-  }
-}
-
-// ============================================================================
-// Lookup contact by phone number (for deduplication)
-// ============================================================================
-async function lookupContactByPhone(phone, credentials) {
-  try {
-    const result = await ghlRequest(
-      'GET',
-      `/contacts/?locationId=${credentials.locationId}&query=${encodeURIComponent(phone)}`,
-      credentials
-    );
-
-    return result.contacts && result.contacts.length > 0 ? result.contacts[0] : null;
-  } catch (error) {
-    console.error('GHL lookup error:', error);
-    return null;
-  }
-}
-
-// ============================================================================
-// Create or Update GHL Contact
-// ============================================================================
-async function createOrUpdateContact(lead, credentials) {
-  try {
-    // Check if contact exists
-    const existingContact = await lookupContactByPhone(lead.phone, credentials);
-
-    const contactData = {
-      locationId: credentials.locationId,
-      firstName: lead.name.split(' ')[0] || lead.name,
-      lastName: lead.name.split(' ').slice(1).join(' ') || '',
-      email: lead.email || '',
-      phone: lead.phone,
-      address1: lead.address || '',
-      city: lead.city || '',
-      state: lead.state || '',
-      postalCode: lead.zip || '',
-      // Custom fields
-      customFields: [
-        { key: 'buyer_type', value: lead.buyer_type || '' },
-        { key: 'company_name', value: lead.company_name || '' },
-        { key: 'project_type', value: lead.project_type || '' },
-        { key: 'lead_source', value: lead.lead_source || '' },
-        { key: 'status', value: lead.status || 'lead' },
-        { key: 'not_sold_reason', value: lead.not_sold_reason || '' },
-        { key: 'contract_price', value: lead.contract_price?.toString() || '' },
-        { key: 'preferred_contact', value: lead.preferred_contact || '' },
-        { key: 'notes', value: lead.notes || '' }
-      ]
-    };
-
-    let contact;
-    if (existingContact) {
-      // Update existing contact
-      contact = await ghlRequest(
-        'PUT',
-        `/contacts/${existingContact.id}`,
-        credentials,
-        contactData
-      );
-    } else {
-      // Create new contact
-      contact = await ghlRequest(
-        'POST',
-        '/contacts/',
-        credentials,
-        contactData
-      );
-    }
-
-    // Update lead with GHL contact ID (only if column exists)
-    try {
-      await db.query(
-        'UPDATE leads SET ghl_contact_id = $1 WHERE id = $2',
-        [contact.contact?.id || contact.id, lead.id]
-      );
-    } catch (dbError) {
-      console.log('Note: Could not update GHL contact ID (column may not exist)');
-    }
-
-    return contact;
-  } catch (error) {
-    console.error('GHL sync error:', error.message);
-    throw error;
-  }
-}
-
-// ============================================================================
-// Create GHL Appointment
-// ============================================================================
-async function createAppointment(lead, appointmentDate, credentials) {
-  try {
-    if (!credentials.calendarId) {
-      throw new Error('Calendar ID not configured for this company');
-    }
-
-    if (!lead.ghl_contact_id) {
-      throw new Error('Contact must be synced to GHL before creating appointment');
-    }
-
-    const appointmentData = {
-      calendarId: credentials.calendarId,
-      locationId: credentials.locationId,
-      contactId: lead.ghl_contact_id,
-      startTime: new Date(appointmentDate).toISOString(),
-      endTime: new Date(new Date(appointmentDate).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour
-      title: `Appointment - ${lead.name}`,
-      appointmentStatus: 'confirmed'
-    };
-
-    const appointment = await ghlRequest(
-      'POST',
-      '/appointments/',
-      credentials,
-      appointmentData
-    );
-
-    // Update lead with appointment ID
-    await db.query(
-      'UPDATE leads SET ghl_appointment_id = $1, appointment_date = $2 WHERE id = $3',
-      [appointment.id, appointmentDate, lead.id]
-    );
-
-    return appointment;
-  } catch (error) {
-    console.error('GHL create appointment error:', error);
-    throw error;
-  }
-}
-
-// ============================================================================
-// Update GHL Appointment
-// ============================================================================
-async function updateAppointment(appointmentId, appointmentDate, credentials) {
-  try {
-    const appointmentData = {
-      startTime: new Date(appointmentDate).toISOString(),
-      endTime: new Date(new Date(appointmentDate).getTime() + 60 * 60 * 1000).toISOString()
-    };
-
-    return await ghlRequest(
-      'PUT',
-      `/appointments/${appointmentId}`,
-      credentials,
-      appointmentData
-    );
-  } catch (error) {
-    console.error('GHL update appointment error:', error);
-    throw error;
-  }
-}
-
-// ============================================================================
-// Cancel/Delete GHL Appointment
-// ============================================================================
-async function cancelAppointment(appointmentId, credentials) {
-  try {
-    return await ghlRequest(
-      'DELETE',
-      `/appointments/${appointmentId}`,
-      credentials
-    );
-  } catch (error) {
-    console.error('GHL cancel appointment error:', error);
-    throw error;
-  }
-}
-
-// ============================================================================
-// Main sync function - called from routes
-// GRACEFULLY HANDLES MISSING CREDENTIALS
-// ============================================================================
-async function syncLeadToGHL(lead, companyId) {
-  try {
-    // Try to get credentials - if they don't exist, just skip sync
-    const credentials = await getCompanyGHLCredentials(companyId);
-    await createOrUpdateContact(lead, credentials);
-    console.log(`GHL sync successful for lead ${lead.id}`);
-    return { success: true };
-  } catch (error) {
-    // Log but don't throw - GHL sync is optional
-    if (error.message.includes('credentials not configured')) {
-      console.log(`Skipping GHL sync for company ${companyId} (no credentials configured)`);
-    } else {
-      console.error('GHL sync failed:', error.message);
-    }
-    return { success: false, error: error.message };
-  }
-}
-
-// ============================================================================
-// Webhook handler - for inbound leads from GHL
-// ============================================================================
-async function handleGHLWebhook(webhookData) {
-  try {
-    // Extract contact data from webhook
-    const { contact, locationId } = webhookData;
-
-    // Find company by location ID
-    const companyResult = await db.query(
-      'SELECT id FROM companies WHERE ghl_location_id = $1',
-      [locationId]
-    );
-
-    if (companyResult.rows.length === 0) {
-      throw new Error('Company not found for location ID');
-    }
-
-    const companyId = companyResult.rows[0].id;
-
-    // Check if lead already exists by phone
-    const existingLead = await db.query(
-      'SELECT id FROM leads WHERE company_id = $1 AND phone = $2',
-      [companyId, contact.phone]
-    );
-
-    if (existingLead.rows.length > 0) {
-      // Update existing lead
-      await db.query(
-        `UPDATE leads SET
-          name = $1,
-          email = $2,
-          ghl_contact_id = $3
-         WHERE id = $4`,
-        [
-          `${contact.firstName} ${contact.lastName}`.trim(),
-          contact.email,
-          contact.id,
-          existingLead.rows[0].id
-        ]
-      );
-    } else {
-      // Create new lead
-      await db.query(
-        `INSERT INTO leads (
-          company_id, name, phone, email, address, city, state, zip,
-          ghl_contact_id, lead_source, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          companyId,
-          `${contact.firstName} ${contact.lastName}`.trim(),
-          contact.phone,
-          contact.email,
-          contact.address1,
-          contact.city,
-          contact.state,
-          contact.postalCode,
-          contact.id,
-          'Website',
-          'lead'
-        ]
-      );
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Webhook handler error:', error);
-    throw error;
-  }
-}
+// IMPORTANT: All syncs use the company's API key stored in DB
+// and the company's GHL locationId.
 
 module.exports = {
-  syncLeadToGHL,
-  createAppointment,
-  updateAppointment,
-  cancelAppointment,
-  handleGHLWebhook,
-  lookupContactByPhone
+    /**
+     * Sync a lead TO GoHighLevel
+     *
+     * Called automatically after create/update.
+     * Never blocks JobFlow — failures are recorded but user-facing flow continues.
+     *
+     * lead: full DB row for the lead
+     * company: row from `companies` table incl. api_key + location_id
+     */
+    syncLeadToGHL: async function (lead, company) {
+        try {
+            if (!company.api_key || !company.location_id) {
+                console.log("No GHL API key or location ID for company:", company.id);
+                await db.query(
+                    `UPDATE leads SET ghl_sync_status = 'missing_api', ghl_last_synced = NOW() WHERE id = $1`,
+                    [lead.id]
+                );
+                return;
+            }
+
+            // GHL API endpoint
+            const url = "https://rest.gohighlevel.com/v1/contacts/";
+
+            // Build payload using correct unique keys
+            const payload = {
+                "firstName": lead.first_name || "",
+                "lastName": lead.last_name || "",
+                "email": lead.email || "",
+                "phone": lead.phone || "",
+                "companyName": lead.company_name || "",
+                "address1": lead.address || "",
+                "city": lead.city || "",
+                "state": lead.state || "",
+                "postalCode": lead.zip || "",
+
+                // Custom fields using unique keys (snake_case)
+                "customField": {
+                    "contact.buyer_type": lead.buyer_type || "",
+                    "contact.project_type": lead.project_type || "",
+                    "contact.preferred_means_of_contact": lead.preferred_contact || "",
+                    "contact.project_notes": lead.notes || "",
+                    "contact.contract_price": lead.contract_price || "",
+                    "contact.referral_source": lead.lead_source || "",
+                    "contact.customer_business_name": lead.company_name || "",
+                    "contact.appointment_date": lead.appointment_date || "",
+                }
+            };
+
+            let method = "POST";
+            let ghlUrl = url;
+
+            // If lead already has a GHL contact ID → update instead of create
+            if (lead.ghl_contact_id) {
+                method = "PUT";
+                ghlUrl = `${url}${lead.ghl_contact_id}`;
+            }
+
+            // Perform request
+            const response = await fetch(ghlUrl, {
+                method,
+                headers: {
+                    "Authorization": `Bearer ${company.api_key}`,
+                    "Content-Type": "application/json",
+                    "Version": "2021-04-15"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error("GHL sync failed:", data);
+                await db.query(
+                    `UPDATE leads SET ghl_sync_status = 'failed', ghl_last_synced = NOW() WHERE id = $1`,
+                    [lead.id]
+                );
+                return;
+            }
+
+            // If created, GHL returns a contact ID
+            const newGhlId = data.contact?.id || lead.ghl_contact_id;
+
+            await db.query(
+                `UPDATE leads
+                 SET ghl_contact_id = $1,
+                     ghl_sync_status = 'success',
+                     ghl_last_synced = NOW()
+                 WHERE id = $2`,
+                [newGhlId, lead.id]
+            );
+
+            console.log("Lead synced to GHL successfully:", lead.id);
+
+        } catch (err) {
+            console.error("GHL sync error:", err);
+
+            await db.query(
+                `UPDATE leads SET ghl_sync_status = 'error', ghl_last_synced = NOW() WHERE id = $1`,
+                [lead.id]
+            );
+        }
+    },
+
+
+    /**
+     * This will be used later for CRON re-sync
+     * Pulling GHL → JobFlow (not implemented yet)
+     */
+    fetchGHLContact: async function () {
+        return null;
+    }
 };
