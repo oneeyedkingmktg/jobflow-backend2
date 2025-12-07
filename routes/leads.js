@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-const { authenticateToken } = require('../middleware/auth'); 
+const { authenticateToken } = require('../middleware/auth');
 const ghlAPI = require('../controllers/ghlAPI.js');
 
-// Must be authenticated
+// Correct middleware
 router.use(authenticateToken);
 
 /**
@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
         const result = await db.query(insertQuery, params);
         const lead = result.rows[0];
 
-        res.json(lead); // return immediately
+        res.json(lead);
 
         setImmediate(async () => {
             try {
@@ -94,7 +94,7 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * UPDATE lead
+ * UPDATE a lead
  */
 router.put('/:id', async (req, res) => {
     try {
