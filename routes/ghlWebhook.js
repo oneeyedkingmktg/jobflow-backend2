@@ -60,45 +60,43 @@ async function findExistingLead(companyId, ghlId, phone, email) {
   return null;
 }
 
+// ============================================================================
+// ALWAYS overwrite fields when webhook updates an existing lead
+// ============================================================================
 async function updateLeadIfNeeded(existing, updates) {
   const fields = [];
   const values = [];
   let idx = 1;
 
-  const pushIfNew = (dbField, newVal) => {
-    if (newVal === undefined || newVal === null || newVal === "") return;
-    const current = existing[dbField];
-    if (current !== null && current !== "" && current !== undefined) return;
+  const pushField = (dbField, newVal) => {
     fields.push(`${dbField} = $${idx}`);
     values.push(newVal);
     idx++;
   };
 
-  pushIfNew("name", updates.name);
-  pushIfNew("first_name", updates.first_name);
-  pushIfNew("last_name", updates.last_name);
-  pushIfNew("full_name", updates.full_name);
+  pushField("name", updates.name);
+  pushField("first_name", updates.first_name);
+  pushField("last_name", updates.last_name);
+  pushField("full_name", updates.full_name);
 
-  pushIfNew("phone", updates.phone);
-  pushIfNew("email", updates.email);
-  pushIfNew("address", updates.address);
-  pushIfNew("city", updates.city);
-  pushIfNew("state", updates.state);
-  pushIfNew("zip", updates.zip);
-  pushIfNew("buyer_type", updates.buyer_type);
-  pushIfNew("company_name", updates.company_name);
-  pushIfNew("project_type", updates.project_type);
-  pushIfNew("lead_source", updates.lead_source);
-  pushIfNew("preferred_contact", updates.preferred_contact);
-  pushIfNew("notes", updates.notes);
-  pushIfNew("ghl_contact_id", updates.ghl_contact_id);
+  pushField("phone", updates.phone);
+  pushField("email", updates.email);
+  pushField("address", updates.address);
+  pushField("city", updates.city);
+  pushField("state", updates.state);
+  pushField("zip", updates.zip);
+  pushField("buyer_type", updates.buyer_type);
+  pushField("company_name", updates.company_name);
+  pushField("project_type", updates.project_type);
+  pushField("lead_source", updates.lead_source);
+  pushField("preferred_contact", updates.preferred_contact);
+  pushField("notes", updates.notes);
+  pushField("ghl_contact_id", updates.ghl_contact_id);
 
   fields.push(`ghl_last_synced = NOW()`);
   fields.push(`ghl_sync_status = 'webhook'`);
   fields.push(`needs_sync = false`);
   fields.push(`updated_at = NOW()`);
-
-  if (fields.length === 0) return existing;
 
   const sql = `
     UPDATE leads
@@ -122,7 +120,6 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
   try {
     const companyId = parseInt(req.params.companyId, 10);
     if (!companyId) {
-      console.log("ERROR: Missing companyId");
       return res.status(400).json({ error: "Invalid companyId" });
     }
 
@@ -168,7 +165,6 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     const notes = body.notes || null;
 
-    // Split first/last for dashboard compatibility
     const nameParts = fullName.split(" ");
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
