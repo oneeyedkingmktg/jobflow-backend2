@@ -1,14 +1,12 @@
-// routes/leads.js
-
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-const authMiddleware = require('../middleware/auth');   // <-- FIXED
+const { authenticateToken } = require('../middleware/auth'); 
 const ghlAPI = require('../controllers/ghlAPI.js');
 
 // Must be authenticated
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 /**
  * GET all leads for this user’s company
@@ -75,9 +73,8 @@ router.post('/', async (req, res) => {
         const result = await db.query(insertQuery, params);
         const lead = result.rows[0];
 
-        res.json(lead);  // FRONTEND RETURNS IMMEDIATELY
+        res.json(lead); // return immediately
 
-        // Fire-and-forget GHL sync (non-blocking)
         setImmediate(async () => {
             try {
                 const company = await db.query(
@@ -97,7 +94,7 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * UPDATE an existing lead
+ * UPDATE lead
  */
 router.put('/:id', async (req, res) => {
     try {
@@ -160,9 +157,8 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: "Lead not found" });
         }
 
-        res.json(updatedLead); // FRONTEND DOES NOT WAIT FOR GHL
+        res.json(updatedLead);
 
-        // Fire-and-forget GHL sync
         setImmediate(async () => {
             try {
                 const company = await db.query(
