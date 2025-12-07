@@ -3,114 +3,202 @@
 const fetch = require('node-fetch');
 const db = require('../config/database');
 
-// All GHL calls must use the company's stored API key + locationId
-module.exports = {
+const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
 
-    /**
-     * Sync a lead TO GoHighLevel
-     */
-    syncLeadToGHL: async function (lead, company) {
-        try {
-            if (!company.api_key || !company.location_id) {
-                console.log("No GHL API key or location ID for company:", company.id);
-                await db.query(
-                    `UPDATE leads 
-                     SET ghl_sync_status = 'missing_api', ghl_last_synced = NOW() 
-                     WHERE id = $1`,
-                    [lead.id]
-                );
-                return;
-            }
+function normalizePhone(phone) {
+  if (!phone) return null;
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits) return null;
 
-            // Correct GHL contacts API base URL
-            const url = "https://rest.gohighlevel.com/v1/contacts/";
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
 
-            // Build the contact payload
-            const payload = {
-                firstName: lead.first_name || "",
-                lastName: lead.last_name || "",
-                email: lead.email || "",
-                phone: lead.phone || "",
-                companyName: lead.company_name || "",
-                address1: lead.address || "",
-                city: lead.city || "",
-                state: lead.state || "",
-                postalCode: lead.zip || "",
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
 
-                customField: {
-                    "contact.buyer_type": lead.buyer_type || "",
-                    "contact.project_type": lead.project_type || "",
-                    "contact.preferred_means_of_contact": lead.preferred_contact || "",
-                    "contact.project_notes": lead.notes || "",
-                    "contact.contract_price": lead.contract_price || "",
-                    "contact.referral_source": lead.lead_source || "",
-                    "contact.customer_business_name": lead.company_name || "",
-                    "contact.appointment_date": lead.appointment_date || "",
-                },
+  if (!digits.startsWith('+')) {
+    return `+${digits}`;
+  }
 
-                // MUST include locationId for creation
-                locationId: company.location_id
-            };
+  return digits;
+}
 
-            // Determine if new contact or update
-            let method = "POST";
-            let ghlUrl = url;
+async function ghlRequest(company, endpoint, options = {}) {
+  const apiKey = company.api_key;
+  const locationId = company.location_id;
 
-            if (lead.ghl_contact_id) {
-                method = "PUT";
-                ghlUrl = `${url}${lead.ghl_contact_id}`;
-            }
+  if (!apiKey || !locationId) {
+    throw new Error('Missing GHL API key or location ID for company');
+  }
 
-            // MAIN FIX: Correct headers required by GHL REST API
-            const response = await fetch(ghlUrl, {
-                method,
-                headers: {
-                    Authorization: `Bearer ${company.api_key}`,   // FIXED
-                    Version: "2021-07-28",                         // FIXED
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            });
+  const url = new URL(`${GHL_BASE_URL}${endpoint}`);
 
-            const data = await response.json();
+  const params = options.params || {};
+  if (!params.locationId) {
+    params.locationId = locationId;
+  }
 
-            if (!response.ok) {
-                console.error("GHL sync failed:", data);
-                await db.query(
-                    `UPDATE leads 
-                     SET ghl_sync_status = 'failed', ghl_last_synced = NOW() 
-                     WHERE id = $1`,
-                    [lead.id]
-                );
-                return;
-            }
-
-            const newGhlId = data.contact?.id || lead.ghl_contact_id;
-
-            await db.query(
-                `UPDATE leads
-                 SET ghl_contact_id = $1,
-                     ghl_sync_status = 'success',
-                     ghl_last_synced = NOW()
-                 WHERE id = $2`,
-                [newGhlId, lead.id]
-            );
-
-            console.log("Lead synced to GHL successfully:", lead.id);
-
-        } catch (err) {
-            console.error("GHL sync error:", err);
-
-            await db.query(
-                `UPDATE leads 
-                 SET ghl_sync_status = 'error', ghl_last_synced = NOW() 
-                 WHERE id = $1`,
-                [lead.id]
-            );
-        }
-    },
-
-    fetchGHLContact: async function () {
-        return null;
+  Object.keys(params).forEach((key) => {
+    const value = params[key];
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.append(key, value);
     }
+  });
+
+  const fetchOptions = {
+    method: options.method || 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  };
+
+  if (options.body) {
+    fetchOptions.body = JSON.stringify(options.body);
+  }
+
+  const res = await fetch(url.toString(), fetchOptions);
+  const text = await res.text();
+
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (e) {
+    data = text;
+  }
+
+  if (!res.ok) {
+    console.error('GHL API Error:', {
+      status: res.status,
+      statusText: res.statusText,
+      endpoint: url.toString(),
+      response: data,
+    });
+    throw new Error(`GHL API error ${res.status}`);
+  }
+
+  return data;
+}
+
+async function upsertContactFromLead(lead, company) {
+  const phone = normalizePhone(lead.phone || lead.phone_number);
+  const email = lead.email;
+
+  let existing = null;
+
+  if (phone) {
+    try {
+      const result = await ghlRequest(company, '/contacts/', {
+        method: 'GET',
+        params: { query: phone },
+      });
+
+      if (Array.isArray(result.contacts) && result.contacts.length > 0) {
+        existing = result.contacts[0];
+      }
+    } catch (err) {
+      console.warn(
+        'GHL contact search by phone failed, continuing to create:',
+        err.message
+      );
+    }
+  }
+
+  if (!existing && email) {
+    try {
+      const result = await ghlRequest(company, '/contacts/', {
+        method: 'GET',
+        params: { query: email },
+      });
+
+      if (Array.isArray(result.contacts) && result.contacts.length > 0) {
+        existing = result.contacts[0];
+      }
+    } catch (err) {
+      console.warn(
+        'GHL contact search by email failed, continuing to create:',
+        err.message
+      );
+    }
+  }
+
+  const payload = {
+    firstName: lead.first_name || lead.firstName || '',
+    lastName: lead.last_name || lead.lastName || '',
+    email: email || '',
+    phone: phone || '',
+    source: 'JobFlow',
+  };
+
+  let contact;
+
+  if (existing && existing.id) {
+    contact = await ghlRequest(company, `/contacts/${existing.id}`, {
+      method: 'PUT',
+      body: payload,
+    });
+  } else {
+    contact = await ghlRequest(company, '/contacts/', {
+      method: 'POST',
+      body: payload,
+    });
+  }
+
+  return contact;
+}
+
+module.exports = {
+  syncLeadToGHL: async function (lead, company) {
+    try {
+      const contact = await upsertContactFromLead(lead, company);
+
+      await db.query(
+        `UPDATE leads 
+         SET ghl_sync_status = 'success',
+             ghl_last_synced = NOW()
+         WHERE id = $1`,
+        [lead.id]
+      );
+
+      return contact;
+    } catch (error) {
+      console.error('syncLeadToGHL error:', error);
+
+      await db.query(
+        `UPDATE leads 
+         SET ghl_sync_status = 'error',
+             ghl_last_synced = NOW()
+         WHERE id = $1`,
+        [lead.id]
+      );
+
+      throw error;
+    }
+  },
+
+  searchGHLContactByPhone: async function (phone, company) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      return null;
+    }
+
+    const result = await ghlRequest(company, '/contacts/', {
+      method: 'GET',
+      params: { query: normalized },
+    });
+
+    return result;
+  },
+
+  fetchGHLContact: async function (contactId, company) {
+    if (!contactId) return null;
+
+    const contact = await ghlRequest(company, `/contacts/${contactId}`, {
+      method: 'GET',
+    });
+
+    return contact;
+  },
 };
