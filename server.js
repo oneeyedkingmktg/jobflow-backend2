@@ -10,7 +10,8 @@ const authRoutes = require('./routes/auth');
 const leadsRoutes = require('./routes/leads');
 const usersRoutes = require('./routes/users');
 const companiesRoutes = require('./routes/companies');
-const ghlRoutes = require('./routes/ghl'); // ADDED
+const ghlRoutes = require('./routes/ghl'); 
+const ghlWebhookRoutes = require('./routes/ghlWebhook'); // NEW - Webhook route
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,7 +32,10 @@ app.use('/auth', authRoutes);
 app.use('/leads', leadsRoutes);
 app.use('/users', usersRoutes);
 app.use('/companies', companiesRoutes);
-app.use('/ghl', ghlRoutes); // ADDED
+app.use('/ghl', ghlRoutes); 
+
+// NEW — Webhook endpoint (GHL → JobFlow)
+app.use('/webhooks/ghl', ghlWebhookRoutes);
 
 // ============================================================================
 // HEALTH CHECK
