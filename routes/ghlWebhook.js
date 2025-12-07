@@ -1,4 +1,4 @@
-// FILE: ghlWebhook.js (UPDATED)
+// FILE: ghlWebhook.js (UPDATED – lead_source now locked after first set)
 // ============================================================================
 // GHL Webhook Receiver + TEST ROUTE + Full Upsert Logic
 // ============================================================================
@@ -61,7 +61,7 @@ async function findExistingLead(companyId, ghlId, phone, email) {
 }
 
 // ============================================================================
-// ALWAYS overwrite fields when webhook updates an existing lead
+// ALWAYS overwrite fields EXCEPT lead_source (locked after first assignment)
 // ============================================================================
 async function updateLeadIfNeeded(existing, updates) {
   const fields = [];
@@ -88,7 +88,13 @@ async function updateLeadIfNeeded(existing, updates) {
   pushField("buyer_type", updates.buyer_type);
   pushField("company_name", updates.company_name);
   pushField("project_type", updates.project_type);
-  pushField("lead_source", updates.lead_source);
+
+  // LEAD SOURCE LOCKING LOGIC
+  const existingLeadSource = existing.lead_source;
+  if (!existingLeadSource || existingLeadSource.trim() === "") {
+    pushField("lead_source", updates.lead_source);
+  }
+
   pushField("preferred_contact", updates.preferred_contact);
   pushField("notes", updates.notes);
   pushField("ghl_contact_id", updates.ghl_contact_id);
@@ -127,9 +133,6 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     console.log("Raw Body:", JSON.stringify(body, null, 2));
 
-    // ========================================================================
-    // EXTRACT REAL CONTACT DATA (GHL-style)
-    // ============================================================================
     const phone =
       body.phone ||
       body.phoneNumber ||
@@ -219,6 +222,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       console.log("DEBUG: updated lead id:", saved.id);
     } else {
       console.log("DEBUG: inserting new lead");
+
       const insert = await db.query(
         `
         INSERT INTO leads (
@@ -277,6 +281,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           ghlContactId,
         ]
       );
+
       saved = insert.rows[0];
       console.log("DEBUG: inserted new lead id:", saved.id);
     }
