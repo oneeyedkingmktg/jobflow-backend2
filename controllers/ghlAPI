@@ -68,7 +68,7 @@ module.exports = {
             const response = await fetch(ghlUrl, {
                 method,
                 headers: {
-                    "Authorization": `Bearer ${company.api_key}`,
+Authorization: `APIKey ${process.env.GHL_API_KEY}`,
                     "Content-Type": "application/json",
                     "Version": "2021-04-15"
                 },
