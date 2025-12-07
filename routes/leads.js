@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-const authMiddleware = require('../middleware/authMiddleware');
+
 const ghlAPI = require('../controllers/ghlAPI.js');
 
 // Must be authenticated
