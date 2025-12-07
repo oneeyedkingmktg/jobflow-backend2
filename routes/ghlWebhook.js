@@ -1,14 +1,45 @@
 // ============================================================================
 // GHL Webhook Receiver + TEMP TEST ROUTE
 // ============================================================================
+
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
 // ============================================================================
-// TEMP TEST ENDPOINT (GET)
-// This allows us to confirm the route is mounted.
-// Visit: /webhooks/ghl/test
+// RAW BODY CAPTURE (required for GHL webhooks)
+// ============================================================================
+
+router.use(
+  express.raw({ type: "*/*", limit: "2mb" }),
+  (req, res, next) => {
+    try {
+      const raw = req.body?.toString() || "";
+      console.log("\n================ RAW WEBHOOK ===================");
+      console.log(raw);
+      console.log("================================================\n");
+
+      if (raw && raw.length > 0) {
+        try {
+          req.jsonBody = JSON.parse(raw);
+        } catch (err) {
+          console.error("JSON parse failed:", err);
+          req.jsonBody = {};
+        }
+      } else {
+        req.jsonBody = {};
+      }
+    } catch (e) {
+      console.error("Raw body capture error:", e);
+      req.jsonBody = {};
+    }
+    next();
+  }
+);
+
+// ============================================================================
+// TEMP TEST ENDPOINT
+// GET /webhooks/ghl/test
 // ============================================================================
 router.get("/test", (req, res) => {
   return res.json({
@@ -38,7 +69,8 @@ async function findExistingLead(companyId, ghlContactId, phone, email) {
   if (phone) {
     const normalized = normalizePhone(phone);
     const byPhone = await db.query(
-      `SELECT * FROM leads WHERE company_id = $1 
+      `SELECT * FROM leads 
+       WHERE company_id = $1 
        AND regexp_replace(phone, '\\D', '', 'g') = $2
        LIMIT 1`,
       [companyId, normalized]
@@ -49,7 +81,7 @@ async function findExistingLead(companyId, ghlContactId, phone, email) {
   if (email) {
     const byEmail = await db.query(
       `SELECT * FROM leads 
-       WHERE company_id = $1 AND lower(email) = lower($2) 
+       WHERE company_id = $1 AND lower(email) = lower($2)
        LIMIT 1`,
       [companyId, email]
     );
@@ -117,32 +149,52 @@ router.post("/:companyId", async (req, res) => {
     const companyId = parseInt(req.params.companyId, 10);
 
     if (!companyId || Number.isNaN(companyId)) {
-      console.error("Webhook missing/invalid companyId param");
-      return res.status(400).json({ error: "Invalid companyId in URL" });
+      console.error("Webhook invalid companyId");
+      return res.status(400).json({ error: "Invalid companyId" });
     }
 
-    const body = req.body || {};
+    const body =
+      req.jsonBody ||
+      req.body ||
+      {};
+
+    console.log("\n========= PARSED WEBHOOK JSON =========");
+    console.log(JSON.stringify(body, null, 2));
+    console.log("=======================================\n");
+
     const contact =
       body.contact ||
       (body.payload && body.payload.contact) ||
       body;
 
     if (!contact || typeof contact !== "object") {
-      console.error("Webhook payload missing contact:", body);
+      console.error("Webhook missing contact");
       return res.status(200).json({ received: true, skipped: "no_contact" });
     }
 
-    const ghlContactId = contact.id || contact.contactId || null;
+    // EXPANDED PHONE DETECTION
+    const phone =
+      contact.phone ||
+      contact.phoneNumber ||
+      contact.phone_number ||
+      contact.primaryPhone ||
+      contact.mobilePhone ||
+      (contact.phones && contact.phones[0] && contact.phones[0].phone) ||
+      null;
+
+    const email =
+      contact.email ||
+      contact.emailAddress ||
+      null;
 
     const firstName = contact.firstName || "";
     const lastName = contact.lastName || "";
+
     const fullName =
       contact.name ||
       `${firstName} ${lastName}`.trim() ||
       "Unknown";
 
-    const phone = contact.phone || contact.phoneNumber || null;
-    const email = contact.email || null;
     const address =
       contact.address1 ||
       contact.address ||
@@ -168,7 +220,7 @@ router.post("/:companyId", async (req, res) => {
       phone ? "Phone" :
       null;
 
-    const status = "lead";
+    const ghlContactId = contact.id || contact.contactId || null;
 
     const upsertPayload = {
       company_id: companyId,
@@ -183,7 +235,7 @@ router.post("/:companyId", async (req, res) => {
       company_name: null,
       project_type: null,
       lead_source: leadSource,
-      status,
+      status: "lead",
       not_sold_reason: null,
       contract_price: null,
       appointment_date: null,
@@ -192,6 +244,7 @@ router.post("/:companyId", async (req, res) => {
       ghl_contact_id: ghlContactId,
     };
 
+    // Find existing
     const existing = await findExistingLead(
       companyId,
       ghlContactId,
@@ -205,36 +258,19 @@ router.post("/:companyId", async (req, res) => {
       saved = await updateLeadIfNeeded(existing, upsertPayload);
       console.log("Updated existing lead:", saved.id);
     } else {
-      const insertResult = await db.query(
+      const insert = await db.query(
         `
         INSERT INTO leads (
-          company_id,
-          name,
-          phone,
-          email,
-          address,
-          city,
-          state,
-          zip,
-          buyer_type,
-          company_name,
-          project_type,
-          lead_source,
-          status,
-          not_sold_reason,
-          contract_price,
-          appointment_date,
-          preferred_contact,
-          notes,
-          ghl_contact_id,
-          ghl_last_synced,
-          ghl_sync_status,
-          needs_sync
-        ) VALUES (
+          company_id, name, phone, email, address, city, state, zip,
+          buyer_type, company_name, project_type, lead_source,
+          status, not_sold_reason, contract_price, appointment_date,
+          preferred_contact, notes, ghl_contact_id,
+          ghl_last_synced, ghl_sync_status, needs_sync
+        )
+        VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,
-          $9,$10,$11,$12,$13,
-          $14,$15,$16,$17,$18,
-          $19,NOW(),'webhook',false
+          $9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
+          NOW(),'webhook',false
         )
         RETURNING *;
         `,
@@ -261,11 +297,11 @@ router.post("/:companyId", async (req, res) => {
         ]
       );
 
-      saved = insertResult.rows[0];
+      saved = insert.rows[0];
       console.log("Created new lead:", saved.id);
     }
 
-    return res.status(200).json({
+    return res.json({
       received: true,
       lead_id: saved.id,
     });
@@ -277,4 +313,3 @@ router.post("/:companyId", async (req, res) => {
 });
 
 module.exports = router;
-
