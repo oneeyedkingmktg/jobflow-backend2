@@ -74,6 +74,10 @@ async function updateLeadIfNeeded(existing, updates) {
   };
 
   pushIfNew("name", updates.name);
+  pushIfNew("first_name", updates.first_name);
+  pushIfNew("last_name", updates.last_name);
+  pushIfNew("full_name", updates.full_name);
+
   pushIfNew("phone", updates.phone);
   pushIfNew("email", updates.email);
   pushIfNew("address", updates.address);
@@ -127,7 +131,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     // ========================================================================
     // EXTRACT REAL CONTACT DATA (GHL-style)
-    // ========================================================================
+    // ============================================================================
     const phone =
       body.phone ||
       body.phoneNumber ||
@@ -163,9 +167,16 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     const notes = body.notes || null;
 
+    // Split first/last for dashboard compatibility
+    const nameParts = fullName.split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
     console.log("EXTRACTED FIELDS:", {
       ghlContactId,
       fullName,
+      firstName,
+      lastName,
       phone,
       email,
       city,
@@ -174,9 +185,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       leadSource,
     });
 
-    // Phone is required for JobFlow logic
     if (!phone) {
-      console.log("ERROR: Missing phone. Skipping DB insert.");
       return res.status(200).json({
         received: true,
         skipped: "missing_phone",
@@ -185,10 +194,14 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     // ========================================================================
     // UPSERT PAYLOAD
-    // ========================================================================
+    // ============================================================================
     const upsertPayload = {
       company_id: companyId,
       name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName,
+
       phone,
       email,
       address,
@@ -210,7 +223,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     // ========================================================================
     // FIND EXISTING
-    // ========================================================================
+    // ============================================================================
     const existing = await findExistingLead(
       companyId,
       ghlContactId,
@@ -222,13 +235,15 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
 
     if (existing) {
       saved = await updateLeadIfNeeded(existing, upsertPayload);
-      console.log("Updated existing lead:", saved.id);
     } else {
       const insert = await db.query(
         `
         INSERT INTO leads (
           company_id,
           name,
+          first_name,
+          last_name,
+          full_name,
           phone,
           email,
           address,
@@ -250,16 +265,16 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           ghl_sync_status,
           needs_sync
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,
-          $9,$10,$11,$12,$13,
-          $14,$15,$16,$17,$18,
-          $19,NOW(),'webhook',false
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW(),'webhook',false
         )
         RETURNING *;
         `,
         [
           upsertPayload.company_id,
           upsertPayload.name,
+          upsertPayload.first_name,
+          upsertPayload.last_name,
+          upsertPayload.full_name,
           upsertPayload.phone,
           upsertPayload.email,
           upsertPayload.address,
@@ -280,7 +295,6 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
         ]
       );
       saved = insert.rows[0];
-      console.log("Created new lead:", saved.id);
     }
 
     return res.status(200).json({
