@@ -1,20 +1,32 @@
 // ============================================================================
-// GHL Webhook Receiver - Contact Upsert
+// GHL Webhook Receiver + TEMP TEST ROUTE
 // ============================================================================
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
-// Normalize phone to digits only for matching
+// ============================================================================
+// TEMP TEST ENDPOINT (GET)
+// This allows us to confirm the route is mounted.
+// Visit: /webhooks/ghl/test
+// ============================================================================
+router.get("/test", (req, res) => {
+  return res.json({
+    ok: true,
+    route: "webhooks/ghl working",
+  });
+});
+
+// ============================================================================
+// Helpers
+// ============================================================================
 function normalizePhone(phone) {
   if (!phone) return null;
   const digits = String(phone).replace(/\D/g, "");
   return digits || null;
 }
 
-// Find existing lead for this company by GHL contact id, phone, or email
 async function findExistingLead(companyId, ghlContactId, phone, email) {
-  // 1) Match by GHL contact id
   if (ghlContactId) {
     const byGhl = await db.query(
       `SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2 LIMIT 1`,
@@ -23,20 +35,22 @@ async function findExistingLead(companyId, ghlContactId, phone, email) {
     if (byGhl.rows.length > 0) return byGhl.rows[0];
   }
 
-  // 2) Match by phone
   if (phone) {
     const normalized = normalizePhone(phone);
     const byPhone = await db.query(
-      `SELECT * FROM leads WHERE company_id = $1 AND regexp_replace(phone, '\\D', '', 'g') = $2 LIMIT 1`,
+      `SELECT * FROM leads WHERE company_id = $1 
+       AND regexp_replace(phone, '\\D', '', 'g') = $2
+       LIMIT 1`,
       [companyId, normalized]
     );
     if (byPhone.rows.length > 0) return byPhone.rows[0];
   }
 
-  // 3) Match by email
   if (email) {
     const byEmail = await db.query(
-      `SELECT * FROM leads WHERE company_id = $1 AND lower(email) = lower($2) LIMIT 1`,
+      `SELECT * FROM leads 
+       WHERE company_id = $1 AND lower(email) = lower($2) 
+       LIMIT 1`,
       [companyId, email]
     );
     if (byEmail.rows.length > 0) return byEmail.rows[0];
@@ -45,7 +59,6 @@ async function findExistingLead(companyId, ghlContactId, phone, email) {
   return null;
 }
 
-// Safely build update statement that only fills missing fields
 async function updateLeadIfNeeded(existing, updates) {
   const fields = [];
   const values = [];
@@ -75,15 +88,12 @@ async function updateLeadIfNeeded(existing, updates) {
   pushIfNew("notes", updates.notes);
   pushIfNew("ghl_contact_id", updates.ghl_contact_id);
 
-  // Always update sync fields when webhook hits
   fields.push(`ghl_last_synced = NOW()`);
   fields.push(`ghl_sync_status = 'webhook'`);
   fields.push(`needs_sync = false`);
   fields.push(`updated_at = NOW()`);
 
-  if (fields.length === 0) {
-    return existing;
-  }
+  if (fields.length === 0) return existing;
 
   const sql = `
     UPDATE leads
@@ -98,7 +108,10 @@ async function updateLeadIfNeeded(existing, updates) {
   return result.rows[0];
 }
 
-// Main webhook handler
+// ============================================================================
+// MAIN WEBHOOK ENDPOINT
+// POST /webhooks/ghl/:companyId
+// ============================================================================
 router.post("/:companyId", async (req, res) => {
   try {
     const companyId = parseInt(req.params.companyId, 10);
@@ -108,7 +121,6 @@ router.post("/:companyId", async (req, res) => {
       return res.status(400).json({ error: "Invalid companyId in URL" });
     }
 
-    // GHL can send various payload shapes; be defensive:
     const body = req.body || {};
     const contact =
       body.contact ||
@@ -116,7 +128,7 @@ router.post("/:companyId", async (req, res) => {
       body;
 
     if (!contact || typeof contact !== "object") {
-      console.error("Webhook payload has no contact object:", body);
+      console.error("Webhook payload missing contact:", body);
       return res.status(200).json({ received: true, skipped: "no_contact" });
     }
 
@@ -129,11 +141,8 @@ router.post("/:companyId", async (req, res) => {
       `${firstName} ${lastName}`.trim() ||
       "Unknown";
 
-    const phoneRaw = contact.phone || contact.phoneNumber || null;
-    const phone = phoneRaw || null;
-
+    const phone = contact.phone || contact.phoneNumber || null;
     const email = contact.email || null;
-
     const address =
       contact.address1 ||
       contact.address ||
@@ -154,7 +163,10 @@ router.post("/:companyId", async (req, res) => {
       contact.additionalInfo ||
       null;
 
-    const preferredContact = email ? "Email" : phone ? "Phone" : null;
+    const preferredContact =
+      email ? "Email" :
+      phone ? "Phone" :
+      null;
 
     const status = "lead";
 
@@ -191,7 +203,7 @@ router.post("/:companyId", async (req, res) => {
 
     if (existing) {
       saved = await updateLeadIfNeeded(existing, upsertPayload);
-      console.log("Updated existing lead from GHL webhook:", saved.id);
+      console.log("Updated existing lead:", saved.id);
     } else {
       const insertResult = await db.query(
         `
@@ -222,7 +234,7 @@ router.post("/:companyId", async (req, res) => {
           $1,$2,$3,$4,$5,$6,$7,$8,
           $9,$10,$11,$12,$13,
           $14,$15,$16,$17,$18,
-          $19,$20,NOW(),'webhook',false
+          $19,NOW(),'webhook',false
         )
         RETURNING *;
         `,
@@ -250,13 +262,14 @@ router.post("/:companyId", async (req, res) => {
       );
 
       saved = insertResult.rows[0];
-      console.log("Created new lead from GHL webhook:", saved.id);
+      console.log("Created new lead:", saved.id);
     }
 
     return res.status(200).json({
       received: true,
       lead_id: saved.id,
     });
+
   } catch (error) {
     console.error("Webhook Error:", error);
     return res.status(500).json({ error: "Webhook processing error" });
