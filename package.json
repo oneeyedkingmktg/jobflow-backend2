@@ -18,7 +18,8 @@
     "jsonwebtoken": "^9.0.2",
     "cors": "^2.8.5",
     "axios": "^1.6.2",
-    "crypto-js": "^4.2.0"
+    "crypto-js": "^4.2.0",
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
