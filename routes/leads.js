@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-
+const authMiddleware = require('../middleware/auth');   // <-- FIXED
 const ghlAPI = require('../controllers/ghlAPI.js');
 
 // Must be authenticated
@@ -28,7 +28,6 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch leads" });
     }
 });
-
 
 /**
  * CREATE a new lead
@@ -96,7 +95,6 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: "Failed to create lead" });
     }
 });
-
 
 /**
  * UPDATE an existing lead
@@ -182,6 +180,5 @@ router.put('/:id', async (req, res) => {
         res.status(500).json({ error: "Failed to update lead" });
     }
 });
-
 
 module.exports = router;
