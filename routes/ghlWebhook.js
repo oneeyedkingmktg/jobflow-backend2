@@ -1,3 +1,4 @@
+// FILE: ghlWebhook.js (UPDATED)
 // ============================================================================
 // GHL Webhook Receiver + TEST ROUTE + Full Upsert Logic
 // ============================================================================
@@ -185,45 +186,8 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       leadSource,
     });
 
-    if (!phone) {
-      return res.status(200).json({
-        received: true,
-        skipped: "missing_phone",
-      });
-    }
+    console.log("DEBUG: about to call findExistingLead");
 
-    // ========================================================================
-    // UPSERT PAYLOAD
-    // ============================================================================
-    const upsertPayload = {
-      company_id: companyId,
-      name: fullName,
-      first_name: firstName,
-      last_name: lastName,
-      full_name: fullName,
-
-      phone,
-      email,
-      address,
-      city,
-      state,
-      zip,
-      buyer_type: null,
-      company_name: null,
-      project_type: null,
-      lead_source: leadSource,
-      status: "lead",
-      not_sold_reason: null,
-      contract_price: null,
-      appointment_date: null,
-      preferred_contact: email ? "Email" : "Phone",
-      notes,
-      ghl_contact_id: ghlContactId,
-    };
-
-    // ========================================================================
-    // FIND EXISTING
-    // ============================================================================
     const existing = await findExistingLead(
       companyId,
       ghlContactId,
@@ -231,11 +195,34 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       email
     );
 
+    console.log("DEBUG: existing lead id:", existing ? existing.id : null);
+
     let saved;
 
     if (existing) {
-      saved = await updateLeadIfNeeded(existing, upsertPayload);
+      console.log("DEBUG: updating existing lead");
+      saved = await updateLeadIfNeeded(existing, {
+        name: fullName,
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName,
+        phone,
+        email,
+        address,
+        city,
+        state,
+        zip,
+        buyer_type: null,
+        company_name: null,
+        project_type: null,
+        lead_source: leadSource,
+        preferred_contact: email ? "Email" : "Phone",
+        notes,
+        ghl_contact_id: ghlContactId,
+      });
+      console.log("DEBUG: updated lead id:", saved.id);
     } else {
+      console.log("DEBUG: inserting new lead");
       const insert = await db.query(
         `
         INSERT INTO leads (
@@ -270,32 +257,35 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
         RETURNING *;
         `,
         [
-          upsertPayload.company_id,
-          upsertPayload.name,
-          upsertPayload.first_name,
-          upsertPayload.last_name,
-          upsertPayload.full_name,
-          upsertPayload.phone,
-          upsertPayload.email,
-          upsertPayload.address,
-          upsertPayload.city,
-          upsertPayload.state,
-          upsertPayload.zip,
-          upsertPayload.buyer_type,
-          upsertPayload.company_name,
-          upsertPayload.project_type,
-          upsertPayload.lead_source,
-          upsertPayload.status,
-          upsertPayload.not_sold_reason,
-          upsertPayload.contract_price,
-          upsertPayload.appointment_date,
-          upsertPayload.preferred_contact,
-          upsertPayload.notes,
-          upsertPayload.ghl_contact_id,
+          companyId,
+          fullName,
+          firstName,
+          lastName,
+          fullName,
+          phone,
+          email,
+          address,
+          city,
+          state,
+          zip,
+          null,
+          null,
+          null,
+          leadSource,
+          "lead",
+          null,
+          null,
+          null,
+          email ? "Email" : "Phone",
+          notes,
+          ghlContactId,
         ]
       );
       saved = insert.rows[0];
+      console.log("DEBUG: inserted new lead id:", saved.id);
     }
+
+    console.log("DEBUG: webhook completed for lead id:", saved.id);
 
     return res.status(200).json({
       received: true,
