@@ -1,4 +1,4 @@
-// FILE: leads.js (UPDATED)
+// FILE: leads.js (UPDATED – DB → JF normalization)
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
@@ -6,7 +6,6 @@ const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const ghlAPI = require('../controllers/ghlAPI.js');
 
-// Correct middleware
 router.use(authenticateToken);
 
 /**
@@ -19,8 +18,41 @@ router.get('/', async (req, res) => {
         const result = await db.query(
             `
             SELECT
-                *,
-                COALESCE(full_name, CONCAT(first_name, ' ', last_name)) AS full_name
+                id,
+                company_id,
+                created_by_user_id,
+                name,
+                first_name,
+                last_name,
+                full_name,
+                phone,
+                email,
+                address,
+                city,
+                state,
+                zip,
+                buyer_type,
+                company_name,
+                project_type,
+                lead_source,
+                referral_source,
+                status,
+                not_sold_reason,
+                contract_price,
+                appointment_date,
+                preferred_contact,
+                notes,
+                ghl_contact_id,
+                ghl_appointment_id,
+                created_at,
+                updated_at,
+                ghl_last_synced,
+                ghl_sync_status,
+                needs_sync,
+
+                /* Normalize full_name for dashboard */
+                COALESCE(full_name, CONCAT(first_name, ' ', last_name)) AS full_name_normalized
+
             FROM leads
             WHERE company_id = $1
             ORDER BY id DESC
@@ -29,6 +61,7 @@ router.get('/', async (req, res) => {
         );
 
         res.json(result.rows);
+
     } catch (error) {
         console.error("Error fetching leads:", error);
         res.status(500).json({ error: "Failed to fetch leads" });
@@ -62,7 +95,7 @@ router.post('/', async (req, res) => {
         } = req.body;
 
         const full_name = `${first_name || ""} ${last_name || ""}`.trim();
-        const name = full_name; // match webhook naming
+        const name = full_name;
 
         const insertQuery = `
             INSERT INTO leads
