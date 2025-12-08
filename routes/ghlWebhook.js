@@ -1,4 +1,4 @@
-// FILE: ghlWebhook.js (UPDATED – lead_source now locked after first set)
+// FILE: ghlWebhook.js (UPDATED – added referral_source tracking & locking)
 // ============================================================================
 // GHL Webhook Receiver + TEST ROUTE + Full Upsert Logic
 // ============================================================================
@@ -9,13 +9,9 @@ const db = require("../config/database");
 
 // ============================================================================
 // TEMP TEST ENDPOINT (GET)
-// Visit: /webhooks/ghl/test
 // ============================================================================
 router.get("/test", (req, res) => {
-  return res.json({
-    ok: true,
-    route: "webhooks/ghl working",
-  });
+  return res.json({ ok: true, route: "webhooks/ghl working" });
 });
 
 // ============================================================================
@@ -39,9 +35,9 @@ async function findExistingLead(companyId, ghlId, phone, email) {
     const digits = normalizePhone(phone);
     const r = await db.query(
       `SELECT * FROM leads
-       WHERE company_id = $1
-       AND regexp_replace(phone, '\\D', '', 'g') = $2
-       LIMIT 1`,
+         WHERE company_id = $1
+         AND regexp_replace(phone, '\\D', '', 'g') = $2
+         LIMIT 1`,
       [companyId, digits]
     );
     if (r.rows.length > 0) return r.rows[0];
@@ -50,8 +46,8 @@ async function findExistingLead(companyId, ghlId, phone, email) {
   if (email) {
     const r = await db.query(
       `SELECT * FROM leads
-       WHERE company_id = $1 AND lower(email) = lower($2)
-       LIMIT 1`,
+         WHERE company_id = $1 AND lower(email) = lower($2)
+         LIMIT 1`,
       [companyId, email]
     );
     if (r.rows.length > 0) return r.rows[0];
@@ -61,7 +57,8 @@ async function findExistingLead(companyId, ghlId, phone, email) {
 }
 
 // ============================================================================
-// ALWAYS overwrite fields EXCEPT lead_source (locked after first assignment)
+// ALWAYS overwrite fields EXCEPT: lead_source & referral_source
+// both locked after first assignment
 // ============================================================================
 async function updateLeadIfNeeded(existing, updates) {
   const fields = [];
@@ -78,7 +75,6 @@ async function updateLeadIfNeeded(existing, updates) {
   pushField("first_name", updates.first_name);
   pushField("last_name", updates.last_name);
   pushField("full_name", updates.full_name);
-
   pushField("phone", updates.phone);
   pushField("email", updates.email);
   pushField("address", updates.address);
@@ -89,10 +85,16 @@ async function updateLeadIfNeeded(existing, updates) {
   pushField("company_name", updates.company_name);
   pushField("project_type", updates.project_type);
 
-  // LEAD SOURCE LOCKING LOGIC
+  // Lead source lock
   const existingLeadSource = existing.lead_source;
   if (!existingLeadSource || existingLeadSource.trim() === "") {
     pushField("lead_source", updates.lead_source);
+  }
+
+  // Referral source lock (GHL custom field)
+  const existingRefSource = existing.referral_source;
+  if (!existingRefSource || existingRefSource.trim() === "") {
+    pushField("referral_source", updates.referral_source);
   }
 
   pushField("preferred_contact", updates.preferred_contact);
@@ -111,24 +113,18 @@ async function updateLeadIfNeeded(existing, updates) {
     RETURNING *;
   `;
   values.push(existing.id);
-
   const result = await db.query(sql, values);
   return result.rows[0];
 }
 
 // ============================================================================
 // MAIN WEBHOOK ENDPOINT
-// POST /webhooks/ghl/:companyId
 // ============================================================================
 router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
   console.log("===== GHL WEBHOOK RECEIVED =====");
 
   try {
     const companyId = parseInt(req.params.companyId, 10);
-    if (!companyId) {
-      return res.status(400).json({ error: "Invalid companyId" });
-    }
-
     const body = req.body || {};
 
     console.log("Raw Body:", JSON.stringify(body, null, 2));
@@ -138,6 +134,10 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       body.phoneNumber ||
       (body.contact && body.contact.phone) ||
       null;
+
+    if (!phone) {
+      return res.status(200).json({ received: true, skipped: "missing_phone" });
+    }
 
     const email =
       body.email ||
@@ -155,7 +155,6 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       null;
 
     const address = body.address || body.full_address || null;
-
     const city = body.city || (body.location && body.location.city) || null;
     const state = body.state || (body.location && body.location.state) || null;
     const zip =
@@ -165,6 +164,12 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       body.tags && typeof body.tags === "string" && body.tags.length > 0
         ? body.tags
         : "GHL Webhook";
+
+    // NEW: Referral Source from GHL custom field
+    const referralSource =
+      (body.contact && body.contact.referral_source) ||
+      (body.customData && body.customData.referral_source) ||
+      null;
 
     const notes = body.notes || null;
 
@@ -183,9 +188,8 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       state,
       zip,
       leadSource,
+      referralSource,
     });
-
-    console.log("DEBUG: about to call findExistingLead");
 
     const existing = await findExistingLead(
       companyId,
@@ -194,12 +198,9 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
       email
     );
 
-    console.log("DEBUG: existing lead id:", existing ? existing.id : null);
-
     let saved;
 
     if (existing) {
-      console.log("DEBUG: updating existing lead");
       saved = await updateLeadIfNeeded(existing, {
         name: fullName,
         first_name: firstName,
@@ -215,14 +216,12 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
         company_name: null,
         project_type: null,
         lead_source: leadSource,
+        referral_source: referralSource,
         preferred_contact: email ? "Email" : "Phone",
         notes,
         ghl_contact_id: ghlContactId,
       });
-      console.log("DEBUG: updated lead id:", saved.id);
     } else {
-      console.log("DEBUG: inserting new lead");
-
       const insert = await db.query(
         `
         INSERT INTO leads (
@@ -241,6 +240,7 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           company_name,
           project_type,
           lead_source,
+          referral_source,
           status,
           not_sold_reason,
           contract_price,
@@ -252,7 +252,8 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           ghl_sync_status,
           needs_sync
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW(),'webhook',false
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+          'lead',NULL,NULL,NULL,$18,$19,$20,NOW(),'webhook',false
         )
         RETURNING *;
         `,
@@ -272,26 +273,16 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           null,
           null,
           leadSource,
-          "lead",
-          null,
-          null,
-          null,
+          referralSource,
           email ? "Email" : "Phone",
           notes,
           ghlContactId,
         ]
       );
-
       saved = insert.rows[0];
-      console.log("DEBUG: inserted new lead id:", saved.id);
     }
 
-    console.log("DEBUG: webhook completed for lead id:", saved.id);
-
-    return res.status(200).json({
-      received: true,
-      lead_id: saved.id,
-    });
+    return res.status(200).json({ received: true, lead_id: saved.id });
   } catch (err) {
     console.error("Webhook Error:", err);
     return res.status(500).json({ error: "Webhook processing error" });
