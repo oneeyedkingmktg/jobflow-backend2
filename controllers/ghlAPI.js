@@ -1,27 +1,22 @@
-// controllers/ghlAPI
+// FILE: controllers/ghlAPI.js (UPDATED – DB → GHL status sync)
 
 const fetch = require('node-fetch');
 const db = require('../config/database');
 
 const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
 
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 function normalizePhone(phone) {
   if (!phone) return null;
   const digits = String(phone).replace(/\D/g, '');
   if (!digits) return null;
 
-  if (digits.length === 10) {
-    return `+1${digits}`;
-  }
-
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`;
-  }
-
-  if (!digits.startsWith('+')) {
-    return `+${digits}`;
-  }
-
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (!digits.startsWith('+')) return `+${digits}`;
   return digits;
 }
 
@@ -34,11 +29,9 @@ async function ghlRequest(company, endpoint, options = {}) {
   }
 
   const url = new URL(`${GHL_BASE_URL}${endpoint}`);
-
   const params = options.params || {};
-  if (!params.locationId) {
-    params.locationId = locationId;
-  }
+
+  if (!params.locationId) params.locationId = locationId;
 
   Object.keys(params).forEach((key) => {
     const value = params[key];
@@ -65,14 +58,13 @@ async function ghlRequest(company, endpoint, options = {}) {
   let data;
   try {
     data = text ? JSON.parse(text) : null;
-  } catch (e) {
+  } catch {
     data = text;
   }
 
   if (!res.ok) {
     console.error('GHL API Error:', {
       status: res.status,
-      statusText: res.statusText,
       endpoint: url.toString(),
       response: data,
     });
@@ -81,6 +73,60 @@ async function ghlRequest(company, endpoint, options = {}) {
 
   return data;
 }
+
+// ============================================================================
+// DB → GHL TAG SYNC (Pipeline Status)
+// ============================================================================
+
+function mapStatusToJFTag(status) {
+  switch (status) {
+    case 'lead':
+      return 'JF-Lead';
+    case 'appointment_set':
+      return 'JF-ApptSet';
+    case 'sold':
+      return 'JF-Sold';
+    case 'complete':
+      return 'JF-Complete';
+    case 'not_sold':
+      return 'JF-NotSold';
+    default:
+      return 'JF-Lead';
+  }
+}
+
+async function applyStatusTagsInGHL(contactId, newTag, company) {
+  if (!contactId) return;
+
+  try {
+    const existing = await ghlRequest(company, `/contacts/${contactId}`, {
+      method: 'GET',
+    });
+
+    const tags = existing.tags || [];
+    const jfTags = [
+      'JF-Lead',
+      'JF-ApptSet',
+      'JF-Sold',
+      'JF-Complete',
+      'JF-NotSold',
+    ];
+
+    const filteredTags = tags.filter((t) => !jfTags.includes(t));
+    filteredTags.push(newTag);
+
+    await ghlRequest(company, `/contacts/${contactId}`, {
+      method: 'PUT',
+      body: { tags: filteredTags },
+    });
+  } catch (err) {
+    console.error('Error applying GHL status tags:', err.message);
+  }
+}
+
+// ============================================================================
+// CONTACT UPSERT (DB → GHL)
+// ============================================================================
 
 async function upsertContactFromLead(lead, company) {
   const phone = normalizePhone(lead.phone || lead.phone_number);
@@ -98,12 +144,7 @@ async function upsertContactFromLead(lead, company) {
       if (Array.isArray(result.contacts) && result.contacts.length > 0) {
         existing = result.contacts[0];
       }
-    } catch (err) {
-      console.warn(
-        'GHL contact search by phone failed, continuing to create:',
-        err.message
-      );
-    }
+    } catch {}
   }
 
   if (!existing && email) {
@@ -116,17 +157,12 @@ async function upsertContactFromLead(lead, company) {
       if (Array.isArray(result.contacts) && result.contacts.length > 0) {
         existing = result.contacts[0];
       }
-    } catch (err) {
-      console.warn(
-        'GHL contact search by email failed, continuing to create:',
-        err.message
-      );
-    }
+    } catch {}
   }
 
   const payload = {
-    firstName: lead.first_name || lead.firstName || '',
-    lastName: lead.last_name || lead.lastName || '',
+    firstName: lead.first_name || '',
+    lastName: lead.last_name || '',
     email: email || '',
     phone: phone || '',
     source: 'JobFlow',
@@ -146,8 +182,15 @@ async function upsertContactFromLead(lead, company) {
     });
   }
 
+  const jfTag = mapStatusToJFTag(lead.status);
+  await applyStatusTagsInGHL(contact.id, jfTag, company);
+
   return contact;
 }
+
+// ============================================================================
+// PUBLIC EXPORTED API
+// ============================================================================
 
 module.exports = {
   syncLeadToGHL: async function (lead, company) {
@@ -180,25 +223,19 @@ module.exports = {
 
   searchGHLContactByPhone: async function (phone, company) {
     const normalized = normalizePhone(phone);
-    if (!normalized) {
-      return null;
-    }
+    if (!normalized) return null;
 
-    const result = await ghlRequest(company, '/contacts/', {
+    return await ghlRequest(company, '/contacts/', {
       method: 'GET',
       params: { query: normalized },
     });
-
-    return result;
   },
 
   fetchGHLContact: async function (contactId, company) {
     if (!contactId) return null;
 
-    const contact = await ghlRequest(company, `/contacts/${contactId}`, {
+    return await ghlRequest(company, `/contacts/${contactId}`, {
       method: 'GET',
     });
-
-    return contact;
   },
 };
