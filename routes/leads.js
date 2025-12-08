@@ -1,349 +1,263 @@
-// FILE: leads.js (UPDATED – DB → JF normalization + STATUS ENDPOINT)
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../config/database');
+const pool = require("../config/database");
+const { authenticateToken } = require("../middleware/auth");
 
-const { authenticateToken } = require('../middleware/auth');
-const ghlAPI = require('../controllers/ghlAPI.js');
+// ============================================================================
+// Helper: Normalize Name Fields
+// ============================================================================
+function parseName(fullName) {
+  if (!fullName) return { first_name: "", last_name: "", full_name: "" };
+  const parts = fullName.trim().split(" ");
+  const first = parts.shift() || "";
+  const last = parts.join(" ");
+  return {
+    first_name: first,
+    last_name: last,
+    full_name: fullName.trim(),
+  };
+}
 
-router.use(authenticateToken);
+// ============================================================================
+// GET ALL LEADS (For Logged-In Company)
+// ============================================================================
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const { company_id } = req.user;
 
-/**
- * GET all leads for this user’s company
- */
-router.get('/', async (req, res) => {
-    try {
-        const companyId = req.user.company_id;
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM leads
+      WHERE company_id = $1
+      ORDER BY created_at DESC
+      `,
+      [company_id]
+    );
 
-        const result = await db.query(
-            `
-            SELECT
-                id,
-                company_id,
-                created_by_user_id,
-                name,
-                first_name,
-                last_name,
-                full_name,
-                phone,
-                email,
-                address,
-                city,
-                state,
-                zip,
-                buyer_type,
-                company_name,
-                project_type,
-                lead_source,
-                referral_source,
-                status,
-                not_sold_reason,
-                contract_price,
-                appointment_date,
-                preferred_contact,
-                notes,
-                ghl_contact_id,
-                ghl_appointment_id,
-                created_at,
-                updated_at,
-                ghl_last_synced,
-                ghl_sync_status,
-                needs_sync,
-
-                COALESCE(full_name, CONCAT(first_name, ' ', last_name)) AS full_name_normalized
-
-            FROM leads
-            WHERE company_id = $1
-            ORDER BY id DESC
-            `,
-            [companyId]
-        );
-
-        res.json(result.rows);
-
-    } catch (error) {
-        console.error("Error fetching leads:", error);
-        res.status(500).json({ error: "Failed to fetch leads" });
-    }
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/**
- * CREATE a new lead
- */
-router.post('/', async (req, res) => {
-    try {
-        const companyId = req.user.company_id;
+// ============================================================================
+// GET SINGLE LEAD
+// ============================================================================
+router.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { company_id } = req.user;
 
-        const {
-            first_name,
-            last_name,
-            email,
-            phone,
-            company_name,
-            address,
-            city,
-            state,
-            zip,
-            buyer_type,
-            project_type,
-            preferred_contact,
-            notes,
-            contract_price,
-            lead_source,
-            appointment_date
-        } = req.body;
+    const result = await pool.query(
+      `SELECT * FROM leads WHERE id = $1 AND company_id = $2`,
+      [id, company_id]
+    );
 
-        const full_name = `${first_name || ""} ${last_name || ""}`.trim();
-        const name = full_name;
-
-        const insertQuery = `
-            INSERT INTO leads
-            (
-                company_id,
-                first_name,
-                last_name,
-                full_name,
-                name,
-                email,
-                phone,
-                company_name,
-                address,
-                city,
-                state,
-                zip,
-                buyer_type,
-                project_type,
-                preferred_contact,
-                notes,
-                contract_price,
-                lead_source,
-                appointment_date,
-                needs_sync,
-                ghl_sync_status
-            )
-            VALUES
-            (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-                $11,$12,$13,$14,$15,$16,$17,$18,$19,
-                TRUE,'pending'
-            )
-            RETURNING *;
-        `;
-
-        const params = [
-            companyId,
-            first_name,
-            last_name,
-            full_name,
-            name,
-            email,
-            phone,
-            company_name,
-            address,
-            city,
-            state,
-            zip,
-            buyer_type,
-            project_type,
-            preferred_contact,
-            notes,
-            contract_price,
-            lead_source,
-            appointment_date
-        ];
-
-        const result = await db.query(insertQuery, params);
-        const lead = result.rows[0];
-
-        res.json(lead);
-
-        setImmediate(async () => {
-            try {
-                const company = await db.query(
-                    `SELECT * FROM companies WHERE id = $1`,
-                    [companyId]
-                );
-                await ghlAPI.syncLeadToGHL(lead, company.rows[0]);
-            } catch (err) {
-                console.error("Async GHL sync error (create):", err);
-            }
-        });
-
-    } catch (error) {
-        console.error("Error creating lead:", error);
-        res.status(500).json({ error: "Failed to create lead" });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Lead not found" });
     }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/**
- * UPDATE a lead
- */
-router.put('/:id', async (req, res) => {
-    try {
-        const companyId = req.user.company_id;
-        const leadId = req.params.id;
+// ============================================================================
+// CREATE LEAD
+// ============================================================================
+router.post("/", authenticateToken, async (req, res) => {
+  try {
+    const data = req.body;
+    const { company_id, id: user_id } = req.user;
 
-        const {
-            first_name,
-            last_name,
-            email,
-            phone,
-            company_name,
-            address,
-            city,
-            state,
-            zip,
-            buyer_type,
-            project_type,
-            preferred_contact,
-            notes,
-            contract_price,
-            lead_source,
-            appointment_date
-        } = req.body;
+    const nameParts = parseName(data.name);
 
-        const full_name = `${first_name || ""} ${last_name || ""}`.trim();
-        const name = full_name;
+    const result = await pool.query(
+      `
+      INSERT INTO leads (
+        company_id,
+        created_by_user_id,
+        name,
+        full_name,
+        first_name,
+        last_name,
+        phone,
+        email,
+        address,
+        city,
+        state,
+        zip,
+        buyer_type,
+        company_name,
+        project_type,
+        lead_source,
+        referral_source,
+        status,
+        not_sold_reason,
+        contract_price,
+        appointment_date,
+        preferred_contact,
+        notes,
+        install_date,
+        install_tentative,
+        needs_sync
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7,$8,$9,$10,$11,$12,
+        $13,$14,$15,$16,$17,
+        $18,$19,$20,$21,$22,$23,
+        $24,$25,$26
+      )
+      RETURNING *
+      `,
+      [
+        company_id,
+        user_id,
 
-        const updateQuery = `
-            UPDATE leads SET
-                first_name = $1,
-                last_name = $2,
-                full_name = $3,
-                name = $4,
-                email = $5,
-                phone = $6,
-                company_name = $7,
-                address = $8,
-                city = $9,
-                state = $10,
-                zip = $11,
-                buyer_type = $12,
-                project_type = $13,
-                preferred_contact = $14,
-                notes = $15,
-                contract_price = $16,
-                lead_source = $17,
-                appointment_date = $18,
-                needs_sync = TRUE,
-                ghl_sync_status = 'pending'
-            WHERE id = $19 AND company_id = $20
-            RETURNING *;
-        `;
+        data.name || "",
+        nameParts.full_name,
+        nameParts.first_name,
+        nameParts.last_name,
 
-        const params = [
-            first_name,
-            last_name,
-            full_name,
-            name,
-            email,
-            phone,
-            company_name,
-            address,
-            city,
-            state,
-            zip,
-            buyer_type,
-            project_type,
-            preferred_contact,
-            notes,
-            contract_price,
-            lead_source,
-            appointment_date,
-            leadId,
-            companyId
-        ];
+        data.phone || "",
+        data.email || "",
+        data.address || "",
+        data.city || "",
+        data.state || "",
+        data.zip || "",
 
-        const result = await db.query(updateQuery, params);
-        const updatedLead = result.rows[0];
+        data.buyer_type || "",
+        data.company_name || "",
+        data.project_type || "",
+        data.lead_source || "",
+        data.referral_source || "",
 
-        if (!updatedLead) {
-            return res.status(404).json({ error: "Lead not found" });
-        }
+        data.status || "Lead",
+        data.not_sold_reason || "",
+        data.contract_price || null,
 
-        res.json(updatedLead);
+        data.appointment_date || null,
+        data.preferred_contact || "",
+        data.notes || "",
 
-        setImmediate(async () => {
-            try {
-                const company = await db.query(
-                    `SELECT * FROM companies WHERE id = $1`,
-                    [companyId]
-                );
-                await ghlAPI.syncLeadToGHL(updatedLead, company.rows[0]);
-            } catch (err) {
-                console.error("Async GHL sync error (update):", err);
-            }
-        });
+        data.install_date || null,
+        data.install_tentative || false,
 
-    } catch (error) {
-        console.error("Error updating lead:", error);
-        res.status(500).json({ error: "Failed to update lead" });
-    }
+        false // needs_sync OFF because no GHL
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("CREATE ERROR", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
+// ============================================================================
+// UPDATE LEAD
+// ============================================================================
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    const { company_id } = req.user;
 
-/* -----------------------------------------------------------
-   NEW: UPDATE LEAD STATUS (DB is the source of truth)
------------------------------------------------------------ */
-router.put('/:id/status', async (req, res) => {
-    try {
-        const companyId = req.user.company_id;
-        const leadId = req.params.id;
-        const { status } = req.body;
+    const nameParts = parseName(data.name);
 
-        if (!status) {
-            return res.status(400).json({ error: "Missing status" });
-        }
+    const result = await pool.query(
+      `
+      UPDATE leads SET
+        name = $1,
+        full_name = $2,
+        first_name = $3,
+        last_name = $4,
+        phone = $5,
+        email = $6,
+        address = $7,
+        city = $8,
+        state = $9,
+        zip = $10,
+        buyer_type = $11,
+        company_name = $12,
+        project_type = $13,
+        lead_source = $14,
+        referral_source = $15,
+        status = $16,
+        not_sold_reason = $17,
+        contract_price = $18,
+        appointment_date = $19,
+        preferred_contact = $20,
+        notes = $21,
+        install_date = $22,
+        install_tentative = $23,
+        updated_at = NOW()
+      WHERE id = $24 AND company_id = $25
+      RETURNING *
+      `,
+      [
+        data.name || "",
+        nameParts.full_name,
+        nameParts.first_name,
+        nameParts.last_name,
 
-        const validStatuses = [
-            'lead',
-            'appointment_set',
-            'sold',
-            'not_sold',
-            'completed'
-        ];
+        data.phone || "",
+        data.email || "",
+        data.address || "",
+        data.city || "",
+        data.state || "",
+        data.zip || "",
 
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({ error: "Invalid status" });
-        }
+        data.buyer_type || "",
+        data.company_name || "",
+        data.project_type || "",
+        data.lead_source || "",
+        data.referral_source || "",
 
-        const result = await db.query(
-            `
-            UPDATE leads
-            SET
-                status = $1,
-                needs_sync = TRUE,
-                ghl_sync_status = 'pending',
-                updated_at = NOW()
-            WHERE id = $2 AND company_id = $3
-            RETURNING *;
-            `,
-            [status, leadId, companyId]
-        );
+        data.status || "Lead",
+        data.not_sold_reason || "",
+        data.contract_price || null,
 
-        const updatedLead = result.rows[0];
-        if (!updatedLead) {
-            return res.status(404).json({ error: "Lead not found" });
-        }
+        data.appointment_date || null,
+        data.preferred_contact || "",
+        data.notes || "",
 
-        res.json(updatedLead);
+        data.install_date || null,
+        data.install_tentative || false,
 
-        setImmediate(async () => {
-            try {
-                const company = await db.query(
-                    `SELECT * FROM companies WHERE id = $1`,
-                    [companyId]
-                );
-                await ghlAPI.syncLeadToGHL(updatedLead, company.rows[0]);
-            } catch (err) {
-                console.error("Async GHL sync error (status):", err);
-            }
-        });
+        id,
+        company_id
+      ]
+    );
 
-    } catch (error) {
-        console.error("Error updating status:", error);
-        res.status(500).json({ error: "Failed to update status" });
-    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("UPDATE ERROR", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// DELETE LEAD
+// ============================================================================
+router.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { company_id } = req.user;
+
+    await pool.query(`DELETE FROM leads WHERE id = $1 AND company_id = $2`, [
+      id,
+      company_id,
+    ]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("DELETE ERROR", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
