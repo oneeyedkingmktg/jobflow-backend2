@@ -1,13 +1,9 @@
-// FILE: controllers/ghlAPI.js (UPDATED – DB → GHL status sync)
+// controllers/ghlAPI
 
 const fetch = require('node-fetch');
 const db = require('../config/database');
 
 const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
-
-// ============================================================================
-// HELPERS
-// ============================================================================
 
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -20,6 +16,9 @@ function normalizePhone(phone) {
   return digits;
 }
 
+/* -----------------------------------------------------------
+   INTERNAL: GHL HTTP WRAPPER
+----------------------------------------------------------- */
 async function ghlRequest(company, endpoint, options = {}) {
   const apiKey = company.api_key;
   const locationId = company.location_id;
@@ -29,8 +28,8 @@ async function ghlRequest(company, endpoint, options = {}) {
   }
 
   const url = new URL(`${GHL_BASE_URL}${endpoint}`);
-  const params = options.params || {};
 
+  const params = options.params || {};
   if (!params.locationId) params.locationId = locationId;
 
   Object.keys(params).forEach((key) => {
@@ -58,13 +57,14 @@ async function ghlRequest(company, endpoint, options = {}) {
   let data;
   try {
     data = text ? JSON.parse(text) : null;
-  } catch {
+  } catch (e) {
     data = text;
   }
 
   if (!res.ok) {
     console.error('GHL API Error:', {
       status: res.status,
+      statusText: res.statusText,
       endpoint: url.toString(),
       response: data,
     });
@@ -74,60 +74,9 @@ async function ghlRequest(company, endpoint, options = {}) {
   return data;
 }
 
-// ============================================================================
-// DB → GHL TAG SYNC (Pipeline Status)
-// ============================================================================
-
-function mapStatusToJFTag(status) {
-  switch (status) {
-    case 'lead':
-      return 'JF-Lead';
-    case 'appointment_set':
-      return 'JF-ApptSet';
-    case 'sold':
-      return 'JF-Sold';
-    case 'complete':
-      return 'JF-Complete';
-    case 'not_sold':
-      return 'JF-NotSold';
-    default:
-      return 'JF-Lead';
-  }
-}
-
-async function applyStatusTagsInGHL(contactId, newTag, company) {
-  if (!contactId) return;
-
-  try {
-    const existing = await ghlRequest(company, `/contacts/${contactId}`, {
-      method: 'GET',
-    });
-
-    const tags = existing.tags || [];
-    const jfTags = [
-      'JF-Lead',
-      'JF-ApptSet',
-      'JF-Sold',
-      'JF-Complete',
-      'JF-NotSold',
-    ];
-
-    const filteredTags = tags.filter((t) => !jfTags.includes(t));
-    filteredTags.push(newTag);
-
-    await ghlRequest(company, `/contacts/${contactId}`, {
-      method: 'PUT',
-      body: { tags: filteredTags },
-    });
-  } catch (err) {
-    console.error('Error applying GHL status tags:', err.message);
-  }
-}
-
-// ============================================================================
-// CONTACT UPSERT (DB → GHL)
-// ============================================================================
-
+/* -----------------------------------------------------------
+   INTERNAL: FIND OR CREATE CONTACT
+----------------------------------------------------------- */
 async function upsertContactFromLead(lead, company) {
   const phone = normalizePhone(lead.phone || lead.phone_number);
   const email = lead.email;
@@ -140,11 +89,10 @@ async function upsertContactFromLead(lead, company) {
         method: 'GET',
         params: { query: phone },
       });
-
-      if (Array.isArray(result.contacts) && result.contacts.length > 0) {
-        existing = result.contacts[0];
-      }
-    } catch {}
+      if (result.contacts?.length > 0) existing = result.contacts[0];
+    } catch (err) {
+      console.warn('Search by phone failed:', err.message);
+    }
   }
 
   if (!existing && email) {
@@ -153,11 +101,10 @@ async function upsertContactFromLead(lead, company) {
         method: 'GET',
         params: { query: email },
       });
-
-      if (Array.isArray(result.contacts) && result.contacts.length > 0) {
-        existing = result.contacts[0];
-      }
-    } catch {}
+      if (result.contacts?.length > 0) existing = result.contacts[0];
+    } catch (err) {
+      console.warn('Search by email failed:', err.message);
+    }
   }
 
   const payload = {
@@ -168,34 +115,69 @@ async function upsertContactFromLead(lead, company) {
     source: 'JobFlow',
   };
 
-  let contact;
-
-  if (existing && existing.id) {
-    contact = await ghlRequest(company, `/contacts/${existing.id}`, {
+  if (existing?.id) {
+    return await ghlRequest(company, `/contacts/${existing.id}`, {
       method: 'PUT',
-      body: payload,
-    });
-  } else {
-    contact = await ghlRequest(company, '/contacts/', {
-      method: 'POST',
       body: payload,
     });
   }
 
-  const jfTag = mapStatusToJFTag(lead.status);
-  await applyStatusTagsInGHL(contact.id, jfTag, company);
-
-  return contact;
+  return await ghlRequest(company, '/contacts/', {
+    method: 'POST',
+    body: payload,
+  });
 }
 
-// ============================================================================
-// PUBLIC EXPORTED API
-// ============================================================================
+/* -----------------------------------------------------------
+   INTERNAL: STATUS → TAG LOGIC
+----------------------------------------------------------- */
+function getTagForStatus(status) {
+  switch (status) {
+    case 'lead': return 'Lead';
+    case 'appointment_set': return 'Appt Set';
+    case 'sold': return 'Sold';
+    case 'not_sold': return 'Not Sold';
+    case 'completed': return 'Completed';
+    default: return null;
+  }
+}
 
+const ALL_STATUS_TAGS = ['Lead', 'Appt Set', 'Sold', 'Not Sold', 'Completed'];
+
+/* -----------------------------------------------------------
+   INTERNAL: APPLY TAGS
+----------------------------------------------------------- */
+async function applyStatusTag(company, contactId, status) {
+  const newTag = getTagForStatus(status);
+  if (!newTag) return;
+
+  // 1. Remove all status tags
+  for (const tag of ALL_STATUS_TAGS) {
+    await ghlRequest(company, `/contacts/${contactId}/tags/${encodeURIComponent(tag)}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  }
+
+  // 2. Add the correct tag
+  await ghlRequest(company, `/contacts/${contactId}/tags/`, {
+    method: 'POST',
+    body: { tags: [newTag] }
+  });
+}
+
+/* -----------------------------------------------------------
+   PUBLIC: SYNC FROM DB → GHL
+----------------------------------------------------------- */
 module.exports = {
   syncLeadToGHL: async function (lead, company) {
     try {
+      // Create or update contact
       const contact = await upsertContactFromLead(lead, company);
+
+      // Apply tag based on DB status
+      if (lead.status && contact?.id) {
+        await applyStatusTag(company, contact.id, lead.status);
+      }
 
       await db.query(
         `UPDATE leads 
@@ -206,6 +188,7 @@ module.exports = {
       );
 
       return contact;
+
     } catch (error) {
       console.error('syncLeadToGHL error:', error);
 
