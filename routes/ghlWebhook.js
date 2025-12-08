@@ -1,4 +1,4 @@
-// FILE: ghlWebhook.js (UPDATED – added referral_source tracking & locking)
+// FILE: ghlWebhook.js (FINAL – referral_source locking + correct INSERT order)
 // ============================================================================
 // GHL Webhook Receiver + TEST ROUTE + Full Upsert Logic
 // ============================================================================
@@ -8,7 +8,7 @@ const router = express.Router();
 const db = require("../config/database");
 
 // ============================================================================
-// TEMP TEST ENDPOINT (GET)
+// TEMP TEST ENDPOINT
 // ============================================================================
 router.get("/test", (req, res) => {
   return res.json({ ok: true, route: "webhooks/ghl working" });
@@ -35,9 +35,9 @@ async function findExistingLead(companyId, ghlId, phone, email) {
     const digits = normalizePhone(phone);
     const r = await db.query(
       `SELECT * FROM leads
-         WHERE company_id = $1
-         AND regexp_replace(phone, '\\D', '', 'g') = $2
-         LIMIT 1`,
+       WHERE company_id = $1
+       AND regexp_replace(phone, '\\D', '', 'g') = $2
+       LIMIT 1`,
       [companyId, digits]
     );
     if (r.rows.length > 0) return r.rows[0];
@@ -46,8 +46,8 @@ async function findExistingLead(companyId, ghlId, phone, email) {
   if (email) {
     const r = await db.query(
       `SELECT * FROM leads
-         WHERE company_id = $1 AND lower(email) = lower($2)
-         LIMIT 1`,
+       WHERE company_id = $1 AND lower(email) = lower($2)
+       LIMIT 1`,
       [companyId, email]
     );
     if (r.rows.length > 0) return r.rows[0];
@@ -58,7 +58,7 @@ async function findExistingLead(companyId, ghlId, phone, email) {
 
 // ============================================================================
 // ALWAYS overwrite fields EXCEPT: lead_source & referral_source
-// both locked after first assignment
+// locked once set
 // ============================================================================
 async function updateLeadIfNeeded(existing, updates) {
   const fields = [];
@@ -85,15 +85,11 @@ async function updateLeadIfNeeded(existing, updates) {
   pushField("company_name", updates.company_name);
   pushField("project_type", updates.project_type);
 
-  // Lead source lock
-  const existingLeadSource = existing.lead_source;
-  if (!existingLeadSource || existingLeadSource.trim() === "") {
+  if (!existing.lead_source || existing.lead_source.trim() === "") {
     pushField("lead_source", updates.lead_source);
   }
 
-  // Referral source lock (GHL custom field)
-  const existingRefSource = existing.referral_source;
-  if (!existingRefSource || existingRefSource.trim() === "") {
+  if (!existing.referral_source || existing.referral_source.trim() === "") {
     pushField("referral_source", updates.referral_source);
   }
 
@@ -113,6 +109,7 @@ async function updateLeadIfNeeded(existing, updates) {
     RETURNING *;
   `;
   values.push(existing.id);
+
   const result = await db.query(sql, values);
   return result.rows[0];
 }
@@ -121,13 +118,9 @@ async function updateLeadIfNeeded(existing, updates) {
 // MAIN WEBHOOK ENDPOINT
 // ============================================================================
 router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
-  console.log("===== GHL WEBHOOK RECEIVED =====");
-
   try {
     const companyId = parseInt(req.params.companyId, 10);
     const body = req.body || {};
-
-    console.log("Raw Body:", JSON.stringify(body, null, 2));
 
     const phone =
       body.phone ||
@@ -165,31 +158,16 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
         ? body.tags
         : "GHL Webhook";
 
-    // NEW: Referral Source from GHL custom field
     const referralSource =
       (body.contact && body.contact.referral_source) ||
       (body.customData && body.customData.referral_source) ||
-      null;
+      "CRM Lead";
 
     const notes = body.notes || null;
 
     const nameParts = fullName.split(" ");
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
-
-    console.log("EXTRACTED FIELDS:", {
-      ghlContactId,
-      fullName,
-      firstName,
-      lastName,
-      phone,
-      email,
-      city,
-      state,
-      zip,
-      leadSource,
-      referralSource,
-    });
 
     const existing = await findExistingLead(
       companyId,
@@ -252,8 +230,8 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           ghl_sync_status,
           needs_sync
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-          'lead',NULL,NULL,NULL,$18,$19,$20,NOW(),'webhook',false
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+          'lead',NULL,NULL,NULL,$17,$18,$19,NOW(),'webhook',false
         )
         RETURNING *;
         `,
