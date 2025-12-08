@@ -1,4 +1,4 @@
-// FILE: leads.js (UPDATED – DB → JF normalization)
+// FILE: leads.js (UPDATED – DB → JF normalization + STATUS ENDPOINT)
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
@@ -50,7 +50,6 @@ router.get('/', async (req, res) => {
                 ghl_sync_status,
                 needs_sync,
 
-                /* Normalize full_name for dashboard */
                 COALESCE(full_name, CONCAT(first_name, ' ', last_name)) AS full_name_normalized
 
             FROM leads
@@ -279,6 +278,71 @@ router.put('/:id', async (req, res) => {
     } catch (error) {
         console.error("Error updating lead:", error);
         res.status(500).json({ error: "Failed to update lead" });
+    }
+});
+
+
+/* -----------------------------------------------------------
+   NEW: UPDATE LEAD STATUS (DB is the source of truth)
+----------------------------------------------------------- */
+router.put('/:id/status', async (req, res) => {
+    try {
+        const companyId = req.user.company_id;
+        const leadId = req.params.id;
+        const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ error: "Missing status" });
+        }
+
+        const validStatuses = [
+            'lead',
+            'appointment_set',
+            'sold',
+            'not_sold',
+            'completed'
+        ];
+
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: "Invalid status" });
+        }
+
+        const result = await db.query(
+            `
+            UPDATE leads
+            SET
+                status = $1,
+                needs_sync = TRUE,
+                ghl_sync_status = 'pending',
+                updated_at = NOW()
+            WHERE id = $2 AND company_id = $3
+            RETURNING *;
+            `,
+            [status, leadId, companyId]
+        );
+
+        const updatedLead = result.rows[0];
+        if (!updatedLead) {
+            return res.status(404).json({ error: "Lead not found" });
+        }
+
+        res.json(updatedLead);
+
+        setImmediate(async () => {
+            try {
+                const company = await db.query(
+                    `SELECT * FROM companies WHERE id = $1`,
+                    [companyId]
+                );
+                await ghlAPI.syncLeadToGHL(updatedLead, company.rows[0]);
+            } catch (err) {
+                console.error("Async GHL sync error (status):", err);
+            }
+        });
+
+    } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).json({ error: "Failed to update status" });
     }
 });
 
