@@ -1,3 +1,5 @@
+// File: backend/routes/leads.js - updated 2025-12-10
+
 // ============================================================================
 // Leads Routes - Full DB Integration (Name Parsing + All Fields Mapped)
 // ============================================================================
@@ -43,9 +45,9 @@ const toCamel = (row) => ({
   notes: row.notes,
   contractPrice: row.contract_price,
 
-  // dates
-  apptDate: row.appointment_date,
-  apptTime: row.appointment_time,
+  // dates (canonical names for frontend)
+  appointmentDate: row.appointment_date,
+  appointmentTime: row.appointment_time,
   installDate: row.install_date,
   installTentative: row.install_tentative,
 
@@ -115,7 +117,6 @@ router.post("/", async (req, res) => {
     const validationError = validateLead(data);
     if (validationError) return res.status(400).json({ error: validationError });
 
-    // name parsing
     const parsed = parseName(data.name);
 
     const result = await pool.query(
