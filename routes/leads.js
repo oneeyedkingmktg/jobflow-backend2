@@ -1,15 +1,11 @@
-// File: backend/routes/leads.js - updated 2025-12-10
-
-// ============================================================================
-// Leads Routes - Full DB Integration (Name Parsing + All Fields Mapped)
-// ============================================================================
+// File: backend/routes/leads.js - updated to ensure ALL date/time fields use clean()
 
 const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 
-// Convert empty strings to null
-const clean = (v) => (v === "" ? null : v);
+// Convert empty strings → null
+const clean = (v) => (v === "" || v === " " || v === undefined ? null : v);
 
 // Convert DB row → frontend camelCase
 const toCamel = (row) => ({
@@ -17,29 +13,24 @@ const toCamel = (row) => ({
   companyId: row.company_id,
   createdByUserId: row.created_by_user_id,
 
-  // names
   name: row.name,
   fullName: row.full_name,
   firstName: row.first_name,
   lastName: row.last_name,
 
-  // contact
   phone: row.phone,
   email: row.email,
   preferredContact: row.preferred_contact,
 
-  // address
   address: row.address,
   city: row.city,
   state: row.state,
   zip: row.zip,
 
-  // business
   buyerType: row.buyer_type,
   companyName: row.company_name,
   projectType: row.project_type,
 
-  // lead sources
   leadSource: row.lead_source,
   referralSource: row.referral_source,
 
@@ -48,9 +39,9 @@ const toCamel = (row) => ({
   notes: row.notes,
   contractPrice: row.contract_price,
 
-  // dates (canonical names for frontend)
   appointmentDate: row.appointment_date,
   appointmentTime: row.appointment_time,
+
   installDate: row.install_date,
   installTentative: row.install_tentative,
 
@@ -62,8 +53,7 @@ const toCamel = (row) => ({
 function parseName(full) {
   if (!full || !full.trim()) return { first: "", last: "", full: "" };
   const parts = full.trim().split(" ");
-  if (parts.length === 1)
-    return { first: parts[0], last: "", full: parts[0] };
+  if (parts.length === 1) return { first: parts[0], last: "", full: parts[0] };
   return {
     first: parts[0],
     last: parts.slice(1).join(" "),
@@ -83,7 +73,9 @@ const validateLead = (lead) => {
 // ============================================================================
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM leads ORDER BY created_at DESC`);
+    const result = await pool.query(
+      `SELECT * FROM leads ORDER BY created_at DESC`
+    );
     res.json({ leads: result.rows.map(toCamel) });
   } catch (error) {
     console.error("Error fetching leads:", error);
@@ -118,7 +110,8 @@ router.post("/", async (req, res) => {
     const data = req.body;
 
     const validationError = validateLead(data);
-    if (validationError) return res.status(400).json({ error: validationError });
+    if (validationError)
+      return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
 
@@ -172,13 +165,13 @@ router.post("/", async (req, res) => {
         data.not_sold_reason,
         clean(data.contract_price),
 
-        data.appointment_date,
-        data.appointment_time,
+        clean(data.appointment_date),
+        clean(data.appointment_time),
 
         data.preferred_contact,
         data.notes,
 
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
       ]
     );
@@ -199,7 +192,8 @@ router.put("/:id", async (req, res) => {
     const id = req.params.id;
 
     const validationError = validateLead(data);
-    if (validationError) return res.status(400).json({ error: validationError });
+    if (validationError)
+      return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
 
@@ -259,13 +253,10 @@ router.put("/:id", async (req, res) => {
         data.not_sold_reason,
         clean(data.contract_price),
 
-        data.appointment_date,
-        data.appointment_time,
+        clean(data.appointment_date),
+        clean(data.appointment_time),
 
-        data.preferred_contact,
-        data.notes,
-
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
 
         id,
