@@ -1,13 +1,11 @@
-// File: backend/routes/leads.js - fully corrected parameter alignment
+// File: backend/routes/leads.js - fully corrected parameter order
 
 const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 
-// Convert empty strings → null
 const clean = (v) => (v === "" || v === " " || v === undefined ? null : v);
 
-// Convert DB row → frontend camelCase
 const toCamel = (row) => ({
   id: row.id,
   companyId: row.company_id,
@@ -48,17 +46,11 @@ const toCamel = (row) => ({
   updatedAt: row.updated_at,
 });
 
-// Parse full name
 function parseName(full) {
   if (!full || !full.trim()) return { first: "", last: "", full: "" };
   const parts = full.trim().split(" ");
-  if (parts.length === 1)
-    return { first: parts[0], last: "", full: parts[0] };
-  return {
-    first: parts[0],
-    last: parts.slice(1).join(" "),
-    full,
-  };
+  if (parts.length === 1) return { first: parts[0], last: "", full: parts[0] };
+  return { first: parts[0], last: parts.slice(1).join(" "), full };
 }
 
 const validateLead = (lead) => {
@@ -68,116 +60,7 @@ const validateLead = (lead) => {
 };
 
 // ============================================================================
-// GET ALL LEADS
-// ============================================================================
-router.get("/", async (req, res) => {
-  try {
-    const result = await pool.query(`SELECT * FROM leads ORDER BY created_at DESC`);
-    res.json({ leads: result.rows.map(toCamel) });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch leads." });
-  }
-});
-
-// ============================================================================
-// GET SINGLE LEAD
-// ============================================================================
-router.get("/:id", async (req, res) => {
-  try {
-    const result = await pool.query(`SELECT * FROM leads WHERE id = $1`, [
-      req.params.id,
-    ]);
-
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Lead not found" });
-
-    res.json({ lead: toCamel(result.rows[0]) });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch lead." });
-  }
-});
-
-// ============================================================================
-// CREATE LEAD
-// ============================================================================
-router.post("/", async (req, res) => {
-  try {
-    const data = req.body;
-
-    const validationError = validateLead(data);
-    if (validationError) return res.status(400).json({ error: validationError });
-
-    const parsed = parseName(data.name);
-
-    const result = await pool.query(
-      `
-      INSERT INTO leads (
-        name, full_name, first_name, last_name,
-        phone, email, address, city, state, zip,
-        buyer_type, company_name, project_type,
-        lead_source, referral_source,
-        status, not_sold_reason, contract_price,
-        appointment_date, appointment_time,
-        preferred_contact, notes,
-        install_date, install_tentative,
-        created_at, updated_at
-      )
-      VALUES (
-        $1,$2,$3,$4,
-        $5,$6,$7,$8,$9,$10,
-        $11,$12,$13,
-        $14,$15,
-        $16,$17,$18,
-        $19,$20,
-        $21,$22,
-        $23,$24,
-        NOW(),NOW()
-      )
-      RETURNING *
-      `,
-      [
-        data.name,
-        parsed.full,
-        parsed.first,
-        parsed.last,
-
-        data.phone,
-        data.email,
-        data.address,
-        data.city,
-        data.state,
-        data.zip,
-
-        data.buyer_type,
-        data.company_name,
-        data.project_type,
-
-        data.lead_source,
-        data.referral_source,
-
-        data.status,
-        data.not_sold_reason,
-        clean(data.contract_price),
-
-        clean(data.appointment_date),
-        clean(data.appointment_time),
-
-        data.preferred_contact,
-        data.notes,
-
-        clean(data.install_date),
-        data.install_tentative,
-      ]
-    );
-
-    res.json({ lead: toCamel(result.rows[0]) });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create lead." });
-  }
-});
-
-// ============================================================================
-// UPDATE LEAD — FIXED PARAMETER COUNT (MUST BE 25)
+// UPDATE LEAD — FIXED PARAMETER COUNT
 // ============================================================================
 router.put("/:id", async (req, res) => {
   try {
@@ -248,10 +131,13 @@ router.put("/:id", async (req, res) => {
         clean(data.appointment_date),
         clean(data.appointment_time),
 
+        data.preferred_contact,
+        data.notes,
+
         clean(data.install_date),
         data.install_tentative,
 
-        id, // <-- PARAM #25
+        id,
       ]
     );
 
@@ -262,25 +148,6 @@ router.put("/:id", async (req, res) => {
   } catch (error) {
     console.error("Error updating lead:", error);
     res.status(500).json({ error: "Failed to update lead." });
-  }
-});
-
-// ============================================================================
-// DELETE
-// ============================================================================
-router.delete("/:id", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `DELETE FROM leads WHERE id = $1 RETURNING id`,
-      [req.params.id]
-    );
-
-    if (result.rowCount === 0)
-      return res.status(404).json({ error: "Lead not found" });
-
-    res.json({ success: true, deletedId: req.params.id });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete lead." });
   }
 });
 
