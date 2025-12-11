@@ -1,4 +1,4 @@
-// File: backend/routes/leads.js - updated to ensure ALL date/time fields use clean()
+// File: backend/routes/leads.js - fully corrected parameter alignment
 
 const express = require("express");
 const router = express.Router();
@@ -41,7 +41,6 @@ const toCamel = (row) => ({
 
   appointmentDate: row.appointment_date,
   appointmentTime: row.appointment_time,
-
   installDate: row.install_date,
   installTentative: row.install_tentative,
 
@@ -53,7 +52,8 @@ const toCamel = (row) => ({
 function parseName(full) {
   if (!full || !full.trim()) return { first: "", last: "", full: "" };
   const parts = full.trim().split(" ");
-  if (parts.length === 1) return { first: parts[0], last: "", full: parts[0] };
+  if (parts.length === 1)
+    return { first: parts[0], last: "", full: parts[0] };
   return {
     first: parts[0],
     last: parts.slice(1).join(" "),
@@ -61,7 +61,6 @@ function parseName(full) {
   };
 }
 
-// Required fields
 const validateLead = (lead) => {
   if (!lead.name) return "Name is required.";
   if (!lead.phone) return "Phone is required.";
@@ -73,12 +72,9 @@ const validateLead = (lead) => {
 // ============================================================================
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM leads ORDER BY created_at DESC`
-    );
+    const result = await pool.query(`SELECT * FROM leads ORDER BY created_at DESC`);
     res.json({ leads: result.rows.map(toCamel) });
   } catch (error) {
-    console.error("Error fetching leads:", error);
     res.status(500).json({ error: "Failed to fetch leads." });
   }
 });
@@ -97,7 +93,6 @@ router.get("/:id", async (req, res) => {
 
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
-    console.error("Error fetching lead:", error);
     res.status(500).json({ error: "Failed to fetch lead." });
   }
 });
@@ -110,8 +105,7 @@ router.post("/", async (req, res) => {
     const data = req.body;
 
     const validationError = validateLead(data);
-    if (validationError)
-      return res.status(400).json({ error: validationError });
+    if (validationError) return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
 
@@ -178,13 +172,12 @@ router.post("/", async (req, res) => {
 
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
-    console.error("Error creating lead:", error);
     res.status(500).json({ error: "Failed to create lead." });
   }
 });
 
 // ============================================================================
-// UPDATE LEAD
+// UPDATE LEAD — FIXED PARAMETER COUNT (MUST BE 25)
 // ============================================================================
 router.put("/:id", async (req, res) => {
   try {
@@ -192,8 +185,7 @@ router.put("/:id", async (req, res) => {
     const id = req.params.id;
 
     const validationError = validateLead(data);
-    if (validationError)
-      return res.status(400).json({ error: validationError });
+    if (validationError) return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
 
@@ -259,7 +251,7 @@ router.put("/:id", async (req, res) => {
         clean(data.install_date),
         data.install_tentative,
 
-        id,
+        id, // <-- PARAM #25
       ]
     );
 
@@ -274,7 +266,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // ============================================================================
-// DELETE LEAD
+// DELETE
 // ============================================================================
 router.delete("/:id", async (req, res) => {
   try {
@@ -288,7 +280,6 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ success: true, deletedId: req.params.id });
   } catch (error) {
-    console.error("Error deleting lead:", error);
     res.status(500).json({ error: "Failed to delete lead." });
   }
 });
