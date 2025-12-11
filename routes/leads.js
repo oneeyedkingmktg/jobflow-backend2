@@ -1,54 +1,43 @@
-// File: backend/routes/leads.js - diagnostic version
+// File: backend/routes/leads.js - corrected timestamp cleaning
 
 const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 
-// Convert empty strings to null
 const clean = (v) => (v === "" ? null : v);
 
-// Convert DB row → frontend camelCase
 const toCamel = (row) => ({
   id: row.id,
   companyId: row.company_id,
   createdByUserId: row.created_by_user_id,
-
   name: row.name,
   fullName: row.full_name,
   firstName: row.first_name,
   lastName: row.last_name,
-
   phone: row.phone,
   email: row.email,
   preferredContact: row.preferred_contact,
-
   address: row.address,
   city: row.city,
   state: row.state,
   zip: row.zip,
-
   buyerType: row.buyer_type,
   companyName: row.company_name,
   projectType: row.project_type,
-
   leadSource: row.lead_source,
   referralSource: row.referral_source,
-
   status: row.status,
   notSoldReason: row.not_sold_reason,
   notes: row.notes,
   contractPrice: row.contract_price,
-
   appointmentDate: row.appointment_date,
   appointmentTime: row.appointment_time,
   installDate: row.install_date,
   installTentative: row.install_tentative,
-
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
 
-// Parse name into components
 function parseName(full) {
   if (!full || !full.trim()) return { first: "", last: "", full: "" };
   const parts = full.trim().split(" ");
@@ -56,16 +45,12 @@ function parseName(full) {
   return { first: parts[0], last: parts.slice(1).join(" "), full };
 }
 
-// Validate required fields
 const validateLead = (lead) => {
   if (!lead.name) return "Name is required.";
   if (!lead.phone) return "Phone is required.";
   return null;
 };
 
-// ============================================================================
-// GET ALL LEADS
-// ============================================================================
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM leads ORDER BY created_at DESC`);
@@ -76,18 +61,13 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ============================================================================
-// GET SINGLE LEAD
-// ============================================================================
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM leads WHERE id = $1`, [
       req.params.id,
     ]);
-
     if (result.rows.length === 0)
       return res.status(404).json({ error: "Lead not found" });
-
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
     console.error("Error fetching lead:", error);
@@ -95,9 +75,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ============================================================================
-// CREATE LEAD
-// ============================================================================
 router.post("/", async (req, res) => {
   try {
     const data = req.body;
@@ -138,32 +115,25 @@ router.post("/", async (req, res) => {
         parsed.full,
         parsed.first,
         parsed.last,
-
         data.phone,
         data.email,
         data.address,
         data.city,
         data.state,
         data.zip,
-
         data.buyer_type,
         data.company_name,
         data.project_type,
-
         data.lead_source,
         data.referral_source,
-
         data.status,
         data.not_sold_reason,
         clean(data.contract_price),
-
-        data.appointment_date,
-        data.appointment_time,
-
+        clean(data.appointment_date),
+        clean(data.appointment_time),
         data.preferred_contact,
         data.notes,
-
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
       ]
     );
@@ -175,9 +145,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ============================================================================
-// UPDATE LEAD
-// ============================================================================
 router.put("/:id", async (req, res) => {
   try {
     const data = req.body;
@@ -187,45 +154,6 @@ router.put("/:id", async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
-
-    // ============================================================
-    // LOG EXACT PARAMETERS SENT — this solves the 23 vs. 25 bug
-    // ============================================================
-    console.log("UPDATE PARAMS:", [
-      data.name,
-      parsed.full,
-      parsed.first,
-      parsed.last,
-
-      data.phone,
-      data.email,
-      data.address,
-      data.city,
-      data.state,
-      data.zip,
-
-      data.buyer_type,
-      data.company_name,
-      data.project_type,
-
-      data.lead_source,
-      data.referral_source,
-
-      data.status,
-      data.not_sold_reason,
-      clean(data.contract_price),
-
-      data.appointment_date,
-      data.appointment_time,
-
-      data.preferred_contact,
-      data.notes,
-
-      data.install_date,
-      data.install_tentative,
-
-      id,
-    ]);
 
     const result = await pool.query(
       `
@@ -264,34 +192,26 @@ router.put("/:id", async (req, res) => {
         parsed.full,
         parsed.first,
         parsed.last,
-
         data.phone,
         data.email,
         data.address,
         data.city,
         data.state,
         data.zip,
-
         data.buyer_type,
         data.company_name,
         data.project_type,
-
         data.lead_source,
         data.referral_source,
-
         data.status,
         data.not_sold_reason,
         clean(data.contract_price),
-
-        data.appointment_date,
-        data.appointment_time,
-
+        clean(data.appointment_date),
+        clean(data.appointment_time),
         data.preferred_contact,
         data.notes,
-
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
-
         id,
       ]
     );
@@ -306,9 +226,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// ============================================================================
-// DELETE LEAD
-// ============================================================================
 router.delete("/:id", async (req, res) => {
   try {
     const result = await pool.query(
