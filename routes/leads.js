@@ -4,7 +4,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 
-const clean = (v) => (v === "" ? null : v);
+const clean = (v) => (v === "" || v === undefined ? null : v);
 const fallbackCompany = (v) => (v ? v : 1);
 
 const toCamel = (row) => ({
@@ -103,7 +103,6 @@ router.post("/", async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
-
     const companyId = fallbackCompany(data.company_id);
 
     const result = await pool.query(
@@ -161,13 +160,13 @@ router.post("/", async (req, res) => {
         data.not_sold_reason,
         clean(data.contract_price),
 
-        data.appointment_date,
-        data.appointment_time,
+        clean(data.appointment_date),
+        clean(data.appointment_time),
 
         data.preferred_contact,
         data.notes,
 
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
       ]
     );
@@ -189,7 +188,6 @@ router.put("/:id", async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
 
     const parsed = parseName(data.name);
-
     const companyId = fallbackCompany(data.company_id);
 
     const result = await pool.query(
@@ -251,13 +249,13 @@ router.put("/:id", async (req, res) => {
         data.not_sold_reason,
         clean(data.contract_price),
 
-        data.appointment_date,
-        data.appointment_time,
+        clean(data.appointment_date),
+        clean(data.appointment_time),
 
         data.preferred_contact,
         data.notes,
 
-        data.install_date,
+        clean(data.install_date),
         data.install_tentative,
 
         id,
