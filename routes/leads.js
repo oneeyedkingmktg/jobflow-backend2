@@ -8,6 +8,9 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 
+// Convert empty strings to null
+const clean = (v) => (v === "" ? null : v);
+
 // Convert DB row → frontend camelCase
 const toCamel = (row) => ({
   id: row.id,
@@ -167,7 +170,7 @@ router.post("/", async (req, res) => {
 
         data.status,
         data.not_sold_reason,
-        data.contract_price,
+        clean(data.contract_price),
 
         data.appointment_date,
         data.appointment_time,
@@ -254,7 +257,7 @@ router.put("/:id", async (req, res) => {
 
         data.status,
         data.not_sold_reason,
-        data.contract_price,
+        clean(data.contract_price),
 
         data.appointment_date,
         data.appointment_time,
