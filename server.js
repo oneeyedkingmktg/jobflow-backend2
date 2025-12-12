@@ -1,40 +1,47 @@
 // ============================================================================
-// JobFlow Backend - Main Server
+// JobFlow Backend - Main Server (v3.0 unified architecture)
 // ============================================================================
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Import routes
+const { authenticateToken } = require('./middleware/auth');
+
+// Public routes
 const authRoutes = require('./routes/auth');
+const ghlWebhookRoutes = require('./routes/ghlWebhook');
+
+// Protected routes
 const leadsRoutes = require('./routes/leads');
 const usersRoutes = require('./routes/users');
 const companiesRoutes = require('./routes/companies');
-const ghlRoutes = require('./routes/ghl');               // Existing GHL API proxy
-const ghlWebhookRoutes = require('./routes/ghlWebhook'); // NEW: Webhook listener
+const ghlRoutes = require('./routes/ghl');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ============================================================================
-// MIDDLEWARE
+// GLOBAL MIDDLEWARE
 // ============================================================================
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ============================================================================
-// ROUTES
+// PUBLIC ROUTES (NO AUTH)
 // ============================================================================
 app.use('/auth', authRoutes);
-app.use('/leads', leadsRoutes);
-app.use('/users', usersRoutes);
-app.use('/companies', companiesRoutes);
-app.use('/ghl', ghlRoutes);
 
-// NEW: Webhook endpoint
-// Format: /webhooks/ghl/:companyId
+// Webhooks (external system cannot send JWT)
 app.use('/webhooks/ghl', ghlWebhookRoutes);
+
+// ============================================================================
+// PROTECTED ROUTES (JWT REQUIRED)
+// ============================================================================
+app.use('/leads', authenticateToken, leadsRoutes);
+app.use('/users', authenticateToken, usersRoutes);
+app.use('/companies', authenticateToken, companiesRoutes);
+app.use('/ghl', authenticateToken, ghlRoutes);
 
 // ============================================================================
 // HEALTH CHECK
@@ -49,11 +56,11 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗
-║   JobFlow Backend API Server           ║
-║   Port: ${PORT}                        ║
-║   Environment: ${process.env.NODE_ENV || 'development'}        ║
+║        JobFlow Backend API Server      ║
+║        Port: ${PORT}                            
+║        Environment: ${process.env.NODE_ENV || 'development'}      
 ╚════════════════════════════════════════╝
-  `);
+`);
 });
 
 module.exports = app;
