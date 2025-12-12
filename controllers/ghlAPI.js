@@ -1,66 +1,73 @@
-// controllers/ghlAPI.js
+// ============================================================================
+// controllers/ghlAPI.js (v4.0) – Multi-Company GHL Integration
+// ============================================================================
 
-const fetch = require('node-fetch');
-const db = require('../config/database');
+const fetch = require("node-fetch");
+const db = require("../config/database");
+const { decryptApiKey } = require("../routes/companies"); // REQUIRED for API key
 
-const GHL_BASE_URL = 'https://rest.gohighlevel.com/v1';
+const GHL_BASE_URL = "https://rest.gohighlevel.com/v1";
 
+// ----------------------------------------------------------------------------
+// PHONE NORMALIZATION
+// ----------------------------------------------------------------------------
 function normalizePhone(phone) {
   if (!phone) return null;
-  const digits = String(phone).replace(/\D/g, '');
+  const digits = String(phone).replace(/\D/g, "");
+
   if (!digits) return null;
   if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-  if (!digits.startsWith('+')) return `+${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (!digits.startsWith("+")) return `+${digits}`;
   return digits;
 }
 
+// ----------------------------------------------------------------------------
+// LOW-LEVEL GHL REQUEST WRAPPER
+// ----------------------------------------------------------------------------
 async function ghlRequest(company, endpoint, options = {}) {
-  const apiKey = company.api_key;
-  const locationId = company.location_id;
+  const encryptedApiKey = company.ghl_api_key;
+  const locationId = company.ghl_location_id;
 
-  if (!apiKey || !locationId) {
-    throw new Error('Missing GHL API key or location ID for company');
-  }
+  if (!encryptedApiKey) throw new Error("Company missing encrypted GHL API key");
+  if (!locationId) throw new Error("Company missing GHL location ID");
+
+  const apiKey = decryptApiKey(encryptedApiKey);
 
   const url = new URL(`${GHL_BASE_URL}${endpoint}`);
 
   const params = options.params || {};
   if (!params.locationId) params.locationId = locationId;
 
-  Object.keys(params).forEach((key) => {
-    const value = params[key];
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.append(key, value);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") {
+      url.searchParams.append(k, v);
     }
   });
 
   const fetchOptions = {
-    method: options.method || 'GET',
+    method: options.method || "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   };
 
-  if (options.body) {
-    fetchOptions.body = JSON.stringify(options.body);
-  }
+  if (options.body) fetchOptions.body = JSON.stringify(options.body);
 
   const res = await fetch(url.toString(), fetchOptions);
-  const text = await res.text();
+  const raw = await res.text();
 
   let data;
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch (e) {
-    data = text;
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = raw;
   }
 
   if (!res.ok) {
-    console.error('GHL API Error:', {
+    console.error("GHL API ERROR", {
       status: res.status,
-      statusText: res.statusText,
       endpoint: url.toString(),
       response: data,
     });
@@ -70,9 +77,9 @@ async function ghlRequest(company, endpoint, options = {}) {
   return data;
 }
 
-// --------------------------------------------------------
-// STATUS → TAG MAP
-// --------------------------------------------------------
+// ----------------------------------------------------------------------------
+// STATUS → TAG MAP (PER YOUR SPEC)
+// ----------------------------------------------------------------------------
 const STATUS_TAGS = {
   lead: "status - lead",
   appointment_set: "status - appointment set",
@@ -81,102 +88,103 @@ const STATUS_TAGS = {
   completed: "status - complete",
 };
 
+// Remove old tags + assign new one
 async function applyStatusTags(contactId, newStatusTag, existingTags, company) {
   const allStatusTags = Object.values(STATUS_TAGS);
+  const toRemove = existingTags.filter((t) => allStatusTags.includes(t));
 
-  const tagsToRemove = existingTags.filter((t) => allStatusTags.includes(t));
-
-  for (const tag of tagsToRemove) {
+  for (const tag of toRemove) {
     await ghlRequest(company, `/contacts/${contactId}/tags/${encodeURIComponent(tag)}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
   }
 
   if (newStatusTag) {
     await ghlRequest(company, `/contacts/${contactId}/tags/`, {
       method: "POST",
-      body: { tags: [newStatusTag] }
+      body: { tags: [newStatusTag] },
     });
   }
 }
 
-// --------------------------------------------------------
-// CREATE OR UPDATE CONTACT
-// --------------------------------------------------------
+// ----------------------------------------------------------------------------
+// UPSERT CONTACT FROM LEAD
+// ----------------------------------------------------------------------------
 async function upsertContactFromLead(lead, company) {
-  const phone = normalizePhone(lead.phone || lead.phone_number);
+  const phone = normalizePhone(lead.phone);
   const email = lead.email;
 
   let existing = null;
 
+  // Search by phone
   if (phone) {
     try {
-      const result = await ghlRequest(company, '/contacts/', {
-        method: 'GET',
+      const result = await ghlRequest(company, "/contacts/", {
+        method: "GET",
         params: { query: phone },
       });
       if (Array.isArray(result.contacts) && result.contacts.length > 0) {
         existing = result.contacts[0];
       }
-    } catch (err) {}
+    } catch {}
   }
 
+  // Search by email
   if (!existing && email) {
     try {
-      const result = await ghlRequest(company, '/contacts/', {
-        method: 'GET',
+      const result = await ghlRequest(company, "/contacts/", {
+        method: "GET",
         params: { query: email },
       });
       if (Array.isArray(result.contacts) && result.contacts.length > 0) {
         existing = result.contacts[0];
       }
-    } catch (err) {}
+    } catch {}
   }
 
   const payload = {
-    firstName: lead.first_name || '',
-    lastName: lead.last_name || '',
-    email: email || '',
-    phone: phone || '',
-    source: 'JobFlow',
+    firstName: lead.first_name || "",
+    lastName: lead.last_name || "",
+    email: email || "",
+    phone: phone || "",
+    source: "JobFlow",
   };
 
   let contact;
 
-  if (existing && existing.id) {
+  if (existing?.id) {
     contact = await ghlRequest(company, `/contacts/${existing.id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: payload,
     });
   } else {
-    contact = await ghlRequest(company, '/contacts/', {
-      method: 'POST',
+    contact = await ghlRequest(company, "/contacts/", {
+      method: "POST",
       body: payload,
     });
   }
 
   const contactId = contact.id;
-
   const existingTags = Array.isArray(contact.tags) ? contact.tags : [];
 
-  const jfStatus = lead.status;
-  const tagToAssign = STATUS_TAGS[jfStatus] || null;
+  const status = lead.status;
+  const tagToAssign = STATUS_TAGS[status] || null;
 
   await applyStatusTags(contactId, tagToAssign, existingTags, company);
 
   return contact;
 }
 
-// --------------------------------------------------------
-// PUBLIC EXPORTS
-// --------------------------------------------------------
+// ----------------------------------------------------------------------------
+// EXPORTS
+// ----------------------------------------------------------------------------
 module.exports = {
   syncLeadToGHL: async function (lead, company) {
     try {
       const contact = await upsertContactFromLead(lead, company);
 
       await db.query(
-        `UPDATE leads 
+        `UPDATE leads
          SET ghl_sync_status = 'success',
              ghl_last_synced = NOW()
          WHERE id = $1`,
@@ -184,17 +192,16 @@ module.exports = {
       );
 
       return contact;
-
-    } catch (error) {
+    } catch (err) {
       await db.query(
-        `UPDATE leads 
+        `UPDATE leads
          SET ghl_sync_status = 'error',
              ghl_last_synced = NOW()
          WHERE id = $1`,
         [lead.id]
       );
 
-      throw error;
+      throw err;
     }
   },
 
@@ -202,19 +209,17 @@ module.exports = {
     const normalized = normalizePhone(phone);
     if (!normalized) return null;
 
-    const result = await ghlRequest(company, '/contacts/', {
-      method: 'GET',
+    return await ghlRequest(company, "/contacts/", {
+      method: "GET",
       params: { query: normalized },
     });
-
-    return result;
   },
 
   fetchGHLContact: async function (contactId, company) {
     if (!contactId) return null;
 
     return await ghlRequest(company, `/contacts/${contactId}`, {
-      method: 'GET',
+      method: "GET",
     });
   },
 };
