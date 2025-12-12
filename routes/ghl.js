@@ -1,22 +1,27 @@
-// routes/ghl.js
+// ============================================================================
+// GHL Proxy Routes (v3.0) - Fully Company-Isolated
+// ============================================================================
 
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const ghl = require('../controllers/ghlAPI');
 
-// VERIFY COMPANY + LOAD COMPANY RECORD
+// ---------------------------------------------------------------------------
+// Load company for the authenticated user
+// ---------------------------------------------------------------------------
 async function loadCompany(req, res, next) {
-  const companyId = req.headers['x-company-id'];
-
-  if (!companyId) {
-    return res.status(400).json({ error: 'Missing x-company-id header' });
-  }
-
   try {
-    const result = await db.query('SELECT * FROM companies WHERE id = $1', [
-      companyId,
-    ]);
+    const companyId = req.user.company_id;
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'User has no assigned company' });
+    }
+
+    const result = await db.query(
+      'SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL',
+      [companyId]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
@@ -25,11 +30,13 @@ async function loadCompany(req, res, next) {
     req.company = result.rows[0];
     next();
   } catch (err) {
-    return res.status(500).json({ error: 'Database error' });
+    return res.status(500).json({ error: 'Company lookup failed' });
   }
 }
 
+// ---------------------------------------------------------------------------
 // SEARCH CONTACT BY PHONE
+// ---------------------------------------------------------------------------
 router.get('/search-by-phone', loadCompany, async (req, res) => {
   try {
     const phone = req.query.phone || '';
@@ -40,7 +47,9 @@ router.get('/search-by-phone', loadCompany, async (req, res) => {
   }
 });
 
-// SYNC LEAD INTO GHL
+// ---------------------------------------------------------------------------
+// SYNC LEAD TO GHL
+// ---------------------------------------------------------------------------
 router.post('/sync-lead', loadCompany, async (req, res) => {
   try {
     const lead = req.body;
@@ -60,7 +69,9 @@ router.post('/sync-lead', loadCompany, async (req, res) => {
   }
 });
 
-// GET CONTACT BY ID
+// ---------------------------------------------------------------------------
+// GET CONTACT FROM GHL BY ID
+// ---------------------------------------------------------------------------
 router.get('/contact/:id', loadCompany, async (req, res) => {
   try {
     const contact = await ghl.fetchGHLContact(req.params.id, req.company);
