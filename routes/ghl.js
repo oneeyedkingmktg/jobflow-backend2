@@ -1,5 +1,5 @@
 // ============================================================================
-// GHL Proxy Routes (v3.0) - Fully Company-Isolated
+// routes/ghl.js (v4.0) – Multi-Company GHL Proxy Routes
 // ============================================================================
 
 const express = require('express');
@@ -7,19 +7,32 @@ const router = express.Router();
 const db = require('../config/database');
 const ghl = require('../controllers/ghlAPI');
 
-// ---------------------------------------------------------------------------
-// Load company for the authenticated user
-// ---------------------------------------------------------------------------
+// ============================================================================
+// LOAD COMPANY MIDDLEWARE (VALIDATES + PROVIDES decrypted GHL creds)
+// ============================================================================
+
 async function loadCompany(req, res, next) {
+  const companyId = req.headers['x-company-id'];
+
+  if (!companyId) {
+    return res.status(400).json({ error: 'Missing x-company-id header' });
+  }
+
   try {
-    const companyId = req.user.company_id;
-
-    if (!companyId) {
-      return res.status(400).json({ error: 'User has no assigned company' });
-    }
-
     const result = await db.query(
-      'SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL',
+      `SELECT 
+        id,
+        company_name,
+        ghl_api_key,
+        ghl_location_id,
+        ghl_calendar_id,
+        billing_status,
+        monthly_price,
+        setup_fee_paid,
+        created_at,
+        updated_at
+       FROM companies 
+       WHERE id = $1 AND deleted_at IS NULL`,
       [companyId]
     );
 
@@ -27,35 +40,42 @@ async function loadCompany(req, res, next) {
       return res.status(404).json({ error: 'Company not found' });
     }
 
+    // Attach full DB company object to request
     req.company = result.rows[0];
     next();
   } catch (err) {
-    return res.status(500).json({ error: 'Company lookup failed' });
+    console.error('Company lookup error:', err);
+    return res.status(500).json({ error: 'Database error loading company' });
   }
 }
 
-// ---------------------------------------------------------------------------
-// SEARCH CONTACT BY PHONE
-// ---------------------------------------------------------------------------
+// ============================================================================
+// SEARCH CONTACT BY PHONE (GET /ghl/search-by-phone?phone=xxx)
+// ============================================================================
+
 router.get('/search-by-phone', loadCompany, async (req, res) => {
   try {
     const phone = req.query.phone || '';
+
     const result = await ghl.searchGHLContactByPhone(phone, req.company);
+
     return res.json(result);
   } catch (err) {
+    console.error('GHL Search-by-phone error:', err);
     return res.status(500).json({ error: 'Search failed' });
   }
 });
 
-// ---------------------------------------------------------------------------
-// SYNC LEAD TO GHL
-// ---------------------------------------------------------------------------
+// ============================================================================
+// SYNC LEAD INTO GHL (POST /ghl/sync-lead)
+// ============================================================================
+
 router.post('/sync-lead', loadCompany, async (req, res) => {
   try {
     const lead = req.body;
 
     if (!lead || !lead.id) {
-      return res.status(400).json({ error: 'Invalid lead payload' });
+      return res.status(400).json({ error: 'Invalid lead payload (missing id)' });
     }
 
     const contact = await ghl.syncLeadToGHL(lead, req.company);
@@ -65,18 +85,22 @@ router.post('/sync-lead', loadCompany, async (req, res) => {
       contact,
     });
   } catch (err) {
+    console.error('GHL sync error:', err);
     return res.status(500).json({ error: 'Sync failed' });
   }
 });
 
-// ---------------------------------------------------------------------------
-// GET CONTACT FROM GHL BY ID
-// ---------------------------------------------------------------------------
+// ============================================================================
+// FETCH CONTACT BY GHL ID (GET /ghl/contact/:id)
+// ============================================================================
+
 router.get('/contact/:id', loadCompany, async (req, res) => {
   try {
     const contact = await ghl.fetchGHLContact(req.params.id, req.company);
+
     return res.json(contact);
   } catch (err) {
+    console.error('GHL fetch contact error:', err);
     return res.status(500).json({ error: 'Fetch failed' });
   }
 });
