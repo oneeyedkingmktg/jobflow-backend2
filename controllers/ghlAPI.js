@@ -1,10 +1,22 @@
 // ============================================================================
-// controllers/ghlAPI.js (v4.0) – Multi-Company GHL Integration
+// controllers/ghlAPI.js (v4.1) – Multi-Company GHL Integration
 // ============================================================================
 
 const fetch = require("node-fetch");
 const db = require("../config/database");
-const { decryptApiKey } = require("../routes/companies"); // REQUIRED for API key
+const CryptoJS = require("crypto-js");
+
+// Load encryption key (same key used in companies.js)
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "change-this-encryption-key";
+
+// ----------------------------------------------------------------------------
+// DECRYPT COMPANY API KEY
+// ----------------------------------------------------------------------------
+function decryptApiKey(encryptedKey) {
+  if (!encryptedKey) return null;
+  const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
 
 const GHL_BASE_URL = "https://rest.gohighlevel.com/v1";
 
@@ -78,7 +90,7 @@ async function ghlRequest(company, endpoint, options = {}) {
 }
 
 // ----------------------------------------------------------------------------
-// STATUS → TAG MAP (PER YOUR SPEC)
+// STATUS MAP
 // ----------------------------------------------------------------------------
 const STATUS_TAGS = {
   lead: "status - lead",
@@ -88,15 +100,19 @@ const STATUS_TAGS = {
   completed: "status - complete",
 };
 
-// Remove old tags + assign new one
+// ----------------------------------------------------------------------------
+// APPLY STATUS TAGS
+// ----------------------------------------------------------------------------
 async function applyStatusTags(contactId, newStatusTag, existingTags, company) {
   const allStatusTags = Object.values(STATUS_TAGS);
   const toRemove = existingTags.filter((t) => allStatusTags.includes(t));
 
   for (const tag of toRemove) {
-    await ghlRequest(company, `/contacts/${contactId}/tags/${encodeURIComponent(tag)}`, {
-      method: "DELETE",
-    });
+    await ghlRequest(
+      company,
+      `/contacts/${contactId}/tags/${encodeURIComponent(tag)}`,
+      { method: "DELETE" }
+    );
   }
 
   if (newStatusTag) {
@@ -176,7 +192,7 @@ async function upsertContactFromLead(lead, company) {
 }
 
 // ----------------------------------------------------------------------------
-// EXPORTS
+// MODULE EXPORTS
 // ----------------------------------------------------------------------------
 module.exports = {
   syncLeadToGHL: async function (lead, company) {
@@ -200,7 +216,6 @@ module.exports = {
          WHERE id = $1`,
         [lead.id]
       );
-
       throw err;
     }
   },
