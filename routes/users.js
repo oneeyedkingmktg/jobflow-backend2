@@ -1,12 +1,16 @@
 // ============================================================================
-// Users Routes - User management within companies
+// Users Routes - Company-scoped user management (v4.0 normalized)
 // ============================================================================
+
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Convert empty strings → null
+const clean = (v) => (v === '' ? null : v);
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -19,7 +23,9 @@ router.get('/', requireRole('admin', 'master'), async (req, res) => {
     const companyId = req.user.company_id;
 
     const result = await db.query(
-      `SELECT id, email, name, phone, role, is_active, created_at, last_login
+      `SELECT 
+        id, email, name, phone, role, 
+        is_active, created_at, last_login
        FROM users 
        WHERE company_id = $1 AND deleted_at IS NULL
        ORDER BY created_at DESC`,
@@ -42,19 +48,18 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
     const companyId = req.user.company_id;
     const creatorRole = req.user.role;
 
-    // Validation
     if (!email || !password || !name || !role) {
-      return res.status(400).json({ error: 'Email, password, name, and role are required' });
+      return res.status(400).json({
+        error: 'Email, password, name, and role are required'
+      });
     }
 
-    // Role validation - users can only create roles at or below their level
     const roleHierarchy = { master: 3, admin: 2, user: 1 };
-    
+
     if (creatorRole !== 'master' && roleHierarchy[role] >= roleHierarchy[creatorRole]) {
       return res.status(403).json({ error: 'Cannot create user with equal or higher role' });
     }
 
-    // Check if email already exists
     const existing = await db.query(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
@@ -64,15 +69,22 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
     const result = await db.query(
-      `INSERT INTO users (company_id, email, password_hash, name, phone, role, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, email, name, phone, role, is_active, created_at`,
-      [companyId, email.toLowerCase(), passwordHash, name, phone, role, req.user.id]
+      `INSERT INTO users (
+        company_id, email, password_hash, name, phone, role, created_by_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, email, name, phone, role, is_active, created_at`,
+      [
+        companyId,
+        email.toLowerCase(),
+        passwordHash,
+        name,
+        clean(phone),
+        role,
+        req.user.id
+      ]
     );
 
     res.status(201).json({ user: result.rows[0] });
@@ -88,10 +100,9 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, role, is_active } = req.body;
     const companyId = req.user.company_id;
+    const { name, phone, role, is_active } = req.body;
 
-    // Verify user belongs to company
     const existing = await db.query(
       'SELECT role FROM users WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL',
       [id, companyId]
@@ -101,7 +112,6 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Update user
     const result = await db.query(
       `UPDATE users SET
         name = COALESCE($1, name),
@@ -111,7 +121,14 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $5 AND company_id = $6
        RETURNING id, email, name, phone, role, is_active, updated_at`,
-      [name, phone, role, is_active, id, companyId]
+      [
+        clean(name),
+        clean(phone),
+        clean(role),
+        is_active,
+        id,
+        companyId
+      ]
     );
 
     res.json({ user: result.rows[0] });
@@ -122,20 +139,22 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
 });
 
 // ============================================================================
-// DELETE /api/users/:id - Delete user (Admin/Master only)
+// DELETE /api/users/:id - Soft delete user (Admin/Master only)
 // ============================================================================
 router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.user.company_id;
 
-    // Cannot delete yourself
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
     const result = await db.query(
-      'UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND company_id = $2 RETURNING id',
+      `UPDATE users 
+       SET deleted_at = CURRENT_TIMESTAMP 
+       WHERE id = $1 AND company_id = $2
+       RETURNING id`,
       [id, companyId]
     );
 
@@ -162,7 +181,6 @@ router.put('/me/password', async (req, res) => {
       return res.status(400).json({ error: 'Current and new password required' });
     }
 
-    // Get current password hash
     const result = await db.query(
       'SELECT password_hash FROM users WHERE id = $1',
       [userId]
@@ -170,18 +188,17 @@ router.put('/me/password', async (req, res) => {
 
     const user = result.rows[0];
 
-    // Verify current password
     const isValid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
-    // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update password
     await db.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      `UPDATE users 
+       SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2`,
       [newPasswordHash, userId]
     );
 
