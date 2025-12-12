@@ -9,33 +9,33 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All routes require master role
 router.use(authenticateToken);
 router.use(requireRole('master'));
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'change-this-encryption-key';
 
-// Helper: Encrypt API key
+// Encrypt API key
 const encryptApiKey = (apiKey) => {
   return CryptoJS.AES.encrypt(apiKey, ENCRYPTION_KEY).toString();
 };
 
-// Helper: Decrypt API key
+// Decrypt API key (used only by ghlAPI.js)
 const decryptApiKey = (encryptedKey) => {
+  if (!encryptedKey) return null;
   const bytes = CryptoJS.AES.decrypt(encryptedKey, ENCRYPTION_KEY);
   return bytes.toString(CryptoJS.enc.Utf8);
 };
 
 // ============================================================================
-// GET /api/companies - Get all companies
+// GET ALL COMPANIES
 // ============================================================================
 router.get('/', async (req, res) => {
   try {
     const result = await db.query(
       `SELECT 
         c.*,
-        COUNT(DISTINCT u.id) as user_count,
-        COUNT(DISTINCT l.id) as lead_count
+        COUNT(DISTINCT u.id) AS user_count,
+        COUNT(DISTINCT l.id) AS lead_count
        FROM companies c
        LEFT JOIN users u ON c.id = u.company_id AND u.deleted_at IS NULL
        LEFT JOIN leads l ON c.id = l.company_id AND l.deleted_at IS NULL
@@ -44,8 +44,7 @@ router.get('/', async (req, res) => {
        ORDER BY c.created_at DESC`
     );
 
-    // Remove encrypted API keys from response
-    const companies = result.rows.map(company => ({
+    const companies = result.rows.map((company) => ({
       ...company,
       ghl_api_key: company.ghl_api_key ? '***hidden***' : null
     }));
@@ -58,15 +57,15 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================================================
-// GET /api/companies/:id - Get single company
+// GET SINGLE COMPANY
 // ============================================================================
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-
     const result = await db.query(
-      'SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL',
-      [id]
+      `SELECT *
+       FROM companies
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -74,8 +73,6 @@ router.get('/:id', async (req, res) => {
     }
 
     const company = result.rows[0];
-    
-    // Hide encrypted API key
     company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
 
     res.json({ company });
@@ -86,7 +83,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// POST /api/companies - Create new company (onboard contractor)
+// CREATE COMPANY + ADMIN USER
 // ============================================================================
 router.post('/', async (req, res) => {
   try {
@@ -103,16 +100,14 @@ router.post('/', async (req, res) => {
       admin_phone
     } = req.body;
 
-    // Validation
     if (!company_name || !admin_email || !admin_password || !admin_name) {
-      return res.status(400).json({ 
-        error: 'Company name, admin email, password, and name are required' 
-      });
+      return res
+        .status(400)
+        .json({ error: 'Company name, admin email, password, and name are required' });
     }
 
-    // Check if admin email already exists
     const existingUser = await db.query(
-      'SELECT id FROM users WHERE email = $1',
+      `SELECT id FROM users WHERE email = $1`,
       [admin_email.toLowerCase()]
     );
 
@@ -120,25 +115,27 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Admin email already registered' });
     }
 
-    // Encrypt GHL API key if provided
     const encryptedApiKey = ghl_api_key ? encryptApiKey(ghl_api_key) : null;
 
-    // Start transaction
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Create company
       const companyResult = await client.query(
         `INSERT INTO companies (
-          company_name, ghl_api_key, ghl_location_id, ghl_calendar_id, 
-          billing_status, monthly_price
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          company_name,
+          ghl_api_key,
+          ghl_location_id,
+          ghl_calendar_id,
+          billing_status,
+          monthly_price
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *`,
         [
-          company_name, 
-          encryptedApiKey, 
-          ghl_location_id, 
+          company_name,
+          encryptedApiKey,
+          ghl_location_id,
           ghl_calendar_id,
           billing_status || 'trial',
           monthly_price
@@ -147,14 +144,19 @@ router.post('/', async (req, res) => {
 
       const company = companyResult.rows[0];
 
-      // Hash admin password
       const passwordHash = await bcrypt.hash(admin_password, 10);
 
-      // Create admin user
       const userResult = await client.query(
         `INSERT INTO users (
-          company_id, email, password_hash, name, phone, role, created_by_user_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          company_id,
+          email,
+          password_hash,
+          name,
+          phone,
+          role,
+          created_by_user_id
+        )
+        VALUES ($1, $2, $3, $4, $5, 'admin', $6)
         RETURNING id, email, name, phone, role`,
         [
           company.id,
@@ -162,23 +164,22 @@ router.post('/', async (req, res) => {
           passwordHash,
           admin_name,
           admin_phone,
-          'admin',
           req.user.id
         ]
       );
 
       await client.query('COMMIT');
 
-      res.status(201).json({ 
+      res.status(201).json({
         company: {
           ...company,
           ghl_api_key: company.ghl_api_key ? '***hidden***' : null
         },
         admin_user: userResult.rows[0]
       });
-    } catch (error) {
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
@@ -189,11 +190,10 @@ router.post('/', async (req, res) => {
 });
 
 // ============================================================================
-// PUT /api/companies/:id - Update company
+// UPDATE COMPANY
 // ============================================================================
 router.put('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
     const {
       company_name,
       ghl_api_key,
@@ -204,8 +204,8 @@ router.put('/:id', async (req, res) => {
       setup_fee_paid
     } = req.body;
 
-    // Encrypt GHL API key if provided and not the placeholder
     let encryptedApiKey = undefined;
+
     if (ghl_api_key && ghl_api_key !== '***hidden***') {
       encryptedApiKey = encryptApiKey(ghl_api_key);
     }
@@ -220,7 +220,7 @@ router.put('/:id', async (req, res) => {
         monthly_price = COALESCE($6, monthly_price),
         setup_fee_paid = COALESCE($7, setup_fee_paid),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8
+       WHERE id = $8 AND deleted_at IS NULL
        RETURNING *`,
       [
         company_name,
@@ -230,7 +230,7 @@ router.put('/:id', async (req, res) => {
         billing_status,
         monthly_price,
         setup_fee_paid,
-        id
+        req.params.id
       ]
     );
 
@@ -249,15 +249,16 @@ router.put('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// DELETE /api/companies/:id - Delete company (soft delete)
+// SOFT DELETE COMPANY
 // ============================================================================
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-
     const result = await db.query(
-      'UPDATE companies SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id',
-      [id]
+      `UPDATE companies
+       SET deleted_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id`,
+      [req.params.id]
     );
 
     if (result.rows.length === 0) {
@@ -272,4 +273,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
-module.exports.decryptApiKey = decryptApiKey; // Export for use in GHL API
+module.exports.decryptApiKey = decryptApiKey;
