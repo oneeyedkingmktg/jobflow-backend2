@@ -73,8 +73,8 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO users (
-        company_id, email, password_hash, name, phone, role, created_by_user_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        company_id, email, password_hash, name, phone, role
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, email, name, phone, role, is_active, created_at`,
       [
         companyId,
@@ -82,8 +82,7 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
         passwordHash,
         name,
         clean(phone),
-        role,
-        req.user.id
+        role
       ]
     );
 
