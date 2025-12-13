@@ -1,5 +1,6 @@
 // ============================================================================
-// Users Routes - Company-scoped user management (v4.0 normalized)
+// Users Routes - Company-scoped user management (v4.1 normalized)
+// FIX: Explicitly return company_id in all user payloads
 // ============================================================================
 
 const express = require('express');
@@ -18,14 +19,22 @@ router.use(authenticateToken);
 // ============================================================================
 // GET /api/users - Get all users in company (Admin/Master only)
 // ============================================================================
+
 router.get('/', requireRole('admin', 'master'), async (req, res) => {
   try {
     const companyId = req.user.company_id;
 
     const result = await db.query(
       `SELECT 
-        id, email, name, phone, role, 
-        is_active, created_at, last_login
+        id,
+        company_id,
+        email,
+        name,
+        phone,
+        role,
+        is_active,
+        created_at,
+        last_login
        FROM users 
        WHERE company_id = $1 AND deleted_at IS NULL
        ORDER BY created_at DESC`,
@@ -42,6 +51,7 @@ router.get('/', requireRole('admin', 'master'), async (req, res) => {
 // ============================================================================
 // POST /api/users - Create new user (Admin/Master only)
 // ============================================================================
+
 router.post('/', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { email, password, name, phone, role } = req.body;
@@ -56,8 +66,13 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 
     const roleHierarchy = { master: 3, admin: 2, user: 1 };
 
-    if (creatorRole !== 'master' && roleHierarchy[role] >= roleHierarchy[creatorRole]) {
-      return res.status(403).json({ error: 'Cannot create user with equal or higher role' });
+    if (
+      creatorRole !== 'master' &&
+      roleHierarchy[role] >= roleHierarchy[creatorRole]
+    ) {
+      return res
+        .status(403)
+        .json({ error: 'Cannot create user with equal or higher role' });
     }
 
     const existing = await db.query(
@@ -73,9 +88,22 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO users (
-        company_id, email, password_hash, name, phone, role
+        company_id,
+        email,
+        password_hash,
+        name,
+        phone,
+        role
       ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, email, name, phone, role, is_active, created_at`,
+      RETURNING
+        id,
+        company_id,
+        email,
+        name,
+        phone,
+        role,
+        is_active,
+        created_at`,
       [
         companyId,
         email.toLowerCase(),
@@ -96,6 +124,7 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 // ============================================================================
 // PUT /api/users/:id - Update user (Admin/Master only)
 // ============================================================================
+
 router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -119,7 +148,15 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
         is_active = COALESCE($4, is_active),
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $5 AND company_id = $6
-       RETURNING id, email, name, phone, role, is_active, updated_at`,
+       RETURNING
+        id,
+        company_id,
+        email,
+        name,
+        phone,
+        role,
+        is_active,
+        updated_at`,
       [
         clean(name),
         clean(phone),
@@ -140,12 +177,13 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
 // ============================================================================
 // DELETE /api/users/:id - Soft delete user (Admin/Master only)
 // ============================================================================
+
 router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.user.company_id;
 
-    if (parseInt(id) === req.user.id) {
+    if (parseInt(id, 10) === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
@@ -171,13 +209,16 @@ router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {
 // ============================================================================
 // PUT /api/users/me/password - Change own password
 // ============================================================================
+
 router.put('/me/password', async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current and new password required' });
+      return res
+        .status(400)
+        .json({ error: 'Current and new password required' });
     }
 
     const result = await db.query(
@@ -187,9 +228,15 @@ router.put('/me/password', async (req, res) => {
 
     const user = result.rows[0];
 
-    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+    const isValid = await bcrypt.compare(
+      currentPassword,
+      user.password_hash
+    );
+
     if (!isValid) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      return res
+        .status(401)
+        .json({ error: 'Current password is incorrect' });
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
