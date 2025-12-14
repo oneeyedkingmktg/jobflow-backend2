@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/companies.js
-// Version: v2.1 - Match actual DB schema (ghl_install_calendar, ghl_appt_calendar)
+// Version: v2.2 - Remove monthly_price and setup_fee_paid (not in DB schema)
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -84,7 +84,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// CREATE COMPANY (Simplified - matches actual DB schema)
+// CREATE COMPANY (Only fields that exist in DB)
 // ============================================================================
 router.post('/', async (req, res) => {
   try {
@@ -98,8 +98,7 @@ router.post('/', async (req, res) => {
       ghl_location_id,
       ghl_install_calendar,
       ghl_appt_calendar,
-      billing_status,
-      monthly_price
+      billing_status
     } = req.body;
 
     const companyName = company_name || name;
@@ -120,10 +119,9 @@ router.post('/', async (req, res) => {
         ghl_location_id,
         ghl_install_calendar,
         ghl_appt_calendar,
-        billing_status,
-        monthly_price
+        billing_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         companyName,
@@ -134,8 +132,7 @@ router.post('/', async (req, res) => {
         ghl_location_id || null,
         ghl_install_calendar || null,
         ghl_appt_calendar || null,
-        billing_status || 'active',
-        monthly_price || null
+        billing_status || 'active'
       ]
     );
 
@@ -150,7 +147,7 @@ router.post('/', async (req, res) => {
 });
 
 // ============================================================================
-// UPDATE COMPANY
+// UPDATE COMPANY (Only fields that exist in DB)
 // ============================================================================
 router.put('/:id', async (req, res) => {
   try {
@@ -164,9 +161,7 @@ router.put('/:id', async (req, res) => {
       ghl_location_id,
       ghl_install_calendar,
       ghl_appt_calendar,
-      billing_status,
-      monthly_price,
-      setup_fee_paid
+      billing_status
     } = req.body;
 
     const companyName = company_name || name;
@@ -189,10 +184,8 @@ router.put('/:id', async (req, res) => {
         ghl_install_calendar = COALESCE($7, ghl_install_calendar),
         ghl_appt_calendar = COALESCE($8, ghl_appt_calendar),
         billing_status = COALESCE($9, billing_status),
-        monthly_price = COALESCE($10, monthly_price),
-        setup_fee_paid = COALESCE($11, setup_fee_paid),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $12 AND deleted_at IS NULL
+       WHERE id = $10 AND deleted_at IS NULL
        RETURNING *`,
       [
         companyName,
@@ -204,8 +197,6 @@ router.put('/:id', async (req, res) => {
         ghl_install_calendar,
         ghl_appt_calendar,
         billing_status,
-        monthly_price,
-        setup_fee_paid,
         req.params.id
       ]
     );
