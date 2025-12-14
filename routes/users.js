@@ -1,6 +1,6 @@
 // ============================================================================
-// Users Routes - Company-scoped user management (v4.1 normalized)
-// FIX: Explicitly return company_id in all user payloads
+// Users Routes - Company-scoped user management (v4.2 - master can query any company)
+// FIX: Master admin can pass ?company_id=X to get users for specific company
 // ============================================================================
 
 const express = require('express');
@@ -18,11 +18,20 @@ router.use(authenticateToken);
 
 // ============================================================================
 // GET /api/users - Get all users in company (Admin/Master only)
+// Master admin can optionally pass ?company_id=X to get users for specific company
 // ============================================================================
 
 router.get('/', requireRole('admin', 'master'), async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    let companyId;
+
+    // Master admin can query any company via query parameter
+    if (req.user.role === 'master' && req.query.company_id) {
+      companyId = parseInt(req.query.company_id, 10);
+    } else {
+      // Regular admin or master without query param gets their own company
+      companyId = req.user.company_id;
+    }
 
     const result = await db.query(
       `SELECT 
