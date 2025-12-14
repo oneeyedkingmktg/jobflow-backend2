@@ -1,5 +1,6 @@
 // ============================================================================
-// Companies Routes - Master admin company management
+// Companies Routes - Master admin company management (v2.0)
+// FIX: Add phone/email/address support, fix create/update
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -83,106 +84,62 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// CREATE COMPANY + ADMIN USER
+// CREATE COMPANY (Simplified - no auto admin creation)
 // ============================================================================
 router.post('/', async (req, res) => {
   try {
     const {
       company_name,
+      name, // Accept either company_name or name
+      phone,
+      email,
+      address,
       ghl_api_key,
       ghl_location_id,
       ghl_calendar_id,
       billing_status,
-      monthly_price,
-      admin_email,
-      admin_password,
-      admin_name,
-      admin_phone
+      monthly_price
     } = req.body;
 
-    if (!company_name || !admin_email || !admin_password || !admin_name) {
-      return res
-        .status(400)
-        .json({ error: 'Company name, admin email, password, and name are required' });
-    }
+    const companyName = company_name || name;
 
-    const existingUser = await db.query(
-      `SELECT id FROM users WHERE email = $1`,
-      [admin_email.toLowerCase()]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Admin email already registered' });
+    if (!companyName) {
+      return res.status(400).json({ error: 'Company name is required' });
     }
 
     const encryptedApiKey = ghl_api_key ? encryptApiKey(ghl_api_key) : null;
 
-    const client = await db.pool.connect();
-    try {
-      await client.query('BEGIN');
+    const result = await db.query(
+      `INSERT INTO companies (
+        company_name,
+        phone,
+        email,
+        address,
+        ghl_api_key,
+        ghl_location_id,
+        ghl_calendar_id,
+        billing_status,
+        monthly_price
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *`,
+      [
+        companyName,
+        phone || null,
+        email || null,
+        address || null,
+        encryptedApiKey,
+        ghl_location_id || null,
+        ghl_calendar_id || null,
+        billing_status || 'active',
+        monthly_price || null
+      ]
+    );
 
-      const companyResult = await client.query(
-        `INSERT INTO companies (
-          company_name,
-          ghl_api_key,
-          ghl_location_id,
-          ghl_calendar_id,
-          billing_status,
-          monthly_price
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *`,
-        [
-          company_name,
-          encryptedApiKey,
-          ghl_location_id,
-          ghl_calendar_id,
-          billing_status || 'trial',
-          monthly_price
-        ]
-      );
+    const company = result.rows[0];
+    company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
 
-      const company = companyResult.rows[0];
-
-      const passwordHash = await bcrypt.hash(admin_password, 10);
-
-      const userResult = await client.query(
-        `INSERT INTO users (
-          company_id,
-          email,
-          password_hash,
-          name,
-          phone,
-          role,
-          created_by_user_id
-        )
-        VALUES ($1, $2, $3, $4, $5, 'admin', $6)
-        RETURNING id, email, name, phone, role`,
-        [
-          company.id,
-          admin_email.toLowerCase(),
-          passwordHash,
-          admin_name,
-          admin_phone,
-          req.user.id
-        ]
-      );
-
-      await client.query('COMMIT');
-
-      res.status(201).json({
-        company: {
-          ...company,
-          ghl_api_key: company.ghl_api_key ? '***hidden***' : null
-        },
-        admin_user: userResult.rows[0]
-      });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
+    res.status(201).json({ company });
   } catch (error) {
     console.error('Create company error:', error);
     res.status(500).json({ error: 'Failed to create company' });
@@ -196,6 +153,10 @@ router.put('/:id', async (req, res) => {
   try {
     const {
       company_name,
+      name, // Accept either company_name or name
+      phone,
+      email,
+      address,
       ghl_api_key,
       ghl_location_id,
       ghl_calendar_id,
@@ -203,6 +164,8 @@ router.put('/:id', async (req, res) => {
       monthly_price,
       setup_fee_paid
     } = req.body;
+
+    const companyName = company_name || name;
 
     let encryptedApiKey = undefined;
 
@@ -213,17 +176,23 @@ router.put('/:id', async (req, res) => {
     const result = await db.query(
       `UPDATE companies SET
         company_name = COALESCE($1, company_name),
-        ghl_api_key = COALESCE($2, ghl_api_key),
-        ghl_location_id = COALESCE($3, ghl_location_id),
-        ghl_calendar_id = COALESCE($4, ghl_calendar_id),
-        billing_status = COALESCE($5, billing_status),
-        monthly_price = COALESCE($6, monthly_price),
-        setup_fee_paid = COALESCE($7, setup_fee_paid),
+        phone = COALESCE($2, phone),
+        email = COALESCE($3, email),
+        address = COALESCE($4, address),
+        ghl_api_key = COALESCE($5, ghl_api_key),
+        ghl_location_id = COALESCE($6, ghl_location_id),
+        ghl_calendar_id = COALESCE($7, ghl_calendar_id),
+        billing_status = COALESCE($8, billing_status),
+        monthly_price = COALESCE($9, monthly_price),
+        setup_fee_paid = COALESCE($10, setup_fee_paid),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8 AND deleted_at IS NULL
+       WHERE id = $11 AND deleted_at IS NULL
        RETURNING *`,
       [
-        company_name,
+        companyName,
+        phone,
+        email,
+        address,
         encryptedApiKey,
         ghl_location_id,
         ghl_calendar_id,
