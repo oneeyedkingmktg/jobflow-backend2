@@ -1,6 +1,6 @@
 // ============================================================================
-// Companies Routes - Master admin company management (v2.1)
-// FIX: Match actual DB schema - no ghl_calendar_id, use ghl_install_calendar & ghl_appt_calendar
+// Companies Routes - Master admin company management (v2.0)
+// FIX: Add phone/email/address support, fix create/update
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -84,7 +84,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// CREATE COMPANY (Simplified - matches actual DB schema)
+// CREATE COMPANY (Simplified - no auto admin creation)
 // ============================================================================
 router.post('/', async (req, res) => {
   try {
@@ -96,8 +96,7 @@ router.post('/', async (req, res) => {
       address,
       ghl_api_key,
       ghl_location_id,
-      ghl_install_calendar,
-      ghl_appt_calendar,
+      ghl_calendar_id,
       billing_status,
       monthly_price
     } = req.body;
@@ -118,12 +117,11 @@ router.post('/', async (req, res) => {
         address,
         ghl_api_key,
         ghl_location_id,
-        ghl_install_calendar,
-        ghl_appt_calendar,
+        ghl_calendar_id,
         billing_status,
         monthly_price
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         companyName,
@@ -132,8 +130,7 @@ router.post('/', async (req, res) => {
         address || null,
         encryptedApiKey,
         ghl_location_id || null,
-        ghl_install_calendar || null,
-        ghl_appt_calendar || null,
+        ghl_calendar_id || null,
         billing_status || 'active',
         monthly_price || null
       ]
@@ -162,8 +159,7 @@ router.put('/:id', async (req, res) => {
       address,
       ghl_api_key,
       ghl_location_id,
-      ghl_install_calendar,
-      ghl_appt_calendar,
+      ghl_calendar_id,
       billing_status,
       monthly_price,
       setup_fee_paid
@@ -173,7 +169,6 @@ router.put('/:id', async (req, res) => {
 
     let encryptedApiKey = undefined;
 
-    // Only encrypt if a new key is provided (not the hidden placeholder)
     if (ghl_api_key && ghl_api_key !== '***hidden***') {
       encryptedApiKey = encryptApiKey(ghl_api_key);
     }
@@ -186,13 +181,12 @@ router.put('/:id', async (req, res) => {
         address = COALESCE($4, address),
         ghl_api_key = COALESCE($5, ghl_api_key),
         ghl_location_id = COALESCE($6, ghl_location_id),
-        ghl_install_calendar = COALESCE($7, ghl_install_calendar),
-        ghl_appt_calendar = COALESCE($8, ghl_appt_calendar),
-        billing_status = COALESCE($9, billing_status),
-        monthly_price = COALESCE($10, monthly_price),
-        setup_fee_paid = COALESCE($11, setup_fee_paid),
+        ghl_calendar_id = COALESCE($7, ghl_calendar_id),
+        billing_status = COALESCE($8, billing_status),
+        monthly_price = COALESCE($9, monthly_price),
+        setup_fee_paid = COALESCE($10, setup_fee_paid),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $12 AND deleted_at IS NULL
+       WHERE id = $11 AND deleted_at IS NULL
        RETURNING *`,
       [
         companyName,
@@ -201,8 +195,7 @@ router.put('/:id', async (req, res) => {
         address,
         encryptedApiKey,
         ghl_location_id,
-        ghl_install_calendar,
-        ghl_appt_calendar,
+        ghl_calendar_id,
         billing_status,
         monthly_price,
         setup_fee_paid,
