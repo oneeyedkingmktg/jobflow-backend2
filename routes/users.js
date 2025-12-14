@@ -1,6 +1,6 @@
 // ============================================================================
-// Users Routes - Company-scoped user management (v4.2 - master can query any company)
-// FIX: Master admin can pass ?company_id=X to get users for specific company
+// Users Routes - Company-scoped user management (v4.3 - master can manage any company)
+// FIX: Master admin can specify company_id in body for create/update operations
 // ============================================================================
 
 const express = require('express');
@@ -59,13 +59,21 @@ router.get('/', requireRole('admin', 'master'), async (req, res) => {
 
 // ============================================================================
 // POST /api/users - Create new user (Admin/Master only)
+// Master admin can specify company_id in body to create user for any company
 // ============================================================================
 
 router.post('/', requireRole('admin', 'master'), async (req, res) => {
   try {
-    const { email, password, name, phone, role } = req.body;
-    const companyId = req.user.company_id;
+    const { email, password, name, phone, role, company_id } = req.body;
     const creatorRole = req.user.role;
+
+    // Master can specify company_id, otherwise use their own
+    let targetCompanyId;
+    if (creatorRole === 'master' && company_id) {
+      targetCompanyId = company_id;
+    } else {
+      targetCompanyId = req.user.company_id;
+    }
 
     if (!email || !password || !name || !role) {
       return res.status(400).json({
@@ -114,7 +122,7 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
         is_active,
         created_at`,
       [
-        companyId,
+        targetCompanyId,
         email.toLowerCase(),
         passwordHash,
         name,
@@ -132,31 +140,79 @@ router.post('/', requireRole('admin', 'master'), async (req, res) => {
 
 // ============================================================================
 // PUT /api/users/:id - Update user (Admin/Master only)
+// Master admin can update users from any company
 // ============================================================================
 
 router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
-    const companyId = req.user.company_id;
-    const { name, phone, role, is_active } = req.body;
+    const { name, phone, role, is_active, company_id } = req.body;
+    const userRole = req.user.role;
 
+    // Get the existing user to check permissions
     const existing = await db.query(
-      'SELECT role FROM users WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL',
-      [id, companyId]
+      'SELECT company_id, role FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [id]
     );
 
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const existingUser = existing.rows[0];
+
+    // Non-master users can only update users in their own company
+    if (userRole !== 'master' && existingUser.company_id !== req.user.company_id) {
+      return res.status(403).json({ error: 'Cannot update users from other companies' });
+    }
+
+    // Build dynamic update query
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex}`);
+      values.push(clean(name));
+      paramIndex++;
+    }
+
+    if (phone !== undefined) {
+      updates.push(`phone = $${paramIndex}`);
+      values.push(clean(phone));
+      paramIndex++;
+    }
+
+    if (role !== undefined) {
+      updates.push(`role = $${paramIndex}`);
+      values.push(clean(role));
+      paramIndex++;
+    }
+
+    if (is_active !== undefined) {
+      updates.push(`is_active = $${paramIndex}`);
+      values.push(is_active);
+      paramIndex++;
+    }
+
+    // Master admin can change company assignment
+    if (userRole === 'master' && company_id !== undefined) {
+      updates.push(`company_id = $${paramIndex}`);
+      values.push(company_id);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(id);
+
     const result = await db.query(
       `UPDATE users SET
-        name = COALESCE($1, name),
-        phone = COALESCE($2, phone),
-        role = COALESCE($3, role),
-        is_active = COALESCE($4, is_active),
-        updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND company_id = $6
+        ${updates.join(', ')}
+       WHERE id = $${paramIndex}
        RETURNING
         id,
         company_id,
@@ -166,14 +222,7 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
         role,
         is_active,
         updated_at`,
-      [
-        clean(name),
-        clean(phone),
-        clean(role),
-        is_active,
-        id,
-        companyId
-      ]
+      values
     );
 
     res.json({ user: result.rows[0] });
@@ -185,23 +234,39 @@ router.put('/:id', requireRole('admin', 'master'), async (req, res) => {
 
 // ============================================================================
 // DELETE /api/users/:id - Soft delete user (Admin/Master only)
+// Master admin can delete users from any company
 // ============================================================================
 
 router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {
   try {
     const { id } = req.params;
-    const companyId = req.user.company_id;
+    const userRole = req.user.role;
 
     if (parseInt(id, 10) === req.user.id) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
+    // Get the user to check permissions
+    const existing = await db.query(
+      'SELECT company_id FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Non-master users can only delete users in their own company
+    if (userRole !== 'master' && existing.rows[0].company_id !== req.user.company_id) {
+      return res.status(403).json({ error: 'Cannot delete users from other companies' });
+    }
+
     const result = await db.query(
       `UPDATE users 
        SET deleted_at = CURRENT_TIMESTAMP 
-       WHERE id = $1 AND company_id = $2
+       WHERE id = $1
        RETURNING id`,
-      [id, companyId]
+      [id]
     );
 
     if (result.rows.length === 0) {
