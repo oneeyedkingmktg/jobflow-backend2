@@ -1,6 +1,6 @@
 // ============================================================================
-// Users Routes - Company-scoped user management (v4.3 - master can manage any company)
-// FIX: Master admin can specify company_id in body for create/update operations
+// File: routes/users.js
+// Version: v4.4 - Support returning ALL users for master admin
 // ============================================================================
 
 const express = require('express');
@@ -17,24 +17,57 @@ const clean = (v) => (v === '' ? null : v);
 router.use(authenticateToken);
 
 // ============================================================================
-// GET /api/users - Get all users in company (Admin/Master only)
-// Master admin can optionally pass ?company_id=X to get users for specific company
+// GET /api/users - Get users (Admin/Master only)
+// Master admin can:
+//   - ?company_id=X → Get users for specific company
+//   - No query param → Get ALL users from ALL companies
+// Regular admin always gets only their own company's users
 // ============================================================================
 
 router.get('/', requireRole('admin', 'master'), async (req, res) => {
   try {
-    let companyId;
+    let query;
+    let params;
 
-    // Master admin can query any company via query parameter
-    if (req.user.role === 'master' && req.query.company_id) {
-      companyId = parseInt(req.query.company_id, 10);
+    if (req.user.role === 'master') {
+      // Master admin
+      if (req.query.company_id) {
+        // Specific company requested
+        const companyId = parseInt(req.query.company_id, 10);
+        query = `SELECT 
+          id,
+          company_id,
+          email,
+          name,
+          phone,
+          role,
+          is_active,
+          created_at,
+          last_login
+         FROM users 
+         WHERE company_id = $1 AND deleted_at IS NULL
+         ORDER BY created_at DESC`;
+        params = [companyId];
+      } else {
+        // No company_id = return ALL users from ALL companies
+        query = `SELECT 
+          id,
+          company_id,
+          email,
+          name,
+          phone,
+          role,
+          is_active,
+          created_at,
+          last_login
+         FROM users 
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC`;
+        params = [];
+      }
     } else {
-      // Regular admin or master without query param gets their own company
-      companyId = req.user.company_id;
-    }
-
-    const result = await db.query(
-      `SELECT 
+      // Regular admin - only their own company
+      query = `SELECT 
         id,
         company_id,
         email,
@@ -46,9 +79,11 @@ router.get('/', requireRole('admin', 'master'), async (req, res) => {
         last_login
        FROM users 
        WHERE company_id = $1 AND deleted_at IS NULL
-       ORDER BY created_at DESC`,
-      [companyId]
-    );
+       ORDER BY created_at DESC`;
+      params = [req.user.company_id];
+    }
+
+    const result = await db.query(query, params);
 
     res.json({ users: result.rows });
   } catch (error) {
@@ -59,7 +94,7 @@ router.get('/', requireRole('admin', 'master'), async (req, res) => {
 
 // ============================================================================
 // POST /api/users - Create new user (Admin/Master only)
-// Master admin can specify company_id in body to create user for any company
+// Master admin can specify company_id in request body
 // ============================================================================
 
 router.post('/', requireRole('admin', 'master'), async (req, res) => {
