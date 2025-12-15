@@ -91,7 +91,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find user by email - JOIN with companies table to get company_name
+    // Find user by email - JOIN with companies table to get company_name and suspended status
     const result = await pool.query(
       `SELECT 
         u.id, 
@@ -99,6 +99,7 @@ router.post('/login', async (req, res) => {
         u.password_hash, 
         u.company_id,
         c.company_name,
+        c.suspended,
         u.role, 
         c.ghl_location_id 
       FROM users u
@@ -117,7 +118,15 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.rows[0];
-    console.log('User ID:', user.id, 'Role:', user.role);
+    console.log('User ID:', user.id, 'Role:', user.role, 'Company suspended:', user.suspended);
+
+    // Check if company is suspended
+    if (user.suspended === true) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is suspended. Please contact support.'
+      });
+    }
 
     // Verify password using password_hash
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
