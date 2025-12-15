@@ -1,11 +1,17 @@
-// File: backend/routes/leads.js
+// ============================================================================
+// File: routes/leads.js
+// Version: v2.0 - Add company filtering for multi-tenant isolation
+// ============================================================================
 
 const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
+const { authenticateToken } = require('../middleware/auth');
+
+// Apply authentication to all routes
+router.use(authenticateToken);
 
 const clean = (v) => (v === "" || v === undefined ? null : v);
-const fallbackCompany = (v) => (v ? v : 1);
 
 const toCamel = (row) => ({
   id: row.id,
@@ -65,11 +71,18 @@ const validateLead = (lead) => {
   return null;
 };
 
-// GET ALL
+// ============================================================================
+// GET ALL LEADS - Filtered by user's company
+// ============================================================================
 router.get("/", async (req, res) => {
   try {
+    const companyId = req.user.company_id;
+
     const result = await pool.query(
-      `SELECT * FROM leads ORDER BY created_at DESC`
+      `SELECT * FROM leads 
+       WHERE company_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [companyId]
     );
     res.json({ leads: result.rows.map(toCamel) });
   } catch (error) {
@@ -78,15 +91,23 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET ONE
+// ============================================================================
+// GET SINGLE LEAD - Must belong to user's company
+// ============================================================================
 router.get("/:id", async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM leads WHERE id = $1`, [
-      req.params.id,
-    ]);
+    const companyId = req.user.company_id;
+    const { id } = req.params;
 
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Lead not found" });
+    const result = await pool.query(
+      `SELECT * FROM leads 
+       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [id, companyId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Lead not found." });
+    }
 
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
@@ -95,112 +116,103 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// CREATE
+// ============================================================================
+// CREATE LEAD - Assign to user's company
+// ============================================================================
 router.post("/", async (req, res) => {
   try {
-    const data = req.body;
-    const validationError = validateLead(data);
-    if (validationError) return res.status(400).json({ error: validationError });
+    const companyId = req.user.company_id;
+    const userId = req.user.id;
 
-    const parsed = parseName(data.name);
-    const companyId = fallbackCompany(data.company_id);
+    const lead = req.body;
+    const error = validateLead(lead);
+    if (error) return res.status(400).json({ error });
+
+    const { first, last, full } = parseName(lead.name || lead.full_name);
 
     const result = await pool.query(
-      `
-      INSERT INTO leads (
-        company_id, created_by_user_id,
+      `INSERT INTO leads (
+        company_id, created_by_user_id, 
         name, full_name, first_name, last_name,
-        phone, email, address, city, state, zip,
+        phone, email, preferred_contact,
+        address, city, state, zip,
         buyer_type, company_name, project_type,
         lead_source, referral_source,
-        status, not_sold_reason, contract_price,
+        status, not_sold_reason, notes, contract_price,
         appointment_date, appointment_time,
-        preferred_contact, notes,
-        install_date, install_tentative,
-        created_at, updated_at
+        install_date, install_tentative
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
       )
-      VALUES (
-        $1, $2,
-        $3,$4,$5,$6,
-        $7,$8,$9,$10,$11,$12,
-        $13,$14,$15,
-        $16,$17,
-        $18,$19,$20,
-        $21,$22,
-        $23,$24,
-        $25,$26,
-        NOW(),NOW()
-      )
-      RETURNING *
-      `,
+      RETURNING *`,
       [
         companyId,
-        data.created_by_user_id || 1,
-
-        data.name,
-        parsed.full,
-        parsed.first,
-        parsed.last,
-
-        data.phone,
-        data.email,
-        data.address,
-        data.city,
-        data.state,
-        data.zip,
-
-        data.buyer_type,
-        data.company_name,
-        data.project_type,
-
-        data.lead_source,
-        data.referral_source,
-
-        data.status,
-        data.not_sold_reason,
-        clean(data.contract_price),
-
-        clean(data.appointment_date),
-        clean(data.appointment_time),
-
-        data.preferred_contact,
-        data.notes,
-
-        clean(data.install_date),
-        data.install_tentative,
+        userId,
+        full,
+        full,
+        first,
+        last,
+        clean(lead.phone),
+        clean(lead.email),
+        clean(lead.preferredContact),
+        clean(lead.address),
+        clean(lead.city),
+        clean(lead.state),
+        clean(lead.zip),
+        clean(lead.buyerType),
+        clean(lead.companyName),
+        clean(lead.projectType),
+        clean(lead.leadSource),
+        clean(lead.referralSource),
+        lead.status || "lead",
+        clean(lead.notSoldReason),
+        clean(lead.notes),
+        clean(lead.contractPrice),
+        clean(lead.appointmentDate || lead.apptDate),
+        clean(lead.appointmentTime || lead.apptTime),
+        clean(lead.installDate),
+        lead.installTentative || false,
       ]
     );
 
-    res.json({ lead: toCamel(result.rows[0]) });
+    res.status(201).json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
     console.error("Error creating lead:", error);
     res.status(500).json({ error: "Failed to create lead." });
   }
 });
 
-// UPDATE
+// ============================================================================
+// UPDATE LEAD - Must belong to user's company
+// ============================================================================
 router.put("/:id", async (req, res) => {
   try {
-    const data = req.body;
-    const id = req.params.id;
+    const companyId = req.user.company_id;
+    const { id } = req.params;
+    const lead = req.body;
 
-    const validationError = validateLead(data);
-    if (validationError) return res.status(400).json({ error: validationError });
+    // Verify lead belongs to user's company
+    const checkResult = await pool.query(
+      `SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [id, companyId]
+    );
 
-    const parsed = parseName(data.name);
-    const companyId = fallbackCompany(data.company_id);
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: "Lead not found." });
+    }
+
+    const { first, last, full } = parseName(lead.name || lead.full_name);
 
     const result = await pool.query(
-      `
-      UPDATE leads
-      SET
-        company_id = $1,
-        name = $2,
-        full_name = $3,
-        first_name = $4,
-        last_name = $5,
-        phone = $6,
-        email = $7,
+      `UPDATE leads SET
+        name = COALESCE($1, name),
+        full_name = COALESCE($2, full_name),
+        first_name = COALESCE($3, first_name),
+        last_name = COALESCE($4, last_name),
+        phone = COALESCE($5, phone),
+        email = $6,
+        preferred_contact = $7,
         address = $8,
         city = $9,
         state = $10,
@@ -210,60 +222,46 @@ router.put("/:id", async (req, res) => {
         project_type = $14,
         lead_source = $15,
         referral_source = $16,
-        status = $17,
+        status = COALESCE($17, status),
         not_sold_reason = $18,
-        contract_price = $19,
-        appointment_date = $20,
-        appointment_time = $21,
-        preferred_contact = $22,
-        notes = $23,
-        install_date = $24,
-        install_tentative = $25,
-        updated_at = NOW()
-      WHERE id = $26
-      RETURNING *
-      `,
+        notes = $19,
+        contract_price = $20,
+        appointment_date = $21,
+        appointment_time = $22,
+        install_date = $23,
+        install_tentative = COALESCE($24, install_tentative),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $25 AND company_id = $26
+      RETURNING *`,
       [
-        companyId,
-
-        data.name,
-        parsed.full,
-        parsed.first,
-        parsed.last,
-
-        data.phone,
-        data.email,
-        data.address,
-        data.city,
-        data.state,
-        data.zip,
-
-        data.buyer_type,
-        data.company_name,
-        data.project_type,
-
-        data.lead_source,
-        data.referral_source,
-
-        data.status,
-        data.not_sold_reason,
-        clean(data.contract_price),
-
-        clean(data.appointment_date),
-        clean(data.appointment_time),
-
-        data.preferred_contact,
-        data.notes,
-
-        clean(data.install_date),
-        data.install_tentative,
-
+        full || null,
+        full || null,
+        first || null,
+        last || null,
+        clean(lead.phone),
+        clean(lead.email),
+        clean(lead.preferredContact),
+        clean(lead.address),
+        clean(lead.city),
+        clean(lead.state),
+        clean(lead.zip),
+        clean(lead.buyerType),
+        clean(lead.companyName),
+        clean(lead.projectType),
+        clean(lead.leadSource),
+        clean(lead.referralSource),
+        lead.status,
+        clean(lead.notSoldReason),
+        clean(lead.notes),
+        clean(lead.contractPrice),
+        clean(lead.appointmentDate || lead.apptDate),
+        clean(lead.appointmentTime || lead.apptTime),
+        clean(lead.installDate),
+        lead.installTentative,
         id,
+        companyId,
       ]
     );
-
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Lead not found" });
 
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
@@ -272,21 +270,57 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE
+// ============================================================================
+// DELETE LEAD (soft delete) - Must belong to user's company
+// ============================================================================
 router.delete("/:id", async (req, res) => {
   try {
+    const companyId = req.user.company_id;
+    const { id } = req.params;
+
     const result = await pool.query(
-      `DELETE FROM leads WHERE id = $1 RETURNING id`,
-      [req.params.id]
+      `UPDATE leads 
+       SET deleted_at = CURRENT_TIMESTAMP 
+       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
+       RETURNING id`,
+      [id, companyId]
     );
 
-    if (result.rowCount === 0)
-      return res.status(404).json({ error: "Lead not found" });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Lead not found." });
+    }
 
-    res.json({ success: true, deletedId: req.params.id });
+    res.json({ message: "Lead deleted successfully." });
   } catch (error) {
     console.error("Error deleting lead:", error);
     res.status(500).json({ error: "Failed to delete lead." });
+  }
+});
+
+// ============================================================================
+// PHONE LOOKUP - Search within user's company only
+// ============================================================================
+router.get("/search/phone/:phone", async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { phone } = req.params;
+
+    // Strip non-digits
+    const digits = phone.replace(/\D/g, "");
+
+    const result = await pool.query(
+      `SELECT * FROM leads 
+       WHERE company_id = $1 
+       AND deleted_at IS NULL
+       AND phone LIKE $2
+       ORDER BY created_at DESC`,
+      [companyId, `%${digits}%`]
+    );
+
+    res.json({ leads: result.rows.map(toCamel) });
+  } catch (error) {
+    console.error("Error searching phone:", error);
+    res.status(500).json({ error: "Failed to search phone." });
   }
 });
 
