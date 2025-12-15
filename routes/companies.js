@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/companies.js
-// Version: v2.3 - Add estimator_enabled field and correct all database fields
+// Version: v2.4 - Add website, city, state, zip, suspended fields
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -93,7 +93,12 @@ router.post('/', async (req, res) => {
       name, // Accept both formats
       phone,
       email,
+      website,
       address,
+      city,
+      state,
+      zip,
+      suspended,
       ghl_api_key,
       ghl_location_id,
       ghl_install_calendar,
@@ -126,7 +131,12 @@ router.post('/', async (req, res) => {
           company_name,
           phone,
           email,
+          website,
           address,
+          city,
+          state,
+          zip,
+          suspended,
           ghl_api_key,
           ghl_location_id,
           ghl_install_calendar,
@@ -134,13 +144,18 @@ router.post('/', async (req, res) => {
           estimator_enabled,
           billing_status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING *`,
         [
           finalCompanyName,
           phone || null,
           email || null,
+          website || null,
           address || null,
+          city || null,
+          state || null,
+          zip || null,
+          suspended || false,
           encryptedApiKey,
           ghl_location_id || null,
           ghl_install_calendar || null,
@@ -214,7 +229,12 @@ router.put('/:id', async (req, res) => {
       name, // Accept both formats
       phone,
       email,
+      website,
       address,
+      city,
+      state,
+      zip,
+      suspended,
       ghl_api_key,
       ghlApiKey, // Accept camelCase too
       ghl_location_id,
@@ -245,21 +265,31 @@ router.put('/:id', async (req, res) => {
         company_name = COALESCE($1, company_name),
         phone = COALESCE($2, phone),
         email = COALESCE($3, email),
-        address = COALESCE($4, address),
-        ghl_api_key = COALESCE($5, ghl_api_key),
-        ghl_location_id = COALESCE($6, ghl_location_id),
-        ghl_install_calendar = COALESCE($7, ghl_install_calendar),
-        ghl_appt_calendar = COALESCE($8, ghl_appt_calendar),
-        estimator_enabled = COALESCE($9, estimator_enabled),
-        billing_status = COALESCE($10, billing_status),
+        website = COALESCE($4, website),
+        address = COALESCE($5, address),
+        city = COALESCE($6, city),
+        state = COALESCE($7, state),
+        zip = COALESCE($8, zip),
+        suspended = COALESCE($9, suspended),
+        ghl_api_key = COALESCE($10, ghl_api_key),
+        ghl_location_id = COALESCE($11, ghl_location_id),
+        ghl_install_calendar = COALESCE($12, ghl_install_calendar),
+        ghl_appt_calendar = COALESCE($13, ghl_appt_calendar),
+        estimator_enabled = COALESCE($14, estimator_enabled),
+        billing_status = COALESCE($15, billing_status),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $11 AND deleted_at IS NULL
+       WHERE id = $16 AND deleted_at IS NULL
        RETURNING *`,
       [
         finalCompanyName,
         phone,
         email,
+        website,
         address,
+        city,
+        state,
+        zip,
+        suspended,
         encryptedApiKey,
         ghl_location_id || ghlLocationId,
         ghl_install_calendar || ghlInstallCalendar,
