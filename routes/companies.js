@@ -203,46 +203,6 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to create company' });
   }
 });
-          company_id,
-          email,
-          password_hash,
-          name,
-          phone,
-          role,
-          created_by_user_id
-        )
-        VALUES ($1, $2, $3, $4, $5, 'admin', $6)
-        RETURNING id, email, name, phone, role`,
-        [
-          company.id,
-          admin_email.toLowerCase(),
-          passwordHash,
-          admin_name,
-          admin_phone,
-          req.user.id
-        ]
-      );
-
-      await client.query('COMMIT');
-
-      res.status(201).json({
-        company: {
-          ...company,
-          ghl_api_key: company.ghl_api_key ? '***hidden***' : null
-        },
-        admin_user: userResult.rows[0]
-      });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Create company error:', error);
-    res.status(500).json({ error: 'Failed to create company' });
-  }
-});
 
 // ============================================================================
 // UPDATE COMPANY
