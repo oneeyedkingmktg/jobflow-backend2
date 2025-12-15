@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/leads.js
-// Version: v2.1 - Fix master admin permissions for GET/UPDATE/DELETE operations
+// Version: v2.2 - Fix snake_case field reading and add debug logging
 // ============================================================================
 
 const express = require("express");
@@ -150,10 +150,16 @@ router.post("/", async (req, res) => {
     }
 
     const lead = req.body;
+    
+    console.log("CREATE LEAD - Body received:", JSON.stringify(lead, null, 2));
+    console.log("CREATE LEAD - Company ID:", companyId);
+    
     const error = validateLead(lead);
     if (error) return res.status(400).json({ error });
 
     const { first, last, full } = parseName(lead.name || lead.full_name);
+    
+    console.log("Parsed name - First:", first, "Last:", last, "Full:", full);
 
     const result = await pool.query(
       `INSERT INTO leads (
@@ -180,26 +186,28 @@ router.post("/", async (req, res) => {
         last,
         clean(lead.phone),
         clean(lead.email),
-        clean(lead.preferredContact),
+        clean(lead.preferred_contact),
         clean(lead.address),
         clean(lead.city),
         clean(lead.state),
         clean(lead.zip),
-        clean(lead.buyerType),
-        clean(lead.companyName),
-        clean(lead.projectType),
-        clean(lead.leadSource),
-        clean(lead.referralSource),
+        clean(lead.buyer_type),
+        clean(lead.company_name),
+        clean(lead.project_type),
+        clean(lead.lead_source),
+        clean(lead.referral_source),
         lead.status || "lead",
-        clean(lead.notSoldReason),
+        clean(lead.not_sold_reason),
         clean(lead.notes),
-        clean(lead.contractPrice),
-        clean(lead.appointmentDate || lead.apptDate),
-        clean(lead.appointmentTime || lead.apptTime),
-        clean(lead.installDate),
-        lead.installTentative || false,
+        clean(lead.contract_price),
+        clean(lead.appointment_date),
+        clean(lead.appointment_time),
+        clean(lead.install_date),
+        lead.install_tentative || false,
       ]
     );
+
+    console.log("CREATE result:", JSON.stringify(result.rows[0], null, 2));
 
     res.status(201).json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
@@ -215,6 +223,9 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const lead = req.body;
+
+    console.log("UPDATE LEAD - ID:", id);
+    console.log("UPDATE LEAD - Body received:", JSON.stringify(lead, null, 2));
 
     // Verify lead exists and check company access
     const checkResult = await pool.query(
@@ -234,6 +245,8 @@ router.put("/:id", async (req, res) => {
     }
 
     const { first, last, full } = parseName(lead.name || lead.full_name);
+
+    console.log("Parsed name - First:", first, "Last:", last, "Full:", full);
 
     const result = await pool.query(
       `UPDATE leads SET
@@ -271,27 +284,32 @@ router.put("/:id", async (req, res) => {
         last || null,
         clean(lead.phone),
         clean(lead.email),
-        clean(lead.preferredContact),
+        clean(lead.preferred_contact),
         clean(lead.address),
         clean(lead.city),
         clean(lead.state),
         clean(lead.zip),
-        clean(lead.buyerType),
-        clean(lead.companyName),
-        clean(lead.projectType),
-        clean(lead.leadSource),
-        clean(lead.referralSource),
+        clean(lead.buyer_type),
+        clean(lead.company_name),
+        clean(lead.project_type),
+        clean(lead.lead_source),
+        clean(lead.referral_source),
         lead.status,
-        clean(lead.notSoldReason),
+        clean(lead.not_sold_reason),
         clean(lead.notes),
-        clean(lead.contractPrice),
-        clean(lead.appointmentDate || lead.apptDate),
-        clean(lead.appointmentTime || lead.apptTime),
-        clean(lead.installDate),
-        lead.installTentative,
+        clean(lead.contract_price),
+        clean(lead.appointment_date),
+        clean(lead.appointment_time),
+        clean(lead.install_date),
+        lead.install_tentative,
         id,
       ]
     );
+
+    console.log("UPDATE result rows:", result.rows.length);
+    if (result.rows.length > 0) {
+      console.log("Updated lead:", JSON.stringify(result.rows[0], null, 2));
+    }
 
     res.json({ lead: toCamel(result.rows[0]) });
   } catch (error) {
