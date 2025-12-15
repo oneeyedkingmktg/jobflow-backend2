@@ -72,18 +72,30 @@ const validateLead = (lead) => {
 };
 
 // ============================================================================
-// GET ALL LEADS - Filtered by user's company
+// GET ALL LEADS - Master sees all, regular users see only their company
 // ============================================================================
 router.get("/", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    let result;
 
-    const result = await pool.query(
-      `SELECT * FROM leads 
-       WHERE company_id = $1 AND deleted_at IS NULL
-       ORDER BY created_at DESC`,
-      [companyId]
-    );
+    if (req.user.role === 'master') {
+      // Master admin sees ALL leads from ALL companies
+      result = await pool.query(
+        `SELECT * FROM leads 
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC`
+      );
+    } else {
+      // Regular users see only their company's leads
+      const companyId = req.user.company_id;
+      result = await pool.query(
+        `SELECT * FROM leads 
+         WHERE company_id = $1 AND deleted_at IS NULL
+         ORDER BY created_at DESC`,
+        [companyId]
+      );
+    }
+
     res.json({ leads: result.rows.map(toCamel) });
   } catch (error) {
     console.error("Error fetching leads:", error);
@@ -117,12 +129,19 @@ router.get("/:id", async (req, res) => {
 });
 
 // ============================================================================
-// CREATE LEAD - Assign to user's company
+// CREATE LEAD - Master can specify company, regular users use their own
 // ============================================================================
 router.post("/", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
     const userId = req.user.id;
+    
+    // Master can specify company_id, regular users use their own
+    let companyId;
+    if (req.user.role === 'master') {
+      companyId = req.body.company_id || req.user.company_id;
+    } else {
+      companyId = req.user.company_id;
+    }
 
     const lead = req.body;
     const error = validateLead(lead);
@@ -298,24 +317,36 @@ router.delete("/:id", async (req, res) => {
 });
 
 // ============================================================================
-// PHONE LOOKUP - Search within user's company only
+// PHONE LOOKUP - Master searches all companies, regular users their own
 // ============================================================================
 router.get("/search/phone/:phone", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
     const { phone } = req.params;
-
-    // Strip non-digits
     const digits = phone.replace(/\D/g, "");
 
-    const result = await pool.query(
-      `SELECT * FROM leads 
-       WHERE company_id = $1 
-       AND deleted_at IS NULL
-       AND phone LIKE $2
-       ORDER BY created_at DESC`,
-      [companyId, `%${digits}%`]
-    );
+    let result;
+
+    if (req.user.role === 'master') {
+      // Master searches across all companies
+      result = await pool.query(
+        `SELECT * FROM leads 
+         WHERE deleted_at IS NULL
+         AND phone LIKE $1
+         ORDER BY created_at DESC`,
+        [`%${digits}%`]
+      );
+    } else {
+      // Regular users search within their company
+      const companyId = req.user.company_id;
+      result = await pool.query(
+        `SELECT * FROM leads 
+         WHERE company_id = $1 
+         AND deleted_at IS NULL
+         AND phone LIKE $2
+         ORDER BY created_at DESC`,
+        [companyId, `%${digits}%`]
+      );
+    }
 
     res.json({ leads: result.rows.map(toCamel) });
   } catch (error) {
