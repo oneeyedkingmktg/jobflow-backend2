@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/leads.js
-// Version: v2.0 - Add company filtering for multi-tenant isolation
+// Version: v2.1 - Fix master admin permissions for GET/UPDATE/DELETE operations
 // ============================================================================
 
 const express = require("express");
@@ -104,24 +104,30 @@ router.get("/", async (req, res) => {
 });
 
 // ============================================================================
-// GET SINGLE LEAD - Must belong to user's company
+// GET SINGLE LEAD - Master can view any lead, regular users only their company
 // ============================================================================
 router.get("/:id", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
     const { id } = req.params;
 
     const result = await pool.query(
       `SELECT * FROM leads 
-       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-      [id, companyId]
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Lead not found." });
     }
 
-    res.json({ lead: toCamel(result.rows[0]) });
+    const lead = result.rows[0];
+
+    // Non-master users can only view leads from their company
+    if (req.user.role !== 'master' && lead.company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Access denied to this lead." });
+    }
+
+    res.json({ lead: toCamel(lead) });
   } catch (error) {
     console.error("Error fetching lead:", error);
     res.status(500).json({ error: "Failed to fetch lead." });
@@ -203,22 +209,28 @@ router.post("/", async (req, res) => {
 });
 
 // ============================================================================
-// UPDATE LEAD - Must belong to user's company
+// UPDATE LEAD - Master can update any lead, regular users only their company
 // ============================================================================
 router.put("/:id", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
     const { id } = req.params;
     const lead = req.body;
 
-    // Verify lead belongs to user's company
+    // Verify lead exists and check company access
     const checkResult = await pool.query(
-      `SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-      [id, companyId]
+      `SELECT id, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
     );
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: "Lead not found." });
+    }
+
+    const existingLead = checkResult.rows[0];
+
+    // Non-master users can only update leads from their company
+    if (req.user.role !== 'master' && existingLead.company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Access denied to this lead." });
     }
 
     const { first, last, full } = parseName(lead.name || lead.full_name);
@@ -250,7 +262,7 @@ router.put("/:id", async (req, res) => {
         install_date = $23,
         install_tentative = COALESCE($24, install_tentative),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $25 AND company_id = $26
+      WHERE id = $25
       RETURNING *`,
       [
         full || null,
@@ -278,7 +290,6 @@ router.put("/:id", async (req, res) => {
         clean(lead.installDate),
         lead.installTentative,
         id,
-        companyId,
       ]
     );
 
@@ -290,24 +301,36 @@ router.put("/:id", async (req, res) => {
 });
 
 // ============================================================================
-// DELETE LEAD (soft delete) - Must belong to user's company
+// DELETE LEAD (soft delete) - Master can delete any lead, regular users only their company
 // ============================================================================
 router.delete("/:id", async (req, res) => {
   try {
-    const companyId = req.user.company_id;
     const { id } = req.params;
+
+    // Get the lead to check company ownership
+    const checkResult = await pool.query(
+      `SELECT id, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: "Lead not found." });
+    }
+
+    const lead = checkResult.rows[0];
+
+    // Non-master users can only delete leads from their company
+    if (req.user.role !== 'master' && lead.company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Access denied to this lead." });
+    }
 
     const result = await pool.query(
       `UPDATE leads 
        SET deleted_at = CURRENT_TIMESTAMP 
-       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
+       WHERE id = $1 AND deleted_at IS NULL
        RETURNING id`,
-      [id, companyId]
+      [id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Lead not found." });
-    }
 
     res.json({ message: "Lead deleted successfully." });
   } catch (error) {
