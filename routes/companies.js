@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/companies.js
-// Version: v2.2 - Remove monthly_price and setup_fee_paid (not in DB schema)
+// Version: v2.3 - Add estimator_enabled field and correct all database fields
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -84,13 +84,13 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================================================
-// CREATE COMPANY (Only fields that exist in DB)
+// CREATE COMPANY + ADMIN USER
 // ============================================================================
 router.post('/', async (req, res) => {
   try {
     const {
       company_name,
-      name, // Accept either company_name or name
+      name, // Accept both formats
       phone,
       email,
       address,
@@ -98,48 +98,146 @@ router.post('/', async (req, res) => {
       ghl_location_id,
       ghl_install_calendar,
       ghl_appt_calendar,
-      billing_status
+      estimator_enabled,
+      billing_status,
+      admin_email,
+      admin_password,
+      admin_name,
+      admin_phone
     } = req.body;
 
-    const companyName = company_name || name;
+    const finalCompanyName = company_name || name;
 
-    if (!companyName) {
+    if (!finalCompanyName) {
       return res.status(400).json({ error: 'Company name is required' });
     }
 
-    const encryptedApiKey = ghl_api_key ? encryptApiKey(ghl_api_key) : null;
+    // Only require admin details if provided (simplified creation)
+    const encryptedApiKey = ghl_api_key && ghl_api_key !== '***hidden***' 
+      ? encryptApiKey(ghl_api_key) 
+      : null;
 
-    const result = await db.query(
-      `INSERT INTO companies (
-        company_name,
-        phone,
-        email,
-        address,
-        ghl_api_key,
-        ghl_location_id,
-        ghl_install_calendar,
-        ghl_appt_calendar,
-        billing_status
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *`,
-      [
-        companyName,
-        phone || null,
-        email || null,
-        address || null,
-        encryptedApiKey,
-        ghl_location_id || null,
-        ghl_install_calendar || null,
-        ghl_appt_calendar || null,
-        billing_status || 'active'
-      ]
-    );
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const company = result.rows[0];
-    company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
+      const companyResult = await client.query(
+        `INSERT INTO companies (
+          company_name,
+          phone,
+          email,
+          address,
+          ghl_api_key,
+          ghl_location_id,
+          ghl_install_calendar,
+          ghl_appt_calendar,
+          estimator_enabled,
+          billing_status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *`,
+        [
+          finalCompanyName,
+          phone || null,
+          email || null,
+          address || null,
+          encryptedApiKey,
+          ghl_location_id || null,
+          ghl_install_calendar || null,
+          ghl_appt_calendar || null,
+          estimator_enabled || false,
+          billing_status || 'active'
+        ]
+      );
 
-    res.status(201).json({ company });
+      const company = companyResult.rows[0];
+
+      // Create admin user if details provided
+      if (admin_email && admin_password && admin_name) {
+        const existingUser = await client.query(
+          `SELECT id FROM users WHERE email = $1`,
+          [admin_email.toLowerCase()]
+        );
+
+        if (existingUser.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Admin email already registered' });
+        }
+
+        const passwordHash = await bcrypt.hash(admin_password, 10);
+
+        await client.query(
+          `INSERT INTO users (
+            company_id,
+            email,
+            password_hash,
+            name,
+            phone,
+            role,
+            is_active
+          )
+          VALUES ($1, $2, $3, $4, $5, 'admin', true)`,
+          [
+            company.id,
+            admin_email.toLowerCase(),
+            passwordHash,
+            admin_name,
+            admin_phone || null
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
+
+      res.status(201).json({ company });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Create company error:', error);
+    res.status(500).json({ error: 'Failed to create company' });
+  }
+});
+          company_id,
+          email,
+          password_hash,
+          name,
+          phone,
+          role,
+          created_by_user_id
+        )
+        VALUES ($1, $2, $3, $4, $5, 'admin', $6)
+        RETURNING id, email, name, phone, role`,
+        [
+          company.id,
+          admin_email.toLowerCase(),
+          passwordHash,
+          admin_name,
+          admin_phone,
+          req.user.id
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        company: {
+          ...company,
+          ghl_api_key: company.ghl_api_key ? '***hidden***' : null
+        },
+        admin_user: userResult.rows[0]
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Create company error:', error);
     res.status(500).json({ error: 'Failed to create company' });
@@ -147,30 +245,39 @@ router.post('/', async (req, res) => {
 });
 
 // ============================================================================
-// UPDATE COMPANY (Only fields that exist in DB)
+// UPDATE COMPANY
 // ============================================================================
 router.put('/:id', async (req, res) => {
   try {
     const {
       company_name,
-      name, // Accept either company_name or name
+      name, // Accept both formats
       phone,
       email,
       address,
       ghl_api_key,
+      ghlApiKey, // Accept camelCase too
       ghl_location_id,
+      ghlLocationId,
       ghl_install_calendar,
+      ghlInstallCalendar,
       ghl_appt_calendar,
+      ghlApptCalendar,
+      estimator_enabled,
+      estimatorEnabled,
       billing_status
     } = req.body;
 
-    const companyName = company_name || name;
+    console.log("UPDATE COMPANY - Body received:", JSON.stringify(req.body, null, 2));
 
+    const finalCompanyName = company_name || name;
+
+    // Handle API key encryption
     let encryptedApiKey = undefined;
-
-    // Only encrypt if a new key is provided (not the hidden placeholder)
-    if (ghl_api_key && ghl_api_key !== '***hidden***') {
-      encryptedApiKey = encryptApiKey(ghl_api_key);
+    const apiKeyValue = ghl_api_key || ghlApiKey;
+    
+    if (apiKeyValue && apiKeyValue !== '***hidden***') {
+      encryptedApiKey = encryptApiKey(apiKeyValue);
     }
 
     const result = await db.query(
@@ -183,19 +290,21 @@ router.put('/:id', async (req, res) => {
         ghl_location_id = COALESCE($6, ghl_location_id),
         ghl_install_calendar = COALESCE($7, ghl_install_calendar),
         ghl_appt_calendar = COALESCE($8, ghl_appt_calendar),
-        billing_status = COALESCE($9, billing_status),
+        estimator_enabled = COALESCE($9, estimator_enabled),
+        billing_status = COALESCE($10, billing_status),
         updated_at = CURRENT_TIMESTAMP
-       WHERE id = $10 AND deleted_at IS NULL
+       WHERE id = $11 AND deleted_at IS NULL
        RETURNING *`,
       [
-        companyName,
+        finalCompanyName,
         phone,
         email,
         address,
         encryptedApiKey,
-        ghl_location_id,
-        ghl_install_calendar,
-        ghl_appt_calendar,
+        ghl_location_id || ghlLocationId,
+        ghl_install_calendar || ghlInstallCalendar,
+        ghl_appt_calendar || ghlApptCalendar,
+        estimator_enabled !== undefined ? estimator_enabled : estimatorEnabled,
         billing_status,
         req.params.id
       ]
@@ -207,6 +316,8 @@ router.put('/:id', async (req, res) => {
 
     const company = result.rows[0];
     company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
+
+    console.log("UPDATE COMPANY - Result:", JSON.stringify(company, null, 2));
 
     res.json({ company });
   } catch (error) {
