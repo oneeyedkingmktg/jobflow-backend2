@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/companies.js
-// Version: v2.4 - Add website, city, state, zip, suspended fields
+// Version: v2.5 - CRITICAL: Fix boolean handling (suspended, estimator_enabled)
 // ============================================================================
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -226,7 +226,7 @@ router.put('/:id', async (req, res) => {
   try {
     const {
       company_name,
-      name, // Accept both formats
+      name,
       phone,
       email,
       website,
@@ -236,7 +236,7 @@ router.put('/:id', async (req, res) => {
       zip,
       suspended,
       ghl_api_key,
-      ghlApiKey, // Accept camelCase too
+      ghlApiKey,
       ghl_location_id,
       ghlLocationId,
       ghl_install_calendar,
@@ -260,6 +260,13 @@ router.put('/:id', async (req, res) => {
       encryptedApiKey = encryptApiKey(apiKeyValue);
     }
 
+    // CRITICAL: Handle booleans explicitly (false is a valid value!)
+    const suspendedValue = suspended !== undefined ? suspended : undefined;
+    const estimatorValue = estimator_enabled !== undefined ? estimator_enabled : 
+                          (estimatorEnabled !== undefined ? estimatorEnabled : undefined);
+
+    console.log("Boolean values - suspended:", suspendedValue, "estimator_enabled:", estimatorValue);
+
     const result = await db.query(
       `UPDATE companies SET
         company_name = COALESCE($1, company_name),
@@ -270,12 +277,12 @@ router.put('/:id', async (req, res) => {
         city = COALESCE($6, city),
         state = COALESCE($7, state),
         zip = COALESCE($8, zip),
-        suspended = COALESCE($9, suspended),
+        suspended = CASE WHEN $9::boolean IS NOT NULL THEN $9::boolean ELSE suspended END,
         ghl_api_key = COALESCE($10, ghl_api_key),
         ghl_location_id = COALESCE($11, ghl_location_id),
         ghl_install_calendar = COALESCE($12, ghl_install_calendar),
         ghl_appt_calendar = COALESCE($13, ghl_appt_calendar),
-        estimator_enabled = COALESCE($14, estimator_enabled),
+        estimator_enabled = CASE WHEN $14::boolean IS NOT NULL THEN $14::boolean ELSE estimator_enabled END,
         billing_status = COALESCE($15, billing_status),
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $16 AND deleted_at IS NULL
@@ -289,12 +296,12 @@ router.put('/:id', async (req, res) => {
         city,
         state,
         zip,
-        suspended,
+        suspendedValue,
         encryptedApiKey,
         ghl_location_id || ghlLocationId,
         ghl_install_calendar || ghlInstallCalendar,
         ghl_appt_calendar || ghlApptCalendar,
-        estimator_enabled !== undefined ? estimator_enabled : estimatorEnabled,
+        estimatorValue,
         billing_status,
         req.params.id
       ]
