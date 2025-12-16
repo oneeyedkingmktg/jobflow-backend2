@@ -81,17 +81,10 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    console.log('Login attempt for:', email);
-
-    // Validate input
     if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and password are required' 
-      });
+      return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Find user by email - JOIN with companies table to get company_name and suspended status
     const result = await pool.query(
       `SELECT 
         u.id, 
@@ -108,52 +101,27 @@ router.post('/login', async (req, res) => {
       [email]
     );
 
-    console.log('User found:', result.rows.length > 0);
-
     if (result.rows.length === 0) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid email or password' 
-      });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     const user = result.rows[0];
-    console.log('User ID:', user.id, 'Role:', user.role, 'Company suspended:', user.suspended);
 
-    // Check if company is suspended
     if (user.suspended === true) {
-      return res.status(403).json({
-        success: false,
-        message: 'This account is suspended. Please contact support.'
-      });
+      return res.status(403).json({ message: 'This account is suspended.' });
     }
 
-    // Verify password using password_hash
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    console.log('Password valid:', isValidPassword);
-
     if (!isValidPassword) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid email or password' 
-      });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    // Generate JWT token - IMPORTANT: Use 'id' not 'userId' to match middleware
     const token = jwt.sign(
-      { 
-        id: user.id,  // Must be 'id' to match middleware expectations
-        email: user.email, 
-        role: user.role,
-        company_id: user.company_id
-      },
+      { id: user.id, email: user.email, role: user.role, company_id: user.company_id },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log('Login successful for:', email);
-
-    // Return success with token and user info
     res.json({
       success: true,
       token,
@@ -168,12 +136,7 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Login failed',
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Login failed', error: error.message });
   }
 });
 
@@ -181,17 +144,12 @@ router.post('/login', async (req, res) => {
 router.get('/verify', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    
     if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No token provided' 
-      });
+      return res.status(401).json({ message: 'No token provided' });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Fetch fresh user data with company info
+
     const result = await pool.query(
       `SELECT 
         u.id, 
@@ -207,23 +165,72 @@ router.get('/verify', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'User not found' 
-      });
+      return res.status(401).json({ message: 'User not found' });
     }
 
-    res.json({
-      success: true,
-      user: result.rows[0]
-    });
+    res.json({ success: true, user: result.rows[0] });
 
   } catch (error) {
-    console.error('Token verification error:', error);
-    res.status(401).json({ 
-      success: false, 
-      message: 'Invalid token' 
-    });
+    res.status(401).json({ message: 'Invalid token' });
+  }
+});
+
+// ============================================================================
+// UPDATE OWN PROFILE (SELF-SERVICE)
+// ============================================================================
+
+router.put('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.id;
+
+    const { name, email, phone, zip, password } = req.body;
+
+    const updates = [];
+    const values = [];
+    let i = 1;
+
+    if (name) {
+      updates.push(`name = $${i++}`);
+      values.push(name);
+    }
+    if (email) {
+      updates.push(`email = $${i++}`);
+      values.push(email);
+    }
+    if (phone) {
+      updates.push(`phone = $${i++}`);
+      values.push(phone);
+    }
+    if (zip) {
+      updates.push(`zip = $${i++}`);
+      values.push(zip);
+    }
+    if (password) {
+      const hash = await bcrypt.hash(password, 10);
+      updates.push(`password_hash = $${i++}`);
+      values.push(hash);
+    }
+
+    if (updates.length === 0) {
+      return res.json({ success: true });
+    }
+
+    await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${i}`,
+      [...values, userId]
+    );
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Update self error:', error);
+    res.status(403).json({ message: 'Insufficient permissions' });
   }
 });
 
