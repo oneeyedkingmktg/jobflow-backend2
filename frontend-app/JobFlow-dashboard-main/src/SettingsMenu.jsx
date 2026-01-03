@@ -24,7 +24,8 @@ const formatPhone = (phone) => {
   return phone;
 };
 
-export default function SettingsMenu() {
+export default function SettingsMenu({ onRefresh }) {
+
   const { companies, switchCompany, currentCompany } = useCompany();
   const { user, isMaster, logout } = useAuth();
 
@@ -66,6 +67,12 @@ export default function SettingsMenu() {
   const handleMyProfile = () => {
     setShowMenu(false);
     setShowUserProfile(true);
+  };
+    const handleRefresh = () => {
+    setShowMenu(false);
+    if (typeof onRefresh === "function") {
+      onRefresh();
+    }
   };
 
   const handleLogout = () => {
@@ -194,6 +201,8 @@ export default function SettingsMenu() {
                       onClick={handleLogout} 
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-red-600 font-medium hover:bg-red-50 transition"
                     >
+
+  
                       Logout
                     </button>
                   </div>
@@ -203,6 +212,13 @@ export default function SettingsMenu() {
               {/* ADMIN MENU */}
               {isAdmin && !isMasterUser && (
                 <div className="p-4 space-y-2">
+                  <button
+  onClick={handleRefresh}
+  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+>
+  Refresh
+</button>
+
                   <button 
                     onClick={handleCompanySettings} 
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
@@ -215,6 +231,13 @@ export default function SettingsMenu() {
                   >
                     My Profile
                   </button>
+                  <button
+  onClick={handleRefresh}
+  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+>
+  Refresh
+</button>
+
                   <button 
                     onClick={handleLogout} 
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-red-600 font-medium hover:bg-red-50 transition"
@@ -227,6 +250,13 @@ export default function SettingsMenu() {
               {/* USER MENU */}
               {isRegularUser && !isAdmin && !isMasterUser && (
                 <div className="p-4 space-y-2">
+                  <button
+  onClick={handleRefresh}
+  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+>
+  Refresh
+</button>
+
                   <button 
                     onClick={handleMyProfile} 
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"

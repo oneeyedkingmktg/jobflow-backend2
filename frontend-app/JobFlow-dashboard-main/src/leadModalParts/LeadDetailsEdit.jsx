@@ -74,7 +74,7 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
           <input
             type="text"
             value={form.zip}
-            onChange={(e) => onChange("zip", e.target.value)}
+  onChange={(e) => onChange("zip", e.target.value.replace(/\D/g, "").slice(0, 5))}
             className="w-full mt-1 px-3 py-2 border rounded-lg"
           />
         </div>

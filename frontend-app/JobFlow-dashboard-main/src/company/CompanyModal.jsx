@@ -3,6 +3,8 @@
 // Version: v1.8.6 - Add API key status indicator
 // ============================================================================
 
+console.log("📂 CompanyModal.jsx file loaded");
+
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
 import UsersHome from "../users/UsersHome";
@@ -25,7 +27,12 @@ export default function CompanyModal({
   onClose,
   onSave,
 }) {
+  console.log("🎨 CompanyModal component rendering");
+  console.log("🎨 Mode:", mode);
+  console.log("🎨 Received company:", company);
+  
   const { user, isMaster } = useAuth();
+  // ... rest of code
   const isCreate = mode === "create";
   const isMasterUser = isMaster();
   const isAdminUser = user?.role === "admin";
@@ -53,62 +60,98 @@ export default function CompanyModal({
   // ------------------------------------------------------------
   const [prevCompanyId, setPrevCompanyId] = useState(null);
 
-  useEffect(() => {
-    if (isCreate) {
-      setActiveSection("info");
-      setSectionMode("edit");
-      setForm({
-        name: "",
-        phone: "",
-        email: "",
-        website: "",
-        address: "",
-        city: "",
-        state: "",
-        zip: "",
-        suspended: false,
-      });
-      setGhlForm({
-        ghlApiKey: "",
-        ghlLocationId: "",
-        ghlInstallCalendar: "",
-        ghlApptCalendar: "",
-      });
-      setSuspendedTouched(false);
-      setPrevCompanyId(null);
-      return;
-    }
+ useEffect(() => {
+  console.log("🔍 useEffect triggered");
+  console.log("🔍 isCreate:", isCreate);
+  console.log("🔍 company:", company);
+  
+  
+  if (isCreate) {
+    setActiveSection("info");
+    setSectionMode("edit");
+    setForm({
+      name: "",
+      phone: "",
+      email: "",
+      website: "",
+      address: "",
+      city: "",
+      state: "",
+      zip: "",
+      suspended: false,
+    });
+setGhlForm({
+  ghlApiKey: "",
+  ghlLocationId: "",
+  ghlInstallCalendar: "",
+  ghlApptCalendar: "",
+  ghlApptAssignedUser: "",
+  ghlInstallAssignedUser: "",
+  ghlApptTitleTemplate: "",
+  ghlInstallTitleTemplate: "",
+  ghlApptDescriptionTemplate: "",
+  ghlInstallDescriptionTemplate: "",
+});
 
-    if (company) {
-      setActiveSection("info");
-      setSectionMode("view");
+    setSuspendedTouched(false);
+    setPrevCompanyId(null);
+    return;
+  }
 
-      setForm({
-        name: company.name || "",
-        phone: company.phone || "",
-        email: company.email || "",
-        website: company.website || "",
-        address: company.address || "",
-        city: company.city || "",
-        state: company.state || "",
-        zip: company.zip || "",
-        suspended: company.suspended === true,
-      });
+  if (company) {
+    console.log("🔍 Company exists, setting form data");
+    console.log("🔍 company.ghl_appt_calendar:", company.ghl_appt_calendar);
+    console.log("🔍 company.ghl_install_calendar:", company.ghl_install_calendar);
+    console.log("🔍 company.ghl_appt_assigned_user:", company.ghl_appt_assigned_user);
+    console.log("🔍 company.ghl_install_assigned_user:", company.ghl_install_assigned_user);
+      console.log("🔍 Company exists, setting form data");
+  console.log("🔍 company.ghlApptTitleTemplate:", company.ghlApptTitleTemplate);
+  console.log("🔍 company.ghlInstallTitleTemplate:", company.ghlInstallTitleTemplate);
+  console.log("🔍 company.ghlApptDescriptionTemplate:", company.ghlApptDescriptionTemplate?.substring(0, 50));
+  console.log("🔍 FULL COMPANY OBJECT:", company);
 
-      setGhlForm({
-        ghlApiKey: company.ghlApikey || "",
-        ghlLocationId: company.ghlLocationId || "",
-        ghlInstallCalendar: company.ghlInstallCalendar || "",
-        ghlApptCalendar: company.ghlApptCalendar || "",
-      });
+    setActiveSection("info");
+    setSectionMode("view");
 
-      setSuspendedTouched(false);
-      setPrevCompanyId(company.id);
-    }
-  }, [isCreate, company]);
+    setForm({
+      name: company.name || "",
+      phone: company.phone || "",
+      email: company.email || "",
+      website: company.website || "",
+      address: company.address || "",
+      city: company.city || "",
+      state: company.state || "",
+      zip: company.zip || "",
+      suspended: company.suspended === true,
+    });
+console.log("🧠 Initializing GHL form from company:", {
+  ghl_location_id: company.ghl_location_id,
+  ghl_appt_calendar: company.ghl_appt_calendar,
+  ghl_install_calendar: company.ghl_install_calendar,
+});
 
-  if (!form) return null;
+    setGhlForm({
+      ghlApiKey: company.ghl_api_key || "",
+      ghlLocationId: company.ghl_location_id || "",
+      ghlInstallCalendar: company.ghl_install_calendar || "",
+      ghlApptCalendar: company.ghl_appt_calendar || "",
+      ghlApptAssignedUser: company.ghl_appt_assigned_user || "",
+      ghlInstallAssignedUser: company.ghl_install_assigned_user || "",
+      ghlApptTitleTemplate: company.ghl_appt_title_template ?? "",
+      ghlInstallTitleTemplate: company.ghl_install_title_template ?? "",
 
+     ghlApptDescriptionTemplate: company.ghl_appt_description_template ?? "",
+ghlInstallDescriptionTemplate: company.ghl_install_description_template ?? "",
+    });
+    
+    console.log("🔍 setGhlForm called with data");
+
+    setSuspendedTouched(false);
+    setPrevCompanyId(company.id);
+  }
+}, [isCreate, company, company?.id, company?.updatedAt]);
+
+if (!form) return null;
   // ------------------------------------------------------------
   // HANDLERS
   // ------------------------------------------------------------
@@ -159,38 +202,66 @@ export default function CompanyModal({
     }
   };
 
-  const handleSaveGHLKeys = async () => {
-    if (saving) return;
+const handleSaveGHLKeys = async () => {
+  if (saving) return;
 
-    try {
-      setSaving(true);
-      setError("");
+  try {
+    setSaving(true);
+    setError("");
 
-      const payload = {
-        name: form.name,
-        phone: form.phone || null,
-        email: form.email || null,
-        website: form.website || null,
-        address: form.address || null,
-        city: form.city || null,
-        state: form.state || null,
-        zip: form.zip || null,
-        suspended: form.suspended,
-        ghl_api_key: ghlForm.ghlApiKey || null,
-        ghl_location_id: ghlForm.ghlLocationId || null,
-        ghl_install_calendar: ghlForm.ghlInstallCalendar || null,
-        ghl_appt_calendar: ghlForm.ghlApptCalendar || null,
-      };
+    const payload = {
+      name: form.name,
+      phone: form.phone || null,
+      email: form.email || null,
+      website: form.website || null,
+      address: form.address || null,
+      city: form.city || null,
+      state: form.state || null,
+      zip: form.zip || null,
+      suspended: form.suspended,
+    };
 
-      await onSave(payload);
-      setError("");
-    } catch (err) {
-      console.error("GHL save error:", err);
-      setError(err.message || "Failed to save GHL keys");
-    } finally {
-      setSaving(false);
+    // Only include GHL fields if they have values (don't overwrite with null)
+    if (ghlForm.ghlApiKey) {
+      payload.ghl_api_key = ghlForm.ghlApiKey;
     }
-  };
+    if (ghlForm.ghlLocationId) {
+      payload.ghl_location_id = ghlForm.ghlLocationId;
+    }
+    if (ghlForm.ghlInstallCalendar) {
+      payload.ghl_install_calendar = ghlForm.ghlInstallCalendar;
+    }
+    if (ghlForm.ghlApptCalendar) {
+      payload.ghl_appt_calendar = ghlForm.ghlApptCalendar;
+    }
+    if (ghlForm.ghlApptAssignedUser) {
+      payload.ghl_appt_assigned_user = ghlForm.ghlApptAssignedUser;
+    }
+    if (ghlForm.ghlInstallAssignedUser) {
+      payload.ghl_install_assigned_user = ghlForm.ghlInstallAssignedUser;
+    }
+    if (ghlForm.ghlApptTitleTemplate) {
+      payload.ghl_appt_title_template = ghlForm.ghlApptTitleTemplate;
+    }
+    if (ghlForm.ghlInstallTitleTemplate) {
+      payload.ghl_install_title_template = ghlForm.ghlInstallTitleTemplate;
+    }
+    if (ghlForm.ghlApptDescriptionTemplate) {
+      payload.ghl_appt_description_template = ghlForm.ghlApptDescriptionTemplate;
+    }
+    if (ghlForm.ghlInstallDescriptionTemplate) {
+      payload.ghl_install_description_template = ghlForm.ghlInstallDescriptionTemplate;
+    }
+
+    await onSave(payload);
+    setError("");
+  } catch (err) {
+    console.error("GHL save error:", err);
+    setError(err.message || "Failed to save GHL keys");
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ------------------------------------------------------------
   // UI HELPERS
@@ -352,7 +423,7 @@ export default function CompanyModal({
     );
   };
 
-  const renderGHLKeys = () => {
+const renderGHLKeys = () => {
     const hasApiKey = company?.ghl_api_key || company?.ghlApikey;
 
     return (
@@ -370,6 +441,7 @@ export default function CompanyModal({
           </p>
         </div>
 
+        {/* API Credentials */}
         <div>
           <div className="flex items-center justify-between mb-1">
             <div className={viewLabel}>GHL API KEY</div>
@@ -406,24 +478,102 @@ export default function CompanyModal({
           />
         </div>
 
-        <div>
-          <div className={viewLabel}>INSTALL CALENDAR ID</div>
-          <input
-            className={editBox}
-            value={ghlForm.ghlInstallCalendar}
-            onChange={(e) => handleGhlChange("ghlInstallCalendar", e.target.value)}
-            placeholder="Calendar ID for installation appointments"
-          />
+        {/* Appointment Calendar Section */}
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-bold text-gray-700 mb-3">Appointment Calendar</h4>
+
+          <div>
+            <div className={viewLabel}>CALENDAR ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlApptCalendar}
+              onChange={(e) => handleGhlChange("ghlApptCalendar", e.target.value)}
+              placeholder="Calendar ID for sales appointments"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>ASSIGNED USER ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlApptAssignedUser}
+              onChange={(e) => handleGhlChange("ghlApptAssignedUser", e.target.value)}
+              placeholder="GHL User ID for appointment bookings"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>TITLE TEMPLATE</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlApptTitleTemplate}
+              onChange={(e) => handleGhlChange("ghlApptTitleTemplate", e.target.value)}
+              placeholder="{{full_name}} - Appointment"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>DESCRIPTION TEMPLATE</div>
+            <textarea
+              className={`${editBox} font-mono text-xs`}
+              rows="8"
+              value={ghlForm.ghlApptDescriptionTemplate}
+              onChange={(e) => handleGhlChange("ghlApptDescriptionTemplate", e.target.value)}
+              placeholder="Customer: {{full_name}}&#10;Phone: {{phone}}&#10;Email: {{email}}&#10;&#10;Service Address:&#10;{{address}}&#10;{{city}}, {{state}} {{zip}}"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Available fields: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <div className={viewLabel}>APPOINTMENT CALENDAR ID</div>
-          <input
-            className={editBox}
-            value={ghlForm.ghlApptCalendar}
-            onChange={(e) => handleGhlChange("ghlApptCalendar", e.target.value)}
-            placeholder="Calendar ID for sales appointments"
-          />
+        {/* Install Calendar Section */}
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-bold text-gray-700 mb-3">Install Calendar</h4>
+
+          <div>
+            <div className={viewLabel}>CALENDAR ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlInstallCalendar}
+              onChange={(e) => handleGhlChange("ghlInstallCalendar", e.target.value)}
+              placeholder="Calendar ID for installation appointments"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>ASSIGNED USER ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlInstallAssignedUser}
+              onChange={(e) => handleGhlChange("ghlInstallAssignedUser", e.target.value)}
+              placeholder="GHL User ID for install bookings"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>TITLE TEMPLATE</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlInstallTitleTemplate}
+              onChange={(e) => handleGhlChange("ghlInstallTitleTemplate", e.target.value)}
+              placeholder="{{full_name}} - Install"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>DESCRIPTION TEMPLATE</div>
+            <textarea
+              className={`${editBox} font-mono text-xs`}
+              rows="8"
+              value={ghlForm.ghlInstallDescriptionTemplate}
+              onChange={(e) => handleGhlChange("ghlInstallDescriptionTemplate", e.target.value)}
+              placeholder="Customer: {{full_name}}&#10;Phone: {{phone}}&#10;Email: {{email}}&#10;&#10;Service Address:&#10;{{address}}&#10;{{city}}, {{state}} {{zip}}"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Available fields: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -456,10 +606,25 @@ export default function CompanyModal({
             {isMasterUser && (
               <button
                 className={sectionBtn(activeSection === "ghl")}
-                onClick={() => {
-                  setActiveSection("ghl");
-                  setSectionMode("edit");
-                }}
+onClick={() => {
+  setActiveSection("ghl");
+  setSectionMode("edit");
+
+  setGhlForm({
+    ghlApiKey: company.ghlApiKey || "",
+    ghlLocationId: company.ghlLocationId || "",
+    ghlInstallCalendar: company.ghlInstallCalendar || "",
+    ghlApptCalendar: company.ghlApptCalendar || "",
+    ghlApptAssignedUser: company.ghlApptAssignedUser || "",
+    ghlInstallAssignedUser: company.ghlInstallAssignedUser || "",
+    ghlApptTitleTemplate: company.ghlApptTitleTemplate ?? "",
+    ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
+    ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
+    ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
+  });
+}}
+
+
               >
                 GHL Keys
               </button>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "./AuthContext";
 
-export default function Login() {
+export default function Login({ onForgotPassword }) {
   const { login, error, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,6 +53,16 @@ export default function Login() {
           {isLoading ? "Loading..." : "Login"}
         </button>
       </form>
+
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={onForgotPassword}
+          className="text-blue-600 hover:text-blue-800 text-sm"
+        >
+          Forgot Password?
+        </button>
+      </div>
     </div>
   );
 }

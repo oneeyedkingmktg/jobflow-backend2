@@ -7,7 +7,9 @@ export default function LeadStatusBar({
   setForm,
   onOpenNotSold,
   onOpenApptModal,
+  onOpenInstallModal,
 }) {
+
   const currentStatus = form.status || "lead";
 
   const setStatus = (status) => {
@@ -32,11 +34,12 @@ export default function LeadStatusBar({
     const next = NEXT_STATUS[currentStatus];
     if (!next) return;
 
-    if (currentStatus === "appointment_set" && next === "sold") {
-      setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
-      if (onOpenApptModal) onOpenApptModal();
-      return;
-    }
+if (currentStatus === "appointment_set" && next === "sold") {
+  setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
+  if (onOpenInstallModal) onOpenInstallModal();
+  return;
+}
+
 
     setStatus(next);
   };

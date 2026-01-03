@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/LeadModal.jsx
-// Version: v1.1 – With estimate loading functionality
+// Version: v1.2 – Fixed save and exit functionality
 // ============================================================================
 
 import React, { useState } from "react";
@@ -19,13 +19,15 @@ import LeadModalsWrapper from "./leadModalParts/LeadModalsWrapper.jsx";
 import LeadStatusBar from "./leadModalParts/LeadStatusBar.jsx";
 import EstimateModal from "./EstimateModal.jsx";
 
-export default function LeadModal({ lead, onSave, onSaveAndExit, onDelete }) {
+export default function LeadModal({ lead, onSave, onSaveAndExit, onDelete, onClose }) {
+
   const { currentCompany } = useCompany();
 
-  const [form, setForm] = useState({
-    ...lead,
-    hasEstimate: lead?.hasEstimate === true,
-  });
+const [form, setForm] = useState({
+  ...lead,
+  phone: formatPhoneNumber(lead?.phone || ""),
+  hasEstimate: lead?.hasEstimate === true,
+});
 
   const [isEditing, setIsEditing] = useState(!lead?.id);
   const [saving, setSaving] = useState(false);
@@ -38,28 +40,50 @@ export default function LeadModal({ lead, onSave, onSaveAndExit, onDelete }) {
   const [showApptModal, setShowApptModal] = useState(false);
   const [showNotSoldModal, setShowNotSoldModal] = useState(false);
 
-  const handleSave = async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      const updated = await onSave(form);
-      if (updated) setForm(p => ({ ...p, ...updated }));
-    } finally {
-      setSaving(false);
+const handleSave = async () => {
+  if (saving) return;
+  setSaving(true);
+  try {
+    const updated = await onSave(form);
+    if (updated) {
+      setForm(p => ({ ...p, ...updated }));
     }
-  };
+  } catch (error) {
+    console.error("Save error:", error);
+  } finally {
+    setSaving(false);
+  }
+};
 
-  const handleSaveAndExit = async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await onSaveAndExit(form);
-    } catch (error) {
-      console.error("Save and exit error:", error);
-    } finally {
-      setSaving(false);
+
+const handleSaveAndExit = async () => {
+  console.log("🔥 handleSaveAndExit CALLED");
+  if (saving) return;
+  setSaving(true);
+  try {
+    console.log("💾 About to save:", form);
+    const result = await onSaveAndExit(form);
+    console.log("✅ Save completed:", result);
+    
+    console.log("🚪 About to call onClose");
+    if (onClose) {
+      onClose();
+      console.log("✅ onClose called");
+    } else {
+      console.log("❌ onClose is undefined!");
     }
-  };
+  } catch (error) {
+    console.error("❌ Save and exit error:", error);
+    alert("Error saving: " + error.message);
+  } finally {
+    setSaving(false);
+    console.log("🏁 handleSaveAndExit finished, saving:", saving);
+  }
+};
+
+
+
+
 
   const handleNotSoldSelect = (reason) => {
     setForm(p => ({
@@ -107,12 +131,14 @@ export default function LeadModal({ lead, onSave, onSaveAndExit, onDelete }) {
           />
 
           <div className="px-6 py-6 space-y-5">
-            <LeadStatusBar 
-              form={form} 
-              setForm={setForm}
-              onOpenNotSold={() => setShowNotSoldModal(true)}
-              onOpenApptModal={() => setShowApptModal(true)}
-            />
+<LeadStatusBar 
+  form={form} 
+  setForm={setForm}
+  onOpenNotSold={() => setShowNotSoldModal(true)}
+  onOpenApptModal={() => setShowApptModal(true)}
+  onOpenInstallModal={() => setShowDateModal("install")}
+ />
+
 
             <LeadAddressBox 
               form={form}

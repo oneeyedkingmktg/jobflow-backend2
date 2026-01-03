@@ -97,13 +97,15 @@ export default function EstimateModal({ estimate, onClose }) {
                   {estimate.calculated_sf ? `${Number(estimate.calculated_sf).toLocaleString()} sq ft` : "N/A"}
                 </div>
               </div>
-
-              <div>
-                <div className="text-xs text-gray-500 uppercase">Concrete Condition</div>
-                <div className="font-semibold text-gray-900">
-                  {estimate.condition || "N/A"}
-                </div>
-              </div>
+<div>
+  <div className="text-xs text-gray-500 uppercase">Concrete Condition</div>
+  <div className="font-semibold text-gray-900">
+    {estimate.condition === "none" ? "Good" : 
+     estimate.condition === "minor" ? "A Few Cracks" : 
+     estimate.condition === "major" ? "A Lot of Cracks" : 
+     "N/A"}
+  </div>
+</div>
 
               <div>
                 <div className="text-xs text-gray-500 uppercase">Existing Coating</div>

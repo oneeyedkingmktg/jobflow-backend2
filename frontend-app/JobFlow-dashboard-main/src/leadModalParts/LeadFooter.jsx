@@ -19,27 +19,19 @@ export default function LeadFooter({
     <div className="pt-6 border-t border-gray-200">
       <div className="flex items-center justify-between w-full">
         {/* LEFT BUTTON */}
-        {isEditing ? (
-          <button
-            onClick={onExit}
-            disabled={saving}
-            className="px-4 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save & Exit"}
-          </button>
-        ) : (
-          <button
-            onClick={onExit}
-            disabled={saving}
-            className="px-4 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save & Exit"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onExit}
+          disabled={saving}
+          className="px-4 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save & Exit"}
+        </button>
 
         {/* RIGHT BUTTON */}
         {!isEditing ? (
           <button
+            type="button"
             onClick={onEdit}
             className="px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
           >
@@ -47,6 +39,7 @@ export default function LeadFooter({
           </button>
         ) : (
           <button
+            type="button"
             onClick={onSave}
             disabled={saving}
             className="px-5 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
@@ -60,6 +53,7 @@ export default function LeadFooter({
       <div className="mt-4 flex justify-center">
         {!deleteConfirm ? (
           <button
+            type="button"
             onClick={() => setDeleteConfirm(true)}
             disabled={saving}
             className="text-sm text-red-600 hover:text-red-800 underline disabled:opacity-50"
@@ -73,12 +67,14 @@ export default function LeadFooter({
             </div>
             <div className="flex gap-4">
               <button
+                type="button"
                 onClick={() => setDeleteConfirm(false)}
                 className="px-3 py-2 text-sm bg-gray-200 rounded-md hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={onDelete}
                 className="px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
               >

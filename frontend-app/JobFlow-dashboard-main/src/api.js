@@ -9,11 +9,7 @@
    v1.2 – Use console.error for diagnostic logging
 ============================================================================ */
 
-// Use local backend in dev, Render in prod
-const API_BASE_URL =
-  window.location.hostname === "localhost"
-    ? "http://localhost:3001"
-    : "https://jobflow-backend-tw5u.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /* Utility to convert camelCase → snake_case for payloads */
 const toSnake = (obj) => {
