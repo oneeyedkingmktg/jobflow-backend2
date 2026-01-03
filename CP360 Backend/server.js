@@ -1,5 +1,7 @@
+console.log("🔥 SERVER FILE LOADED");
+
 // ============================================================================
-// JobFlow Backend - Main Server (v3.3 unified architecture)
+// JobFlow Backend - Main Server (v3.4 - added GHL contact webhook)
 // ============================================================================
 
 // 🔴 DOTENV MUST BE FIRST
@@ -26,6 +28,7 @@ const { authenticateToken } = require("./middleware/auth");
 // Public routes
 const authRoutes = require("./routes/auth");
 const ghlWebhookRoutes = require("./routes/ghlWebhook");
+const webhookRoutes = require("./routes/webhookRoutes");
 const estimatorRoutes = require("./routes/estimator");
 
 // Protected routes
@@ -53,6 +56,7 @@ app.use(express.urlencoded({ extended: true }));
 // ============================================================================
 app.use("/auth", authRoutes);
 app.use("/webhooks/ghl", ghlWebhookRoutes);
+app.use("/api/webhooks", webhookRoutes); // NEW: GHL contact sync webhook
 
 // 🔓 PUBLIC ESTIMATOR PREVIEW (MUST COME FIRST)
 app.use("/estimator/preview", estimatorRoutes);
@@ -60,7 +64,7 @@ app.use("/estimator/preview", estimatorRoutes);
 // ============================================================================
 // PROTECTED ROUTES (JWT REQUIRED)
 // ============================================================================
-app.use("/leads", authenticateToken, leadsRoutes);
+app.use("/leads", leadsRoutes);
 app.use("/users", authenticateToken, usersRoutes);
 app.use("/companies", authenticateToken, companiesRoutes);
 app.use("/ghl", authenticateToken, ghlRoutes);
