@@ -44,15 +44,16 @@ const webhookController = {
       const contactData = {
         ghl_contact_id: webhookData.contact_id || webhookData.id,
         name: `${webhookData.first_name || webhookData.firstName || ''} ${webhookData.last_name || webhookData.lastName || ''}`.trim(),
-        phone: webhookData.phone ? webhookData.phone.replace(/\+1/, '').replace(/\D/g, '') : null, // Remove +1 and non-digits
+        phone: webhookData.phone ? webhookData.phone.replace(/\+1/, '').replace(/\D/g, '') : null,
         email: webhookData.email || null,
         address: webhookData.address1 || null,
         city: webhookData.city || null,
         state: webhookData.state || null,
         zip: webhookData.postal_code || webhookData.postalCode || null,
-        referral_source: webhookData['contact.jf_lead_source'] || null,
-        project_type: webhookData['contact.est_project_type'] || null,
-        notes: webhookData['contact.jf_notes'] || null,
+        referral_source: webhookData['JF Referral Source'] || null,
+        lead_source: webhookData['JF Lead Source'] || null,
+        project_type: webhookData['EST Project Type'] || null,
+        notes: webhookData['JF Notes'] || null,
       };
       
       console.log('📋 Mapped contact data:', contactData);
@@ -115,12 +116,20 @@ const fieldsToUpdate = {
           ghl_last_synced: now
         };
         
-        // WRITE-ONCE RULE: Only update referral_source if it's currently empty
+// WRITE-ONCE RULE: Only update referral_source if it's currently empty
         if (!existingLead.referral_source && contactData.referral_source) {
           fieldsToUpdate.referral_source = contactData.referral_source;
           console.log('✍️ Setting referral_source (was empty):', contactData.referral_source);
         } else if (existingLead.referral_source) {
           console.log('🔒 Skipping referral_source (already set):', existingLead.referral_source);
+        }
+        
+        // WRITE-ONCE RULE: Only update lead_source if it's currently empty
+        if (!existingLead.lead_source && contactData.lead_source) {
+          fieldsToUpdate.lead_source = contactData.lead_source;
+          console.log('✍️ Setting lead_source (was empty):', contactData.lead_source);
+        } else if (existingLead.lead_source) {
+          console.log('🔒 Skipping lead_source (already set):', existingLead.lead_source);
         }
         
         // Build SQL UPDATE statement
@@ -135,9 +144,9 @@ const fieldsToUpdate = {
 result = await client.query(
           `INSERT INTO leads (
             company_id, ghl_contact_id, name, phone, email,
-            address, city, state, zip, referral_source, project_type,
+            address, city, state, zip, referral_source, lead_source, project_type,
             notes, status, sync_source, ghl_last_synced, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           RETURNING *`,
           [
             company.id,
@@ -150,6 +159,7 @@ result = await client.query(
             contactData.state,
             contactData.zip,
             contactData.referral_source,
+            contactData.lead_source,
             contactData.project_type,
             contactData.notes,
             'lead', // Default status
