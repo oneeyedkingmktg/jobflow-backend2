@@ -1,10 +1,12 @@
 // File: src/App.jsx
-// Version: v1.1.1 – Bypass global loading gate for Companies screen (surgical)
+// Version: v1.1.2 – Added password reset token detection
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { CompanyProvider, useCompany } from "./CompanyContext";
 import Login from "./Login";
+import ForgotPassword from "./ForgotPassword";
+import ResetPassword from "./ResetPassword";
 import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import "./index.css";
@@ -58,6 +60,15 @@ function AppContent() {
   // App-level screen control (default = leads)
   const [activeScreen, setActiveScreen] = useState("leads");
 
+  // Detect reset token in URL and show reset password screen
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      setActiveScreen("reset-password");
+    }
+  }, []);
+
   // Expose setter for admin navigation
   if (typeof window !== "undefined") {
     window.__setAppScreen = setActiveScreen;
@@ -83,10 +94,16 @@ function AppContent() {
   }
 
   /* ---------------------------------------
-     2. Login screen
+     2. Login / Password Reset screens
      --------------------------------------- */
   if (!isAuthenticated || !user) {
-    return <Login />;
+    if (activeScreen === "forgot-password") {
+      return <ForgotPassword onBack={() => setActiveScreen("login")} />;
+    }
+    if (activeScreen === "reset-password") {
+      return <ResetPassword onBack={() => setActiveScreen("login")} />;
+    }
+    return <Login onForgotPassword={() => setActiveScreen("forgot-password")} />;
   }
 
   /* ---------------------------------------

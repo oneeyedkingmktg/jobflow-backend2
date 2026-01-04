@@ -46,10 +46,20 @@ router.get('/', async (req, res) => {
        ORDER BY c.created_at DESC`
     );
 
-    const companies = result.rows.map((company) => ({
-      ...company,
-      ghl_api_key: company.ghl_api_key ? '***hidden***' : null
-    }));
+    const companies = result.rows.map((company) => {
+      console.log("🔍 [BACKEND] Company ID", company.id, "fields:", {
+        ghl_appt_calendar: company.ghl_appt_calendar,
+        ghl_install_calendar: company.ghl_install_calendar,
+        ghl_appt_assigned_user: company.ghl_appt_assigned_user,
+      });
+      
+      // Hide API key
+      if (company.ghl_api_key) {
+        company.ghl_api_key = "***hidden***";
+      }
+      
+      return company;
+    });
 
     res.json({ companies });
   } catch (error) {
@@ -75,7 +85,17 @@ router.get('/:id', async (req, res) => {
     }
 
     const company = result.rows[0];
+    
+    console.log("🔍 [BACKEND] RAW company from DB:", {
+      ghl_appt_calendar: company.ghl_appt_calendar,
+      ghl_install_calendar: company.ghl_install_calendar,
+      ghl_appt_assigned_user: company.ghl_appt_assigned_user,
+      ghl_install_assigned_user: company.ghl_install_assigned_user,
+    });
+    
     company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
+
+    console.log("🔍 [BACKEND] Sending to frontend:", company);
 
     res.json({ company });
   } catch (error) {
@@ -89,28 +109,34 @@ router.get('/:id', async (req, res) => {
 // ============================================================================
 router.post('/', requireRole('master'), async (req, res) => {
   try {
-    const {
-      company_name,
-      name,
-      phone,
-      email,
-      website,
-      address,
-      city,
-      state,
-      zip,
-      suspended,
-      ghl_api_key,
-      ghl_location_id,
-      ghl_install_calendar,
-      ghl_appt_calendar,
-      estimator_enabled,
-      billing_status,
-      admin_email,
-      admin_password,
-      admin_name,
-      admin_phone
-    } = req.body;
+const {
+  company_name,
+  name,
+  phone,
+  email,
+  website,
+  address,
+  city,
+  state,
+  zip,
+  suspended,
+  ghl_api_key,
+  ghl_location_id,
+  ghl_install_calendar,
+  ghl_appt_calendar,
+  ghl_appt_assigned_user,          // NEW
+  ghl_install_assigned_user,        // NEW
+  ghl_appt_title_template,          // NEW (optional, uses DB default)
+  ghl_install_title_template,       // NEW (optional, uses DB default)
+  ghl_appt_description_template,    // NEW (optional, uses DB default)
+  ghl_install_description_template, // NEW (optional, uses DB default)
+  estimator_enabled,
+  billing_status,
+  admin_email,
+  admin_password,
+  admin_name,
+  admin_phone
+} = req.body;
 
     const finalCompanyName = company_name || name;
 
@@ -127,7 +153,7 @@ router.post('/', requireRole('master'), async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      const companyResult = await client.query(
+const companyResult = await client.query(
         `INSERT INTO companies (
           company_name,
           phone,
@@ -142,10 +168,16 @@ router.post('/', requireRole('master'), async (req, res) => {
           ghl_location_id,
           ghl_install_calendar,
           ghl_appt_calendar,
+          ghl_appt_assigned_user,
+          ghl_install_assigned_user,
+          ghl_appt_title_template,
+          ghl_install_title_template,
+          ghl_appt_description_template,
+          ghl_install_description_template,
           estimator_enabled,
           billing_status
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
         RETURNING *`,
         [
           finalCompanyName,
@@ -161,6 +193,12 @@ router.post('/', requireRole('master'), async (req, res) => {
           ghl_location_id || null,
           ghl_install_calendar || null,
           ghl_appt_calendar || null,
+          ghl_appt_assigned_user || null,
+          ghl_install_assigned_user || null,
+          ghl_appt_title_template || null,
+          ghl_install_title_template || null,
+          ghl_appt_description_template || null,
+          ghl_install_description_template || null,
           estimator_enabled || false,
           billing_status || 'active'
         ]
@@ -242,6 +280,12 @@ router.put('/:id', requireRole('master'), async (req, res) => {
     console.log('  ghl_location_id:', sanitizedBody.ghl_location_id);
     console.log('  ghl_install_calendar:', sanitizedBody.ghl_install_calendar);
     console.log('  ghl_appt_calendar:', sanitizedBody.ghl_appt_calendar);
+    console.log('  ghl_appt_assigned_user:', sanitizedBody.ghl_appt_assigned_user);
+    console.log('  ghl_install_assigned_user:', sanitizedBody.ghl_install_assigned_user);
+    console.log('  ghl_appt_title_template:', sanitizedBody.ghl_appt_title_template);
+    console.log('  ghl_install_title_template:', sanitizedBody.ghl_install_title_template);
+    console.log('  ghl_appt_description_template:', sanitizedBody.ghl_appt_description_template?.substring(0, 50) + '...');
+    console.log('  ghl_install_description_template:', sanitizedBody.ghl_install_description_template?.substring(0, 50) + '...');
 
     const {
       company_name,
@@ -263,6 +307,12 @@ router.put('/:id', requireRole('master'), async (req, res) => {
       ghlInstallCalendar,
       ghl_appt_calendar,
       ghlApptCalendar,
+      ghl_appt_assigned_user,
+      ghl_install_assigned_user,
+      ghl_appt_title_template,
+      ghl_install_title_template,
+      ghl_appt_description_template,
+      ghl_install_description_template,
 
       estimator_enabled,
       estimatorEnabled,
@@ -367,48 +417,60 @@ router.put('/:id', requireRole('master'), async (req, res) => {
     // -----------------------------
     // Update companies (company-only)
     // -----------------------------
-    const companyResult = await client.query(
-      `UPDATE companies SET
-        company_name = COALESCE($1, company_name),
-        phone = COALESCE($2, phone),
-        email = COALESCE($3, email),
-        website = COALESCE($4, website),
-        address = COALESCE($5, address),
-        city = COALESCE($6, city),
-        state = COALESCE($7, state),
-        zip = COALESCE($8, zip),
+const companyResult = await client.query(
+  `UPDATE companies SET
+    company_name = COALESCE($1, company_name),
+    phone = COALESCE($2, phone),
+    email = COALESCE($3, email),
+    website = COALESCE($4, website),
+    address = COALESCE($5, address),
+    city = COALESCE($6, city),
+    state = COALESCE($7, state),
+    zip = COALESCE($8, zip),
 
-        suspended = COALESCE($9, suspended),
-        estimator_enabled = COALESCE($10, estimator_enabled),
+    suspended = COALESCE($9, suspended),
+    estimator_enabled = COALESCE($10, estimator_enabled),
 
-        ghl_api_key = COALESCE($11, ghl_api_key),
-        ghl_location_id = COALESCE($12, ghl_location_id),
-        ghl_install_calendar = COALESCE($13, ghl_install_calendar),
-        ghl_appt_calendar = COALESCE($14, ghl_appt_calendar),
+    ghl_api_key = COALESCE($11, ghl_api_key),
+    ghl_location_id = COALESCE($12, ghl_location_id),
+    ghl_install_calendar = COALESCE($13, ghl_install_calendar),
+    ghl_appt_calendar = COALESCE($14, ghl_appt_calendar),
+    ghl_appt_assigned_user = COALESCE($15, ghl_appt_assigned_user),
+    ghl_install_assigned_user = COALESCE($16, ghl_install_assigned_user),
+    ghl_appt_title_template = COALESCE($17, ghl_appt_title_template),
+    ghl_install_title_template = COALESCE($18, ghl_install_title_template),
+    ghl_appt_description_template = COALESCE($19, ghl_appt_description_template),
+    ghl_install_description_template = COALESCE($20, ghl_install_description_template),
 
-        billing_status = COALESCE($15, billing_status),
-        updated_at = CURRENT_TIMESTAMP
-       WHERE id = $16 AND deleted_at IS NULL
-       RETURNING *`,
-      [
-        finalCompanyName,
-        phone,
-        email,
-        website,
-        address,
-        city,
-        state,
-        zip,
-        suspendedValue,
-        estimatorValue,
-        encryptedApiKey,
-        ghlLocationValue,
-        ghlInstallCalValue,
-        ghlApptCalValue,
-        billing_status,
-        companyId
-      ]
-    );
+    billing_status = COALESCE($21, billing_status),
+    updated_at = CURRENT_TIMESTAMP
+   WHERE id = $22 AND deleted_at IS NULL
+   RETURNING *`,
+  [
+    finalCompanyName,
+    phone,
+    email,
+    website,
+    address,
+    city,
+    state,
+    zip,
+    suspendedValue,
+    estimatorValue,
+    encryptedApiKey,
+    ghlLocationValue,
+    ghlInstallCalValue,
+    ghlApptCalValue,
+    ghl_appt_assigned_user || null,
+    ghl_install_assigned_user || null,
+    ghl_appt_title_template || null,
+    ghl_install_title_template || null,
+    ghl_appt_description_template || null,
+    ghl_install_description_template || null,
+    billing_status,
+    companyId
+  ]
+);
 
     if (companyResult.rows.length === 0) {
       await client.query('ROLLBACK');

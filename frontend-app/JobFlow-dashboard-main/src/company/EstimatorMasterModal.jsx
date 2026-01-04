@@ -12,26 +12,59 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [error, setError] = useState("");
   
   const [form, setForm] = useState({
-    estimatorEnabled: false,
-    fontFamily: "",
-    baseFontSize: null,
-    textColor: "",
-    primaryButtonColor: "",
-    primaryButtonTextColor: "",
-    primaryButtonRadius: null,
-    primaryButtonHoverColor: "",
-    accentColor: "",
-    mutedTextColor: "",
-    cardBackgroundColor: "",
-    cardBorderRadius: null,
-    cardShadowStrength: "",
-    maxWidth: null,
-    useEmbeddedStyles: true,
-    disclaimerText: "",
-    minJobInfoText: "",
-    standardInfoText: "",
-    tyUrlRedirect: "",
-  });
+  estimatorEnabled: false,
+
+  // Typography
+  fontFamily: "",
+  baseFontSize: null,
+
+  // Base colors
+  textColor: "",
+  accentColor: "",
+  mutedTextColor: "",
+
+  // Primary button
+  primaryButtonColor: "",
+  primaryButtonTextColor: "",
+  primaryButtonRadius: null,
+  primaryButtonHoverColor: "",
+
+  // Form button colors
+  selectedButtonColor: "",
+  selectedButtonTextColor: "",
+  unselectedButtonColor: "",
+  unselectedButtonTextColor: "",
+
+  // Card / layout
+  cardBackgroundColor: "",
+  cardBorderRadius: null,
+  cardShadowStrength: "",
+  maxWidth: null,
+  useEmbeddedStyles: true,
+
+// Results page styling
+  priceBoxBorderColor: "",
+  pricingInfoBoxBackgroundColor: "",
+  pricingInfoBoxStripeColor: "",
+
+// Text content
+customProjectLabel: "",
+disclaimerText: "",
+minJobInfoText: "",
+standardInfoText: "",
+
+// Commercial pricing
+commercialPricePerSfMin: null,
+commercialPricePerSfMax: null,
+
+
+  // Bottom CTA
+  nextStepsButtonText: "",
+
+  // Redirect
+  tyUrlRedirect: "",
+});
+
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -42,7 +75,8 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
         setError("");
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:3001/estimator/config?company_id=${company.id}`,
+          `${API_BASE_URL}/estimator/config?company_id=${company.id}`,
+
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -51,27 +85,59 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
         if (!response.ok) throw new Error("Failed to load estimator config");
 
         const data = await response.json();
-        setForm({
-          estimatorEnabled: data.is_active ?? false,
-          fontFamily: data.font_family ?? "",
-          baseFontSize: data.base_font_size ?? null,
-          textColor: data.text_color ?? "",
-          primaryButtonColor: data.primary_button_color ?? "",
-          primaryButtonTextColor: data.primary_button_text_color ?? "",
-          primaryButtonRadius: data.primary_button_radius ?? null,
-          primaryButtonHoverColor: data.primary_button_hover_color ?? "",
-          accentColor: data.accent_color ?? "",
-          mutedTextColor: data.muted_text_color ?? "",
-          cardBackgroundColor: data.card_background_color ?? "",
-          cardBorderRadius: data.card_border_radius ?? null,
-          cardShadowStrength: data.card_shadow_strength ?? "",
-          maxWidth: data.max_width ?? null,
-          useEmbeddedStyles: data.use_embedded_styles ?? true,
-          disclaimerText: data.disclaimer_text ?? "",
-          minJobInfoText: data.min_job_info_text ?? "",
-          standardInfoText: data.standard_info_text ?? "",
-          tyUrlRedirect: data.ty_url_redirect ?? "",
-        });
+setForm({
+  estimatorEnabled: data.is_active ?? false,
+
+  // Typography
+  fontFamily: data.font_family ?? "",
+  baseFontSize: data.base_font_size ?? null,
+
+  // Base colors
+  textColor: data.text_color ?? "",
+  accentColor: data.accent_color ?? "",
+  mutedTextColor: data.muted_text_color ?? "",
+
+  // Primary button
+  primaryButtonColor: data.primary_button_color ?? "",
+  primaryButtonTextColor: data.primary_button_text_color ?? "",
+  primaryButtonRadius: data.primary_button_radius ?? null,
+  primaryButtonHoverColor: data.primary_button_hover_color ?? "",
+
+// Form button colors
+  selectedButtonColor: data.selected_button_color ?? "",
+  selectedButtonTextColor: data.selected_button_text_color ?? "",
+  unselectedButtonColor: data.unselected_button_color ?? "",
+  unselectedButtonTextColor: data.unselected_button_text_color ?? "",
+
+  // Card / layout
+  cardBackgroundColor: data.card_background_color ?? "",
+  cardBorderRadius: data.card_border_radius ?? null,
+  cardShadowStrength: data.card_shadow_strength ?? "",
+  maxWidth: data.max_width ?? null,
+  useEmbeddedStyles: data.use_embedded_styles ?? true,
+
+  // Results page styling
+  priceBoxBorderColor: data.price_box_border_color ?? "",
+  pricingInfoBoxBackgroundColor: data.pricing_info_box_background_color ?? "",
+  pricingInfoBoxStripeColor: data.pricing_info_box_stripe_color ?? "",
+
+// Text content
+disclaimerText: data.disclaimer_text ?? "",
+minJobInfoText: data.min_job_info_text ?? "",
+standardInfoText: data.standard_info_text ?? "",
+
+// Commercial pricing
+commercialPricePerSfMin: data.commercial_price_per_sf_min ?? null,
+commercialPricePerSfMax: data.commercial_price_per_sf_max ?? null,
+
+
+  // Bottom CTA
+  nextStepsButtonText: data.next_steps_button_text ?? "",
+
+  // Redirect
+  tyUrlRedirect: data.ty_url_redirect ?? "",
+});
+
       } catch (err) {
         setError(err.message || "Failed to load estimator config");
       } finally {
@@ -100,21 +166,56 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
     </div>
   );
 
-  const textInput = (label, field, placeholder = "") =>
-    mode === "view"
-      ? viewBlock(label, displayValue(form[field]))
-      : (
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{label}</label>
+  // ---------------------------------------------------------------------------
+// Color input with live swatch preview
+// ---------------------------------------------------------------------------
+const colorInput = (label, field) =>
+  mode === "view"
+    ? viewBlock(label, displayValue(form[field]))
+    : (
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-1">
+          {label}
+        </label>
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={form[field] ?? ""}
             onChange={(e) => handleChange(field, e.target.value)}
-            placeholder={placeholder}
-            className="w-full px-3 py-2 border rounded-lg text-sm"
+            placeholder="#ffffff"
+className="w-1/2 px-3 py-2 border rounded-lg text-sm"
+
+          />
+          <div
+            className="w-6 h-6 rounded border"
+            style={{ backgroundColor: form[field] || "#ffffff" }}
           />
         </div>
-      );
+      </div>
+    );
+
+// ---------------------------------------------------------------------------
+// Standard text input
+// ---------------------------------------------------------------------------
+const textInput = (label, field, placeholder = "") =>
+  mode === "view"
+    ? viewBlock(label, displayValue(form[field]))
+    : (
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-1">
+          {label}
+        </label>
+        <input
+          type="text"
+          value={form[field] ?? ""}
+          onChange={(e) => handleChange(field, e.target.value)}
+          placeholder={placeholder}
+          className="w-1/2 px-3 py-2 border rounded-lg text-sm"
+
+        />
+      </div>
+    );
+
 
   const numberInput = (label, field, suffix = "") =>
     mode === "view"
@@ -128,7 +229,8 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
             onChange={(e) =>
               handleChange(field, e.target.value ? parseInt(e.target.value) : null)
             }
-            className="w-full px-3 py-2 border rounded-lg text-sm"
+className="w-1/2 px-3 py-2 border rounded-lg text-sm"
+
           />
         </div>
       );
@@ -157,30 +259,67 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
       setError("");
 
       const payload = {
-        company_id: company.id,
-        is_active: form.estimatorEnabled,
-        font_family: form.fontFamily || null,
-        base_font_size: form.baseFontSize,
-        text_color: form.textColor || null,
-        primary_button_color: form.primaryButtonColor || null,
-        primary_button_text_color: form.primaryButtonTextColor || null,
-        primary_button_radius: form.primaryButtonRadius,
-        primary_button_hover_color: form.primaryButtonHoverColor || null,
-        accent_color: form.accentColor || null,
-        muted_text_color: form.mutedTextColor || null,
-        card_background_color: form.cardBackgroundColor || null,
-        card_border_radius: form.cardBorderRadius,
-        card_shadow_strength: form.cardShadowStrength || null,
-        max_width: form.maxWidth,
-        use_embedded_styles: form.useEmbeddedStyles,
-        disclaimer_text: form.disclaimerText || null,
-        min_job_info_text: form.minJobInfoText || null,
-        standard_info_text: form.standardInfoText || null,
-        ty_url_redirect: form.tyUrlRedirect || null,
-      };
+  company_id: company.id,
+  is_active: form.estimatorEnabled,
+
+  // Typography
+  font_family: form.fontFamily || null,
+  base_font_size: form.baseFontSize,
+
+  // Base colors
+  text_color: form.textColor || null,
+  accent_color: form.accentColor || null,
+  muted_text_color: form.mutedTextColor || null,
+
+  // Primary button
+  primary_button_color: form.primaryButtonColor || null,
+  primary_button_text_color: form.primaryButtonTextColor || null,
+  primary_button_radius: form.primaryButtonRadius,
+  primary_button_hover_color: form.primaryButtonHoverColor || null,
+
+// Form button colors
+  selected_button_color: form.selectedButtonColor || null,
+  selected_button_text_color: form.selectedButtonTextColor || null,
+  unselected_button_color: form.unselectedButtonColor || null,
+  unselected_button_text_color: form.unselectedButtonTextColor || null,
+
+  // Card / layout
+  card_background_color: form.cardBackgroundColor || null,
+  card_border_radius: form.cardBorderRadius,
+  card_shadow_strength: form.cardShadowStrength || null,
+  max_width: form.maxWidth,
+  use_embedded_styles: form.useEmbeddedStyles,
+
+  // Results page styling
+// Results page styling
+  price_box_border_color: form.priceBoxBorderColor || null,
+  pricing_info_box_background:
+    form.pricingInfoBoxBackgroundColor || null,
+  pricing_info_box_stripe_color:
+    form.pricingInfoBoxStripeColor || null,
+    
+// Text content
+custom_project_label: form.customProjectLabel || null,
+disclaimer_text: form.disclaimerText || null,
+min_job_info_text: form.minJobInfoText || null,
+standard_info_text: form.standardInfoText || null,
+
+// Commercial pricing
+commercial_price_per_sf_min: form.commercialPricePerSfMin,
+commercial_price_per_sf_max: form.commercialPricePerSfMax,
+
+
+  // Bottom CTA
+  next_steps_button_text: form.nextStepsButtonText || null,
+
+  // Redirect
+  ty_url_redirect: form.tyUrlRedirect || null,
+};
+
 
       const token = localStorage.getItem("token");
-      const url = "http://localhost:3001/estimator/config";
+      const url = `${API_BASE_URL}/estimator/config`;
+
 
       let response = await fetch(url, {
         method: "PUT",
@@ -278,42 +417,76 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
           {/* TYPOGRAPHY */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-bold text-gray-900 mb-3">Typography</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {textInput("Font Family", "fontFamily", "inherit")}
-              {numberInput("Base Font Size", "baseFontSize", "px")}
-            </div>
+<div className="grid grid-cols-2 gap-4">
+  {colorInput("Text Color", "textColor")}
+  {colorInput("Accent Color", "accentColor")}
+  {colorInput("Muted Text Color", "mutedTextColor")}
+</div>
+
           </div>
 
           {/* COLORS */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Colors</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {textInput("Text Color", "textColor")}
-              {textInput("Accent Color", "accentColor")}
-              {textInput("Muted Text Color", "mutedTextColor")}
-            </div>
-          </div>
+{/* COLORS */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">Colors</h3>
+  <div className="grid grid-cols-2 gap-4">
+    {colorInput("Text Color", "textColor")}
+    {colorInput("Accent Color", "accentColor")}
+    {colorInput("Muted Text Color", "mutedTextColor")}
+  </div>
+</div>
+
 
           {/* PRIMARY BUTTON */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-bold text-gray-900 mb-3">Primary Button</h3>
             <div className="grid grid-cols-2 gap-4">
-              {textInput("Background Color", "primaryButtonColor")}
-              {textInput("Text Color", "primaryButtonTextColor")}
-              {textInput("Hover Color", "primaryButtonHoverColor")}
+{colorInput("Background Color", "primaryButtonColor")}
+{colorInput("Text Color", "primaryButtonTextColor")}
+{colorInput("Hover Color", "primaryButtonHoverColor")}
+
               {numberInput("Border Radius", "primaryButtonRadius", "px")}
             </div>
           </div>
-
-          {/* CARD STYLING */}
+          
+          {/* FORM BUTTONS */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Card Styling</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {textInput("Background Color", "cardBackgroundColor")}
-              {numberInput("Border Radius", "cardBorderRadius", "px")}
-              {textInput("Shadow Strength", "cardShadowStrength")}
+            <h3 className="font-bold text-gray-900 mb-3">Form Buttons (Project/Condition Selectors)</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {colorInput("Selected Button Color", "selectedButtonColor")}
+              {colorInput("Selected Button Text Color", "selectedButtonTextColor")}
+              {colorInput("Unselected Button Color", "unselectedButtonColor")}
+              {colorInput("Unselected Button Text Color", "unselectedButtonTextColor")}
             </div>
           </div>
+
+{/* CARD STYLING */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">Card Styling</h3>
+
+  {/* Row 1 */}
+  <div className="grid grid-cols-2 gap-4 mb-4">
+    {colorInput("Background Color", "cardBackgroundColor")}
+    {numberInput("Border Radius", "cardBorderRadius", "px")}
+  </div>
+
+  {/* Row 2 */}
+  <div className="grid grid-cols-2 gap-4">
+    {textInput("Shadow Strength", "cardShadowStrength")}
+  </div>
+</div>
+
+{/* RESULTS PAGE STYLING */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">Results Page</h3>
+  <div className="grid grid-cols-2 gap-4">
+ { colorInput("Price Box Border Color", "priceBoxBorderColor") }
+{ colorInput("Pricing Info Box Background", "pricingInfoBoxBackgroundColor") }
+{ colorInput("Pricing Info Box Stripe Color", "pricingInfoBoxStripeColor") }
+
+  </div>
+</div>
+
 
           {/* LAYOUT */}
           <div className="bg-gray-50 rounded-lg p-4">
@@ -340,21 +513,32 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
             </div>
           </div>
 
-          {/* TEXT CONTENT */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Text Content</h3>
-            <div className="space-y-4">
-              {textArea("Disclaimer Text", "disclaimerText")}
-              {textArea("Minimum Job Info Text", "minJobInfoText")}
-              {textArea("Standard Info Text", "standardInfoText")}
-            </div>
-          </div>
+{/* TEXT CONTENT */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">Text Content</h3>
 
-          {/* THANK YOU REDIRECT */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Thank You Page</h3>
-            {textInput("Redirect URL", "tyUrlRedirect")}
-          </div>
+  <div className="space-y-4">
+    {textInput("Custom Floor Display Name", "customProjectLabel", "e.g. Dance Floors")}
+    {textArea("Disclaimer Text", "disclaimerText")}
+    {textArea("Minimum Job Info Text", "minJobInfoText")}
+    {textArea("Standard Info Text", "standardInfoText")}
+  </div>
+</div>
+
+
+{/* CALL TO ACTION */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">Call To Action</h3>
+
+  <div className="grid grid-cols-2 gap-4 mb-4">
+    {textInput("Final CTA Button Text", "nextStepsButtonText", "e.g. Next Steps")}
+  </div>
+
+  <div className="mt-4">
+    {textInput("Thank You Page Redirect URL", "tyUrlRedirect")}
+  </div>
+</div>
+
         </div>
 
         {/* FOOTER */}

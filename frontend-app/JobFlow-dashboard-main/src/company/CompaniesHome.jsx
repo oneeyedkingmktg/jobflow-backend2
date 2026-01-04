@@ -67,33 +67,39 @@ export default function CompaniesHome() {
   // ------------------------------------------------------------
   // SAVE (ACTUAL FIX)
   // ------------------------------------------------------------
-  const handleSaveCompany = async (form) => {
-    try {
-      setError("");
+const handleSaveCompany = async (form) => {
+  try {
+    setError("");
 
-      // 🔒 Backend expects company_name, not name
-      const payload = {
-        ...form,
-        company_name: form.name,
-      };
-      delete payload.name;
+    // 🔒 Backend expects company_name, not name
+    const payload = {
+      ...form,
+      company_name: form.name,
+    };
+    delete payload.name;
 
-      if (modalMode === "create") {
-        await createCompany(payload);
-      } else if (selectedCompany) {
-        await updateCompany(selectedCompany.id, payload);
-      }
-
+    if (modalMode === "create") {
+      await createCompany(payload);
       await loadCompanies();
-
       setShowModal(false);
       setSelectedCompany(null);
       setModalMode("view");
-    } catch (err) {
-      setError(err.message || "Failed to save company");
+    } else if (selectedCompany) {
+      // ✅ Save and get the updated company directly from API response
+      const result = await updateCompany(selectedCompany.id, payload);
+      
+      // ✅ Use the fresh data from the API response immediately
+      if (result?.company) {
+        setSelectedCompany(result.company);
+      }
+      
+      // Reload the companies list in the background
+      await loadCompanies();
     }
-  };
-
+  } catch (err) {
+    setError(err.message || "Failed to save company");
+  }
+};
   // ------------------------------------------------------------
   // FILTER
   // ------------------------------------------------------------

@@ -2,16 +2,24 @@
 import React, { useState, useEffect } from "react";
 
 export default function CompanyDetails({ company, onBack, onSave, saving }) {
-  const [formData, setFormData] = useState({
+const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
     timezone: "",
     sales_calendar: "",
-    install_calendar: "",
+    //install_calendar: "",
     ghl_api_key: "",
     ghl_location_id: "",
+    ghl_appt_calendar: "",
+    ghl_install_calendar: "",
+    ghl_appt_assigned_user: "",
+    ghl_install_assigned_user: "",
+    ghl_appt_title_template: "",
+    ghl_install_title_template: "",
+    ghl_appt_description_template: "",
+    ghl_install_description_template: "",
     suspended: false,
   });
 
@@ -21,16 +29,24 @@ export default function CompanyDetails({ company, onBack, onSave, saving }) {
   useEffect(() => {
     if (!company) return;
 
-    setFormData({
+setFormData({
       name: company.company_name || company.name || "",
       phone: company.phone || "",
       email: company.email || "",
       address: company.address || "",
       timezone: company.timezone || "",
       sales_calendar: company.sales_calendar || "",
-      install_calendar: company.install_calendar || "",
+      ghl_install_calendar: company.ghl_install_calendar || "",
       ghl_api_key: company.ghl_api_key || "",
       ghl_location_id: company.ghl_location_id || "",
+      ghl_appt_calendar: company.ghl_appt_calendar || "",
+      ghl_install_calendar: company.ghl_install_calendar || "",
+      ghl_appt_assigned_user: company.ghl_appt_assigned_user || "",
+      ghl_install_assigned_user: company.ghl_install_assigned_user || "",
+      ghl_appt_title_template: company.ghl_appt_title_template ?? "",
+      ghl_install_title_template: company.ghl_install_title_template || "{{full_name}} - Install",
+      ghl_appt_description_template: company.ghl_appt_description_template || "",
+      ghl_install_description_template: company.ghl_install_description_template || "",
       suspended: !!company.suspended,
     });
     setError("");
@@ -215,39 +231,145 @@ export default function CompanyDetails({ company, onBack, onSave, saving }) {
             <label className="font-semibold">Install Calendar</label>
             <input
               type="text"
-              value={formData.install_calendar}
+              value={formData.ghl_install_calendar}
               onChange={(e) =>
-                handleChange("install_calendar", e.target.value)
+                handleChange("ghl_install_calendar", e.target.value)
               }
               className="w-full px-4 py-3 border rounded-lg"
             />
           </div>
         </div>
 
-        {/* GHL */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-          <div>
-            <label className="font-semibold">
-              Company GHL Location Code (ghl_api_key)
-            </label>
-            <input
-              type="text"
-              value={formData.ghl_api_key}
-              onChange={(e) => handleChange("ghl_api_key", e.target.value)}
-              className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
-            />
+{/* GHL */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="text-lg font-bold text-gray-800">GHL Integration</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="font-semibold">GHL API Key</label>
+              <input
+                type="text"
+                value={formData.ghl_api_key}
+                onChange={(e) => handleChange("ghl_api_key", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold">GHL Location ID</label>
+              <input
+                type="text"
+                value={formData.ghl_location_id}
+                onChange={(e) => handleChange("ghl_location_id", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="font-semibold">GHL Location ID</label>
-            <input
-              type="text"
-              value={formData.ghl_location_id}
-              onChange={(e) =>
-                handleChange("ghl_location_id", e.target.value)
-              }
-              className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
-            />
+          {/* Appointment Calendar */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="font-bold text-gray-700 mb-3">Appointment Calendar</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="font-semibold">Calendar ID</label>
+                <input
+                  type="text"
+                  value={formData.ghl_appt_calendar}
+                  onChange={(e) => handleChange("ghl_appt_calendar", e.target.value)}
+                  className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold">Assigned User ID</label>
+                <input
+                  type="text"
+                  value={formData.ghl_appt_assigned_user}
+                  onChange={(e) => handleChange("ghl_appt_assigned_user", e.target.value)}
+                  className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+                  placeholder="User ID for appointments"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="font-semibold">Title Template</label>
+              <input
+                type="text"
+                value={formData.ghl_appt_title_template}
+                onChange={(e) => handleChange("ghl_appt_title_template", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg"
+                placeholder="{{full_name}} - Appointment"
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="font-semibold">Description Template</label>
+              <textarea
+                value={formData.ghl_appt_description_template}
+                onChange={(e) => handleChange("ghl_appt_description_template", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+                rows="8"
+                placeholder="Customer: {{full_name}}&#10;Phone: {{phone}}&#10;Email: {{email}}&#10;&#10;Service Address:&#10;{{address}}&#10;{{city}}, {{state}} {{zip}}"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Available: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
+              </div>
+            </div>
+          </div>
+
+          {/* Install Calendar */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="font-bold text-gray-700 mb-3">Install Calendar</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="font-semibold">Calendar ID</label>
+                <input
+                  type="text"
+                  value={formData.ghl_install_calendar}
+                  onChange={(e) => handleChange("ghl_install_calendar", e.target.value)}
+                  className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold">Assigned User ID</label>
+                <input
+                  type="text"
+                  value={formData.ghl_install_assigned_user}
+                  onChange={(e) => handleChange("ghl_install_assigned_user", e.target.value)}
+                  className="w-full px-4 py-3 border rounded-lg font-mono text-sm"
+                  placeholder="User ID for installs"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="font-semibold">Title Template</label>
+              <input
+                type="text"
+                value={formData.ghl_install_title_template}
+                onChange={(e) => handleChange("ghl_install_title_template", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg"
+                placeholder="{{full_name}} - Install"
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="font-semibold">Description Template</label>
+              <textarea
+                value={formData.ghl_install_description_template}
+                onChange={(e) => handleChange("ghl_install_description_template", e.target.value)}
+                className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+                rows="8"
+                placeholder="Customer: {{full_name}}&#10;Phone: {{phone}}&#10;Email: {{email}}&#10;&#10;Service Address:&#10;{{address}}&#10;{{city}}, {{state}} {{zip}}"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Available: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
+              </div>
+            </div>
           </div>
         </div>
 

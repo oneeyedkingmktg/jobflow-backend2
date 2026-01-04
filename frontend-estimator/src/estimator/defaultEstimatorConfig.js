@@ -1,20 +1,8 @@
 // ============================================================================
 // Estimator Default Config
 // File: estimator/defaultEstimatorConfig.js
-// Version: v1.0.0 – Canonical seeded defaults for new companies
+// Version: v1.2.0 – Added results + coating button styling fields
 // ============================================================================
-//
-// Purpose:
-// - When a new contractor/company needs an estimator_configs row, we seed it
-//   with explicit values (no guessing, no UI fallback).
-// - Any numeric field that is not explicitly set should be 0,
-//   except multipliers where 1 is the neutral default.
-//
-// Notes:
-// - existing_coating_flat_fee is treated as ADDED $/SF (not a flat $ amount).
-// - Pricing fields default to 0 to avoid fallback pricing.
-// - card_shadow_strength is intentionally omitted (ambiguous / unused).
-//
 
 function defaultEstimatorConfig(companyId) {
   return {
@@ -29,73 +17,73 @@ function defaultEstimatorConfig(companyId) {
     // ------------------------------------------------------------------------
     allow_garage_1: true,
     allow_garage_2: true,
-    allow_garage_3: false,
-    allow_garage_4: false,
-    allow_patio: false,
-    allow_basement: false,
+    allow_garage_3: true,
+    allow_garage_4: true,
+    allow_patio: true,
+    allow_basement: true,
     allow_custom: false,
     allow_commercial: false,
 
     // ------------------------------------------------------------------------
-    // Average SF for garage types (used for calculations when garage_* selected)
-    // Explicit, no UI fallback. Use 0 if unknown.
+    // Average SF for garage types
     // ------------------------------------------------------------------------
-    avg_sf_1_car: 0,
-    avg_sf_2_car: 0,
-    avg_sf_3_car: 0,
-    avg_sf_4_car: 0,
+    avg_sf_1_car: 250,
+    avg_sf_2_car: 450,
+    avg_sf_3_car: 650,
+    avg_sf_4_car: 850,
 
     // ------------------------------------------------------------------------
     // Offered finishes (tabs)
     // ------------------------------------------------------------------------
     offers_solid: true,
     offers_flake: true,
-    offers_metallic: false,
+    offers_metallic: true,
 
     // ------------------------------------------------------------------------
-    // Minimum job pricing (0 means disabled unless your calculator treats 0 as a floor)
+    // Minimum job pricing
     // ------------------------------------------------------------------------
-    minimum_job_price: 0,
+    minimum_job_price: 1500,
 
-    // ------------------------------------------------------------------------
-    // Price per SF ranges (NO fallback pricing; 0 means not set)
-    // ------------------------------------------------------------------------
-    solid_price_per_sf_min: 0,
-    solid_price_per_sf_max: 0,
+// ------------------------------------------------------------------------
+// Price per SF ranges
+// ------------------------------------------------------------------------
+solid_price_per_sf_min: 5.0,
+solid_price_per_sf_max: 8.0,
 
-    flake_price_per_sf_min: 0,
-    flake_price_per_sf_max: 0,
+flake_price_per_sf_min: 7.0,
+flake_price_per_sf_max: 10.0,
 
-    metallic_price_per_sf_min: 0,
-    metallic_price_per_sf_max: 0,
+metallic_price_per_sf_min: 10.0,
+metallic_price_per_sf_max: 15.0,
 
-    patio_price_per_sf_min: 0,
-    patio_price_per_sf_max: 0,
+patio_price_per_sf_min: 8.0,
+patio_price_per_sf_max: 12.0,
 
-    basement_price_per_sf_min: 0,
-    basement_price_per_sf_max: 0,
+basement_price_per_sf_min: 6.0,
+basement_price_per_sf_max: 9.0,
 
-    custom_price_per_sf_min: 0,
-    custom_price_per_sf_max: 0,
+custom_price_per_sf_min: 7.0,
+custom_price_per_sf_max: 11.0,
+
+commercial_price_per_sf_min: 4.5,
+commercial_price_per_sf_max: 7.0,
+
 
     // ------------------------------------------------------------------------
     // Condition multipliers
-    // Neutral multiplier is 1.0 (not 0) so math stays neutral by default.
     // ------------------------------------------------------------------------
     condition_good_multiplier: 1.0,
-    condition_minor_multiplier: 1.0,
-    condition_major_multiplier: 1.0,
+    condition_minor_multiplier: 1.15,
+    condition_major_multiplier: 1.3,
 
     // ------------------------------------------------------------------------
     // Existing coating adjustments
-    // - multiplier applied first
-    // - then add $/SF (existing_coating_flat_fee is actually ADDED $/SF)
     // ------------------------------------------------------------------------
-    existing_coating_multiplier: 1.0,
-    existing_coating_flat_fee: 0,
+    existing_coating_multiplier: 1.25,
+    existing_coating_flat_fee: 2.0,
 
     // ------------------------------------------------------------------------
-    // Custom labels (DB-driven display text)
+    // Custom labels
     // ------------------------------------------------------------------------
     custom_project_label: "Other Project",
 
@@ -104,29 +92,58 @@ function defaultEstimatorConfig(companyId) {
     condition_major_label: "A Lot of Cracks",
 
     // ------------------------------------------------------------------------
-    // Visual styling (DB is source of truth; use explicit values)
-    // If you want “inherit” behavior, keep text fields as "inherit" or "" intentionally.
+    // Visual styling – base
     // ------------------------------------------------------------------------
-    font_family: "inherit",
-    base_font_size: 0,
-    text_color: "",
-    primary_button_color: "",
-    primary_button_text_color: "",
-    primary_button_radius: 0,
-    primary_button_hover_color: "",
-    accent_color: "",
-    muted_text_color: "",
-    card_background_color: "",
-    card_border_radius: 0,
-    max_width: 0,
-    use_embedded_styles: true,
+    font_family:
+      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    base_font_size: 16,
+    text_color: "#1f2937",
+
+    primary_button_color: "#f97316",
+    primary_button_text_color: "#ffffff",
+    primary_button_hover_color: "#ea580c",
+    primary_button_radius: 8,
+
+    accent_color: "#f97316",
+    muted_text_color: "#6b7280",
+
+    card_background_color: "#ffffff",
+    card_border_radius: 12,
+    card_shadow_strength: "medium",
+
+    max_width: 768,
+    use_embedded_styles: false,
+
+    // ------------------------------------------------------------------------
+    // Results page styling
+    // ------------------------------------------------------------------------
+    price_box_border_color: "#e5e7eb",
+
+    pricing_info_box_background_color: "#f8fafc",
+    pricing_info_box_stripe_color: "#f97316",
+
+    // ------------------------------------------------------------------------
+    // Coating type buttons (flake / solid / metallic)
+    // ------------------------------------------------------------------------
+    coating_type_button_bg_color: "#ffffff",
+    coating_type_button_selected_bg_color: "#f97316",
+    coating_type_button_text_color: "#1f2937",
+    coating_type_button_selected_text_color: "#ffffff",
 
     // ------------------------------------------------------------------------
     // Messaging / disclaimer
     // ------------------------------------------------------------------------
-    disclaimer_text: "",
-    min_job_info_text: "",
-    standard_info_text: "",
+    disclaimer_text:
+      "This is an estimate based on the information provided. Final pricing may vary after an in-person inspection.",
+    min_job_info_text:
+      "Minimum job pricing has been applied to this estimate.",
+    standard_info_text:
+      "This estimate is based on average costs for your project type and condition. Contact us for a precise quote!",
+
+    // ------------------------------------------------------------------------
+    // Bottom CTA
+    // ------------------------------------------------------------------------
+    next_steps_button_text: "Next Steps",
 
     // ------------------------------------------------------------------------
     // Redirect

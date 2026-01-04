@@ -1,7 +1,7 @@
 // ============================================================================
 // Estimator Routes
 // File: routes/estimator.js
-// Version: v1.7.13 - Auto-create seeded config on GET when missing
+// Version: v1.7.15 - Added form button color settings
 // ============================================================================
 
 const express = require("express");
@@ -16,74 +16,12 @@ const { calculateEstimate } = require("../estimator/calculateEstimate");
 //       We can refine these later once we align to the new estimator page design.
 // ============================================================================
 
+const { defaultEstimatorConfig } = require("../estimator/defaultEstimatorConfig");
+
 function buildDefaultEstimatorConfig(companyId) {
-  return {
-    company_id: companyId,
-    is_active: true,
-
-    allow_garage_1: true,
-    allow_garage_2: true,
-    allow_garage_3: false,
-    allow_garage_4: false,
-    allow_patio: false,
-    allow_basement: false,
-    allow_custom: false,
-
-    // Typical “current live” starting points; adjust later if your current UI differs
-    avg_sf_1_car: 250,
-    avg_sf_2_car: 400,
-    avg_sf_3_car: 600,
-    avg_sf_4_car: 800,
-
-    offers_solid: true,
-    offers_flake: true,
-    offers_metallic: false,
-
-    minimum_job_price: null,
-
-    solid_price_per_sf_min: null,
-    solid_price_per_sf_max: null,
-    flake_price_per_sf_min: null,
-    flake_price_per_sf_max: null,
-    metallic_price_per_sf_min: null,
-    metallic_price_per_sf_max: null,
-    patio_price_per_sf_min: null,
-    patio_price_per_sf_max: null,
-    basement_price_per_sf_min: null,
-    basement_price_per_sf_max: null,
-    custom_price_per_sf_min: null,
-    custom_price_per_sf_max: null,
-
-    condition_good_multiplier: 1.0,
-    condition_minor_multiplier: null,
-    condition_major_multiplier: null,
-
-    existing_coating_multiplier: null,
-    existing_coating_flat_fee: null,
-
-    font_family: "inherit",
-    base_font_size: null,
-    text_color: null,
-    primary_button_color: null,
-    primary_button_text_color: null,
-    primary_button_radius: null,
-    primary_button_hover_color: null,
-    accent_color: null,
-    muted_text_color: null,
-    card_background_color: null,
-    card_border_radius: null,
-    card_shadow_strength: null,
-    max_width: null,
-    use_embedded_styles: true,
-
-    disclaimer_text: null,
-    min_job_info_text: null,
-    standard_info_text: null,
-
-    allow_commercial: false,
-    ty_url_redirect: null,
-  };
+  return defaultEstimatorConfig(companyId);
 }
+
 
 // ============================================================================
 // GET /estimator/config
@@ -91,11 +29,14 @@ function buildDefaultEstimatorConfig(companyId) {
 
 router.get("/config", async (req, res) => {
   try {
-    const companyId = req.query.company_id;
+    // FIXED: Accept both 'company' and 'company_id' for backwards compatibility
+    const companyId = req.query.company || req.query.company_id;
 
     if (!companyId) {
-      return res.status(400).json({ error: "company_id required" });
+      return res.status(400).json({ error: "company parameter required" });
     }
+
+    console.log("Fetching estimator config for company:", companyId);
 
     const result = await query(
       `
@@ -111,6 +52,7 @@ router.get("/config", async (req, res) => {
     // AUTO-CREATE SEEDED ROW IF MISSING (so new companies start with defaults)
     // ----------------------------------------------------------------------
     if (result.rows.length === 0) {
+      console.log("No config found, creating default for company:", companyId);
       const d = buildDefaultEstimatorConfig(companyId);
 
       const columns = Object.keys(d);
@@ -135,13 +77,15 @@ router.get("/config", async (req, res) => {
         [companyId]
       );
 
+      console.log("Created default config:", created.rows[0]);
       return res.json(created.rows[0]);
     }
 
+    console.log("Config found for company:", companyId);
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Estimator config error:", err);
-    res.status(500).json({ error: "Estimator config failed" });
+    res.status(500).json({ error: "Estimator config failed", details: err.message });
   }
 });
 
@@ -164,7 +108,7 @@ router.put("/config", async (req, res) => {
     }
 
     console.log("=== ESTIMATOR CONFIG SAVE ===");
-    console.log("Version: v1.7.12");
+    console.log("Version: v1.7.15");
     console.log("Payload keys:", Object.keys(b));
 
     // ----------------------------------------------------------------------
@@ -215,6 +159,8 @@ router.put("/config", async (req, res) => {
         basement_price_per_sf_max,
         custom_price_per_sf_min,
         custom_price_per_sf_max,
+        commercial_price_per_sf_min,
+        commercial_price_per_sf_max,
 
         condition_good_multiplier,
         condition_minor_multiplier,
@@ -230,6 +176,10 @@ router.put("/config", async (req, res) => {
         primary_button_text_color,
         primary_button_radius,
         primary_button_hover_color,
+        selected_button_color,
+        selected_button_text_color,
+        unselected_button_color,
+        unselected_button_text_color,
         accent_color,
         muted_text_color,
         card_background_color,
@@ -238,26 +188,34 @@ router.put("/config", async (req, res) => {
         max_width,
         use_embedded_styles,
 
+        price_box_border_color,
+        pricing_info_box_background,
+        pricing_info_box_stripe_color,
+        
+        custom_project_label,
         disclaimer_text,
         min_job_info_text,
         standard_info_text,
+        next_steps_button_text,
 
         allow_commercial,
         ty_url_redirect
       )
-      VALUES (
-        $1,$2,
-        $3,$4,$5,$6,$7,$8,$9,
-        $10,$11,$12,$13,
-        $14,$15,$16,
-        $17,
-        $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
-        $30,$31,$32,
-        $33,$34,
-        $35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,
-        $49,$50,$51,
-        $52,$53
-      )
+VALUES (
+  $1,$2,
+  $3,$4,$5,$6,$7,$8,$9,
+  $10,$11,$12,$13,
+  $14,$15,$16,
+  $17,
+  $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,
+  $30,$31,$32,$33,
+  $34,$35,$36,
+  $37,$38,
+  $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
+  $53,$54,$55,
+  $56,$57,$58,$59,$60,
+  $61,$62,$63,$64
+)
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
 
@@ -292,6 +250,8 @@ router.put("/config", async (req, res) => {
         basement_price_per_sf_max = COALESCE(EXCLUDED.basement_price_per_sf_max, estimator_configs.basement_price_per_sf_max),
         custom_price_per_sf_min = COALESCE(EXCLUDED.custom_price_per_sf_min, estimator_configs.custom_price_per_sf_min),
         custom_price_per_sf_max = COALESCE(EXCLUDED.custom_price_per_sf_max, estimator_configs.custom_price_per_sf_max),
+        commercial_price_per_sf_min = COALESCE(EXCLUDED.commercial_price_per_sf_min, estimator_configs.commercial_price_per_sf_min),
+        commercial_price_per_sf_max = COALESCE(EXCLUDED.commercial_price_per_sf_max, estimator_configs.commercial_price_per_sf_max),
 
         condition_good_multiplier = COALESCE(EXCLUDED.condition_good_multiplier, estimator_configs.condition_good_multiplier),
         condition_minor_multiplier = COALESCE(EXCLUDED.condition_minor_multiplier, estimator_configs.condition_minor_multiplier),
@@ -307,6 +267,10 @@ router.put("/config", async (req, res) => {
         primary_button_text_color = COALESCE(EXCLUDED.primary_button_text_color, estimator_configs.primary_button_text_color),
         primary_button_radius = COALESCE(EXCLUDED.primary_button_radius, estimator_configs.primary_button_radius),
         primary_button_hover_color = COALESCE(EXCLUDED.primary_button_hover_color, estimator_configs.primary_button_hover_color),
+        selected_button_color = COALESCE(EXCLUDED.selected_button_color, estimator_configs.selected_button_color),
+        selected_button_text_color = COALESCE(EXCLUDED.selected_button_text_color, estimator_configs.selected_button_text_color),
+        unselected_button_color = COALESCE(EXCLUDED.unselected_button_color, estimator_configs.unselected_button_color),
+        unselected_button_text_color = COALESCE(EXCLUDED.unselected_button_text_color, estimator_configs.unselected_button_text_color),
         accent_color = COALESCE(EXCLUDED.accent_color, estimator_configs.accent_color),
         muted_text_color = COALESCE(EXCLUDED.muted_text_color, estimator_configs.muted_text_color),
         card_background_color = COALESCE(EXCLUDED.card_background_color, estimator_configs.card_background_color),
@@ -315,9 +279,15 @@ router.put("/config", async (req, res) => {
         max_width = COALESCE(EXCLUDED.max_width, estimator_configs.max_width),
         use_embedded_styles = COALESCE(EXCLUDED.use_embedded_styles, estimator_configs.use_embedded_styles),
 
+        price_box_border_color = COALESCE(EXCLUDED.price_box_border_color, estimator_configs.price_box_border_color),
+        pricing_info_box_background = COALESCE(EXCLUDED.pricing_info_box_background, estimator_configs.pricing_info_box_background),
+        pricing_info_box_stripe_color = COALESCE(EXCLUDED.pricing_info_box_stripe_color, estimator_configs.pricing_info_box_stripe_color),
+        
+        custom_project_label = COALESCE(EXCLUDED.custom_project_label, estimator_configs.custom_project_label),
         disclaimer_text = COALESCE(EXCLUDED.disclaimer_text, estimator_configs.disclaimer_text),
         min_job_info_text = COALESCE(EXCLUDED.min_job_info_text, estimator_configs.min_job_info_text),
         standard_info_text = COALESCE(EXCLUDED.standard_info_text, estimator_configs.standard_info_text),
+        next_steps_button_text = COALESCE(EXCLUDED.next_steps_button_text, estimator_configs.next_steps_button_text),
 
         allow_commercial = COALESCE(EXCLUDED.allow_commercial, estimator_configs.allow_commercial),
         ty_url_redirect = COALESCE(EXCLUDED.ty_url_redirect, estimator_configs.ty_url_redirect),
@@ -355,6 +325,8 @@ router.put("/config", async (req, res) => {
       b.basement_price_per_sf_max,
       b.custom_price_per_sf_min,
       b.custom_price_per_sf_max,
+      b.commercial_price_per_sf_min,
+      b.commercial_price_per_sf_max,
       b.condition_good_multiplier,
       b.condition_minor_multiplier,
       b.condition_major_multiplier,
@@ -367,6 +339,10 @@ router.put("/config", async (req, res) => {
       b.primary_button_text_color,
       b.primary_button_radius,
       b.primary_button_hover_color,
+      b.selected_button_color,
+      b.selected_button_text_color,
+      b.unselected_button_color,
+      b.unselected_button_text_color,
       b.accent_color,
       b.muted_text_color,
       b.card_background_color,
@@ -374,11 +350,16 @@ router.put("/config", async (req, res) => {
       b.card_shadow_strength,
       b.max_width,
       b.use_embedded_styles,
+      b.price_box_border_color,
+      b.pricing_info_box_background,
+      b.pricing_info_box_stripe_color,
+      b.custom_project_label,
       b.disclaimer_text,
       b.min_job_info_text,
       b.standard_info_text,
+      b.next_steps_button_text,
       b.allow_commercial,
-      b.ty_url_redirect,
+      b.ty_url_redirect
     ];
 
     console.log("SQL placeholders:", (sql.match(/\$/g) || []).length);
@@ -413,11 +394,69 @@ router.post("/preview", async (req, res) => {
     );
 
     if (configResult.rows.length === 0) {
-      return res.status(400).json({ error: "NO_ACTIVE_ESTIMATOR_CONFIG" });
+      // Auto-create default config if missing, then continue
+      const defaults = buildDefaultEstimatorConfig(companyId);
+
+      const columns = Object.keys(defaults);
+      const values = Object.values(defaults);
+      const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
+
+      await query(
+        `
+        INSERT INTO estimator_configs (${columns.join(", ")})
+        VALUES (${placeholders})
+        `,
+        values
+      );
+
+      const createdConfig = await query(
+        `
+        SELECT *
+        FROM estimator_configs
+        WHERE company_id = $1
+          AND is_active = true
+        LIMIT 1
+        `,
+        [companyId]
+      );
+
+      configResult.rows = createdConfig.rows;
     }
 
-    const estimate = calculateEstimate(configResult.rows[0], req.body);
-    res.json(estimate);
+    const config = configResult.rows[0];
+    const estimate = calculateEstimate(config, req.body);
+
+    // Fetch company phone number
+const companyResult = await query(
+  `SELECT phone FROM companies WHERE id = $1 LIMIT 1`,
+  [companyId]
+);
+
+const companyPhone = companyResult.rows[0]?.phone || null;
+
+    res.json({
+      estimate,
+      companyPhone,
+      display: {
+        font_family: config.font_family,
+        base_font_size: config.base_font_size,
+        text_color: config.text_color,
+        accent_color: config.accent_color,
+        muted_text_color: config.muted_text_color,
+
+        primary_button_color: config.primary_button_color,
+        primary_button_text_color: config.primary_button_text_color,
+        primary_button_radius: config.primary_button_radius,
+        primary_button_hover_color: config.primary_button_hover_color,
+
+        card_background_color: config.card_background_color,
+        card_border_radius: config.card_border_radius,
+        card_shadow_strength: config.card_shadow_strength,
+
+        max_width: config.max_width,
+      }
+    });
+
   } catch (err) {
     console.error("Estimator preview error:", err);
     res.status(500).json({ error: "Estimator preview failed" });

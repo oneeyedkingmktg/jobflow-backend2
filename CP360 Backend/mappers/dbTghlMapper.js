@@ -135,7 +135,7 @@ function buildInstallEventCreatePayload({ lead, company }) {
   }
 
   return {
-    calendarId: company.install_calendar,
+    calendarId: company.ghl_install_calendar,
     contactId: lead.ghl_contact_id,
     startTime: lead.install_at,
     title: EVENT_TITLES.install,

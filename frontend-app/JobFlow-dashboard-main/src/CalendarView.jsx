@@ -70,37 +70,37 @@ export default function CalendarView({ leads, onSelectLead }) {
     return `${hour}:${m} ${ampm}`;
   };
 
-  const groupedByDate = useMemo(() => {
-    const map = {};
-    leads.forEach((lead) => {
-      const apptKey = lead.apptDate;
-      const installKey = lead.installDate;
-      if (apptKey) {
-        if (!map[apptKey]) map[apptKey] = { appt: [], install: [] };
-        map[apptKey].appt.push(lead);
-      }
-      if (installKey) {
-        if (!map[installKey]) map[installKey] = { appt: [], install: [] };
-        map[installKey].install.push(lead);
-      }
-    });
-    return map;
-  }, [leads]);
+const groupedByDate = useMemo(() => {
+  const map = {};
+  leads.forEach((lead) => {
+    const apptKey = lead.appointmentDate;
+    const installKey = lead.installDate;
+    if (apptKey) {
+      if (!map[apptKey]) map[apptKey] = { appt: [], install: [] };
+      map[apptKey].appt.push(lead);
+    }
+    if (installKey) {
+      if (!map[installKey]) map[installKey] = { appt: [], install: [] };
+      map[installKey].install.push(lead);
+    }
+  });
+  return map;
+}, [leads]);
 
-  const futureLeads = useMemo(() => {
-    const now = new Date();
-    const allLeads = [];
-    
-    // Collect all appointments
-    leads.forEach((l) => {
-      if (l.apptDate && new Date(l.apptDate) >= now) {
-        allLeads.push({
-          ...l,
-          displayDate: l.apptDate,
-          displayType: 'appointment'
-        });
-      }
-    });
+ const futureLeads = useMemo(() => {
+  const now = new Date();
+  const allLeads = [];
+  
+  // Collect all appointments
+  leads.forEach((l) => {
+    if (l.appointmentDate && new Date(l.appointmentDate) >= now) {
+      allLeads.push({
+        ...l,
+        displayDate: l.appointmentDate,
+        displayType: 'appointment'
+      });
+    }
+  });
     
     // Collect all installs
     leads.forEach((l) => {
@@ -347,8 +347,8 @@ export default function CalendarView({ leads, onSelectLead }) {
 
         <div className="space-y-3">
           {[...data.install, ...data.appt].map((lead, i) => {
-            const isInstall = !!lead.installDate && lead.installDate === selectedDate;
-            const isAppt = !!lead.apptDate && lead.apptDate === selectedDate;
+const isInstall = !!lead.installDate && lead.installDate === selectedDate;
+const isAppt = !!lead.appointmentDate && lead.appointmentDate === selectedDate;
             const barColor = isInstall ? "bg-green-500" : isAppt ? "bg-blue-500" : "bg-gray-300";
             const label = isInstall ? "Install" : isAppt ? "Appointment" : "";
 
@@ -381,11 +381,11 @@ export default function CalendarView({ leads, onSelectLead }) {
                   </span>
                 </div>
 
-                {!isInstall && isAppt && lead.apptTime && (
-                  <div className="text-xs text-gray-700 px-3 pb-3">
-                    <strong>Time:</strong> {formatTime12h(lead.apptTime)}
-                  </div>
-                )}
+{!isInstall && isAppt && lead.appointmentTime && (
+  <div className="text-xs text-gray-700 px-3 pb-3">
+    <strong>Time:</strong> {formatTime12h(lead.appointmentTime)}
+  </div>
+)}
               </div>
             );
           })}

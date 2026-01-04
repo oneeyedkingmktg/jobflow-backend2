@@ -1,0 +1,470 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1033{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil Calibri;}}
+{\*\generator Riched20 10.0.19041}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\f0\fs22\lang9 // ============================================================================\par
+// Estimator UI\par
+// File: estimator/Estimator.jsx\par
+// Version: v1.5.9 - Phone format, 5-digit zip, required condition\par
+// ============================================================================\par
+\par
+import \{ useEffect, useState \} from "react";\par
+\par
+export default function Estimator() \{\par
+  const [screen, setScreen] = useState(1);\par
+  const [activeFinish, setActiveFinish] = useState("flake");\par
+  const [customProjectLabel, setCustomProjectLabel] = useState("Other Project");\par
+  const [customProjectEnabled, setCustomProjectEnabled] = useState(true);\par
+\par
+  useEffect(() => \{\par
+    fetch("/estimator/config")\par
+      .then(res => res.json())\par
+      .then(data => \{\par
+        const label = data.customProjectLabel || data.custom_project_label || "";\par
+        if (label.trim()) \{\par
+          setCustomProjectLabel(label.trim());\par
+          setCustomProjectEnabled(true);\par
+        \}\par
+      \})\par
+      .catch(err => console.error("Config error:", err));\par
+  \}, []);\par
+\par
+  const [projectType, setProjectType] = useState("");\par
+  const [condition, setCondition] = useState(""); // CHANGED: was "none", now required\par
+  const [length, setLength] = useState("");\par
+  const [width, setWidth] = useState("");\par
+  const [squareFeet, setSquareFeet] = useState("");\par
+  const [name, setName] = useState("");\par
+  const [email, setEmail] = useState("");\par
+  const [phone, setPhone] = useState("");\par
+  const [zip, setZip] = useState("");\par
+  const [estimate, setEstimate] = useState(null);\par
+  const [error, setError] = useState("");\par
+  const [submitting, setSubmitting] = useState(false);\par
+\par
+  const [showSizeModal, setShowSizeModal] = useState(false);\par
+  const [pendingProjectType, setPendingProjectType] = useState("");\par
+  const [sizeMode, setSizeMode] = useState("dims");\par
+  const [modalLength, setModalLength] = useState("");\par
+  const [modalWidth, setModalWidth] = useState("");\par
+  const [modalSf, setModalSf] = useState("");\par
+  const [sizeError, setSizeError] = useState("");\par
+\par
+  const validEmail = (v) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v);\par
+  const validPhone = (v) => /^\\D*(\\d\\D*)\{10,\}$/.test(v);\par
+\par
+  // ADDED: Phone formatter\par
+  const formatPhoneNumber = (value) => \{\par
+    const cleaned = value.replace(/\\D/g, "");\par
+    const limited = cleaned.substring(0, 10);\par
+\par
+    if (limited.length <= 3) \{\par
+      return limited;\par
+    \} else if (limited.length <= 6) \{\par
+      return `($\{limited.slice(0, 3)\}) $\{limited.slice(3)\}`;\par
+    \} else \{\par
+      return `($\{limited.slice(0, 3)\}) $\{limited.slice(3, 6)\}-$\{limited.slice(6)\}`;\par
+    \}\par
+  \};\par
+\par
+  const needsSizeModal = ["patio", "basement", "custom", "commercial"].includes(projectType);\par
+  const isCommercial = projectType === "commercial";\par
+  const isDimsProject = ["patio", "basement", "custom"].includes(projectType);\par
+\par
+  const formValid =\par
+    projectType &&\par
+    condition &&\par
+    name.trim() &&\par
+    validEmail(email) &&\par
+    validPhone(phone) &&\par
+    zip.trim() &&\par
+    (!needsSizeModal ||\par
+      (isDimsProject && ((Number(length) > 0 && Number(width) > 0) || Number(squareFeet) > 0)) ||\par
+      (isCommercial && Number(squareFeet) > 0));\par
+\par
+  function openSizeModal(nextType) \{\par
+    setPendingProjectType(nextType);\par
+    setShowSizeModal(true);\par
+    setSizeError("");\par
+    setModalLength("");\par
+    setModalWidth("");\par
+    setModalSf("");\par
+    setSizeMode(nextType === "commercial" ? "sf" : "dims");\par
+  \}\par
+\par
+  function cancelSizeModal() \{\par
+    setShowSizeModal(false);\par
+    setPendingProjectType("");\par
+    setSizeError("");\par
+    setProjectType("");\par
+    setLength("");\par
+    setWidth("");\par
+    setSquareFeet("");\par
+  \}\par
+\par
+  function saveSizeModal() \{\par
+    if (!pendingProjectType) return;\par
+\par
+    if (pendingProjectType === "commercial") \{\par
+      const sf = Number(modalSf);\par
+      if (!sf || sf <= 0) \{\par
+        setSizeError("Square footage is required.");\par
+        return;\par
+      \}\par
+      setProjectType(pendingProjectType);\par
+      setSquareFeet(String(sf));\par
+    \} else if (sizeMode === "dims") \{\par
+      const l = Number(modalLength);\par
+      const w = Number(modalWidth);\par
+      if (!l || !w) \{\par
+        setSizeError("Length and width are required.");\par
+        return;\par
+      \}\par
+      setProjectType(pendingProjectType);\par
+      setLength(String(l));\par
+      setWidth(String(w));\par
+      setSquareFeet("");\par
+    \} else \{\par
+      const sf = Number(modalSf);\par
+      if (!sf) \{\par
+        setSizeError("Square footage is required.");\par
+        return;\par
+      \}\par
+      setProjectType(pendingProjectType);\par
+      setSquareFeet(String(sf));\par
+      setLength("");\par
+      setWidth("");\par
+    \}\par
+\par
+    setShowSizeModal(false);\par
+    setPendingProjectType("");\par
+    setSizeError("");\par
+  \}\par
+\par
+  async function submitEstimate() \{\par
+    if (!formValid || submitting) return;\par
+    setSubmitting(true);\par
+    setError("");\par
+\par
+    try \{\par
+      const res = await fetch("/estimator/preview", \{\par
+        method: "POST",\par
+        headers: \{ "Content-Type": "application/json" \},\par
+        body: JSON.stringify(\{\par
+          project: \{ type: projectType, condition \},\par
+          length,\par
+          width,\par
+          squareFeet,\par
+          selectedQuality: activeFinish,\par
+          zip,\par
+          contact: \{ name, email, phone \}\par
+        \})\par
+      \});\par
+\par
+      const data = await res.json();\par
+      if (!res.ok) throw new Error(data.error || "Unable to generate estimate");\par
+\par
+      setEstimate(data);\par
+      setScreen(2);\par
+    \} catch (err) \{\par
+      setError(err.message);\par
+    \} finally \{\par
+      setSubmitting(false);\par
+    \}\par
+  \}\par
+\par
+  // Pre-calculate all display values for Screen 2\par
+  let projectLabel = "";\par
+  let priceDisplay = "$0";\par
+  let conditionLabel = "Good";\par
+  let infoText = "This is an estimate based on the information provided.";\par
+  let phoneDisplay = phone;\par
+  let phoneTel = phone;\par
+\par
+  if (screen === 2 && estimate) \{\par
+    // Project label\par
+    if (projectType.startsWith("garage_")) \{\par
+      projectLabel = projectType.split("_")[1] + " car garage";\par
+    \} else if (["patio", "basement"].includes(projectType)) \{\par
+      if (Number(length) > 0 && Number(width) > 0) \{\par
+        projectLabel = length + "' \'d7 " + width + "' " + projectType;\par
+      \} else if (Number(squareFeet) > 0) \{\par
+        projectLabel = Number(squareFeet).toLocaleString() + " sq ft " + projectType;\par
+      \} else \{\par
+        projectLabel = projectType;\par
+      \}\par
+    \} else if (projectType === "commercial") \{\par
+      if (Number(squareFeet) > 0) \{\par
+        projectLabel = "Commercial space (" + Number(squareFeet).toLocaleString() + " sq ft)";\par
+      \} else \{\par
+        projectLabel = "Commercial space";\par
+      \}\par
+    \} else \{\par
+      projectLabel = projectType;\par
+    \}\par
+\par
+    // Price display\par
+    if (estimate.allPriceRanges && estimate.allPriceRanges[activeFinish]) \{\par
+      const range = estimate.allPriceRanges[activeFinish];\par
+      if (estimate.minimumJobApplied) \{\par
+        priceDisplay = "$" + estimate.displayPriceMin.toLocaleString();\par
+      \} else \{\par
+        priceDisplay = "$" + range.min.toLocaleString() + " \f1\endash  $" + range.max.toLocaleString();\par
+      \}\par
+    \}\par
+\par
+    // Condition label\par
+    if (condition === "minor") \{\par
+      conditionLabel = "A Few Cracks";\par
+    \} else if (condition === "major") \{\par
+      conditionLabel = "A Lot of Cracks";\par
+    \}\par
+\par
+    // Info text\par
+    if (estimate.minimumJobApplied && estimate.minJobInfoText) \{\par
+      infoText = estimate.minJobInfoText;\par
+    \} else if (!estimate.minimumJobApplied && estimate.standardInfoText) \{\par
+      infoText = estimate.standardInfoText;\par
+    \}\par
+\par
+    // Phone formatting\par
+    const digits = phone.replace(/\\D/g, "");\par
+    if (digits.length === 10) \{\par
+      phoneDisplay = "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);\par
+    \}\par
+    phoneTel = digits;\par
+  \}\par
+\par
+  const dimsButtonClass = sizeMode === "dims" \par
+    ? "flex-1 py-2 px-4 rounded-lg font-medium bg-orange-500 text-white" \par
+    : "flex-1 py-2 px-4 rounded-lg font-medium bg-gray-100";\par
+\par
+  const sfButtonClass = sizeMode === "sf"\par
+    ? "flex-1 py-2 px-4 rounded-lg font-medium bg-orange-500 text-white"\par
+    : "flex-1 py-2 px-4 rounded-lg font-medium bg-gray-100";\par
+\par
+  const submitButtonClass = formValid\par
+    ? "w-full font-bold py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white"\par
+    : "w-full font-bold py-3 rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed";\par
+\par
+  return (\par
+    <div className="max-w-3xl mx-auto p-6">\par
+      \{showSizeModal && (\par
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">\par
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">\par
+            <h3 className="text-xl font-bold mb-4">Enter Size</h3>\par
+\par
+            \{pendingProjectType !== "commercial" && (\par
+              <div className="flex gap-2 mb-4">\par
+                <button type="button" onClick=\{() => setSizeMode("dims")\} className=\{dimsButtonClass\}>\par
+                  Length \f0\'d7 Width\par
+                </button>\par
+                <button type="button" onClick=\{() => setSizeMode("sf")\} className=\{sfButtonClass\}>\par
+                  Square Feet\par
+                </button>\par
+              </div>\par
+            )\}\par
+\par
+            <div className="space-y-3 mb-4">\par
+              \{sizeMode === "dims" && pendingProjectType !== "commercial" ? (\par
+                <div>\par
+                  <div className="mb-3">\par
+                    <label className="block text-sm font-medium mb-1">Length (feet)</label>\par
+                    <input\par
+                      type="number"\par
+                      value=\{modalLength\}\par
+                      onChange=\{(e) => setModalLength(e.target.value)\}\par
+                      className="w-full border rounded-lg px-3 py-2"\par
+                      placeholder="20"\par
+                    />\par
+                  </div>\par
+                  <div>\par
+                    <label className="block text-sm font-medium mb-1">Width (feet)</label>\par
+                    <input\par
+                      type="number"\par
+                      value=\{modalWidth\}\par
+                      onChange=\{(e) => setModalWidth(e.target.value)\}\par
+                      className="w-full border rounded-lg px-3 py-2"\par
+                      placeholder="15"\par
+                    />\par
+                  </div>\par
+                </div>\par
+              ) : (\par
+                <div>\par
+                  <label className="block text-sm font-medium mb-1">Square Feet</label>\par
+                  <input\par
+                    type="number"\par
+                    value=\{modalSf\}\par
+                    onChange=\{(e) => setModalSf(e.target.value)\}\par
+                    className="w-full border rounded-lg px-3 py-2"\par
+                    placeholder="300"\par
+                  />\par
+                </div>\par
+              )\}\par
+            </div>\par
+\par
+            \{sizeError && (\par
+              <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded mb-4 text-sm text-red-700">\par
+                \{sizeError\}\par
+              </div>\par
+            )\}\par
+\par
+            <div className="flex gap-3">\par
+              <button type="button" onClick=\{cancelSizeModal\} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 rounded-lg">\par
+                Cancel\par
+              </button>\par
+              <button type="button" onClick=\{saveSizeModal\} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 rounded-lg">\par
+                Save\par
+              </button>\par
+            </div>\par
+          </div>\par
+        </div>\par
+      )\}\par
+\par
+      \{screen === 1 && (\par
+        <div className="bg-white rounded-xl shadow p-6 space-y-6">\par
+          <h2 className="text-2xl font-bold text-center">Instant Price Estimator</h2>\par
+\par
+          <div>\par
+            <label className="font-semibold block mb-2">Your Project</label>\par
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">\par
+              \{["garage_1", "garage_2", "garage_3", "garage_4", "patio", "basement", "commercial"].map((type) => \{\par
+                const isSelected = projectType === type;\par
+                const btnClass = isSelected\par
+                  ? "rounded-lg border px-4 py-3 font-medium bg-orange-500 text-white border-orange-500"\par
+                  : "rounded-lg border px-4 py-3 font-medium bg-white hover:bg-gray-50";\par
+\par
+                return (\par
+                  <button\par
+                    key=\{type\}\par
+                    type="button"\par
+                    onClick=\{() => \{\par
+                      if (["patio", "basement", "commercial"].includes(type)) \{\par
+                        openSizeModal(type);\par
+                      \} else \{\par
+                        setProjectType(type);\par
+                        setLength("");\par
+                        setWidth("");\par
+                        setSquareFeet("");\par
+                      \}\par
+                    \}\}\par
+                    className=\{btnClass\}\par
+                  >\par
+                    \{type === "garage_1" && "1 Car Garage"\}\par
+                    \{type === "garage_2" && "2 Car Garage"\}\par
+                    \{type === "garage_3" && "3 Car Garage"\}\par
+                    \{type === "garage_4" && "4 Car Garage"\}\par
+                    \{type === "patio" && "Patio"\}\par
+                    \{type === "basement" && "Basement"\}\par
+                    \{type === "commercial" && "Commercial"\}\par
+                  </button>\par
+                );\par
+              \})\}\par
+            </div>\par
+          </div>\par
+\par
+          <div>\par
+            <label className="font-semibold block mb-2">Condition of Concrete</label>\par
+            <div className="grid grid-cols-3 gap-3">\par
+              \{[\par
+                \{ value: "none", label: "Good" \},\par
+                \{ value: "minor", label: "A Few Cracks" \},\par
+                \{ value: "major", label: "A Lot of Cracks" \}\par
+              ].map((opt) => \{\par
+                const isSelected = condition === opt.value;\par
+                const btnClass = isSelected\par
+                  ? "rounded-lg border px-4 py-3 font-medium bg-orange-500 text-white border-orange-500"\par
+                  : "rounded-lg border px-4 py-3 font-medium bg-white hover:bg-gray-50";\par
+\par
+                return (\par
+                  <button key=\{opt.value\} type="button" onClick=\{() => setCondition(opt.value)\} className=\{btnClass\}>\par
+                    \{opt.label\}\par
+                  </button>\par
+                );\par
+              \})\}\par
+            </div>\par
+          </div>\par
+\par
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">\par
+            <input className="border rounded px-3 py-2" placeholder="Name" value=\{name\} onChange=\{(e) => setName(e.target.value)\} />\par
+            <input className="border rounded px-3 py-2" placeholder="Email" value=\{email\} onChange=\{(e) => setEmail(e.target.value)\} />\par
+            <input \par
+              className="border rounded px-3 py-2" \par
+              placeholder="Phone" \par
+              value=\{phone\} \par
+              onChange=\{(e) => setPhone(formatPhoneNumber(e.target.value))\}\par
+            />\par
+            <input \par
+              className="border rounded px-3 py-2" \par
+              placeholder="ZIP Code" \par
+              value=\{zip\} \par
+              onChange=\{(e) => \{\par
+                const cleaned = e.target.value.replace(/\\D/g, "");\par
+                setZip(cleaned.substring(0, 5));\par
+              \}\}\par
+            />\par
+          </div>\par
+\par
+          \{error && (\par
+            <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded text-red-700">\par
+              \{error\}\par
+            </div>\par
+          )\}\par
+\par
+          <button onClick=\{submitEstimate\} disabled=\{!formValid || submitting\} className=\{submitButtonClass\}>\par
+            \{submitting ? "Calculating\'85" : "Get My Free Estimate"\}\par
+          </button>\par
+        </div>\par
+      )\}\par
+\par
+      \{screen === 2 && estimate && (\par
+        <div className="bg-white rounded-xl shadow p-6">\par
+          <h2 className="text-2xl font-bold text-center mb-6">Your Estimated Price</h2>\par
+\par
+          <div className="border border-orange-300 rounded-lg overflow-hidden">\par
+            <div className="p-5 text-center space-y-1">\par
+              <div className="text-sm font-semibold text-gray-700">\{projectLabel\}</div>\par
+              <div className="text-2xl font-bold">\{priceDisplay\}</div>\par
+              <div className="text-sm text-gray-600">\par
+                Your floor's current condition: <strong>\{conditionLabel\}</strong>\par
+              </div>\par
+            </div>\par
+\par
+            <div className="px-5 pb-5">\par
+              <div className="bg-yellow-50 border-l-4 border-orange-400 rounded-md px-4 py-4 text-sm">\par
+                \{infoText\}\par
+              </div>\par
+            </div>\par
+          </div>\par
+\par
+          <div className="flex justify-center gap-2 mt-4">\par
+            \{["flake", "solid", "metallic"].map((finish) => \{\par
+              if (!estimate || !estimate.allPriceRanges || !estimate.allPriceRanges[finish]) \{\par
+                return null;\par
+              \}\par
+              const isActive = activeFinish === finish;\par
+              const tabClass = isActive\par
+                ? "px-5 py-2 text-sm font-semibold rounded-t-md border bg-orange-500 text-white border-orange-500"\par
+                : "px-5 py-2 text-sm font-semibold rounded-t-md border bg-white text-gray-600 border-gray-300";\par
+\par
+              return (\par
+                <button key=\{finish\} onClick=\{() => setActiveFinish(finish)\} className=\{tabClass\}>\par
+                  \{finish.charAt(0).toUpperCase() + finish.slice(1)\}\par
+                </button>\par
+              );\par
+            \})\}\par
+          </div>\par
+\par
+          <div className="mt-8 flex flex-col md:flex-row gap-4">\par
+            <button className="w-full md:w-1/2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg">\par
+              Request an In-Person Estimate\par
+            </button>\par
+            <a href=\{"tel:" + phoneTel\} className="w-full md:w-1/2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg text-center">\par
+              Call me at \{phoneDisplay\}\par
+            </a>\par
+          </div>\par
+        </div>\par
+      )\}\par
+    </div>\par
+  );\par
+\}\par
+}
+ 

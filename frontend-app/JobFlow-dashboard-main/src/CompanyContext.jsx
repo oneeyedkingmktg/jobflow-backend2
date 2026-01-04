@@ -67,12 +67,20 @@ export const CompanyProvider = ({ children }) => {
         const normalized = raw.map(normalizeCompany).filter(Boolean);
 
         setCompanies(normalized);
-        setCurrentCompany((prev) => {
-          if (prev && normalized.some((c) => c.id === prev.id)) {
-            return prev;
-          }
-          return normalized[0] || null;
-        });
+setCurrentCompany((prev) => {
+  // Preserve explicitly selected company if it still exists
+  if (prev && normalized.some((c) => c.id === prev.id)) {
+    return prev;
+  }
+
+  // Only auto-select a company if none is currently set
+  if (!prev && normalized.length > 0) {
+    return normalized[0];
+  }
+
+  return null;
+});
+
       } else {
         if (!user.companyId) {
           setCompanies([]);

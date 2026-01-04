@@ -1,16 +1,43 @@
 // ============================================================================
 // File: src/leadModalParts/LeadDetailsView.jsx
-// Version: v1.2 – Added Lead Source display
+// Version: v1.4 – Added project type formatting
 // ============================================================================
 
-import React from "react";
+import React, { useState } from "react";
+import EstimateModal from "../EstimateModal.jsx";
 
 export default function LeadDetailsView({
   form,
   onEdit,
-  onOpenEstimate,
 }) {
   const hasEstimate = form?.hasEstimate === true;
+  const [showEstimateModal, setShowEstimateModal] = useState(false);
+  const [estimateData, setEstimateData] = useState(null);
+
+  const loadEstimate = async () => {
+    try {
+      const { apiRequest } = await import("../api.js");
+      const data = await apiRequest(`/leads/estimator/${form.id}`);
+      setEstimateData(data);
+      setShowEstimateModal(true);
+    } catch (err) {
+      console.error("Failed to load estimate:", err);
+      alert("Could not load estimate details");
+    }
+  };
+
+  const formatProjectType = (type) => {
+    if (!type) return "Not Set";
+    if (type.startsWith("garage_")) {
+      const carCount = type.split("_")[1];
+      return `${carCount} Car Garage`;
+    }
+    if (type === "patio") return "Patio";
+    if (type === "basement") return "Basement";
+    if (type === "commercial") return "Commercial";
+    if (type === "custom") return "Custom Project";
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
 
   return (
     <>
@@ -47,7 +74,7 @@ export default function LeadDetailsView({
         <div>
           <span className="text-gray-500 block">Project Type</span>
           <span className="font-semibold break-words">
-            {form.projectType || "Not Set"}
+            {formatProjectType(form.projectType)}
           </span>
         </div>
 
@@ -75,19 +102,28 @@ export default function LeadDetailsView({
         </div>
       </div>
 
-      {/* SINGLE ESTIMATE BUTTON (BELOW DETAILS) */}
+      {/* ESTIMATE BUTTON - Only shows if lead has estimate */}
       {hasEstimate && (
         <button
           type="button"
-          onClick={onOpenEstimate}
-          className="w-full mt-4 bg-white border border-gray-200 rounded-2xl px-5 py-4
-                     shadow-sm hover:border-blue-500 transition text-left"
+          onClick={(e) => {
+            e.stopPropagation();
+            loadEstimate();
+          }}
+          className="w-full mt-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white 
+                     rounded-xl px-5 py-4 shadow-sm hover:from-blue-700 hover:to-blue-800 
+                     transition font-bold"
         >
-          <div className="text-xs text-gray-500">Estimate</div>
-          <div className="font-bold text-gray-900">
-            View Estimate Details
-          </div>
+          📊 Online Estimate Exists for this Lead
         </button>
+      )}
+
+      {/* ESTIMATE MODAL */}
+      {showEstimateModal && estimateData && (
+        <EstimateModal
+          estimate={estimateData}
+          onClose={() => setShowEstimateModal(false)}
+        />
       )}
     </>
   );

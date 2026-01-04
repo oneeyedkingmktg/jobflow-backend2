@@ -240,4 +240,135 @@ router.put('/me', async (req, res) => {
   }
 });
 
+// TEST EMAIL - REMOVE AFTER TESTING
+router.post('/test-email', async (req, res) => {
+  try {
+    const { sendPasswordResetEmail } = require('../services/email'); // or '../utils/email'
+    
+    await sendPasswordResetEmail('troy@proshieldfloors.com', 'TEST-TOKEN-123');
+    
+    res.json({ success: true, message: 'Test email sent!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// FORGOT PASSWORD - Request reset token
+// ============================================================================
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Check if user exists
+    const userResult = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1 AND is_active = true',
+      [email]
+    );
+
+    // Always return success (don't reveal if email exists)
+    if (userResult.rows.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'If an account exists, a reset link has been sent.' 
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Generate secure random token
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save token to database
+    await pool.query(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
+    );
+
+    // Send email
+    const { sendPasswordResetEmail } = require('../services/email');
+    await sendPasswordResetEmail(user.email, token);
+
+    res.json({ 
+      success: true, 
+      message: 'If an account exists, a reset link has been sent.' 
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Unable to process request' });
+  }
+});
+
+// ============================================================================
+// RESET PASSWORD - Validate token and update password
+// ============================================================================
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Find valid token
+    const tokenResult = await pool.query(
+      `SELECT id, user_id, expires_at, used 
+       FROM password_reset_tokens 
+       WHERE token = $1`,
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired reset link' });
+    }
+
+    const resetToken = tokenResult.rows[0];
+
+    // Check if token is expired
+    if (new Date() > new Date(resetToken.expires_at)) {
+      return res.status(400).json({ message: 'Reset link has expired' });
+    }
+
+    // Check if token was already used
+    if (resetToken.used) {
+      return res.status(400).json({ message: 'Reset link has already been used' });
+    }
+
+    // Hash new password
+    const hash = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [hash, resetToken.user_id]
+    );
+
+    // Mark token as used
+    await pool.query(
+      'UPDATE password_reset_tokens SET used = true WHERE id = $1',
+      [resetToken.id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Password has been reset successfully' 
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Unable to reset password' });
+  }
+});
+
 module.exports = router;

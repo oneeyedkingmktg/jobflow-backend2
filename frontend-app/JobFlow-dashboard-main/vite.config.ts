@@ -5,8 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/estimator": {
-        target: "http://localhost:3001",
+"/estimator": {
+  target: process.env.VITE_API_URL,
+
         changeOrigin: true
       }
     }

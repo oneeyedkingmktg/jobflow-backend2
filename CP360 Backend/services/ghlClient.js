@@ -13,27 +13,38 @@ function createGhlClient({ ghl_api_key, ghl_location_id }) {
     throw new Error("GHL_CONFIG_MISSING");
   }
 
-  const client = axios.create({
-    baseURL: "https://services.leadconnectorhq.com",
-    headers: {
-      Authorization: `Bearer ${ghl_api_key}`,
-      Version: "2021-07-28",
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    timeout: 10000,
-  });
+const client = axios.create({
+  baseURL: "https://services.leadconnectorhq.com",
+  headers: {
+    Authorization: `Bearer ${ghl_api_key}`,
+    Version: "2021-07-28",
+    "Content-Type": "application/json",
+    Accept: "application/json",
+
+    // ✅ REQUIRED FOR LC v2
+    "Location-Id": ghl_location_id,
+  },
+  timeout: 10000,
+});
+
 
   // ---------------------------------------------------------------------------
   // CONTACT UPSERT (CREATE OR UPDATE – SAFE)
   // ---------------------------------------------------------------------------
-  async function createContact(payload) {
+async function createContact(payload) {
+  try {
     const res = await client.post("/contacts/upsert", {
       locationId: ghl_location_id,
       ...payload,
     });
     return res.data?.contact || null;
+  } catch (err) {
+    console.error("❌ GHL UPSERT ERROR STATUS:", err.response?.status);
+    console.error("❌ GHL UPSERT ERROR DATA:", err.response?.data);
+    throw err;
   }
+}
+
 
   async function updateContact(contactId, payload) {
     if (!contactId) throw new Error("CONTACT_ID_REQUIRED");

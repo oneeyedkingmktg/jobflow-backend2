@@ -3,7 +3,8 @@
 import SettingsMenu from "../SettingsMenu.jsx";
 import { useCompany } from "../CompanyContext.jsx";
 
-export default function LeadsHeader() {
+export default function LeadsHeader({ onRefresh }) {
+
   const { currentCompany } = useCompany();
 
   return (
@@ -14,7 +15,8 @@ export default function LeadsHeader() {
           <p className="text-blue-100">{currentCompany?.name || ""}</p>
         </div>
 
-        <SettingsMenu />
+<SettingsMenu onRefresh={onRefresh} />
+
       </div>
     </div>
   );

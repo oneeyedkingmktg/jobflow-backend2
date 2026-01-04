@@ -20,6 +20,8 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
     allowPatio: false,
     allowBasement: false,
     allowCustom: false,
+    customProjectLabel: "",
+
     allowCommercial: false,
 
     // Average square footage
@@ -49,6 +51,9 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
     basementPricePerSfMax: null,
     customPricePerSfMin: null,
     customPricePerSfMax: null,
+    commercialPricePerSfMin: null,
+commercialPricePerSfMax: null,
+
 
     // Condition multipliers
     conditionGoodMultiplier: 1.0,
@@ -70,7 +75,8 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
 
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `http://localhost:3001/estimator/config?company_id=${company.id}`,
+          `${API_BASE_URL}/estimator/config?company_id=${company.id}`,
+
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -98,6 +104,7 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
           allowPatio: d.allow_patio ?? false,
           allowBasement: d.allow_basement ?? false,
           allowCustom: d.allow_custom ?? false,
+          customProjectLabel: d.custom_project_label ?? "Custom",
           allowCommercial: d.allow_commercial ?? false,
 
           avgSf1Car: d.avg_sf_1_car ?? null,
@@ -123,6 +130,9 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
           basementPricePerSfMax: d.basement_price_per_sf_max ?? null,
           customPricePerSfMin: d.custom_price_per_sf_min ?? null,
           customPricePerSfMax: d.custom_price_per_sf_max ?? null,
+          commercialPricePerSfMin: d.commercial_price_per_sf_min ?? null,
+commercialPricePerSfMax: d.commercial_price_per_sf_max ?? null,
+
 
           conditionGoodMultiplier: d.condition_good_multiplier ?? 1.0,
           conditionMinorMultiplier: d.condition_minor_multiplier ?? null,
@@ -162,7 +172,8 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
       setError("");
 
       const token = localStorage.getItem("token");
-      const url = "http://localhost:3001/estimator/config";
+      const url = `${API_BASE_URL}/estimator/config`;
+
 
       // ----------------------------------------------------------------------
       // SAFETY: fetch existing config and merge so partial saves can't null fields
@@ -170,7 +181,8 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
       let existing = {};
       try {
         const existingRes = await fetch(
-          `http://localhost:3001/estimator/config?company_id=${company.id}`,
+          `${API_BASE_URL}/estimator/config?company_id=${company.id}`,
+
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -202,6 +214,7 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
         allow_patio: form.allowPatio,
         allow_basement: form.allowBasement,
         allow_custom: form.allowCustom,
+        custom_project_label: form.customProjectLabel || "Custom",
         allow_commercial: form.allowCommercial,
 
         avg_sf_1_car: toNumOrNull(form.avgSf1Car),
@@ -228,6 +241,9 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
         basement_price_per_sf_max: toNumOrNull(form.basementPricePerSfMax),
         custom_price_per_sf_min: toNumOrNull(form.customPricePerSfMin),
         custom_price_per_sf_max: toNumOrNull(form.customPricePerSfMax),
+        commercial_price_per_sf_min: toNumOrNull(form.commercialPricePerSfMin),
+commercial_price_per_sf_max: toNumOrNull(form.commercialPricePerSfMax),
+
 
         condition_good_multiplier: toNumOrNull(form.conditionGoodMultiplier),
         condition_minor_multiplier: toNumOrNull(form.conditionMinorMultiplier),
@@ -427,16 +443,43 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
             </div>
           </div>
 
-          {/* CUSTOM PRICING */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">
-              Custom Pricing (per sq ft)
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {numberInput("Min", "customPricePerSfMin", "$")}
-              {numberInput("Max", "customPricePerSfMax", "$")}
-            </div>
-          </div>
+{/* CUSTOM PRICING */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">
+    {form.customProjectLabel || "Custom"} Pricing (per sq ft)
+  </h3>
+
+  <div className="mb-4">
+    <label className="block text-xs font-semibold text-gray-700 mb-1">
+      Custom Project Label
+    </label>
+    <input
+      type="text"
+      value={form.customProjectLabel ?? ""}
+      onChange={(e) => handleChange("customProjectLabel", e.target.value)}
+      disabled={mode === "view"}
+      placeholder="e.g. Dance Floors"
+      className="w-1/2 px-3 py-2 border rounded-lg text-sm disabled:bg-transparent disabled:border-transparent"
+    />
+  </div>
+
+  <div className="grid grid-cols-2 gap-4">
+    {numberInput("Min", "customPricePerSfMin", "$")}
+    {numberInput("Max", "customPricePerSfMax", "$")}
+  </div>
+</div>
+
+          {/* COMMERCIAL PRICING */}
+<div className="bg-gray-50 rounded-lg p-4">
+  <h3 className="font-bold text-gray-900 mb-3">
+    Commercial Pricing (per sq ft)
+  </h3>
+  <div className="grid grid-cols-2 gap-4">
+    {numberInput("Min", "commercialPricePerSfMin", "$")}
+    {numberInput("Max", "commercialPricePerSfMax", "$")}
+  </div>
+</div>
+
 
           {/* CONDITION MULTIPLIERS */}
           <div className="bg-gray-50 rounded-lg p-4">
