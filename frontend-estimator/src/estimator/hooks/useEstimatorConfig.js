@@ -1,3 +1,5 @@
+// 🔴 MARKER: THIS IS THE FILE VERCEL *SHOULD* BE BUILDING — 2026-01-05
+
 // ============================================================================
 // Estimator Config Hook
 // File: estimator/hooks/useEstimatorConfig.js
