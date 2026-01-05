@@ -76,39 +76,19 @@ export default function useEstimatorConfig() {
   const [customStyles, setCustomStyles] = useState("");
 
 useEffect(() => {
-  // Get company_id from URL, default to 1
-  const params = new URLSearchParams(window.location.search);
-  const companyId = params.get("company") || 1;
+  console.log("🔥 estimator config useEffect fired");
 
+  fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=1`)
+    .then(res => res.json())
+    .then(data => {
+      console.log("✅ estimator config response", data);
+      setConfig(data);
+    })
+    .catch(err => {
+      console.error("❌ estimator config error", err);
+    });
+}, []);
 
-fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=${companyId}`)
-      .then(res => {
-        console.log("Config response status:", res.status);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        console.log("Raw config from backend:", data);
-        console.log("use_embedded_styles:", data.use_embedded_styles);
-        console.log("primary_button_color:", data.primary_button_color);
-        console.log("primary_button_text_color:", data.primary_button_text_color);
-        
-        setConfig(data);
-        
-        // Generate dynamic styles if use_embedded_styles is true
-        if (data.use_embedded_styles) {
-          const styles = generateCustomStyles(data);
-          console.log("Generated styles:", styles);
-          setCustomStyles(styles);
-        }
-      })
-      .catch(err => {
-        console.error("Config error:", err);
-        console.error("Full error:", err.message);
-      });
-  }, []);
 
   const useCustomStyles = config?.use_embedded_styles === true;
 
