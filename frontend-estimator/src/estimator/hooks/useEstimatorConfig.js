@@ -74,6 +74,8 @@ function generateCustomStyles(cfg) {
 }
 
 export default function useEstimatorConfig() {
+  console.log("🔥 useEstimatorConfig hook is running");
+
   const [config, setConfig] = useState(null);
   const [customStyles, setCustomStyles] = useState("");
 
