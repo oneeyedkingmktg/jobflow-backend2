@@ -126,7 +126,7 @@ if (currentStatus === "appointment_set" && next === "sold") {
                 status: e.target.value,
               }))
             }
-            className="appearance-none text-white font-semibold rounded-full w-full px-4 pr-10 shadow cursor-pointer"
+            className="appearance-none text-white font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
             style={{
               backgroundColor: STATUS_COLORS[form.status],
               height: "48px",
