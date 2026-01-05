@@ -10,10 +10,19 @@ const webhookController = {
       
       const webhookData = req.body;
       
-      // Extract locationId to identify which company
-      const locationId = webhookData.locationId;
+// DEBUG: Log the entire webhook payload
+      console.log('🔍 [WEBHOOK DEBUG] Full webhook received:', JSON.stringify(webhookData, null, 2));
+      
+      // Extract locationId - check multiple possible locations
+      let locationId = webhookData.locationId || 
+                       webhookData.customData?.locationId || 
+                       webhookData.location?.id;
+      
+      console.log('🔍 [WEBHOOK DEBUG] Extracted locationId:', locationId);
+      
       if (!locationId) {
         console.error('❌ No locationId in webhook payload');
+        console.error('❌ Available keys in webhookData:', Object.keys(webhookData));
         return res.status(400).json({ error: 'Missing locationId' });
       }
       

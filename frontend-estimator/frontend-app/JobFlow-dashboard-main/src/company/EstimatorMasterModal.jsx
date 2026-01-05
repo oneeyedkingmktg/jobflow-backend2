@@ -41,10 +41,11 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
         setLoading(true);
         setError("");
         const token = localStorage.getItem("token");
-        const response = await fetch(
-          `http://localhost:3001/estimator/config?company_id=${company.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+const response = await fetch(
+  `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+
 
         if (response.status === 404) return;
 

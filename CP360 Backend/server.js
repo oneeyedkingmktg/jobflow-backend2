@@ -5,16 +5,27 @@ console.log("🔥 SERVER FILE LOADED");
 // ============================================================================
 
 // 🔴 DOTENV MUST BE FIRST
+const path = require("path");
+
 require("dotenv").config({
-  path: require("path").resolve(__dirname, ".env"),
+  path:
+    process.env.NODE_ENV === "production"
+      ? path.resolve(__dirname, ".env.production")
+      : path.resolve(__dirname, ".env.local"),
 });
 
 // Debug: confirm env is actually loaded
 console.log("ENV CHECK:", {
   NODE_ENV: process.env.NODE_ENV,
-  DEV_AUTH_BYPASS: process.env.DEV_AUTH_BYPASS,
   DEV_COMPANY_ID: process.env.DEV_COMPANY_ID,
 });
+
+// Debug: confirm database url is loaded
+console.log(
+  "DB CHECK:",
+  process.env.DATABASE_URL ? "FOUND" : "MISSING"
+);
+
 
 const express = require("express");
 const cors = require("cors");

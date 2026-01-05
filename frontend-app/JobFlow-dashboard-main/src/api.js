@@ -9,7 +9,8 @@
    v1.2 – Use console.error for diagnostic logging
 ============================================================================ */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 /* Utility to convert camelCase → snake_case for payloads */
 const toSnake = (obj) => {

@@ -96,16 +96,18 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
         </select>
       </div>
 
-      {/* COMPANY NAME */}
-      <div>
-        <label className="text-gray-500">Company Name</label>
-        <input
-          type="text"
-          value={form.companyName}
-          onChange={(e) => onChange("companyName", e.target.value)}
-          className="w-full mt-1 px-3 py-2 border rounded-lg"
-        />
-      </div>
+{/* COMPANY NAME - only show if not Residential */}
+      {form.buyerType !== "Residential" && (
+        <div>
+          <label className="text-gray-500">Company Name</label>
+          <input
+            type="text"
+            value={form.companyName}
+            onChange={(e) => onChange("companyName", e.target.value)}
+            className="w-full mt-1 px-3 py-2 border rounded-lg"
+          />
+        </div>
+      )}
 
       {/* PROJECT TYPE */}
       <div>
@@ -121,11 +123,11 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
       {/* CONTRACT PRICE */}
       <div>
         <label className="text-gray-500">Contract Price</label>
-        <input
+<input
           type="number"
           value={form.contractPrice}
           onChange={(e) => onChange("contractPrice", e.target.value)}
-          className="w-full mt-1 px-3 py-2 border rounded-lg"
+          className="w-full mt-1 px-3 py-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
       </div>
 
