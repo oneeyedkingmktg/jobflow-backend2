@@ -85,7 +85,7 @@ export default function useEstimatorConfig() {
       return;
     }
 
-    fetch(`/estimator/config?company=${companyId}`)
+fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=${companyId}`)
       .then(res => {
         console.log("Config response status:", res.status);
         if (!res.ok) {
