@@ -114,7 +114,8 @@ export default function Estimator() {
       // 1️⃣ Get estimate preview
       console.log("🔍 Company ID from URL:", companyId);
       
-      const previewRes = await fetch("/estimator/preview", {
+const previewRes = await fetch(`${import.meta.env.VITE_API_URL}/estimator/preview`, {
+
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
