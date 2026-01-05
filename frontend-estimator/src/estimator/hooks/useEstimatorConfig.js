@@ -75,15 +75,11 @@ export default function useEstimatorConfig() {
   const [config, setConfig] = useState(null);
   const [customStyles, setCustomStyles] = useState("");
 
-  useEffect(() => {
-    // Get company_id from URL
-    const params = new URLSearchParams(window.location.search);
-    const companyId = params.get("company");
-    
-    if (!companyId) {
-      console.error("No company ID in URL");
-      return;
-    }
+useEffect(() => {
+  // Get company_id from URL, default to 1
+  const params = new URLSearchParams(window.location.search);
+  const companyId = params.get("company") || 1;
+
 
 fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=${companyId}`)
       .then(res => {
