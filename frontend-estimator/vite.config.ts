@@ -24,21 +24,19 @@ export default defineConfig({
     strictPort: true,
 
     // Proxy backend API requests to local backend
-proxy: {
-  "/estimator": {
-    target: process.env.VITE_API_URL,
-    changeOrigin: true,
-  },
-  "/leads": {
-    target: process.env.VITE_API_URL,
-    changeOrigin: true,
-  },
-  "/users": {
-    target: process.env.VITE_API_URL,
-    changeOrigin: true,
-  },
-},
-
+    proxy: {
+      "/estimator": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/leads": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/users": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
     },
   },
 });
