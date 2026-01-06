@@ -75,31 +75,22 @@ export default function useEstimatorConfig() {
   const [config, setConfig] = useState(null);
   const [customStyles, setCustomStyles] = useState("");
 
-  useEffect(() => {
-    // Get company_id from URL
+useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const companyId = params.get("company");
+    const companyId = params.get("company") || "1";
     
-    if (!companyId) {
-      console.error("No company ID in URL");
-      return;
-    }
-
-fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=${companyId}`)
-      .then(res => {
-        console.log("Config response status:", res.status);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-        return res.json();
-      })
+    console.log("🔥 estimator config useEffect fired, company:", companyId);
+    
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/estimator/config?company=${companyId}`)
+      .then(res => res.json())
       .then(data => {
-        console.log("Raw config from backend:", data);
-        console.log("use_embedded_styles:", data.use_embedded_styles);
-        console.log("primary_button_color:", data.primary_button_color);
-        console.log("primary_button_text_color:", data.primary_button_text_color);
-        
+        console.log("✅ estimator config response", data);
         setConfig(data);
+        
+        // Generate and set custom styles
+        const styles = generateCustomStyles(data);
+        setCustomStyles(styles);
+        console.log("🎨 Custom styles generated");
         
         // Generate dynamic styles if use_embedded_styles is true
         if (data.use_embedded_styles) {

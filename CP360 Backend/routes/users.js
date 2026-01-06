@@ -237,4 +237,48 @@ router.put("/me/password", async (req, res) => {
   }
 });
 
+// ============================================================================
+// DELETE /api/users/:id - Soft delete user (Admin/Master only)
+// ============================================================================
+router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Can't delete yourself
+    if (parseInt(id, 10) === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    // Get the user to check permissions
+    const existing = await db.query(
+      'SELECT company_id FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Non-master users can only delete users in their own company
+    if (req.user.role !== 'master' && existing.rows[0].company_id !== req.user.company_id) {
+      return res.status(403).json({ error: 'Cannot delete users from other companies' });
+    }
+
+    // Soft delete
+    const result = await db.query(
+      'UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 module.exports = router;
