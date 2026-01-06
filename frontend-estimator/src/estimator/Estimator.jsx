@@ -177,7 +177,16 @@ const leadRes = await fetch("https://api.coatingpro360.com/leads", {
 
       console.log("📡 LEAD RESPONSE STATUS:", leadRes.status);
       
-      const leadResData = await leadRes.json();
+let leadResData;
+const leadText = await leadRes.text();
+
+try {
+  leadResData = JSON.parse(leadText);
+} catch (e) {
+  console.error("❌ Lead response not JSON:", leadText);
+  throw new Error("Lead API did not return JSON");
+}
+
       console.log("📦 LEAD RESPONSE DATA:", leadResData);
 
       if (!leadRes.ok) {
