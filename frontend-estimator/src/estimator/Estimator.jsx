@@ -49,12 +49,24 @@ export default function Estimator() {
     return <div>Loading...</div>;
   }
 
-  // No company parameter - show splash screen
-  if (!companyId) {
+// No company parameter OR estimator not enabled - show promo
+  if (!companyId || !config.estimatorEnabled) {
     return (
       <div className="max-w-2xl mx-auto p-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Floor Coating Estimator</h1>
-        <p className="text-xl text-gray-600">Please access this estimator through your contractor's website.</p>
+        <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
+        <img 
+          src="https://storage.googleapis.com/msgsndr/34aDq5td6waKO9PI60IX/media/695d5f8ac5c3f8ba328bae3b.png" 
+          alt="CoatingPro360" 
+          className="w-64 h-64 mx-auto mb-6"
+        />
+        <a 
+          href="https://coatingpro360.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 text-xl font-semibold underline"
+        >
+          Visit CoatingPro360.com
+        </a>
       </div>
     );
   }
