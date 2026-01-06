@@ -168,11 +168,12 @@ const leadData = {
       console.log("🚀 SENDING LEAD DATA WITH ESTIMATE:", leadData);
 
       // 2️⃣ Create lead (now includes estimate data)
-      const leadRes = await fetch("/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leadData)
-      });
+const leadRes = await fetch("https://api.coatingpro360.com/leads", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(leadData)
+});
+
 
       console.log("📡 LEAD RESPONSE STATUS:", leadRes.status);
       
