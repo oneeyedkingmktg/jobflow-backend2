@@ -149,7 +149,7 @@ const handleSaveAndExit = async () => {
   setForm={setForm}
   onOpenNotSold={() => setShowNotSoldModal(true)}
   onOpenApptModal={() => setShowApptModal(true)}
-  onOpenInstallModal={() => setShowDateModal("install")}
+onOpenInstallModal={() => setShowDateModal("installDate")}
  />
 
 
