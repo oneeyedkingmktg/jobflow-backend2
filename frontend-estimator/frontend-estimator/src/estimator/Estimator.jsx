@@ -148,7 +148,10 @@ export default function Estimator() {
     setError("");
 
     try {
-      const res = await fetch("/estimator/preview", {
+const res = await fetch(
+  `${import.meta.env.VITE_API_BASE_URL}/estimator/preview`,
+  {
+
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
