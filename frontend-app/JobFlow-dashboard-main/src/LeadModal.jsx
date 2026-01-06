@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/LeadModal.jsx
-// Version: v1.2 – Fixed save and exit functionality
+// Version: v1.3 – Connected Call/Text to header buttons
 // ============================================================================
 
 import React, { useState } from "react";
@@ -81,9 +81,19 @@ const handleSaveAndExit = async () => {
   }
 };
 
+  const handleCall = () => {
+    if (form.phone) {
+      const cleanPhone = form.phone.replace(/\D/g, '');
+      window.location.href = `tel:${cleanPhone}`;
+    }
+  };
 
-
-
+  const handleText = () => {
+    if (form.phone) {
+      const cleanPhone = form.phone.replace(/\D/g, '');
+      window.location.href = `sms:${cleanPhone}`;
+    }
+  };
 
   const handleNotSoldSelect = (reason) => {
     setForm(p => ({
@@ -128,6 +138,9 @@ const handleSaveAndExit = async () => {
             name={form.name}
             status={form.status}
             phone={form.phone}
+            onCall={handleCall}
+            onText={handleText}
+            onMap={handleOpenMaps}
           />
 
           <div className="px-6 py-6 space-y-5">
