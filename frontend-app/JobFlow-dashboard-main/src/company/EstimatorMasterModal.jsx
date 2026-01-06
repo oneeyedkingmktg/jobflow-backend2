@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect } from "react";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [mode, setMode] = useState("view");
   const [saving, setSaving] = useState(false);
