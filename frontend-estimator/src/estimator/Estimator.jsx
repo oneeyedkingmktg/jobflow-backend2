@@ -44,6 +44,10 @@ export default function Estimator() {
   const [modalWidth, setModalWidth] = useState("");
   const [modalSf, setModalSf] = useState("");
   const [sizeError, setSizeError] = useState("");
+  // Wait for config to load
+  if (!config) {
+    return <div>Loading...</div>;
+  }
 
   // Modal handlers
   function openSizeModal(nextType) {

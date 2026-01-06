@@ -76,13 +76,21 @@ export default function useEstimatorConfig() {
   const [customStyles, setCustomStyles] = useState("");
 
 useEffect(() => {
-  console.log("🔥 estimator config useEffect fired");
-
-  fetch(`${import.meta.env.VITE_API_URL}/estimator/config?company=1`)
+  const params = new URLSearchParams(window.location.search);
+  const companyId = params.get("company") || "1";
+  
+  console.log("🔥 estimator config useEffect fired, company:", companyId);
+  
+  fetch(`${import.meta.env.VITE_API_BASE_URL}/estimator/config?company=${companyId}`)
     .then(res => res.json())
     .then(data => {
       console.log("✅ estimator config response", data);
       setConfig(data);
+      
+      // Generate and set custom styles
+      const styles = generateCustomStyles(data);
+      setCustomStyles(styles);
+      console.log("🎨 Custom styles generated");
     })
     .catch(err => {
       console.error("❌ estimator config error", err);
