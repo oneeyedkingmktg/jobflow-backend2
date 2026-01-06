@@ -72,7 +72,7 @@ export default function Estimator() {
   }
 
   // Estimator not enabled for this company - show promo
-  if (!config.estimatorEnabled) {
+if (!config.is_active) {
     return (
       <div className="max-w-2xl mx-auto p-8 text-center">
         <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
