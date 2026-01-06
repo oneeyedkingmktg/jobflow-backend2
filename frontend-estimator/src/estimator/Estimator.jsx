@@ -44,13 +44,14 @@ export default function Estimator() {
   const [modalWidth, setModalWidth] = useState("");
   const [modalSf, setModalSf] = useState("");
   const [sizeError, setSizeError] = useState("");
-  // Wait for config to load
+
+// Wait for config to load
   if (!config) {
     return <div>Loading...</div>;
   }
 
-// No company parameter OR estimator not enabled - show promo
-  if (!companyId || !config.estimatorEnabled) {
+  // No company parameter OR estimator not enabled - show promo
+  if (!companyId || !config.is_active) {
     return (
       <div className="max-w-2xl mx-auto p-8 text-center">
         <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
@@ -64,64 +65,6 @@ export default function Estimator() {
           target="_blank" 
           rel="noopener noreferrer"
           className="text-blue-600 hover:text-blue-800 text-xl font-semibold underline"
-        >
-          Visit CoatingPro360.com
-        </a>
-      </div>
-    );
-  }
-
-  // Estimator not enabled for this company - show promo
-console.log("🔍 Config loaded:", config);
-console.log("🔍 is_active value:", config?.is_active);
-console.log("🔍 Showing splash?", !config.is_active);
-
-if (!config.is_active) {
-  return (
-      <div className="max-w-2xl mx-auto p-8 text-center">
-        <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
-        <img 
-          src="https://storage.googleapis.com/msgsndr/34aDq5td6waKO9PI60IX/media/695d5f8ac5c3f8ba328bae3b.png" 
-          alt="CoatingPro360" 
-          className="w-64 h-64 mx-auto mb-6"
-        />
-        <a 
-          href="https://coatingpro360.com" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 text-xl font-semibold underline"
-        >
-          Visit CoatingPro360.com
-        </a>
-      </div>
-    );
-  }
-
-  // No company parameter - show splash screen
-  if (!companyId) {
-    return (
-      <div className="max-w-2xl mx-auto p-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Floor Coating Estimator</h1>
-        <p className="text-xl text-gray-600">Please access this estimator through your contractor's website.</p>
-      </div>
-    );
-  }
-
-  // Estimator not enabled for this company - show promo
-  if (!config.estimatorEnabled) {
-    return (
-      <div className="max-w-2xl mx-auto p-8 text-center">
-        <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
-        <img 
-          src="https://i.imgur.com/YOUR_UPLOADED_IMAGE.png" 
-          alt="CoatingPro360" 
-          className="w-64 h-64 mx-auto mb-6"
-        />
-        <a 
-          href="https://coatingpro360.com" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 text-xl font-semibold"
         >
           Visit CoatingPro360.com
         </a>
