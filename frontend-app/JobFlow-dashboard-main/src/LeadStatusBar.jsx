@@ -15,14 +15,12 @@ export default function LeadStatusBar({
   const currentStatus = form.status || "lead";
 
 const setStatus = (status) => {
-    console.log("🔍 setStatus called with:", status);
+    alert("setStatus called: " + status); // FORCE VISIBLE
     setForm((prev) => ({ ...prev, status }));
     
     // Auto-open appointment modal when status becomes appointment_set
     if (status === "appointment_set") {
-      console.log("✅ Triggering appointment modal");
-      console.log("onOpenApptModal exists?", !!onOpenApptModal);
-      
+      alert("About to open appointment modal"); // FORCE VISIBLE
       if (onOpenApptModal) {
         onOpenApptModal();
       }
