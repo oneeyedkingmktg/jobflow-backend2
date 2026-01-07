@@ -193,16 +193,16 @@ export default function UserProfileModal({
             />
           </div>
 
-          {/* ROLE */}
+         {/* ROLE */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Role
             </label>
             <select
-              disabled={mode === "view"}
+              disabled={mode === "view" || isMyProfile}
               value={form.role}
               onChange={(e) => handleChange("role", e.target.value)}
-              className="w-full rounded-xl border px-4 py-3 disabled:bg-gray-50"
+              className="w-full rounded-xl border px-4 py-3 disabled:bg-gray-50 disabled:cursor-not-allowed"
             >
               <option value="user">User</option>
               <option value="admin">Admin</option>
