@@ -8,6 +8,10 @@ const calendarWebhookController = {
     try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
+          // 🔍 DEBUG: Log ALL field names so we can find the event ID
+    console.log('📅 [DEBUG] Available fields:', Object.keys(req.body));
+    console.log('📅 [DEBUG] Full payload:', req.body);
+      
       const webhookData = req.body;
       
       // Extract event data (try multiple possible field names)
