@@ -630,6 +630,14 @@ onClick={() => {
               </button>
             )}
 
+{(isMasterUser || isAdminUser) && (
+  <button
+    className={sectionBtn(false)}
+    onClick={() => setShowEstimatorPricing(true)}
+  >
+    Estimator
+  </button>
+)}
 
 
 
