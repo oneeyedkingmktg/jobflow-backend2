@@ -630,14 +630,15 @@ onClick={() => {
               </button>
             )}
 
-            {(isMasterUser || (isAdminUser && company?.estimatorEnabled)) && (
-              <button
-                className={sectionBtn(false)}
-                onClick={() => setShowEstimatorPricing(true)}
-              >
-                Estimator
-              </button>
-            )}
+{(isMasterUser || isAdminUser) && (
+  <button
+    className={sectionBtn(false)}
+    onClick={() => setShowEstimatorPricing(true)}
+  >
+    Estimator Admin
+  </button>
+)}
+
 
 {(isMasterUser || isAdminUser) && (
               <button
@@ -670,25 +671,7 @@ onClick={() => {
             {activeSection === "users" && (
               <UsersHome scopedCompany={company} />
             )}
-            {activeSection === "estimator" && (
-              <div className="p-4">
-                <button
-                  onClick={() => setShowEstimatorPricing(true)}
-                  className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl"
-                >
-                  Open Estimator Pricing Config
-                </button>
-                
-                {isMasterUser && (
-                  <button
-                    onClick={() => setShowEstimatorMaster(true)}
-                    className="w-full mt-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl"
-                  >
-                    Open Estimator Styling Config
-                  </button>
-                )}
-              </div>
-            )}
+
           </div>
 
           <div className="border-t px-6 py-4 bg-white rounded-b-2xl flex justify-between">
