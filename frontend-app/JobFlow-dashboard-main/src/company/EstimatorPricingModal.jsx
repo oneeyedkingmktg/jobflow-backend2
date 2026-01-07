@@ -75,7 +75,7 @@ commercialPricePerSfMax: null,
 
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
+          `${import.meta.env.VITE_API_URL}/api/estimator/config?company_id=${company.id}`,
 
           {
             headers: {
@@ -172,7 +172,7 @@ commercialPricePerSfMax: d.commercial_price_per_sf_max ?? null,
       setError("");
 
       const token = localStorage.getItem("token");
-      const url = `${import.meta.env.VITE_API_URL}/estimator/config`;
+      const url = `${import.meta.env.VITE_API_URL}/api/estimator/config`;
 
 
       // ----------------------------------------------------------------------
@@ -181,7 +181,7 @@ commercialPricePerSfMax: d.commercial_price_per_sf_max ?? null,
       let existing = {};
       try {
         const existingRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
+          `${import.meta.env.VITE_API_URL}/api/estimator/config?company_id=${company.id}`,
 
           {
             headers: {
