@@ -40,9 +40,14 @@ const webhookController = {
       const company = companyResult.rows[0];
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
-      // Extract contact data from webhook
+      // Extract contact data from webhook - try multiple possible field names
       const contactData = {
-        ghl_contact_id: webhookData.contact_id || webhookData.id,
+        // Try multiple possible field names for GHL contact ID
+        ghl_contact_id: webhookData.contact_id || 
+                        webhookData.id || 
+                        webhookData.contactId || 
+                        webhookData.contact?.id || 
+                        null,
         name: `${webhookData.first_name || webhookData.firstName || ''} ${webhookData.last_name || webhookData.lastName || ''}`.trim(),
         phone: webhookData.phone ? webhookData.phone.replace(/\+1/, '').replace(/\D/g, '') : null,
         email: webhookData.email || null,
@@ -57,20 +62,44 @@ const webhookController = {
       };
       
       console.log('📋 Mapped contact data:', contactData);
+      console.log('🔍 [DEBUG] Extracted ghl_contact_id:', contactData.ghl_contact_id, 'Type:', typeof contactData.ghl_contact_id);
       
       // Find existing lead - check ghl_contact_id first, then phone, then email
       let existingLead = null;
       
       if (contactData.ghl_contact_id) {
+        // Convert to string for consistent comparison
+        const ghlIdString = String(contactData.ghl_contact_id);
+        
+        console.log('🔍 [MATCHING] Looking for ghl_contact_id:', ghlIdString);
+        
         const ghlIdResult = await client.query(
           'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
-          [company.id, contactData.ghl_contact_id]
+          [company.id, ghlIdString]
         );
         existingLead = ghlIdResult.rows[0];
-        if (existingLead) console.log('✅ Found lead by ghl_contact_id');
+        
+        if (existingLead) {
+          console.log('✅ Found lead by ghl_contact_id:', existingLead.id);
+        } else {
+          console.log('❌ NO MATCH found for ghl_contact_id:', ghlIdString);
+          
+          // DEBUG: Check what's actually in the database
+          const allLeads = await client.query(
+            'SELECT id, ghl_contact_id, name, phone FROM leads WHERE company_id = $1',
+            [company.id]
+          );
+          console.log('📊 [DEBUG] All leads in DB:', allLeads.rows.map(l => ({ 
+            id: l.id, 
+            ghl_contact_id: l.ghl_contact_id, 
+            ghl_contact_id_type: typeof l.ghl_contact_id,
+            name: l.name 
+          })));
+        }
       }
       
       if (!existingLead && contactData.phone) {
+        console.log('🔍 [MATCHING] Trying phone:', contactData.phone);
         const phoneResult = await client.query(
           'SELECT * FROM leads WHERE company_id = $1 AND phone = $2',
           [company.id, contactData.phone]
@@ -80,12 +109,17 @@ const webhookController = {
       }
       
       if (!existingLead && contactData.email) {
+        console.log('🔍 [MATCHING] Trying email:', contactData.email);
         const emailResult = await client.query(
           'SELECT * FROM leads WHERE company_id = $1 AND email = $2',
           [company.id, contactData.email]
         );
         existingLead = emailResult.rows[0];
         if (existingLead) console.log('✅ Found lead by email');
+      }
+      
+      if (!existingLead) {
+        console.log('⚠️ [WARNING] No existing lead found - will create new lead');
       }
       
       let result;
