@@ -870,11 +870,6 @@ const created = await ghlRequest(
 
 console.log("[CALENDAR CREATE SUCCESS] Event ID:", created?.id);
 
-// ✅ ADD INTERNAL NOTE WITH FULL DESCRIPTION
-if (created?.id && description) {
-  await addAppointmentNote(company, created.id, description);
-}
-
 
   return {
     type,
@@ -884,25 +879,6 @@ if (created?.id && description) {
 }
 
 
-// ----------------------------------------------------------------------------
-// ADD APPOINTMENT INTERNAL NOTE (GHL)
-// ----------------------------------------------------------------------------
-async function addAppointmentNote(company, appointmentId, bodyText) {
-  if (!appointmentId || !bodyText) return;
-
-  await ghlRequest(
-    company,
-    `/appointments/${appointmentId}/notes`,
-    {
-      method: "POST",
-      body: {
-        body: bodyText,
-      },
-    }
-  );
-
-  console.log("📝 [GHL] Appointment internal note added:", appointmentId);
-}
 
 
 // ----------------------------------------------------------------------------
