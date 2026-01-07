@@ -50,6 +50,11 @@ export default function Estimator() {
     return <div>Loading...</div>;
   }
 
+  console.log("🔍 DEBUG VALUES:");
+  console.log("companyId:", companyId, "type:", typeof companyId);
+  console.log("is_active:", config.is_active, "type:", typeof config.is_active);
+  console.log("Will show splash?:", !companyId || !config.is_active);
+
   // No company parameter OR estimator not enabled - show promo
   if (!companyId || !config.is_active) {
     return (
