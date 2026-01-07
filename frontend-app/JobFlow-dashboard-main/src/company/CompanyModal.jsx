@@ -639,10 +639,13 @@ onClick={() => {
               </button>
             )}
 
-            {isMasterUser && (
+{(isMasterUser || isAdminUser) && (
               <button
-                className={sectionBtn(false)}
-                onClick={() => setShowEstimatorMaster(true)}
+                className={sectionBtn(activeSection === "estimator")}
+                onClick={() => {
+                  setActiveSection("estimator");
+                  setSectionMode("view");
+                }}
               >
                 Estimator Admin
               </button>
@@ -666,6 +669,25 @@ onClick={() => {
             {activeSection === "ghl" && renderGHLKeys()}
             {activeSection === "users" && (
               <UsersHome scopedCompany={company} />
+            )}
+            {activeSection === "estimator" && (
+              <div className="p-4">
+                <button
+                  onClick={() => setShowEstimatorPricing(true)}
+                  className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl"
+                >
+                  Open Estimator Pricing Config
+                </button>
+                
+                {isMasterUser && (
+                  <button
+                    onClick={() => setShowEstimatorMaster(true)}
+                    className="w-full mt-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl"
+                  >
+                    Open Estimator Styling Config
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
