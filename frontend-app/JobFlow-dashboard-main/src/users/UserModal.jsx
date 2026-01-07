@@ -58,7 +58,7 @@ export default function UserModal({
         phone: user.phone || "",
         role: user.role || "user",
         company_id: user.companyId || user.company_id || null,
-        is_active: user.is_active !== false,
+        is_active: user.isActive ?? user.is_active ?? true,
         password: "",
       });
     }

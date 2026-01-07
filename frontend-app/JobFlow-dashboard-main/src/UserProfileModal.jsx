@@ -212,21 +212,24 @@ export default function UserProfileModal({
             </select>
           </div>
 
-          {/* ACTIVE TOGGLE */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-sm font-semibold text-gray-700">Status</span>
-            {mode === "view" ? (
-              <span className="font-medium">
-                {form.is_active ? "Active" : "Inactive"}
-              </span>
-            ) : (
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => handleChange("is_active", e.target.checked)}
-              />
-            )}
-          </div>
+{/* ACTIVE TOGGLE - Only show when admin/master viewing other users */}
+          {!isMyProfile && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-sm font-semibold text-gray-700">Status</span>
+              {mode === "view" ? (
+                <span className="font-medium">
+                  {form.is_active ? "Active" : "Inactive"}
+                </span>
+              ) : (
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => handleChange("is_active", e.target.checked)}
+                />
+              )}
+            </div>
+          
+          )}
 
           {/* PASSWORD */}
           {mode === "edit" && (
