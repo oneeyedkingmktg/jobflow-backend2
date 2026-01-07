@@ -90,15 +90,13 @@ const renderHome = () => (
           </svg>
         </button>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-3">
-        Settings & Administration
-      </h2>
 
       <div className="space-y-3">
         {isMaster() && (
           <button
             onClick={openManageCompanies}
-            className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl"
+            cclassName="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+
           >
             Manage Companies
           </button>
@@ -107,7 +105,8 @@ const renderHome = () => (
         {isMaster() && (
           <button
             onClick={openManageUsers}
-            className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl"
+            className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+
           >
             Manage Users
           </button>
@@ -125,7 +124,8 @@ const renderHome = () => (
         {!isMaster() && (
           <button
             onClick={openCompanySettings}
-            className="w-full px-6 py-4 bg-gray-700 hover:bg-gray-800 text-white font-bold rounded-xl"
+            className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+
           >
             Company Settings
           </button>
@@ -133,14 +133,16 @@ const renderHome = () => (
 
         <button
           onClick={openMyProfile}
-          className="w-full px-6 py-4 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl"
+          className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+
         >
           My Profile
         </button>
 
         <button
           onClick={logout}
-          className="w-full px-6 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl"
+          className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+
         >
           Logout
         </button>
