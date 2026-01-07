@@ -253,28 +253,16 @@ commercial_price_per_sf_max: toNumOrNull(form.commercialPricePerSfMax),
         existing_coating_flat_fee: toNumOrNull(form.existingCoatingFlatFee),
       };
 
-      let response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+const response = await fetch(url, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  },
+  body: JSON.stringify(payload),
+});
 
-      // If no row exists yet, create it.
-      if (response.status === 404) {
-        response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      if (!response.ok) {
+if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Failed to save estimator config");
       }
