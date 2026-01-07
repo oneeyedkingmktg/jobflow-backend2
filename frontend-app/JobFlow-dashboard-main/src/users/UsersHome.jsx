@@ -28,9 +28,10 @@ export default function UsersHome({ onBack, scopedCompany, showAllUsers = false 
 
   // For "All Users" mode, only require master role
   // For scoped mode, require master role AND a company
-  const canManage = showAllUsers 
-    ? isAuthenticated && user?.role === "master"
-    : isAuthenticated && user?.role === "master" && !!activeCompany;
+const canManage = showAllUsers
+  ? isAuthenticated && user?.role === "master"
+  : isAuthenticated && ["master", "admin"].includes(user?.role) && !!activeCompany;
+
 
   const isEmbedded = !onBack;
 

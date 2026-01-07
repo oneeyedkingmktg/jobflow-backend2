@@ -632,17 +632,7 @@ onClick={() => {
 
 
 
-{(isMasterUser || isAdminUser) && (
-              <button
-                className={sectionBtn(activeSection === "estimator")}
-                onClick={() => {
-                  setActiveSection("estimator");
-                  setSectionMode("view");
-                }}
-              >
-                Estimator Admin
-              </button>
-            )}
+
 
             {(isMasterUser || isAdminUser) && !isCreate && (
               <button
