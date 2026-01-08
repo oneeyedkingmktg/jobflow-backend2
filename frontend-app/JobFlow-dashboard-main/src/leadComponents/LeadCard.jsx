@@ -4,7 +4,6 @@
 import React from "react";
 import { STATUS_COLORS } from "../leadModalParts/statusConfig.js";
 import { getStatusBarText } from "./leadHelpers.js";
-import React from "react";
 import { formatInCompanyTimezone } from "../utils/timezone";
 
 
