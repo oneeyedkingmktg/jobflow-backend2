@@ -103,14 +103,20 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "company_id required" });
     }
 
-    const result = await pool.query(
-      `SELECT *
-       FROM leads
-       WHERE company_id = $1
-         AND deleted_at IS NULL
-       ORDER BY created_at DESC`,
-      [companyId]
-    );
+const result = await pool.query(
+  `
+  SELECT
+    leads.*,
+    companies.timezone
+  FROM leads
+  JOIN companies ON companies.id = leads.company_id
+  WHERE leads.company_id = $1
+    AND leads.deleted_at IS NULL
+  ORDER BY leads.created_at DESC
+  `,
+  [companyId]
+);
+
 
     console.log(`✅ Found ${result.rows.length} leads for company ${companyId}`);
 

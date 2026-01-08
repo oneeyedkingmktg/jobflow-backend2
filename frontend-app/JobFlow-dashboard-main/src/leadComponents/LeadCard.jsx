@@ -4,27 +4,12 @@
 import React from "react";
 import { STATUS_COLORS } from "../leadModalParts/statusConfig.js";
 import { getStatusBarText } from "./leadHelpers.js";
+import React from "react";
+import { formatInCompanyTimezone } from "../utils/timezone";
 
-function formatDate(date) {
-  if (!date) return null;
-  const d = new Date(date);
-  if (isNaN(d)) return null;
-  return d.toLocaleDateString("en-US");
-}
 
-function formatTime(time) {
-  if (!time) return null;
 
-  if (/[ap]m/i.test(time)) return time;
 
-  const [h, m] = time.split(":");
-  if (!h || !m) return time;
-
-  const hour = Number(h);
-  const suffix = hour >= 12 ? "pm" : "am";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${m} ${suffix}`;
-}
 
 function formatProjectType(type) {
   if (!type) return null;
@@ -45,25 +30,34 @@ export default function LeadCard({ lead, onClick }) {
 
   let statusText = getStatusBarText(lead);
 
-  if (lead.status === "appointment_set") {
-    const date = formatDate(lead.appointmentDate);
-    const time = formatTime(lead.appointmentTime);
+if (lead.status === "appointment_set") {
+  const apptDisplay = formatInCompanyTimezone({
+    utcDate: lead.appointmentDate,
+    utcTime: lead.appointmentTime,
+    timezone: lead.timezone,
+    format: "datetime",
+  });
 
-    if (date && time) {
-      statusText = `Appointment Set — ${date} at ${time}`;
-    } else if (date) {
-      statusText = `Appointment Set — ${date}`;
-    }
+  if (apptDisplay) {
+    statusText = `Appointment Set — ${apptDisplay}`;
   }
+}
 
-  if (lead.status === "install_scheduled") {
-    const date = formatDate(lead.installDate);
-    const tentative = lead.installTentative ? " (tentative)" : "";
 
-    if (date) {
-      statusText = `Install — ${date}${tentative}`;
-    }
+if (lead.status === "install_scheduled") {
+  const installDisplay = formatInCompanyTimezone({
+    utcDate: lead.installDate,
+    timezone: lead.timezone,
+    format: "date",
+  });
+
+  const tentative = lead.installTentative ? " (tentative)" : "";
+
+  if (installDisplay) {
+    statusText = `Install — ${installDisplay}${tentative}`;
   }
+}
+
 
   return (
     <div

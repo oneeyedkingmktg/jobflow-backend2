@@ -4,68 +4,16 @@
 // ============================================================================
 
 import React from "react";
+import { formatInCompanyTimezone } from "../utils/timezone";
+
 
 export default function LeadAppointmentSection({
   form,
   setShowApptModal,
   setShowDateModal,
 }) {
-  // =====================================================
-  // SAFE DATE FORMATTER – NO TIMEZONE SHIFTING
-  // Handles:
-  //   "YYYY-MM-DD"
-  //   "YYYY-MM-DD HH:mm:ss"
-  //   "YYYY-MM-DDTHH:mm:ss.sssZ"
-  //   "DD-MM-YY" / "DD-MM-YYYY"
-  // =====================================================
-  const formatDate = (d) => {
-    if (!d) return "Not Set";
 
-    const raw = String(d).trim();
 
-    // Strip off any time / timezone chunk
-    const base = raw.split("T")[0].split(" ")[0]; // e.g. "2025-12-12"
-
-    const parts = base.split("-");
-    if (parts.length === 3) {
-      let [a, b, c] = parts;
-
-      // Case: YYYY-MM-DD
-      if (a.length === 4) {
-        return `${b}/${c}/${a}`;
-      }
-
-      // Case: DD-MM-YYYY
-      if (c.length === 4) {
-        return `${b}/${a}/${c}`;
-      }
-
-      // Case: DD-MM-YY (25-12-16) → assume 20YY
-      if (a.length === 2 && c.length === 2) {
-        const year = `20${c}`;
-        return `${b}/${a}/${year}`;
-      }
-    }
-
-    // Fallback: show the cleaned base
-    return base;
-  };
-
-  // =====================================================
-  // TIME FORMATTER for display (HH:mm → h:mm AM/PM)
-  // =====================================================
-  const formatTime = (t) => {
-    if (!t) return "";
-    let [h, m] = String(t).split(":");
-    h = parseInt(h, 10);
-
-    if (Number.isNaN(h)) return t;
-
-    const ampm = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 || 12;
-
-    return `${hour12}:${m} ${ampm}`;
-  };
 
   // =====================================================
   // Build display strings

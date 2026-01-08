@@ -69,17 +69,19 @@ export default function CompanyModal({
   if (isCreate) {
     setActiveSection("info");
     setSectionMode("edit");
-    setForm({
-      name: "",
-      phone: "",
-      email: "",
-      website: "",
-      address: "",
-      city: "",
-      state: "",
-      zip: "",
-      suspended: false,
-    });
+setForm({
+  name: "",
+  phone: "",
+  email: "",
+  website: "",
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+  timezone: "America/New_York",
+  suspended: false,
+});
+
 setGhlForm({
   ghlApiKey: "",
   ghlLocationId: "",
@@ -113,17 +115,19 @@ setGhlForm({
     setActiveSection("info");
     setSectionMode("view");
 
-    setForm({
-      name: company.name || "",
-      phone: company.phone || "",
-      email: company.email || "",
-      website: company.website || "",
-      address: company.address || "",
-      city: company.city || "",
-      state: company.state || "",
-      zip: company.zip || "",
-      suspended: company.suspended === true,
-    });
+setForm({
+  name: company.name || "",
+  phone: company.phone || "",
+  email: company.email || "",
+  website: company.website || "",
+  address: company.address || "",
+  city: company.city || "",
+  state: company.state || "",
+  zip: company.zip || "",
+  timezone: company.timezone || "America/New_York",
+  suspended: company.suspended === true,
+});
+
 console.log("🧠 Initializing GHL form from company:", {
   ghl_location_id: company.ghl_location_id,
   ghl_appt_calendar: company.ghl_appt_calendar,
@@ -190,6 +194,8 @@ if (!form) return null;
         state: form.state || null,
         zip: form.zip || null,
         suspended: form.suspended,
+        timezone: form.timezone,
+
       };
 
       await onSave(payload);
@@ -397,6 +403,27 @@ const handleSaveGHLKeys = async () => {
               <div className={viewValue}>{form.zip || "—"}</div>
             )}
           </div>
+          <div>
+  <div className={viewLabel}>COMPANY TIME ZONE</div>
+  {isEditing ? (
+    <select
+      className={editBox}
+      value={form.timezone}
+      onChange={(e) => handleChange("timezone", e.target.value)}
+    >
+      <option value="America/New_York">Eastern (America/New_York)</option>
+      <option value="America/Chicago">Central (America/Chicago)</option>
+      <option value="America/Denver">Mountain (America/Denver)</option>
+      <option value="America/Phoenix">Arizona (America/Phoenix)</option>
+      <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+      <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+      <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+    </select>
+  ) : (
+    <div className={viewValue}>{form.timezone || "—"}</div>
+  )}
+</div>
+
         </div>
 
         {isMasterUser && sectionMode === "edit" && (
