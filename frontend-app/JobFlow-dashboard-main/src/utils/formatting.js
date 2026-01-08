@@ -2,13 +2,30 @@
 
 export function formatDate(value) {
   if (!value) return "";
-  const date = new Date(value);
-  if (isNaN(date)) return "";
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const yyyy = date.getFullYear();
-  return `${mm}-${dd}-${yyyy}`;
+
+  const raw = String(value).trim();
+
+  // Strip time / timezone safely
+  const base = raw.split("T")[0].split(" ")[0];
+
+  const parts = base.split("-");
+  if (parts.length === 3) {
+    const [a, b, c] = parts;
+
+    // YYYY-MM-DD
+    if (a.length === 4) {
+      return `${b}-${c}-${a}`;
+    }
+
+    // MM-DD-YYYY (already formatted)
+    if (c.length === 4) {
+      return base;
+    }
+  }
+
+  return base;
 }
+
 
 export function formatTime(value) {
   if (!value) return "";
