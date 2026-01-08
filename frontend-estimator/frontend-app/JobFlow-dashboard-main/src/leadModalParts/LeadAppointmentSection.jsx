@@ -4,6 +4,7 @@
 // ============================================================================
 
 import React from "react";
+import { formatDate, formatTime } from "../utils/formatting.js";
 
 export default function LeadAppointmentSection({
   form,

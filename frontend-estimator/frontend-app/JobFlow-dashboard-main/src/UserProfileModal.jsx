@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { UsersAPI, CompaniesAPI } from "./api";
 import { useCompany } from "./CompanyContext";
+import { formatDate, formatTime } from "../utils/formatting.js";
 
 export default function UserProfileModal({
   user,

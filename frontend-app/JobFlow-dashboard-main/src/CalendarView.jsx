@@ -3,6 +3,7 @@
 // ✅ Maintains all layout and prior logic exactly
 
 import React, { useState, useMemo } from "react";
+import { formatDate, formatTime } from "../utils/formatting.js";
 
 export default function CalendarView({ leads, onSelectLead }) {
   const [viewMode, setViewMode] = useState("month");
