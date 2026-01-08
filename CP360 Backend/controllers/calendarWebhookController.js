@@ -3,17 +3,53 @@ const { pool } = require('../config/database');
 const calendarWebhookController = {
   // Handle GHL calendar event webhook (appointments AND installs)
   handleGHLCalendar: async (req, res) => {
-    const client = await pool.connect();
+    let client;
+
     
     try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
       const webhookData = req.body;
+
+      // =======================================================
+// STEP 1 — EARLY EXIT FOR EXTERNAL (NON-JOBFLOW) EVENTS
+// =======================================================
+
+const calendarData = webhookData.calendar || {};
+const eventId = calendarData.id || calendarData.eventId;
+
+
+
+// TEMP DB connection ONLY to verify JobFlow ownership
+const ownershipClient = await pool.connect();
+
+const ownershipCheck = await ownershipClient.query(
+  `SELECT id FROM leads
+   WHERE appointment_calendar_event_id = $1
+      OR install_calendar_event_id = $1`,
+  [eventId]
+);
+
+ownershipClient.release();
+
+if (ownershipCheck.rows.length === 0) {
+  console.log('⚠️ [EXTERNAL EVENT] Ignored before full DB processing');
+  return res.status(200).json({
+    success: true,
+    message: 'External event ignored (not created by JobFlow)'
+  });
+}
+
+// =======================================================
+// END STEP 1
+// =======================================================
+
       
       // Extract calendar event data - GHL nests it inside 'calendar' object
-      const calendarData = webhookData.calendar || {};
       
-      const eventId = calendarData.id || calendarData.eventId;
+client = await pool.connect();
+
+
       const appointmentId = calendarData.appointmentId;
       const calendarName = calendarData.calendarName;
       const contactId = webhookData.contact_id;
@@ -34,40 +70,33 @@ const calendarWebhookController = {
       console.log('📅 [CALENDAR WEBHOOK] Status:', eventStatus);
       console.log('📅 [CALENDAR WEBHOOK] Location ID:', locationId);
       
-      if (!eventId) {
-        console.error('❌ No event ID in calendar webhook');
-        return res.status(400).json({ error: 'Missing event ID' });
-      }
+
       
       if (!locationId) {
         console.error('❌ No locationId in calendar webhook');
         return res.status(400).json({ error: 'Missing locationId' });
       }
       
-      // 🔒 OPTION 2: Only process events created by JobFlow
-      const eventCheck = await client.query(
-        `SELECT id, company_id FROM leads 
-         WHERE appointment_calendar_event_id = $1 OR install_calendar_event_id = $1`,
-        [eventId]
-      );
-      
-      if (eventCheck.rows.length === 0) {
-        console.log('⚠️ [EXTERNAL EVENT] Event not created by JobFlow - ignoring');
-        return res.status(200).json({ 
-          success: true,
-          message: 'External event ignored (not created by JobFlow)' 
-        });
-      }
       
       console.log('✅ [JOBFLOW EVENT] Event was created by JobFlow - processing');
       
       // Find company by location ID
-      const companyResult = await client.query(
-        `SELECT id, name, ghl_appt_calendar, ghl_install_calendar 
-         FROM companies 
-         WHERE ghl_location_id = $1`,
-        [locationId]
-      );
+const companyResult = await client.query(
+  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar 
+   FROM companies 
+   WHERE ghl_location_id = $1
+   LIMIT 1`,
+  [locationId]
+);
+
+if (companyResult.rows.length !== 1) {
+  console.error('❌ Invalid company resolution for locationId:', locationId);
+  return res.status(200).json({
+    success: true,
+    message: 'Webhook ignored (company could not be uniquely resolved)'
+  });
+}
+
       
       if (companyResult.rows.length === 0) {
         console.error(`❌ No company found for locationId: ${locationId}`);
@@ -236,9 +265,10 @@ const calendarWebhookController = {
         success: false,
         error: error.message
       });
-    } finally {
-      client.release();
-    }
+} finally {
+  if (client) client.release();
+}
+
   }
 };
 
