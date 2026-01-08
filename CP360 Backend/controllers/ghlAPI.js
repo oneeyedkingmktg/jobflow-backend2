@@ -15,6 +15,36 @@ const CryptoJS = require("crypto-js");
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "change-this-encryption-key";
 
 // ----------------------------------------------------------------------------
+// TIMEZONE CONVERSION: Company Local Time → UTC
+// ----------------------------------------------------------------------------
+function convertToUTC(localDateTimeString, timezone) {
+  // Parse the local date/time string
+  const [datePart, timePart] = localDateTimeString.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  
+  // Timezone offset map (hours from UTC)
+  const timezoneOffsets = {
+    'America/New_York': -5,    // EST (winter)
+    'America/Chicago': -6,     // CST (winter)
+    'America/Denver': -7,      // MST (winter)
+    'America/Phoenix': -7,     // MST (no DST)
+    'America/Los_Angeles': -8, // PST (winter)
+    'America/Anchorage': -9,   // AKST (winter)
+    'Pacific/Honolulu': -10,   // HST (no DST)
+  };
+  
+  const offset = timezoneOffsets[timezone] || -5; // Default to EST
+  
+  // Create UTC date by adding the offset
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
+  
+  console.log(`🌍 [TIMEZONE] Converting ${localDateTimeString} ${timezone} → ${utcDate.toISOString()}`);
+  
+  return utcDate;
+}
+
+// ----------------------------------------------------------------------------
 // DECRYPT COMPANY API KEY
 // ----------------------------------------------------------------------------
 function decryptApiKey(encryptedKey) {
@@ -722,7 +752,12 @@ if (calendarType === 'appointment') {
       return null;
     }
 
-    startDateTime = new Date(`${dateOnly}T${time24}:00`);
+    // ✅ FIX: Convert company timezone to UTC
+    const companyTimezone = company.timezone || 'America/New_York';
+    const localDateTimeString = `${dateOnly}T${time24}:00`;
+    
+    // Create date in company's timezone and convert to UTC
+    startDateTime = convertToUTC(localDateTimeString, companyTimezone);
     endDateTime = new Date(startDateTime.getTime() + 60 * 60000); // 1 hour
 }
 
@@ -747,6 +782,9 @@ else if (calendarType === 'install') {
       .toISOString()
       .split("T")[0];
 
+    // ✅ FIX: Convert company timezone to UTC
+    const companyTimezone = company.timezone || 'America/New_York';
+
     // Handle tentative installs with staggered times
     if (lead.install_tentative) {
       const weekStart = new Date(lead.install_date);
@@ -767,10 +805,12 @@ else if (calendarType === 'install') {
       const hours = 8 + Math.floor(offset / 2);
       const minutes = (offset % 2) * 30;
       
-      startDateTime = new Date(`${dateOnly}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`);
+      const localDateTime = `${dateOnly}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      startDateTime = convertToUTC(localDateTime, companyTimezone);
       endDateTime = new Date(startDateTime.getTime() + 8 * 60 * 60000);
     } else {
-      startDateTime = new Date(`${dateOnly}T08:00:00`);
+      const localDateTime = `${dateOnly}T08:00:00`;
+      startDateTime = convertToUTC(localDateTime, companyTimezone);
       endDateTime = new Date(startDateTime.getTime() + 8 * 60 * 60000);
     }
 }
