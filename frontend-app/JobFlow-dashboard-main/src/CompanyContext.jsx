@@ -48,60 +48,65 @@ export const CompanyProvider = ({ children }) => {
     loadCompanies();
   }, [isAuthenticated, user]);
 
-  // ============================================================================
-  // Load companies
-  // ============================================================================
-  const loadCompanies = async () => {
-    try {
-      setLoading(true);
+// ============================================================================
+// Load companies
+// ============================================================================
+const loadCompanies = async () => {
+  try {
+    setLoading(true);
 
-      if (user.role === "master") {
-        const res = await CompaniesAPI.getAll();
+    if (user.role === "master") {
+      const res = await CompaniesAPI.getAll();
 
-        const raw = Array.isArray(res)
-          ? res
-          : Array.isArray(res?.companies)
-          ? res.companies
-          : [];
+      const raw = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.companies)
+        ? res.companies
+        : [];
 
-        const normalized = raw.map(normalizeCompany).filter(Boolean);
+      const normalized = raw.map(normalizeCompany).filter(Boolean);
+      
+      // ✅ Sort by ID ascending so Company 1 is always first
+      normalized.sort((a, b) => a.id - b.id);
 
-        setCompanies(normalized);
-setCurrentCompany((prev) => {
-  // Preserve explicitly selected company if it still exists
-  if (prev && normalized.some((c) => c.id === prev.id)) {
-    return prev;
-  }
-
-  // Only auto-select a company if none is currently set
-  if (!prev && normalized.length > 0) {
-    return normalized[0];
-  }
-
-  return null;
-});
-
-      } else {
-        if (!user.companyId) {
-          setCompanies([]);
-          setCurrentCompany(null);
-          return;
+      setCompanies(normalized);
+      setCurrentCompany((prev) => {
+        // Preserve explicitly selected company if it still exists
+        if (prev && normalized.some((c) => c.id === prev.id)) {
+          return prev;
         }
 
-        const res = await CompaniesAPI.get(user.companyId);
-        const company = normalizeCompany(res.company);
+        // ✅ Always default to Company ID 1 if it exists
+        const companyOne = normalized.find((c) => c.id === 1);
+        if (companyOne) {
+          return companyOne;
+        }
 
-        setCompanies(company ? [company] : []);
-        setCurrentCompany(company);
+        // Fallback to first company if Company 1 doesn't exist
+        return normalized.length > 0 ? normalized[0] : null;
+      });
+
+    } else {
+      if (!user.companyId) {
+        setCompanies([]);
+        setCurrentCompany(null);
+        return;
       }
-    } catch (err) {
-      console.error("CompanyContext load error:", err);
-      setCompanies([]);
-      setCurrentCompany(null);
-    } finally {
-      setLoading(false);
+
+      const res = await CompaniesAPI.get(user.companyId);
+      const company = normalizeCompany(res.company);
+
+      setCompanies(company ? [company] : []);
+      setCurrentCompany(company);
     }
-  };
+  } catch (err) {
+    console.error("CompanyContext load error:", err);
+    setCompanies([]);
+    setCurrentCompany(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ============================================================================
   // Switch active company (MASTER ONLY)
