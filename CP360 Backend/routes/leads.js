@@ -106,16 +106,17 @@ router.get("/", async (req, res) => {
 const result = await pool.query(
   `
   SELECT
-    leads.*,
-    companies.timezone
-  FROM leads
-  JOIN companies ON companies.id = leads.company_id
-  WHERE leads.company_id = $1
-    AND leads.deleted_at IS NULL
-  ORDER BY leads.created_at DESC
+    l.*,
+    c.timezone AS timezone
+  FROM leads l
+  JOIN companies c ON c.id = l.company_id
+  WHERE l.company_id = $1
+    AND l.deleted_at IS NULL
+  ORDER BY l.created_at DESC
   `,
   [companyId]
 );
+
 
 
     console.log(`✅ Found ${result.rows.length} leads for company ${companyId}`);
