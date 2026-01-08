@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
+import { formatDate, formatTime } from "../utils/formatting";
 
 export default function LeadDetails({
   form,
   isEditing,
-  formatDate,
-  formatTime,
   setShowApptModal,
   setShowDateModal,
 }) {
+
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState("");
