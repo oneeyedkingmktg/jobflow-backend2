@@ -8,18 +8,18 @@ const calendarWebhookController = {
     try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
-          // 🔍 DEBUG: Log ALL field names so we can find the event ID
-    console.log('📅 [DEBUG] Available fields:', Object.keys(req.body));
-    console.log('📅 [DEBUG] Full payload:', req.body);
-      
       const webhookData = req.body;
       
-      // Extract event data (try multiple possible field names)
-      const eventId = webhookData.id || webhookData.eventId || webhookData.appointment_id;
-      const calendarId = webhookData.calendarId || webhookData.calendar_id;
-      const contactId = webhookData.contactId || webhookData.contact_id;
-      const startTime = webhookData.startTime || webhookData.start_time || webhookData.appointmentStartTime;
-      const eventStatus = webhookData.status || webhookData.appointmentStatus;
+      // Extract calendar event data - GHL nests it inside 'calendar' object
+      const calendarData = webhookData.calendar || {};
+      
+      const eventId = calendarData.id || calendarData.eventId;
+      const appointmentId = calendarData.appointmentId;
+      const calendarName = calendarData.calendarName;
+      const contactId = webhookData.contact_id;
+      const startTime = calendarData.startTime || calendarData.start_time;
+      const endTime = calendarData.endTime || calendarData.end_time;
+      const eventStatus = calendarData.status || calendarData.appointmentStatus;
       
       // Extract locationId
       let locationId = webhookData.locationId || 
@@ -27,7 +27,11 @@ const calendarWebhookController = {
                        webhookData.location?.id;
       
       console.log('📅 [CALENDAR WEBHOOK] Event ID:', eventId);
-      console.log('📅 [CALENDAR WEBHOOK] Calendar ID:', calendarId);
+      console.log('📅 [CALENDAR WEBHOOK] Appointment ID:', appointmentId);
+      console.log('📅 [CALENDAR WEBHOOK] Calendar Name:', calendarName);
+      console.log('📅 [CALENDAR WEBHOOK] Contact ID:', contactId);
+      console.log('📅 [CALENDAR WEBHOOK] Start Time:', startTime);
+      console.log('📅 [CALENDAR WEBHOOK] Status:', eventStatus);
       console.log('📅 [CALENDAR WEBHOOK] Location ID:', locationId);
       
       if (!eventId) {
@@ -73,15 +77,44 @@ const calendarWebhookController = {
       const company = companyResult.rows[0];
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
-      // Determine event type based on calendar ID
+      // Determine event type based on calendar name or by checking database
       let eventType = null;
-      if (calendarId === company.ghl_appt_calendar) {
-        eventType = 'appointment';
-      } else if (calendarId === company.ghl_install_calendar) {
-        eventType = 'install';
+      
+      // First try to determine from calendar name
+      if (calendarName) {
+        const lowerName = calendarName.toLowerCase();
+        if (lowerName.includes('appointment') || lowerName.includes('appt') || lowerName.includes('sales')) {
+          eventType = 'appointment';
+        } else if (lowerName.includes('install')) {
+          eventType = 'install';
+        }
+      }
+      
+      // If we can't determine from name, check which field in DB has this event ID
+      if (!eventType && eventId) {
+        const apptCheck = await client.query(
+          'SELECT id FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
+          [company.id, eventId]
+        );
+        
+        const installCheck = await client.query(
+          'SELECT id FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
+          [company.id, eventId]
+        );
+        
+        if (apptCheck.rows.length > 0) {
+          eventType = 'appointment';
+        } else if (installCheck.rows.length > 0) {
+          eventType = 'install';
+        }
       }
       
       console.log('📅 [CALENDAR WEBHOOK] Event type determined:', eventType);
+      
+      if (!eventType) {
+        console.log('⚠️ Could not determine event type from calendar name or database');
+        return res.status(400).json({ error: 'Could not determine event type' });
+      }
       
       // Find lead by event ID (we already know it exists from the check above)
       let lead = null;
@@ -131,6 +164,7 @@ const calendarWebhookController = {
       // Handle based on event status
       const isCancelled = eventStatus === 'cancelled' || 
                          eventStatus === 'canceled' || 
+                         eventStatus === 'deleted' ||
                          !startTime;
       
       if (isCancelled) {
