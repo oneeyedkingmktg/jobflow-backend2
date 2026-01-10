@@ -41,6 +41,9 @@ export const formatDisplayTime = (t) => {
 // Top bar text on each card
 export const getStatusBarText = (lead) => {
   switch (lead.status) {
+    case "status_pre_lead":
+      return "Pre-Lead";
+
     case "appointment_set":
       const d = formatDisplayDate(lead.apptDate);
       const t = formatDisplayTime(lead.apptTime);
@@ -60,6 +63,9 @@ export const getStatusBarText = (lead) => {
 
     case "complete":
       return "Completed";
+
+    case "status_junk":
+      return "Junk";
 
     default:
       return "Lead";
