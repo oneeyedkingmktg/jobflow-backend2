@@ -13,6 +13,30 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
+// Map GHL status tags to JF status
+function mapGHLStatusToJF(tags) {
+  if (!tags || !Array.isArray(tags)) return 'status_pre_lead';
+  
+  const tagMap = {
+    'status - pre-lead': 'status_pre_lead',
+    'status - lead': 'lead',
+    'status - appointment set': 'appointment_set',
+    'status - sold': 'sold',
+    'status - not sold': 'not_sold',
+    'status - complete': 'complete',
+    'status - junk': 'status_junk',
+  };
+  
+  for (const tag of tags) {
+    const normalized = String(tag).toLowerCase().trim();
+    if (tagMap[normalized]) {
+      return tagMap[normalized];
+    }
+  }
+  
+  return 'status_pre_lead';
+}
+
 // ============================================================================
 // TEMP TEST ENDPOINT
 // ============================================================================
@@ -159,10 +183,14 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
     const zip =
       body.postalCode || (body.location && body.location.postalCode) || null;
 
-    const leadSource =
+const leadSource =
       body.tags && typeof body.tags === "string" && body.tags.length > 0
         ? body.tags
         : "GHL Webhook";
+
+    const tags = Array.isArray(body.tags) ? body.tags : 
+                 typeof body.tags === "string" ? [body.tags] : [];
+    const status = mapGHLStatusToJF(tags);
 
     const referralSource =
       (body.contact && body.contact.referral_source) ||
@@ -235,9 +263,9 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           ghl_last_synced,
           ghl_sync_status,
           needs_sync
-        ) VALUES (
+) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
-          'lead',NULL,NULL,NULL,$17,$18,$19,NOW(),'webhook',false
+          $20,NULL,NULL,NULL,$17,$18,$19,NOW(),'webhook',false
         )
         RETURNING *;
         `,
@@ -258,9 +286,10 @@ router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
           null,
           leadSource,
           referralSource,
-          email ? "Email" : "Phone",
+email ? "Email" : "Phone",
           notes,
           ghlContactId,
+          status,
         ]
       );
       saved = insert.rows[0];

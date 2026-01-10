@@ -1,5 +1,29 @@
 const { pool } = require('../config/database');
 
+// Map GHL status tags to JF status
+function mapGHLStatusToJF(tags) {
+  if (!tags || !Array.isArray(tags)) return 'status_pre_lead';
+  
+  const tagMap = {
+    'status - pre-lead': 'status_pre_lead',
+    'status - lead': 'lead',
+    'status - appointment set': 'appointment_set',
+    'status - sold': 'sold',
+    'status - not sold': 'not_sold',
+    'status - complete': 'complete',
+    'status - junk': 'status_junk',
+  };
+  
+  for (const tag of tags) {
+    const normalized = String(tag).toLowerCase().trim();
+    if (tagMap[normalized]) {
+      return tagMap[normalized];
+    }
+  }
+  
+  return 'status_pre_lead';
+}
+
 const webhookController = {
   // Handle GHL contact webhook
   handleGHLContact: async (req, res) => {
@@ -40,7 +64,12 @@ const webhookController = {
       const company = companyResult.rows[0];
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
-      // Extract contact data from webhook - try multiple possible field names
+            // Extract tags and map status
+      const tags = webhookData.tags || [];
+      const status = mapGHLStatusToJF(tags);
+      console.log('🏷️ Tags:', tags, '→ Status:', status);
+      
+      // Extract contact data from webhook - try multiple possible field names          
       const contactData = {
         // Try multiple possible field names for GHL contact ID
         ghl_contact_id: webhookData.contact_id || 
@@ -221,8 +250,8 @@ const webhookController = {
             contactData.referral_source,
             contactData.lead_source,
             contactData.project_type,
-            contactData.notes,
-            'lead', // Default status
+contactData.notes,
+            status, // Use mapped status from GHL tags
             'GHL', // sync_source
             now,
             now
