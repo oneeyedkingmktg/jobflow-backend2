@@ -157,7 +157,7 @@ const renderProgressButton = () => {
             className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
             style={{
               backgroundColor: STATUS_COLORS[form.status],
-              color: "white",
+              color: "#FFFFFF",
               height: "48px",
               fontSize: "1.05rem",
             }}
