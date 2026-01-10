@@ -36,7 +36,6 @@ setFormData({
       address: company.address || "",
       timezone: company.timezone || "",
       sales_calendar: company.sales_calendar || "",
-      ghl_install_calendar: company.ghl_install_calendar || "",
       ghl_api_key: company.ghl_api_key || "",
       ghl_location_id: company.ghl_location_id || "",
       ghl_appt_calendar: company.ghl_appt_calendar || "",
