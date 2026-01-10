@@ -45,8 +45,22 @@ if (currentStatus === "appointment_set" && next === "sold") {
   };
 
 const renderProgressButton = () => {
-    if (currentStatus === "archived" || currentStatus === "status_junk" || currentStatus === "complete") return null;
+    if (currentStatus === "archived" || currentStatus === "complete") return null;
 
+    // Junk status: show undo button
+    if (currentStatus === "status_junk") {
+      return (
+        <button
+          onClick={() => setStatus("status_pre_lead")}
+          className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+          style={{ backgroundColor: STATUS_COLORS["status_pre_lead"] }}
+        >
+          <span className="text-sm font-semibold">
+            Undo Junk
+          </span>
+        </button>
+      );
+    }
     // Pre-Lead status: show Move to Lead + Mark as Junk
     if (currentStatus === "status_pre_lead") {
       return (
