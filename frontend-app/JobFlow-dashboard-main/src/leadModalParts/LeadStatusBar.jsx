@@ -45,7 +45,7 @@ if (currentStatus === "appointment_set" && next === "sold") {
   };
 
 const renderProgressButton = () => {
-    if (currentStatus === "archived") return null;
+    if (currentStatus === "archived" || currentStatus === "status_junk" || currentStatus === "complete") return null;
 
     // Pre-Lead status: show Move to Lead + Mark as Junk
     if (currentStatus === "status_pre_lead") {
@@ -146,7 +146,7 @@ const renderProgressButton = () => {
         </div>
 
         <div className="relative w-full sm:w-auto">
-          <select
+<select
             value={form.status}
             onChange={(e) =>
               setForm((p) => ({
@@ -154,27 +154,30 @@ const renderProgressButton = () => {
                 status: e.target.value,
               }))
             }
-            className="appearance-none text-white font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
+            className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
             style={{
               backgroundColor: STATUS_COLORS[form.status],
+              color: "white",
               height: "48px",
               fontSize: "1.05rem",
             }}
           >
-            {Object.keys(STATUS_LABELS).map((s) => (
-              <option
-                key={s}
-                value={s}
-                style={{
-                  padding: "14px 0",
-                  fontSize: "1.1rem",
-                  background: "white",
-                  color: "black",
-                }}
-              >
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
+{Object.keys(STATUS_LABELS)
+              .filter((s) => s !== "status_junk")
+              .map((s) => (
+                <option
+                  key={s}
+                  value={s}
+                  style={{
+                    padding: "14px 0",
+                    fontSize: "1.1rem",
+                    background: "white",
+                    color: "black",
+                  }}
+                >
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
           </select>
 
           <div
