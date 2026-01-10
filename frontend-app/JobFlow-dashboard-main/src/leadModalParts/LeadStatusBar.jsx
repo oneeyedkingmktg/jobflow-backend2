@@ -162,9 +162,7 @@ const renderProgressButton = () => {
               fontSize: "1.05rem",
             }}
           >
-{Object.keys(STATUS_LABELS)
-              .filter((s) => s !== "status_junk")
-              .map((s) => (
+{Object.keys(STATUS_LABELS).map((s) => (
                 <option
                   key={s}
                   value={s}

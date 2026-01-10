@@ -9,7 +9,7 @@ export const STATUS_LABELS = {
 };
 
 export const STATUS_COLORS = {
-status_pre_lead: "#654236",
+status_pre_lead: "#DCC9B6",
   lead: "#59687d",
   appointment_set: "#225ce5",
   sold: "#048c63",
