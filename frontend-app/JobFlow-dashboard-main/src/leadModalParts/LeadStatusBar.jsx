@@ -44,8 +44,36 @@ if (currentStatus === "appointment_set" && next === "sold") {
     setStatus(next);
   };
 
-  const renderProgressButton = () => {
+const renderProgressButton = () => {
     if (currentStatus === "archived") return null;
+
+    // Pre-Lead status: show Move to Lead + Mark as Junk
+    if (currentStatus === "status_pre_lead") {
+      return (
+        <div className="flex gap-3">
+          <button
+            onClick={() => setStatus("lead")}
+            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+            style={{ backgroundColor: STATUS_COLORS["lead"] }}
+          >
+            <span className="text-[10px] uppercase opacity-80">move to</span>
+            <span className="text-sm font-semibold">
+              {"→ Lead"}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setStatus("status_junk")}
+            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+            style={{ backgroundColor: STATUS_COLORS["status_junk"] }}
+          >
+            <span className="text-sm font-semibold">
+              Mark as Junk
+            </span>
+          </button>
+        </div>
+      );
+    }
 
     if (currentStatus === "not_sold") {
       return (

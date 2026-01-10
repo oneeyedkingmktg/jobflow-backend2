@@ -112,6 +112,7 @@ const result = await pool.query(
   JOIN companies c ON c.id = l.company_id
   WHERE l.company_id = $1
     AND l.deleted_at IS NULL
+    AND l.status != 'status_junk'
   ORDER BY l.created_at DESC
   `,
   [companyId]
@@ -188,7 +189,7 @@ if (!companyId) {
       clean(lead.project_type),
       clean(lead.lead_source || "estimator"),
       clean(lead.referral_source),
-      lead.status || "lead",
+      lead.status || "status_pre_lead",
       clean(lead.not_sold_reason),
       clean(lead.notes),
       clean(lead.contract_price),

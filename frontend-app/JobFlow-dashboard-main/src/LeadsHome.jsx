@@ -164,14 +164,15 @@ export default function LeadsHome() {
   // --------------------------------------------------
   // Counts
   // --------------------------------------------------
-  const counts = useMemo(
+const counts = useMemo(
     () => ({
+      "Pre-Leads": leads.filter((l) => l.status === "status_pre_lead").length,
       Leads: leads.filter((l) => l.status === "lead").length,
       "Booked Appt": leads.filter((l) => l.status === "appointment_set").length,
       Sold: leads.filter((l) => l.status === "sold").length,
       "Not Sold": leads.filter((l) => l.status === "not_sold").length,
       Completed: leads.filter((l) => l.status === "complete").length,
-      All: leads.length,
+      All: leads.filter((l) => l.status !== "status_junk").length,
     }),
     [leads]
   );
@@ -179,13 +180,17 @@ export default function LeadsHome() {
   // --------------------------------------------------
   // Filtering
   // --------------------------------------------------
-  const filteredLeads = useMemo(() => {
+const filteredLeads = useMemo(() => {
     const term = searchTerm.toLowerCase();
     const digits = normalizePhone(searchTerm);
 
     return leads.filter((lead) => {
+      // Always exclude junk leads
+      if (lead.status === "status_junk") return false;
+
       const matchesTab =
         activeTab === "All" ||
+        (activeTab === "Pre-Leads" && lead.status === "status_pre_lead") ||
         (activeTab === "Leads" && lead.status === "lead") ||
         (activeTab === "Booked Appt" && lead.status === "appointment_set") ||
         (activeTab === "Sold" && lead.status === "sold") ||
@@ -340,7 +345,7 @@ onCreateNew={(phone) => {
     id: null, 
     name: "", 
     phone, 
-    status: "lead",
+    status: "status_pre_lead",
     companyId: currentCompany?.id,
     createdByUserId: user?.id
   });

@@ -415,11 +415,13 @@ async function ghlRequest(company, endpoint, options = {}) {
 // STATUS MAP
 // ----------------------------------------------------------------------------
 const STATUS_TAGS = {
+  status_pre_lead: "status - pre-lead",
   lead: "status - lead",
   appointment_set: "status - appointment set",
   sold: "status - sold",
   not_sold: "status - not sold",
   completed: "status - complete",
+  status_junk: "status - junk",
 };
 
 // ----------------------------------------------------------------------------
@@ -542,15 +544,17 @@ customFields.push({
     });
   };
 
-  const normalizeStatus = (status) => {
+const normalizeStatus = (status) => {
     if (!status) return null;
     const map = {
+      status_pre_lead: "Pre-Lead",
       lead: "Lead",
       appointment: "Appointment Set",
       appointment_set: "Appointment Set",
       sold: "Sold",
       not_sold: "Not Sold",
-      completed: "Completed"
+      completed: "Completed",
+      status_junk: "Junk"
     };
     return map[String(status).toLowerCase()] || null;
   };

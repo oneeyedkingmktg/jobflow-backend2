@@ -4,22 +4,23 @@ import React from "react";
 
 export default function LeadTabs({ activeTab, setActiveTab, counts, onAddLead }) {
 
-  const tabs = [
+const tabs = [
+    "Pre-Leads",
     "Leads",
     "Booked Appt",
     "Sold",
     "Not Sold",
     "Completed",
     "All",
-    "+ New Lead",
+    "+ Pre-Lead",
     "Calendar",
   ];
 
-  const isStatusTab = (t) =>
-    ["Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All"].includes(t);
+const isStatusTab = (t) =>
+    ["Pre-Leads", "Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All"].includes(t);
 
   const handleClick = (t) => {
-    if (t === "+ New Lead") {
+if (t === "+ Pre-Lead") {
       onAddLead();
       return;
     }
