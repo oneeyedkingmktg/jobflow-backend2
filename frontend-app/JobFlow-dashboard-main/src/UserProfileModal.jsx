@@ -35,9 +35,15 @@ export default function UserProfileModal({
     phone: "",
     role: "user",
     is_active: true,
-    password: "",
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [error, setError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // 🔒 resolved company for THIS user (not currentCompany)
   const [resolvedCompany, setResolvedCompany] = useState(null);
@@ -51,8 +57,16 @@ export default function UserProfileModal({
       phone: resolvedUser.phone || "",
       role: resolvedUser.role || "user",
       is_active: resolvedUser.is_active !== false,
-      password: "",
     });
+    
+    // Reset password form when user changes
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setPasswordError("");
+    setPasswordSuccess(false);
   }, [resolvedUser]);
 
   // Resolve the user's company deterministically
@@ -99,6 +113,54 @@ export default function UserProfileModal({
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError("");
+  };
+
+  const handlePasswordChange = (field, value) => {
+    setPasswordForm((prev) => ({ ...prev, [field]: value }));
+    setPasswordError("");
+    setPasswordSuccess(false);
+  };
+
+  const handleChangePassword = async () => {
+    const { currentPassword, newPassword, confirmPassword } = passwordForm;
+
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("All password fields are required");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      setPasswordError("");
+      
+      // Call the password change API
+      const response = await UsersAPI.changePassword({
+        currentPassword,
+        newPassword,
+      });
+
+      setPasswordSuccess(true);
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      // Hide success message after 3 seconds
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err) {
+      setPasswordError(err.message || "Failed to change password");
+    }
   };
 
   const handleSave = () => {
@@ -239,12 +301,70 @@ export default function UserProfileModal({
           
           )}
 
-          {/* PASSWORD - REMOVED: Use separate password change flow */}
+          {/* PASSWORD CHANGE - Only for self in edit mode */}
           {mode === "edit" && isMyProfile && (
-            <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm text-blue-800">
-              <p className="font-semibold mb-1">Password Changes</p>
-              <p>To change your password, you'll need to use a separate secure password change form that requires your current password.</p>
-              <p className="mt-2 text-xs text-blue-600">Future update: Add "Change Password" button here</p>
+            <div className="pt-4 border-t">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Change Password</h3>
+              
+              {passwordError && (
+                <div className="bg-red-50 border-l-4 border-red-600 p-3 text-red-800 text-sm mb-3">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="bg-green-50 border-l-4 border-green-600 p-3 text-green-800 text-sm mb-3">
+                  Password changed successfully!
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => handlePasswordChange("currentPassword", e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => handlePasswordChange("newPassword", e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="Enter new password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => handlePasswordChange("confirmPassword", e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+
+                <button
+                  onClick={handleChangePassword}
+                  className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 text-sm"
+                >
+                  Change Password
+                </button>
+              </div>
             </div>
           )}
 

@@ -1,12 +1,12 @@
 // ============================================================================
 // File: src/api.js
-// Version: v1.2 - Use console.error for better visibility
+// Version: v1.3 - Added changePassword method
 // ============================================================================
 
 /* ============================================================================
    API Configuration
    ============================================================================
-   v1.2 – Use console.error for diagnostic logging
+   v1.3 – Added changePassword method for secure password updates
 ============================================================================ */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -116,6 +116,12 @@ export const UsersAPI = {
 
   update: (id, data) =>
     apiRequest(`/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(toSnake(data)),
+    }),
+
+  changePassword: (data) =>
+    apiRequest("/users/me/password", {
       method: "PUT",
       body: JSON.stringify(toSnake(data)),
     }),
