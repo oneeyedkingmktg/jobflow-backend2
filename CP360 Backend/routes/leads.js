@@ -141,25 +141,21 @@ router.post("/", async (req, res) => {
   console.log("═══════════════════════════════════\n");
 
   try {
-const userId = req.user?.id || null;
+    const userId = req.user?.id || null;
+    const companyId = req.body.company_id;
 
+    console.log("✅ Company ID:", companyId);
+    console.log("✅ User ID:", userId);
 
-const companyId = req.body.company_id;
-
-console.log("✅ Company ID:", companyId);
-console.log("✅ User ID:", userId);
-
-if (!companyId) {
-  console.log("❌ Missing company_id");
-  return res.status(400).json({ error: "company_id required" });
-}
-
+    if (!companyId) {
+      console.log("❌ Missing company_id");
+      return res.status(400).json({ error: "company_id required" });
+    }
 
     const lead = req.body;
-    const estimate = req.body.estimate; // 🆕 Extract estimate data
+    const estimate = req.body.estimate;
     let displayProjectType = null;
 
-    
     const error = validateLead(lead);
     if (error) {
       console.log("❌ Validation failed:", error);
@@ -169,7 +165,6 @@ if (!companyId) {
     const { first, last, full } = parseName(lead.name || lead.full_name);
     console.log("📝 Parsed name:", { first, last, full });
 
-    // 🔍 DEBUG: Log the exact values being inserted
     const insertValues = [
       companyId,
       userId,
@@ -222,13 +217,11 @@ if (!companyId) {
 
     const newLead = result.rows[0];
     if (displayProjectType) {
-  await pool.query(
-    `UPDATE leads
-     SET project_type = $1
-     WHERE id = $2`,
-    [displayProjectType, newLead.id]
-  );
-}
+      await pool.query(
+        `UPDATE leads SET project_type = $1 WHERE id = $2`,
+        [displayProjectType, newLead.id]
+      );
+    }
 
     console.log("✅ LEAD INSERT SUCCESSFUL - Lead ID:", newLead.id);
 
@@ -238,27 +231,18 @@ if (!companyId) {
       console.log("📊 Estimate data:", estimate);
 
       const displayProjectType =
-  estimate.length_ft && estimate.width_ft && estimate.project_type
-    ? `${estimate.length_ft}' x ${estimate.width_ft}' ${estimate.project_type.charAt(0).toUpperCase() + estimate.project_type.slice(1)}`
-    : estimate.project_type;
-
+        estimate.length_ft && estimate.width_ft && estimate.project_type
+          ? `${estimate.length_ft}' x ${estimate.width_ft}' ${estimate.project_type.charAt(0).toUpperCase() + estimate.project_type.slice(1)}`
+          : estimate.project_type;
 
       try {
         await pool.query(
           `INSERT INTO estimator_leads (
-            lead_id,
-            company_id,
-            project_type,
-            length_ft,
-            width_ft,
-            calculated_sf,
-            condition,
-            existing_coating,
-            selected_quality,
-            display_price_min,
-            display_price_max,
-            all_price_ranges,
-            minimum_job_applied
+            lead_id, company_id, project_type,
+            length_ft, width_ft, calculated_sf,
+            condition, existing_coating, selected_quality,
+            display_price_min, display_price_max,
+            all_price_ranges, minimum_job_applied
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [
             newLead.id,
@@ -272,22 +256,18 @@ if (!companyId) {
             estimate.selected_quality,
             estimate.display_price_min,
             estimate.display_price_max,
-            JSON.stringify(estimate.all_price_ranges), // Convert to JSON string
+            JSON.stringify(estimate.all_price_ranges),
             estimate.minimum_job_applied || false
           ]
         );
         console.log("✅ ESTIMATE INSERT SUCCESSFUL");
-        // UPDATE leads table to mark has_estimate = true
-    await pool.query(
-      `UPDATE leads SET has_estimate = true WHERE id = $1`,
-      [newLead.id]
-    );
-    console.log("✅ UPDATED has_estimate flag");
+        await pool.query(
+          `UPDATE leads SET has_estimate = true WHERE id = $1`,
+          [newLead.id]
+        );
+        console.log("✅ UPDATED has_estimate flag");
       } catch (estimateError) {
         console.error("❌ ESTIMATE INSERT FAILED:", estimateError);
-        console.error("Detail:", estimateError.detail);
-        console.error("Code:", estimateError.code);
-        // Don't fail the whole request if estimate save fails
       }
     } else {
       console.log("ℹ️  No estimate data provided (non-estimator lead)");
@@ -297,14 +277,28 @@ if (!companyId) {
       await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
     ).rows[0];
 
-let ghlSynced = false;
-    if (company.ghl_api_key) {
+    // 🆕 CHECK IF USER HAS BYPASS FLAG
+    let shouldBypassSync = false;
+    if (userId) {
+      const userResult = await pool.query(
+        `SELECT bypass_duplicate_check FROM users WHERE id = $1`,
+        [userId]
+      );
+      if (userResult.rows.length > 0) {
+        shouldBypassSync = userResult.rows[0].bypass_duplicate_check === true;
+      }
+    }
+
+    let ghlSynced = false;
+    if (company.ghl_api_key && !shouldBypassSync) {
       try {
         await syncLeadToGhl({ lead: newLead, company });
         ghlSynced = true;
       } catch (syncError) {
         console.log('GHL sync failed for new lead:', syncError.message);
       }
+    } else if (shouldBypassSync) {
+      console.log('🔓 GHL sync bypassed for testing (master admin bypass enabled)');
     }
 
     res.status(201).json({ lead: toCamel(newLead), ghlSynced });
@@ -312,8 +306,8 @@ let ghlSynced = false;
     console.error("💥 ERROR CREATING LEAD:");
     console.error("Message:", error.message);
     console.error("Stack:", error.stack);
-    console.error("Detail:", error.detail); // PostgreSQL specific
-    console.error("Code:", error.code);     // PostgreSQL error code
+    console.error("Detail:", error.detail);
+    console.error("Code:", error.code);
     res.status(500).json({ error: "Failed to create lead." });
   }
 });
