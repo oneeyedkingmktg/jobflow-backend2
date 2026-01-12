@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/users.js
-// Version: v4.5 – Passwords ONLY change via /users/me/password (LOCKED)
+// Version: v4.6 – Fixed self-update permissions + password routing
 // ============================================================================
 
 const express = require("express");
@@ -30,7 +30,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     if (req.user.role === "master") {
       if (req.query.company_id) {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -38,7 +38,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
         params = [req.query.company_id];
       } else {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -46,7 +46,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       }
     } else {
       query = `
-        SELECT id, company_id, email, name, phone, role, is_active
+        SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -116,57 +116,103 @@ router.post("/", requireRole("admin", "master"), async (req, res) => {
 });
 
 // ============================================================================
-// PUT /api/users/:id – UPDATE PROFILE ONLY (NO PASSWORD EVER)
+// PUT /api/users/:id – UPDATE PROFILE (NO PASSWORD)
+// Users can update themselves, admins can update anyone in company, master can update anyone
 // ============================================================================
 
-router.put("/:id", requireRole("admin", "master"), async (req, res) => {
+router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, role, is_active, company_id } = req.body;
+    const userId = parseInt(id, 10);
+    const { name, phone, role, is_active, company_id, password } = req.body;
 
+    // 🔴 BLOCK PASSWORD ATTEMPTS HERE
+    if (password !== undefined && password !== "") {
+      return res.status(400).json({ 
+        error: "Password changes must use /users/me/password endpoint" 
+      });
+    }
+
+    // Get the target user
     const existing = await db.query(
-      "SELECT company_id FROM users WHERE id = $1 AND deleted_at IS NULL",
-      [id]
+      "SELECT company_id, role FROM users WHERE id = $1 AND deleted_at IS NULL",
+      [userId]
     );
 
     if (!existing.rows.length) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    if (
-      req.user.role !== "master" &&
-      existing.rows[0].company_id !== req.user.company_id
-    ) {
-      return res
-        .status(403)
-        .json({ error: "Cannot update users from other companies" });
+    const targetUser = existing.rows[0];
+    const isSelf = userId === req.user.id;
+
+    // ============================================================================
+    // PERMISSION CHECKS
+    // ============================================================================
+
+    // 1. If updating self → always allowed (but with restrictions)
+    if (isSelf) {
+      // Users can update their own name/phone, but NOT role or is_active
+      if (role !== undefined || is_active !== undefined) {
+        return res.status(403).json({ 
+          error: "You cannot change your own role or active status" 
+        });
+      }
+    } 
+    // 2. If updating someone else → need admin/master
+    else {
+      // Check if user has admin/master role
+      if (req.user.role !== "admin" && req.user.role !== "master") {
+        return res.status(403).json({ 
+          error: "Insufficient permissions to update other users" 
+        });
+      }
+
+      // Non-master admins can only update users in their company
+      if (
+        req.user.role !== "master" &&
+        targetUser.company_id !== req.user.company_id
+      ) {
+        return res.status(403).json({ 
+          error: "Cannot update users from other companies" 
+        });
+      }
     }
+
+    // ============================================================================
+    // BUILD UPDATE QUERY
+    // ============================================================================
 
     const updates = [];
     const values = [];
     let i = 1;
 
+    // Name (anyone can update their own, admins can update others)
     if (name !== undefined) {
       updates.push(`name = $${i++}`);
       values.push(clean(name));
     }
 
+    // Phone (anyone can update their own, admins can update others)
     if (phone !== undefined) {
       updates.push(`phone = $${i++}`);
       values.push(clean(phone));
     }
 
-    if (role !== undefined) {
+    // Role (only admins/master, and not self)
+    if (role !== undefined && !isSelf) {
       updates.push(`role = $${i++}`);
       values.push(role);
     }
 
-    if (is_active !== undefined) {
+    // Active status (only admins/master, and not self)
+    if (is_active !== undefined && !isSelf) {
       updates.push(`is_active = $${i++}`);
       values.push(is_active);
     }
 
-    if (req.user.role === "master" && company_id !== undefined) {
+    // Company (only master)
+    if (req.user.role === "master" && company_id !== undefined && !isSelf) {
       updates.push(`company_id = $${i++}`);
       values.push(company_id);
     }
@@ -175,7 +221,7 @@ router.put("/:id", requireRole("admin", "master"), async (req, res) => {
       return res.status(400).json({ error: "No fields to update" });
     }
 
-    values.push(id);
+    values.push(userId);
 
     const result = await db.query(
       `
