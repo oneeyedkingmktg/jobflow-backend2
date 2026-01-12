@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/UserProfileModal.jsx
-// Version: v1.2 – Show meta fields only for master/admin viewing other users
+// Version: v1.3 – Fixed self-update to exclude role/is_active
 // ============================================================================
 
 import React, { useEffect, useState } from "react";
@@ -107,16 +107,23 @@ export default function UserProfileModal({
       return;
     }
 
-    onSave &&
-      onSave({
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        role: form.role,
-        is_active: form.is_active,
-        ...(form.password ? { password: form.password } : {}),
-      });
+    // Build payload - exclude role/is_active when updating self, exclude password always
+    const payload = {
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+    };
 
+    // Only include role/is_active if editing another user
+    if (!isMyProfile) {
+      payload.role = form.role;
+      payload.is_active = form.is_active;
+    }
+
+    // NOTE: Password should NOT be sent here - need separate password change flow
+    // Using /users/me/password endpoint with current + new password
+
+    onSave && onSave(payload);
     setMode("view");
   };
 
@@ -232,19 +239,12 @@ export default function UserProfileModal({
           
           )}
 
-          {/* PASSWORD */}
-          {mode === "edit" && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Set New Password
-              </label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                placeholder="Leave blank to keep current"
-                className="w-full rounded-xl border px-4 py-3"
-              />
+          {/* PASSWORD - REMOVED: Use separate password change flow */}
+          {mode === "edit" && isMyProfile && (
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm text-blue-800">
+              <p className="font-semibold mb-1">Password Changes</p>
+              <p>To change your password, you'll need to use a separate secure password change form that requires your current password.</p>
+              <p className="mt-2 text-xs text-blue-600">Future update: Add "Change Password" button here</p>
             </div>
           )}
 
