@@ -123,7 +123,7 @@ export const UsersAPI = {
   changePassword: (data) =>
     apiRequest("/users/me/password", {
       method: "PUT",
-      body: JSON.stringify(toSnake(data)),
+      body: JSON.stringify(data), // Don't use toSnake - backend expects camelCase
     }),
 
   delete: (id) =>
