@@ -342,15 +342,23 @@ if (isUpdate) {
         console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly);
         
         if (eventType === 'appointment') {
-          await client.query(
-            `UPDATE leads 
-             SET appointment_date = $1,
-                 appointment_time = $2,
-                 last_synced_appointment_date = $1,
-                 last_synced_appointment_time = $2
-             WHERE id = $3`,
-            [dateOnly, timeOnly, lead.id]
-          );
+const appointmentTimestamp = new Date(startTime);
+
+await client.query(
+  `UPDATE leads 
+   SET appointment_date = $1,
+       appointment_time = $2,
+       last_synced_appointment_date = $3,
+       last_synced_appointment_time = $2
+   WHERE id = $4`,
+  [
+    dateOnly,
+    timeOnly,
+    appointmentTimestamp,
+    lead.id
+  ]
+);
+
         } else if (eventType === 'install') {
           await client.query(
             `UPDATE leads 
