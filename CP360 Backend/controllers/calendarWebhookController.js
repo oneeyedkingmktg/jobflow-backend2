@@ -299,12 +299,12 @@ if (companyResult.rows.length !== 1) {
         
         console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly);
         
-        if (eventType === 'appointment') {
+if (eventType === 'appointment') {
           await client.query(
             `UPDATE leads 
              SET appointment_date = $1,
                  appointment_time = $2,
-                 last_synced_appointment_date = $1,
+                 last_synced_appointment_date = NOW(),
                  last_synced_appointment_time = $2
              WHERE id = $3`,
             [dateOnly, timeOnly, lead.id]
@@ -313,7 +313,7 @@ if (companyResult.rows.length !== 1) {
           await client.query(
             `UPDATE leads 
              SET install_date = $1,
-                 last_synced_install_date = $1
+                 last_synced_install_date = NOW()
              WHERE id = $2`,
             [dateOnly, lead.id]
           );
