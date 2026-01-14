@@ -11,6 +11,7 @@ try {
       
       const webhookData = req.body;
       const contactId = webhookData.contact_id; // Declare once at top
+      const isWorkflowWebhook = !!webhookData.workflow; // Declare once here
 
       // =======================================================
 // STEP 1 — IDENTIFY EVENT OWNERSHIP (JOBFLOW vs EXTERNAL)
@@ -254,7 +255,7 @@ if (companyResult.rows.length !== 1) {
       
 // Check cooldown to prevent loops - ONLY for native calendar webhooks
       // Skip cooldown for workflow webhooks since they only fire once per action
-      const isWorkflowWebhook = !!webhookData.workflow;
+// isWorkflowWebhook declared at top
       
       if (!isWorkflowWebhook) {
         const SYNC_COOLDOWN = 2 * 60 * 1000;
