@@ -124,21 +124,35 @@ if (companyResult.rows.length !== 1) {
       const company = companyResult.rows[0];
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
-      // Determine event type based on calendar name or by checking database
+// Determine event type based on calendar name or calendar ID or by checking database
       let eventType = null;
+      const calendarIdFromEvent = calendarData.calendarId || calendarData.calendar_id;
       
-      // First try to determine from calendar name
-      if (calendarName) {
-        const lowerName = calendarName.toLowerCase();
-        if (lowerName.includes('appointment') || lowerName.includes('appt') || lowerName.includes('sales')) {
+      // Method 1: Try calendar ID match (works for new AND existing events)
+      if (!eventType && calendarIdFromEvent) {
+        if (company.ghl_appt_calendar === calendarIdFromEvent) {
           eventType = 'appointment';
-        } else if (lowerName.includes('install')) {
+          console.log('📅 Event type determined by calendar ID match: appointment');
+        } else if (company.ghl_install_calendar === calendarIdFromEvent) {
           eventType = 'install';
+          console.log('📅 Event type determined by calendar ID match: install');
         }
       }
       
-      // If we can't determine from name, check which field in DB has this event ID
-      if (!eventType && eventId) {
+      // Method 2: Try calendar name
+      if (!eventType && calendarName) {
+        const lowerName = calendarName.toLowerCase();
+        if (lowerName.includes('appointment') || lowerName.includes('appt') || lowerName.includes('sales')) {
+          eventType = 'appointment';
+          console.log('📅 Event type determined by calendar name: appointment');
+        } else if (lowerName.includes('install')) {
+          eventType = 'install';
+          console.log('📅 Event type determined by calendar name: install');
+        }
+      }
+      
+      // Method 3: Check which field in DB has this event ID (for existing events only)
+      if (!eventType && eventId && isJobFlowEvent) {
         const apptCheck = await client.query(
           'SELECT id FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
           [company.id, eventId]
@@ -151,8 +165,10 @@ if (companyResult.rows.length !== 1) {
         
         if (apptCheck.rows.length > 0) {
           eventType = 'appointment';
+          console.log('📅 Event type determined by DB lookup: appointment');
         } else if (installCheck.rows.length > 0) {
           eventType = 'install';
+          console.log('📅 Event type determined by DB lookup: install');
         }
       }
       
