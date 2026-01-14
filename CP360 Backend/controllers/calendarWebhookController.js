@@ -20,6 +20,12 @@ const eventId = calendarData.id || calendarData.eventId;
 
 const ownershipClient = await pool.connect();
 
+const contactId =
+  webhookData.contactId ||
+  webhookData.contact_id ||
+  webhookData.contact?.id;
+
+
 const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
    WHERE (appointment_calendar_event_id = $1
@@ -51,10 +57,6 @@ client = await pool.connect();
 
       const appointmentId = calendarData.appointmentId;
       const calendarName = calendarData.calendarName;
-const contactId =
-  webhookData.contactId ||
-  webhookData.contact_id ||
-  webhookData.contact?.id;
 
       const startTime = calendarData.startTime || calendarData.start_time;
       const endTime = calendarData.endTime || calendarData.end_time;
