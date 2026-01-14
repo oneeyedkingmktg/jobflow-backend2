@@ -162,13 +162,21 @@ const cancelDiscardChanges = () => {
         <div className="bg-[#f5f6f7] rounded-3xl shadow-2xl w-full max-w-3xl my-6 relative">
 
           {/* ✕ CLOSE */}
-          <button
-            onClick={handleExitWithoutSave}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-900 text-xl font-bold"
-            aria-label="Close"
-          >
-            ×
-          </button>
+<button
+  onClick={handleExitWithoutSave}
+  aria-label="Close"
+  className="
+    absolute top-4 right-4
+    text-4xl font-bold
+    text-black
+    leading-none
+    drop-shadow-[0_0_1px_white]
+    hover:opacity-80
+  "
+>
+  ×
+</button>
+
 
           <LeadHeader
             name={form.name}
