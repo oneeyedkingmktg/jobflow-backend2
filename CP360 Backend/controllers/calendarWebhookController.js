@@ -6,23 +6,23 @@ const calendarWebhookController = {
     let client;
 
     
-    try {
+try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
       const webhookData = req.body;
+      const contactId = webhookData.contact_id; // Declare once at top
 
       // =======================================================
-// STEP 1 — EARLY EXIT FOR EXTERNAL (NON-JOBFLOW) EVENTS
+// STEP 1 — IDENTIFY EVENT OWNERSHIP (JOBFLOW vs EXTERNAL)
 // =======================================================
 
 const calendarData = webhookData.calendar || {};
 const eventId = calendarData.id || calendarData.eventId;
 
-
-
-// TEMP DB connection ONLY to verify JobFlow ownership
+// TEMP DB connection to check event ownership
 const ownershipClient = await pool.connect();
 
+// Check if this event was created by JobFlow
 const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
    WHERE appointment_calendar_event_id = $1
@@ -30,13 +30,32 @@ const ownershipCheck = await ownershipClient.query(
   [eventId]
 );
 
+let isJobFlowEvent = ownershipCheck.rows.length > 0;
+let isNewGHLEvent = false;
+
+// If not a JobFlow event, check if it's a NEW event from GHL
+if (!isJobFlowEvent && contactId) {
+  console.log('🔍 [NEW EVENT CHECK] Event not found in JF, checking if contact exists...');
+  
+  const contactCheck = await ownershipClient.query(
+    `SELECT id FROM leads WHERE ghl_contact_id = $1`,
+    [contactId]
+  );
+  
+  if (contactCheck.rows.length > 0) {
+    isNewGHLEvent = true;
+    console.log('✅ [NEW GHL EVENT] Contact exists in JF - will sync new event');
+  }
+}
+
 ownershipClient.release();
 
-if (ownershipCheck.rows.length === 0) {
-  console.log('⚠️ [EXTERNAL EVENT] Ignored before full DB processing');
+// Exit if truly external (no JobFlow connection at all)
+if (!isJobFlowEvent && !isNewGHLEvent) {
+  console.log('⚠️ [EXTERNAL EVENT] Ignored - no JobFlow connection');
   return res.status(200).json({
     success: true,
-    message: 'External event ignored (not created by JobFlow)'
+    message: 'External event ignored (not created by JobFlow, contact not in JF)'
   });
 }
 
@@ -52,7 +71,6 @@ client = await pool.connect();
 
       const appointmentId = calendarData.appointmentId;
       const calendarName = calendarData.calendarName;
-      const contactId = webhookData.contact_id;
       const startTime = calendarData.startTime || calendarData.start_time;
       const endTime = calendarData.endTime || calendarData.end_time;
       const eventStatus = calendarData.status || calendarData.appointmentStatus;
@@ -168,8 +186,37 @@ if (companyResult.rows.length !== 1) {
         }
       }
       
+// If lead still not found and this is a new GHL event, look up by contact ID
+      if (!lead && isNewGHLEvent && contactId) {
+        console.log('🔍 [NEW EVENT] Looking up lead by GHL contact ID:', contactId);
+        const contactResult = await client.query(
+          'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
+          [company.id, contactId]
+        );
+        
+        if (contactResult.rows.length > 0) {
+          lead = contactResult.rows[0];
+          console.log('✅ [NEW EVENT] Found lead by contact ID:', lead.id);
+          
+          // Store the event ID in the appropriate field for future syncs
+          if (eventType === 'appointment') {
+            await client.query(
+              'UPDATE leads SET appointment_calendar_event_id = $1 WHERE id = $2',
+              [eventId, lead.id]
+            );
+            console.log('✅ [NEW EVENT] Stored appointment event ID');
+          } else if (eventType === 'install') {
+            await client.query(
+              'UPDATE leads SET install_calendar_event_id = $1 WHERE id = $2',
+              [eventId, lead.id]
+            );
+            console.log('✅ [NEW EVENT] Stored install event ID');
+          }
+        }
+      }
+      
       if (!lead) {
-        console.log('⚠️ Lead not found (should not happen after event check)');
+        console.log('⚠️ Lead not found');
         return res.status(404).json({ error: 'Lead not found' });
       }
       
