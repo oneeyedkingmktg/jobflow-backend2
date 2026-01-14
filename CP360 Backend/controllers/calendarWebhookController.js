@@ -238,27 +238,29 @@ lead = targetLead;
       
 // Prevent duplicate calendar echoes by value comparison
 if (isUpdate && startTime) {
-  const incomingTimestamp = new Date(startTime).toISOString();
+  // incoming values
+  const incomingDate = startTime.split('T')[0];
+  const incomingTime = startTime.split('T')[1] || null;
 
-  let existingTimestamp = null;
+  // existing values
+  let same = false;
 
   if (eventType === 'appointment' && lead.appointment_date && lead.appointment_time) {
-    existingTimestamp = new Date(
-      `${lead.appointment_date}T${lead.appointment_time}`
-    ).toISOString();
+    same =
+      lead.appointment_date === incomingDate &&
+      lead.appointment_time.startsWith(incomingTime?.substring(0, 5));
   }
 
   if (eventType === 'install' && lead.install_date) {
-    existingTimestamp = new Date(
-      `${lead.install_date}T00:00:00`
-    ).toISOString();
+    same = lead.install_date === incomingDate;
   }
 
-  if (existingTimestamp && existingTimestamp === incomingTimestamp) {
+  if (same) {
     console.log('🔄 [WEBHOOK ECHO] Duplicate calendar event ignored (no change)');
     return res.status(200).json({ success: true });
   }
 }
+
 
 
       
