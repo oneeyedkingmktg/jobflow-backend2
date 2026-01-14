@@ -18,13 +18,12 @@ const calendarWebhookController = {
 const calendarData = webhookData.calendar || {};
 const eventId = calendarData.id || calendarData.eventId;
 
-const ownershipClient = await pool.connect();
-
 const contactId =
   webhookData.contactId ||
   webhookData.contact_id ||
   webhookData.contact?.id;
 
+const ownershipClient = await pool.connect();
 
 const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
@@ -34,7 +33,10 @@ const ownershipCheck = await ownershipClient.query(
   [eventId, contactId]
 );
 
+ownershipClient.release();
+
 const isUpdate = ownershipCheck.rows.length > 0;
+
 
 
 console.log(
@@ -204,52 +206,8 @@ lead = targetLead;
 // =======================================================
 
       
-      // =======================================================
-// CREATE PATH — GHL CREATED EVENT (no existing JF record)
-// =======================================================
-
-if (!isUpdate) {
-  console.log('🆕 [CREATE] Creating new calendar event in JF');
-
-  // Find lead by contactId
-const leadResult = await client.query(
-  `SELECT * FROM leads
-   WHERE ghl_contact_id = $1
-   LIMIT 1`,
-  [contactId]
-);
 
 
-
-  if (leadResult.rows.length === 0) {
-    console.log('⚠️ No lead found for GHL contact — event ignored');
-    return res.status(200).json({
-      success: true,
-      message: 'No matching lead found for contact'
-    });
-  }
-
-  lead = leadResult.rows[0];
-
-  // Assign calendar event ID to correct field
-  if (eventType === 'appointment') {
-    await client.query(
-      `UPDATE leads
-       SET appointment_calendar_event_id = $1
-       WHERE id = $2`,
-      [eventId, lead.id]
-    );
-  } else if (eventType === 'install') {
-    await client.query(
-      `UPDATE leads
-       SET install_calendar_event_id = $1
-       WHERE id = $2`,
-      [eventId, lead.id]
-    );
-  }
-
-  console.log(`✅ [CREATE] Linked ${eventType} event to lead ${lead.id}`);
-}
 // =======================================================
 
 
