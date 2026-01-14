@@ -179,28 +179,44 @@ if (companyResult.rows.length !== 1) {
         return res.status(400).json({ error: 'Could not determine event type' });
       }
       
-      // Find lead by event ID (we already know it exists from the check above)
+// Find lead - for workflow webhooks use contact ID, for native webhooks use event ID
       let lead = null;
+// isWorkflowWebhook already declared above in cooldown section
       
-      if (eventType === 'appointment') {
-        const apptResult = await client.query(
-          'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
-          [company.id, eventId]
+      if (isWorkflowWebhook && contactId) {
+        // Workflow webhooks: Look up by contact ID (event IDs are unreliable)
+        console.log('🔍 [WORKFLOW] Looking up lead by contact ID:', contactId);
+        const contactResult = await client.query(
+          'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
+          [company.id, contactId]
         );
-        if (apptResult.rows.length > 0) {
-          lead = apptResult.rows[0];
-          console.log('✅ Found lead by appointment event ID:', lead.id);
+        if (contactResult.rows.length > 0) {
+          lead = contactResult.rows[0];
+          console.log('✅ [WORKFLOW] Found lead by contact ID:', lead.id);
         }
-      } else if (eventType === 'install') {
-        const installResult = await client.query(
-          'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
-          [company.id, eventId]
-        );
-        if (installResult.rows.length > 0) {
-          lead = installResult.rows[0];
-          console.log('✅ Found lead by install event ID:', lead.id);
+      } else {
+        // Native calendar webhooks: Look up by event ID
+        if (eventType === 'appointment') {
+          const apptResult = await client.query(
+            'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
+            [company.id, eventId]
+          );
+          if (apptResult.rows.length > 0) {
+            lead = apptResult.rows[0];
+            console.log('✅ Found lead by appointment event ID:', lead.id);
+          }
+        } else if (eventType === 'install') {
+          const installResult = await client.query(
+            'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
+            [company.id, eventId]
+          );
+          if (installResult.rows.length > 0) {
+            lead = installResult.rows[0];
+            console.log('✅ Found lead by install event ID:', lead.id);
+          }
         }
       }
+
       
 // If lead still not found and this is a new GHL event, look up by contact ID
       if (!lead && isNewGHLEvent && contactId) {
