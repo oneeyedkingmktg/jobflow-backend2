@@ -236,21 +236,28 @@ if (companyResult.rows.length !== 1) {
         return res.status(404).json({ error: 'Lead not found' });
       }
       
-      // Check cooldown to prevent loops (2 minute cooldown)
-      const SYNC_COOLDOWN = 2 * 60 * 1000;
-      const lastSyncedField = eventType === 'appointment' ? 'last_synced_appointment_date' : 'last_synced_install_date';
-      const lastSynced = lead[lastSyncedField];
+// Check cooldown to prevent loops - ONLY for native calendar webhooks
+      // Skip cooldown for workflow webhooks since they only fire once per action
+      const isWorkflowWebhook = !!webhookData.workflow;
       
-      if (lastSynced) {
-        const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
-        if (timeSinceSync < SYNC_COOLDOWN) {
-          console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
-          return res.status(200).json({ 
-            success: true,
-            message: 'Duplicate calendar sync ignored (cooldown period)',
-            lead_id: lead.id 
-          });
+      if (!isWorkflowWebhook) {
+        const SYNC_COOLDOWN = 2 * 60 * 1000;
+        const lastSyncedField = eventType === 'appointment' ? 'last_synced_appointment_date' : 'last_synced_install_date';
+        const lastSynced = lead[lastSyncedField];
+        
+        if (lastSynced) {
+          const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
+          if (timeSinceSync < SYNC_COOLDOWN) {
+            console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
+            return res.status(200).json({ 
+              success: true,
+              message: 'Duplicate calendar sync ignored (cooldown period)',
+              lead_id: lead.id 
+            });
+          }
         }
+      } else {
+        console.log('⏭️ [WORKFLOW WEBHOOK] Skipping cooldown check');
       }
       
       // Handle based on event status
