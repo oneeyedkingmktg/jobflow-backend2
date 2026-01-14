@@ -11,16 +11,13 @@ const calendarWebhookController = {
       
       const webhookData = req.body;
 
-      // =======================================================
-// STEP 1 — EARLY EXIT FOR EXTERNAL (NON-JOBFLOW) EVENTS
+// =======================================================
+// STEP 1 — DETERMINE IF THIS IS CREATE OR UPDATE
 // =======================================================
 
 const calendarData = webhookData.calendar || {};
 const eventId = calendarData.id || calendarData.eventId;
 
-
-
-// TEMP DB connection ONLY to verify JobFlow ownership
 const ownershipClient = await pool.connect();
 
 const ownershipCheck = await ownershipClient.query(
@@ -32,17 +29,19 @@ const ownershipCheck = await ownershipClient.query(
 
 ownershipClient.release();
 
-if (ownershipCheck.rows.length === 0) {
-  console.log('⚠️ [EXTERNAL EVENT] Ignored before full DB processing');
-  return res.status(200).json({
-    success: true,
-    message: 'External event ignored (not created by JobFlow)'
-  });
-}
+const isUpdate = ownershipCheck.rows.length > 0;
 
+console.log(
+  isUpdate
+    ? '🔄 [CALENDAR] Update event detected'
+    : '🆕 [CALENDAR] New GHL event detected — will create in JF'
+);
+
+// DO NOT RETURN HERE — creation is handled later
 // =======================================================
 // END STEP 1
 // =======================================================
+
 
       
       // Extract calendar event data - GHL nests it inside 'calendar' object
@@ -148,6 +147,54 @@ if (companyResult.rows.length !== 1) {
       // Find lead by event ID (we already know it exists from the check above)
       let lead = null;
       
+      // =======================================================
+// CREATE PATH — GHL CREATED EVENT (no existing JF record)
+// =======================================================
+
+if (!isUpdate) {
+  console.log('🆕 [CREATE] Creating new calendar event in JF');
+
+  // Find lead by contactId
+  const leadResult = await client.query(
+    `SELECT * FROM leads 
+     WHERE ghl_contact_id = $1 
+       AND company_id = $2
+     LIMIT 1`,
+    [contactId, company.id]
+  );
+
+  if (leadResult.rows.length === 0) {
+    console.log('⚠️ No lead found for GHL contact — event ignored');
+    return res.status(200).json({
+      success: true,
+      message: 'No matching lead found for contact'
+    });
+  }
+
+  lead = leadResult.rows[0];
+
+  // Assign calendar event ID to correct field
+  if (eventType === 'appointment') {
+    await client.query(
+      `UPDATE leads
+       SET appointment_calendar_event_id = $1
+       WHERE id = $2`,
+      [eventId, lead.id]
+    );
+  } else if (eventType === 'install') {
+    await client.query(
+      `UPDATE leads
+       SET install_calendar_event_id = $1
+       WHERE id = $2`,
+      [eventId, lead.id]
+    );
+  }
+
+  console.log(`✅ [CREATE] Linked ${eventType} event to lead ${lead.id}`);
+}
+// =======================================================
+
+
       if (eventType === 'appointment') {
         const apptResult = await client.query(
           'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
@@ -173,22 +220,29 @@ if (companyResult.rows.length !== 1) {
         return res.status(404).json({ error: 'Lead not found' });
       }
       
-      // Check cooldown to prevent loops (2 minute cooldown)
-      const SYNC_COOLDOWN = 2 * 60 * 1000;
-      const lastSyncedField = eventType === 'appointment' ? 'last_synced_appointment_date' : 'last_synced_install_date';
-      const lastSynced = lead[lastSyncedField];
-      
-      if (lastSynced) {
-        const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
-        if (timeSinceSync < SYNC_COOLDOWN) {
-          console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
-          return res.status(200).json({ 
-            success: true,
-            message: 'Duplicate calendar sync ignored (cooldown period)',
-            lead_id: lead.id 
-          });
-        }
-      }
+// Check cooldown to prevent loops (2 minute cooldown)
+// Skip cooldown for CREATE events
+if (isUpdate) {
+  const SYNC_COOLDOWN = 2 * 60 * 1000;
+  const lastSyncedField = eventType === 'appointment'
+    ? 'last_synced_appointment_date'
+    : 'last_synced_install_date';
+
+  const lastSynced = lead[lastSyncedField];
+
+  if (lastSynced) {
+    const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
+    if (timeSinceSync < SYNC_COOLDOWN) {
+      console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
+      return res.status(200).json({ 
+        success: true,
+        message: 'Duplicate calendar sync ignored (cooldown period)',
+        lead_id: lead.id 
+      });
+    }
+  }
+}
+
       
       // Handle based on event status
       const isCancelled = eventStatus === 'cancelled' || 
