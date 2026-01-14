@@ -215,11 +215,10 @@ if (!isUpdate) {
 const leadResult = await client.query(
   `SELECT * FROM leads
    WHERE ghl_contact_id = $1
-     AND company_id = $2
-   ORDER BY updated_at DESC
    LIMIT 1`,
-  [contactId, company.id]
+  [contactId]
 );
+
 
 
   if (leadResult.rows.length === 0) {
