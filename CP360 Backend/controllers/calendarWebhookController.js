@@ -150,6 +150,59 @@ if (companyResult.rows.length !== 1) {
       
       // Find lead by event ID (we already know it exists from the check above)
       let lead = null;
+
+      // =======================================================
+// HARD CREATE GUARD — bypass update/cooldown completely
+// =======================================================
+
+if (!isUpdate) {
+  console.log('🆕 [CREATE] New GHL event — bypassing update path');
+
+  const leadResult = await client.query(
+    `SELECT * FROM leads
+     WHERE ghl_contact_id = $1
+       AND company_id = $2
+     LIMIT 1`,
+    [contactId, company.id]
+  );
+
+  if (leadResult.rows.length === 0) {
+    console.log('⚠️ No lead found for GHL contact — stopping');
+    return res.status(200).json({
+      success: true,
+      message: 'No matching lead found for contact'
+    });
+  }
+
+  const targetLead = leadResult.rows[0];
+
+  if (eventType === 'appointment') {
+    await client.query(
+      `UPDATE leads
+       SET appointment_calendar_event_id = $1
+       WHERE id = $2`,
+      [eventId, targetLead.id]
+    );
+  } else if (eventType === 'install') {
+    await client.query(
+      `UPDATE leads
+       SET install_calendar_event_id = $1
+       WHERE id = $2`,
+      [eventId, targetLead.id]
+    );
+  }
+
+  console.log(`✅ [CREATE] Event linked to lead ${targetLead.id}`);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Calendar event created in JobFlow',
+    lead_id: targetLead.id
+  });
+}
+
+// =======================================================
+
       
       // =======================================================
 // CREATE PATH — GHL CREATED EVENT (no existing JF record)
