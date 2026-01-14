@@ -343,17 +343,18 @@ if (isUpdate) {
         
         if (eventType === 'appointment') {
 const appointmentTimestamp = new Date(startTime);
+const appointmentTime = appointmentTimestamp.toISOString().substring(11, 19); // HH:MM:SS
 
 await client.query(
   `UPDATE leads 
    SET appointment_date = $1,
-       appointment_time = $2,
+       appointment_time = $2::time,
        last_synced_appointment_date = $3,
-       last_synced_appointment_time = $2
+       last_synced_appointment_time = $2::time
    WHERE id = $4`,
   [
     dateOnly,
-    timeOnly,
+    appointmentTime,
     appointmentTimestamp,
     lead.id
   ]
