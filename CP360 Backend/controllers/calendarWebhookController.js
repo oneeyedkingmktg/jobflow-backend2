@@ -236,28 +236,30 @@ lead = targetLead;
         return res.status(404).json({ error: 'Lead not found' });
       }
       
-// Check cooldown to prevent loops (2 minute cooldown)
-// Skip cooldown for CREATE events
-if (isUpdate) {
-  const SYNC_COOLDOWN = 2 * 60 * 1000;
-  const lastSyncedField = eventType === 'appointment'
-    ? 'last_synced_appointment_date'
-    : 'last_synced_install_date';
+// Prevent duplicate calendar echoes by value comparison
+if (isUpdate && startTime) {
+  const incomingTimestamp = new Date(startTime).toISOString();
 
-  const lastSynced = lead[lastSyncedField];
+  let existingTimestamp = null;
 
-  if (lastSynced) {
-    const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
-    if (timeSinceSync < SYNC_COOLDOWN) {
-      console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
-      return res.status(200).json({ 
-        success: true,
-        message: 'Duplicate calendar sync ignored (cooldown period)',
-        lead_id: lead.id 
-      });
-    }
+  if (eventType === 'appointment' && lead.appointment_date && lead.appointment_time) {
+    existingTimestamp = new Date(
+      `${lead.appointment_date}T${lead.appointment_time}`
+    ).toISOString();
+  }
+
+  if (eventType === 'install' && lead.install_date) {
+    existingTimestamp = new Date(
+      `${lead.install_date}T00:00:00`
+    ).toISOString();
+  }
+
+  if (existingTimestamp && existingTimestamp === incomingTimestamp) {
+    console.log('🔄 [WEBHOOK ECHO] Duplicate calendar event ignored (no change)');
+    return res.status(200).json({ success: true });
   }
 }
+
 
       
       // Handle based on event status
