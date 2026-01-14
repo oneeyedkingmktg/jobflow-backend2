@@ -6,24 +6,23 @@ const calendarWebhookController = {
     let client;
 
     
-try {
+    try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
       const webhookData = req.body;
-      const contactId = webhookData.contact_id; // Declare once at top
-      const isWorkflowWebhook = !!webhookData.workflow; // Declare once here
 
       // =======================================================
-// STEP 1 — IDENTIFY EVENT OWNERSHIP (JOBFLOW vs EXTERNAL)
+// STEP 1 — EARLY EXIT FOR EXTERNAL (NON-JOBFLOW) EVENTS
 // =======================================================
 
 const calendarData = webhookData.calendar || {};
 const eventId = calendarData.id || calendarData.eventId;
 
-// TEMP DB connection to check event ownership
+
+
+// TEMP DB connection ONLY to verify JobFlow ownership
 const ownershipClient = await pool.connect();
 
-// Check if this event was created by JobFlow
 const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
    WHERE appointment_calendar_event_id = $1
@@ -31,32 +30,13 @@ const ownershipCheck = await ownershipClient.query(
   [eventId]
 );
 
-let isJobFlowEvent = ownershipCheck.rows.length > 0;
-let isNewGHLEvent = false;
-
-// If not a JobFlow event, check if it's a NEW event from GHL
-if (!isJobFlowEvent && contactId) {
-  console.log('🔍 [NEW EVENT CHECK] Event not found in JF, checking if contact exists...');
-  
-  const contactCheck = await ownershipClient.query(
-    `SELECT id FROM leads WHERE ghl_contact_id = $1`,
-    [contactId]
-  );
-  
-  if (contactCheck.rows.length > 0) {
-    isNewGHLEvent = true;
-    console.log('✅ [NEW GHL EVENT] Contact exists in JF - will sync new event');
-  }
-}
-
 ownershipClient.release();
 
-// Exit if truly external (no JobFlow connection at all)
-if (!isJobFlowEvent && !isNewGHLEvent) {
-  console.log('⚠️ [EXTERNAL EVENT] Ignored - no JobFlow connection');
+if (ownershipCheck.rows.length === 0) {
+  console.log('⚠️ [EXTERNAL EVENT] Ignored before full DB processing');
   return res.status(200).json({
     success: true,
-    message: 'External event ignored (not created by JobFlow, contact not in JF)'
+    message: 'External event ignored (not created by JobFlow)'
   });
 }
 
@@ -72,6 +52,7 @@ client = await pool.connect();
 
       const appointmentId = calendarData.appointmentId;
       const calendarName = calendarData.calendarName;
+      const contactId = webhookData.contact_id;
       const startTime = calendarData.startTime || calendarData.start_time;
       const endTime = calendarData.endTime || calendarData.end_time;
       const eventStatus = calendarData.status || calendarData.appointmentStatus;
@@ -125,35 +106,21 @@ if (companyResult.rows.length !== 1) {
       const company = companyResult.rows[0];
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
-// Determine event type based on calendar name or calendar ID or by checking database
+      // Determine event type based on calendar name or by checking database
       let eventType = null;
-      const calendarIdFromEvent = calendarData.calendarId || calendarData.calendar_id;
       
-      // Method 1: Try calendar ID match (works for new AND existing events)
-      if (!eventType && calendarIdFromEvent) {
-        if (company.ghl_appt_calendar === calendarIdFromEvent) {
-          eventType = 'appointment';
-          console.log('📅 Event type determined by calendar ID match: appointment');
-        } else if (company.ghl_install_calendar === calendarIdFromEvent) {
-          eventType = 'install';
-          console.log('📅 Event type determined by calendar ID match: install');
-        }
-      }
-      
-      // Method 2: Try calendar name
-      if (!eventType && calendarName) {
+      // First try to determine from calendar name
+      if (calendarName) {
         const lowerName = calendarName.toLowerCase();
         if (lowerName.includes('appointment') || lowerName.includes('appt') || lowerName.includes('sales')) {
           eventType = 'appointment';
-          console.log('📅 Event type determined by calendar name: appointment');
         } else if (lowerName.includes('install')) {
           eventType = 'install';
-          console.log('📅 Event type determined by calendar name: install');
         }
       }
       
-      // Method 3: Check which field in DB has this event ID (for existing events only)
-      if (!eventType && eventId && isJobFlowEvent) {
+      // If we can't determine from name, check which field in DB has this event ID
+      if (!eventType && eventId) {
         const apptCheck = await client.query(
           'SELECT id FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
           [company.id, eventId]
@@ -166,10 +133,8 @@ if (companyResult.rows.length !== 1) {
         
         if (apptCheck.rows.length > 0) {
           eventType = 'appointment';
-          console.log('📅 Event type determined by DB lookup: appointment');
         } else if (installCheck.rows.length > 0) {
           eventType = 'install';
-          console.log('📅 Event type determined by DB lookup: install');
         }
       }
       
@@ -180,101 +145,49 @@ if (companyResult.rows.length !== 1) {
         return res.status(400).json({ error: 'Could not determine event type' });
       }
       
-// Find lead - for workflow webhooks use contact ID, for native webhooks use event ID
+      // Find lead by event ID (we already know it exists from the check above)
       let lead = null;
-// isWorkflowWebhook already declared above in cooldown section
       
-      if (isWorkflowWebhook && contactId) {
-        // Workflow webhooks: Look up by contact ID (event IDs are unreliable)
-        console.log('🔍 [WORKFLOW] Looking up lead by contact ID:', contactId);
-        const contactResult = await client.query(
-          'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
-          [company.id, contactId]
+      if (eventType === 'appointment') {
+        const apptResult = await client.query(
+          'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
+          [company.id, eventId]
         );
-        if (contactResult.rows.length > 0) {
-          lead = contactResult.rows[0];
-          console.log('✅ [WORKFLOW] Found lead by contact ID:', lead.id);
+        if (apptResult.rows.length > 0) {
+          lead = apptResult.rows[0];
+          console.log('✅ Found lead by appointment event ID:', lead.id);
         }
-      } else {
-        // Native calendar webhooks: Look up by event ID
-        if (eventType === 'appointment') {
-          const apptResult = await client.query(
-            'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
-            [company.id, eventId]
-          );
-          if (apptResult.rows.length > 0) {
-            lead = apptResult.rows[0];
-            console.log('✅ Found lead by appointment event ID:', lead.id);
-          }
-        } else if (eventType === 'install') {
-          const installResult = await client.query(
-            'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
-            [company.id, eventId]
-          );
-          if (installResult.rows.length > 0) {
-            lead = installResult.rows[0];
-            console.log('✅ Found lead by install event ID:', lead.id);
-          }
-        }
-      }
-
-      
-// If lead still not found and this is a new GHL event, look up by contact ID
-      if (!lead && isNewGHLEvent && contactId) {
-        console.log('🔍 [NEW EVENT] Looking up lead by GHL contact ID:', contactId);
-        const contactResult = await client.query(
-          'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
-          [company.id, contactId]
+      } else if (eventType === 'install') {
+        const installResult = await client.query(
+          'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
+          [company.id, eventId]
         );
-        
-        if (contactResult.rows.length > 0) {
-          lead = contactResult.rows[0];
-          console.log('✅ [NEW EVENT] Found lead by contact ID:', lead.id);
-          
-          // Store the event ID in the appropriate field for future syncs
-          if (eventType === 'appointment') {
-            await client.query(
-              'UPDATE leads SET appointment_calendar_event_id = $1 WHERE id = $2',
-              [eventId, lead.id]
-            );
-            console.log('✅ [NEW EVENT] Stored appointment event ID');
-          } else if (eventType === 'install') {
-            await client.query(
-              'UPDATE leads SET install_calendar_event_id = $1 WHERE id = $2',
-              [eventId, lead.id]
-            );
-            console.log('✅ [NEW EVENT] Stored install event ID');
-          }
+        if (installResult.rows.length > 0) {
+          lead = installResult.rows[0];
+          console.log('✅ Found lead by install event ID:', lead.id);
         }
       }
       
       if (!lead) {
-        console.log('⚠️ Lead not found');
+        console.log('⚠️ Lead not found (should not happen after event check)');
         return res.status(404).json({ error: 'Lead not found' });
       }
       
-// Check cooldown to prevent loops - ONLY for native calendar webhooks
-      // Skip cooldown for workflow webhooks since they only fire once per action
-// isWorkflowWebhook declared at top
+      // Check cooldown to prevent loops (2 minute cooldown)
+      const SYNC_COOLDOWN = 2 * 60 * 1000;
+      const lastSyncedField = eventType === 'appointment' ? 'last_synced_appointment_date' : 'last_synced_install_date';
+      const lastSynced = lead[lastSyncedField];
       
-      if (!isWorkflowWebhook) {
-        const SYNC_COOLDOWN = 2 * 60 * 1000;
-        const lastSyncedField = eventType === 'appointment' ? 'last_synced_appointment_date' : 'last_synced_install_date';
-        const lastSynced = lead[lastSyncedField];
-        
-        if (lastSynced) {
-          const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
-          if (timeSinceSync < SYNC_COOLDOWN) {
-            console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
-            return res.status(200).json({ 
-              success: true,
-              message: 'Duplicate calendar sync ignored (cooldown period)',
-              lead_id: lead.id 
-            });
-          }
+      if (lastSynced) {
+        const timeSinceSync = Date.now() - new Date(lastSynced).getTime();
+        if (timeSinceSync < SYNC_COOLDOWN) {
+          console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate calendar sync - synced ${Math.round(timeSinceSync / 1000)}s ago`);
+          return res.status(200).json({ 
+            success: true,
+            message: 'Duplicate calendar sync ignored (cooldown period)',
+            lead_id: lead.id 
+          });
         }
-      } else {
-        console.log('⏭️ [WORKFLOW WEBHOOK] Skipping cooldown check');
       }
       
       // Handle based on event status
@@ -316,12 +229,12 @@ if (companyResult.rows.length !== 1) {
         
         console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly);
         
-if (eventType === 'appointment') {
+        if (eventType === 'appointment') {
           await client.query(
             `UPDATE leads 
              SET appointment_date = $1,
                  appointment_time = $2,
-                 last_synced_appointment_date = NOW(),
+                 last_synced_appointment_date = $1,
                  last_synced_appointment_time = $2
              WHERE id = $3`,
             [dateOnly, timeOnly, lead.id]
@@ -330,7 +243,7 @@ if (eventType === 'appointment') {
           await client.query(
             `UPDATE leads 
              SET install_date = $1,
-                 last_synced_install_date = NOW()
+                 last_synced_install_date = $1
              WHERE id = $2`,
             [dateOnly, lead.id]
           );

@@ -1,9 +1,9 @@
 // ============================================================================
 // File: src/LeadModal.jsx
-// Version: v1.3 – Connected Call/Text to header buttons
+// Version: v1.4 – Exit without saving + dirty check
 // ============================================================================
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useCompany } from "./CompanyContext";
 import { formatPhoneNumber } from "./utils/formatting";
 import { LeadsAPI } from "./api";
@@ -19,88 +19,110 @@ import LeadModalsWrapper from "./leadModalParts/LeadModalsWrapper.jsx";
 import LeadStatusBar from "./leadModalParts/LeadStatusBar.jsx";
 import EstimateModal from "./EstimateModal.jsx";
 
-export default function LeadModal({ lead, onSave, onSaveAndExit, onDelete, onClose }) {
-
+export default function LeadModal({
+  lead,
+  onSave,
+  onSaveAndExit,
+  onDelete,
+  onClose,
+}) {
   const { currentCompany } = useCompany();
 
-const [form, setForm] = useState({
-  ...lead,
-  phone: formatPhoneNumber(lead?.phone || ""),
-  hasEstimate: lead?.hasEstimate === true,
-});
+  const initialFormRef = useRef(null);
+
+  const [form, setForm] = useState(() => {
+    const f = {
+      ...lead,
+      phone: formatPhoneNumber(lead?.phone || ""),
+      hasEstimate: lead?.hasEstimate === true,
+    };
+    initialFormRef.current = JSON.stringify(f);
+    return f;
+  });
 
   const [isEditing, setIsEditing] = useState(!lead?.id);
   const [saving, setSaving] = useState(false);
+
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
+
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  
   const [showDateModal, setShowDateModal] = useState(null);
   const [showApptModal, setShowApptModal] = useState(false);
   const [showNotSoldModal, setShowNotSoldModal] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
 
-const handleSave = async () => {
-  if (saving) return;
-  setSaving(true);
-  try {
-    const updated = await onSave(form);
-    if (updated) {
-      setForm(p => ({ ...p, ...updated }));
-    }
-  } catch (error) {
-    console.error("Save error:", error);
-  } finally {
-    setSaving(false);
+
+  const isDirty =
+    JSON.stringify(form) !== initialFormRef.current;
+
+  // ------------------------------------------------------------------
+  // Exit without saving
+  // ------------------------------------------------------------------
+const handleExitWithoutSave = () => {
+  if (isEditing && isDirty) {
+    setShowDiscardModal(true);
+    return;
   }
+  onClose?.();
 };
 
 
-const handleSaveAndExit = async () => {
-  console.log("🔥 handleSaveAndExit CALLED");
-  if (saving) return;
-  setSaving(true);
-  try {
-    console.log("💾 About to save:", form);
-    const result = await onSaveAndExit(form);
-    console.log("✅ Save completed:", result);
-    
-    console.log("🚪 About to call onClose");
-    if (onClose) {
-      onClose();
-      console.log("✅ onClose called");
-    } else {
-      console.log("❌ onClose is undefined!");
+  // ------------------------------------------------------------------
+  // Save handlers
+  // ------------------------------------------------------------------
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const updated = await onSave(form);
+      if (updated) {
+        const merged = { ...form, ...updated };
+        setForm(merged);
+        initialFormRef.current = JSON.stringify(merged);
+      }
+      setIsEditing(false);
+    } finally {
+      setSaving(false);
     }
-  } catch (error) {
-    console.error("❌ Save and exit error:", error);
-    alert("Error saving: " + error.message);
-  } finally {
-    setSaving(false);
-    console.log("🏁 handleSaveAndExit finished, saving:", saving);
-  }
+  };
+
+  const confirmDiscardChanges = () => {
+  setShowDiscardModal(false);
+  onClose?.();
 };
 
+const cancelDiscardChanges = () => {
+  setShowDiscardModal(false);
+};
+
+
+  const handleSaveAndExit = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const updated = await onSaveAndExit(form);
+      if (updated) {
+        initialFormRef.current = JSON.stringify(updated);
+      }
+      onClose?.();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Utility handlers
+  // ------------------------------------------------------------------
   const handleCall = () => {
-    if (form.phone) {
-      const cleanPhone = form.phone.replace(/\D/g, '');
-      window.location.href = `tel:${cleanPhone}`;
-    }
+    if (!form.phone) return;
+    window.location.href = `tel:${form.phone.replace(/\D/g, "")}`;
   };
 
   const handleText = () => {
-    if (form.phone) {
-      const cleanPhone = form.phone.replace(/\D/g, '');
-      window.location.href = `sms:${cleanPhone}`;
-    }
-  };
-
-  const handleNotSoldSelect = (reason) => {
-    setForm(p => ({
-      ...p,
-      status: "not_sold",
-      notSoldReason: reason
-    }));
+    if (!form.phone) return;
+    window.location.href = `sms:${form.phone.replace(/\D/g, "")}`;
   };
 
   const handleOpenMaps = () => {
@@ -108,32 +130,46 @@ const handleSaveAndExit = async () => {
       .filter(Boolean)
       .join(", ");
     if (address) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank");
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          address
+        )}`,
+        "_blank"
+      );
     }
   };
 
   const handleOpenEstimate = async () => {
     if (!form.id || !form.hasEstimate) return;
-    
     setLoadingEstimate(true);
     try {
       const res = await LeadsAPI.getEstimate(form.id);
       setEstimateData(res.estimate);
       setShowEstimateModal(true);
-    } catch (error) {
-      console.error("Error loading estimate:", error);
-      alert("Failed to load estimate details");
     } finally {
       setLoadingEstimate(false);
     }
   };
 
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-40 pointer-events-none" />
+      <div className="fixed inset-0 bg-black/50 z-40" />
 
-      <div className="fixed inset-0 z-50 flex justify-center items-start p-4 overflow-auto pointer-events-auto">
-        <div className="bg-[#f5f6f7] rounded-3xl shadow-2xl w-full max-w-3xl my-6">
+      <div className="fixed inset-0 z-50 flex justify-center items-start p-4 overflow-auto">
+        <div className="bg-[#f5f6f7] rounded-3xl shadow-2xl w-full max-w-3xl my-6 relative">
+
+          {/* ✕ CLOSE */}
+          <button
+            onClick={handleExitWithoutSave}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-900 text-xl font-bold"
+            aria-label="Close"
+          >
+            ×
+          </button>
+
           <LeadHeader
             name={form.name}
             status={form.status}
@@ -144,23 +180,19 @@ const handleSaveAndExit = async () => {
           />
 
           <div className="px-6 py-6 space-y-5">
-<LeadStatusBar 
-  form={form} 
-  setForm={setForm}
-  onOpenNotSold={() => setShowNotSoldModal(true)}
-  onOpenApptModal={() => setShowApptModal(true)}
-onOpenInstallModal={() => setShowDateModal("installDate")}
- />
-
-
-            <LeadAddressBox 
+            <LeadStatusBar
               form={form}
-              onOpenMaps={handleOpenMaps}
+              setForm={setForm}
+              onOpenNotSold={() => setShowNotSoldModal(true)}
+              onOpenApptModal={() => setShowApptModal(true)}
+              onOpenInstallModal={() => setShowDateModal("installDate")}
             />
-            
+
+            <LeadAddressBox form={form} onOpenMaps={handleOpenMaps} />
+
             <LeadContactSection form={form} />
-            
-            <LeadAppointmentSection 
+
+            <LeadAppointmentSection
               form={form}
               setShowApptModal={setShowApptModal}
               setShowDateModal={setShowDateModal}
@@ -170,10 +202,10 @@ onOpenInstallModal={() => setShowDateModal("installDate")}
               <LeadDetailsEdit
                 form={form}
                 onChange={(k, v) =>
-                  setForm(p => ({ ...p, [k]: v }))
+                  setForm((p) => ({ ...p, [k]: v }))
                 }
                 onPhoneChange={(v) =>
-                  setForm(p => ({
+                  setForm((p) => ({
                     ...p,
                     phone: formatPhoneNumber(v),
                   }))
@@ -211,7 +243,7 @@ onOpenInstallModal={() => setShowDateModal("installDate")}
         />
       )}
 
-      <LeadModalsWrapper 
+      <LeadModalsWrapper
         form={form}
         setForm={setForm}
         showDateModal={showDateModal}
@@ -220,8 +252,44 @@ onOpenInstallModal={() => setShowDateModal("installDate")}
         setShowApptModal={setShowApptModal}
         showNotSoldModal={showNotSoldModal}
         setShowNotSoldModal={setShowNotSoldModal}
-        onNotSoldSelect={handleNotSoldSelect}
       />
+      {showDiscardModal && (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center">
+    {/* Backdrop */}
+    <div
+      className="absolute inset-0 bg-black/40"
+      onClick={cancelDiscardChanges}
+    />
+
+    {/* Modal */}
+    <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Discard changes?
+      </h3>
+
+      <p className="text-sm text-gray-600 mb-6">
+        You have unsaved changes. If you exit now, they will be lost.
+      </p>
+
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={cancelDiscardChanges}
+          className="px-4 py-2 rounded-xl bg-gray-100 text-gray-800 hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={confirmDiscardChanges}
+          className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700"
+        >
+          Discard
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </>
   );
 }
