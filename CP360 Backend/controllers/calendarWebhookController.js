@@ -194,13 +194,11 @@ if (!isUpdate) {
     );
   }
 
-  console.log(`✅ [CREATE] Event linked to lead ${targetLead.id}`);
+console.log(`✅ [CREATE] Event linked to lead ${targetLead.id}`);
 
-  return res.status(200).json({
-    success: true,
-    message: 'Calendar event created in JobFlow',
-    lead_id: targetLead.id
-  });
+// allow flow to continue so dates/times are written below
+lead = targetLead;
+
 }
 
 // =======================================================
