@@ -22,14 +22,14 @@ const ownershipClient = await pool.connect();
 
 const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
-   WHERE appointment_calendar_event_id = $1
-      OR install_calendar_event_id = $1`,
-  [eventId]
+   WHERE (appointment_calendar_event_id = $1
+          OR install_calendar_event_id = $1)
+     AND ghl_contact_id = $2`,
+  [eventId, contactId]
 );
 
-ownershipClient.release();
-
 const isUpdate = ownershipCheck.rows.length > 0;
+
 
 console.log(
   isUpdate
