@@ -51,7 +51,11 @@ client = await pool.connect();
 
       const appointmentId = calendarData.appointmentId;
       const calendarName = calendarData.calendarName;
-      const contactId = webhookData.contact_id;
+const contactId =
+  webhookData.contactId ||
+  webhookData.contact_id ||
+  webhookData.contact?.id;
+
       const startTime = calendarData.startTime || calendarData.start_time;
       const endTime = calendarData.endTime || calendarData.end_time;
       const eventStatus = calendarData.status || calendarData.appointmentStatus;
@@ -155,13 +159,15 @@ if (!isUpdate) {
   console.log('🆕 [CREATE] Creating new calendar event in JF');
 
   // Find lead by contactId
-  const leadResult = await client.query(
-    `SELECT * FROM leads 
-     WHERE ghl_contact_id = $1 
-       AND company_id = $2
-     LIMIT 1`,
-    [contactId, company.id]
-  );
+const leadResult = await client.query(
+  `SELECT * FROM leads
+   WHERE ghl_contact_id = $1
+     AND company_id = $2
+   ORDER BY updated_at DESC
+   LIMIT 1`,
+  [contactId, company.id]
+);
+
 
   if (leadResult.rows.length === 0) {
     console.log('⚠️ No lead found for GHL contact — event ignored');
