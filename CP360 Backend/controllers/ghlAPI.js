@@ -1138,13 +1138,21 @@ if (lead.install_date) {
               }
 
               // Update event ID if created
-              if (result.calendarEventId) {
-                await db.query(
-                  `UPDATE leads
-                   SET install_calendar_event_id = $1
-                   WHERE id = $2`,
-                  [result.calendarEventId, lead.id]
-                );
+if (result.calendarEventId) {
+  // Update the correct field based on event type
+  const fieldName = result.type === 'appointment' 
+    ? 'appointment_calendar_event_id' 
+    : 'install_calendar_event_id';
+    
+  await db.query(
+    `UPDATE leads
+     SET ${fieldName} = $1
+     WHERE id = $2`,
+    [result.calendarEventId, lead.id]
+  );
+  
+  console.log(`✅ Stored ${result.type} event ID:`, result.calendarEventId);
+
               } else if (result.action === 'deleted') {
                 // Clear event ID if deleted
                 await db.query(
