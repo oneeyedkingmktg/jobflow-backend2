@@ -10,6 +10,40 @@
 const fetch = require("node-fetch");
 const db = require("../config/database");
 const CryptoJS = require("crypto-js");
+// ----------------------------------------------------------------------------
+// SYNC GUARD – prevent overlapping GHL syncs per company
+// ----------------------------------------------------------------------------
+const activeCompanySyncs = new Map();
+
+function acquireSyncLock(companyId) {
+  if (activeCompanySyncs.get(companyId)) {
+    return false;
+  }
+  activeCompanySyncs.set(companyId, true);
+  return true;
+}
+
+function releaseSyncLock(companyId) {
+  activeCompanySyncs.delete(companyId);
+}
+
+// ----------------------------------------------------------------------------
+// LEAD-LEVEL SYNC GUARD – prevent same lead syncing twice
+// ----------------------------------------------------------------------------
+const activeLeadSyncs = new Set();
+
+function acquireLeadSyncLock(leadId) {
+  if (activeLeadSyncs.has(leadId)) {
+    return false;
+  }
+  activeLeadSyncs.add(leadId);
+  return true;
+}
+
+function releaseLeadSyncLock(leadId) {
+  activeLeadSyncs.delete(leadId);
+}
+
 
 // Load encryption key (same key used in companies.js)
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "change-this-encryption-key";
@@ -339,7 +373,7 @@ async function handleJFEventRemoval({ lead, company, contactId, type }) {
 
 
 // ----------------------------------------------------------------------------
-// LOW-LEVEL GHL REQUEST WRAPPER
+// LOW-LEVEL GHL REQUEST WRAPPER (HARD TIMEOUT + ABORT)
 // ----------------------------------------------------------------------------
 async function ghlRequest(company, endpoint, options = {}) {
   const encryptedApiKey = company.ghl_api_key;
@@ -350,7 +384,6 @@ async function ghlRequest(company, endpoint, options = {}) {
 
   const apiKey = resolveApiKey(encryptedApiKey);
 
-  // ✅ Fail loudly if decrypt is broken
   if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length < 20) {
     throw new Error(
       "GHL API key decrypt failed (check ENCRYPTION_KEY matches the key used to encrypt stored API keys)"
@@ -358,7 +391,6 @@ async function ghlRequest(company, endpoint, options = {}) {
   }
 
   const url = new URL(`${GHL_BASE_URL}${endpoint}`);
-
   const params = options.params || {};
 
   Object.entries(params).forEach(([k, v]) => {
@@ -366,6 +398,10 @@ async function ghlRequest(company, endpoint, options = {}) {
       url.searchParams.append(k, v);
     }
   });
+
+  const controller = new AbortController();
+  const timeoutMs = 15000; // HARD STOP – 15s
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   const fetchOptions = {
     method: options.method || "GET",
@@ -375,41 +411,54 @@ async function ghlRequest(company, endpoint, options = {}) {
       "Content-Type": "application/json",
       Accept: "application/json"
     },
+    signal: controller.signal
   };
 
-  if (options.body) fetchOptions.body = JSON.stringify(options.body);
+  if (options.body) {
+    fetchOptions.body = JSON.stringify(options.body);
+  }
 
-  console.log("GHL REQUEST DEBUG", {
-    url: url.toString(),
-    method: fetchOptions.method,
-  });
-
-  const res = await fetch(url.toString(), fetchOptions);
-  const raw = await res.text();
-
-  let data;
   try {
-    data = raw ? JSON.parse(raw) : null;
-  } catch {
-    data = raw;
-  }
-
-  if (!res.ok) {
-    // Log the full error details from GHL
-    console.error("❌ [GHL API ERROR]", {
-      status: res.status,
+    console.log("GHL REQUEST DEBUG", {
       url: url.toString(),
-      response: data
+      method: fetchOptions.method,
     });
-    
-    const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
-    error.status = res.status;
-    error.response = data;
-    throw error;
-  }
 
-  return data;
+    const res = await fetch(url.toString(), fetchOptions);
+    const raw = await res.text();
+
+    let data;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
+    }
+
+    if (!res.ok) {
+      console.error("❌ [GHL API ERROR]", {
+        status: res.status,
+        url: url.toString(),
+        response: data
+      });
+
+      const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
+      error.status = res.status;
+      error.response = data;
+      throw error;
+    }
+
+    return data;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      console.error("⏱️ [GHL TIMEOUT]", url.toString());
+      throw new Error("GHL request timed out");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
+
 
 // ----------------------------------------------------------------------------
 // STATUS MAP
@@ -932,40 +981,47 @@ console.log("[CALENDAR CREATE SUCCESS] Event ID:", created?.id);
 // ----------------------------------------------------------------------------
 module.exports = {
   syncLeadCalendarEvent,
-syncLeadToGHL: async function (lead, company) {
+
+  syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
+    const companyId = company?.id;
+
+    if (!companyId) {
+      throw new Error("Missing company ID for sync guard");
+    }
+
+    if (!acquireSyncLock(companyId)) {
+      if (!acquireLeadSyncLock(lead.id)) {
+  console.warn("⛔ [LEAD SYNC GUARD] Sync already running for lead", lead.id);
+  return null;
+}
+
+      console.warn("⛔ [SYNC GUARD] Sync already running for company", companyId);
+      return null;
+    }
+
     try {
       // ==========================================
       // 1️⃣ FETCH LEAD WITH ESTIMATOR DATA
       // ==========================================
       const leadData = await fetchLeadWithEstimator(lead.id);
+      initCalendarSyncState(lead);
+
 
       // ==========================================
       // 2️⃣ CREATE/UPDATE CONTACT
       // ==========================================
-      
-      
-let contact;
-let contactId = lead.ghl_contact_id;
+      let contact = null;
+      let contactId = lead.ghl_contact_id;
 
-// ONLY create/update contact if it does NOT already exist
-if (!contactId) {
-  contact = await upsertContactFromLead(leadData, company);
-  contactId = contact?.id || contact?.contact?.id;
+      // Always upsert so updates get pushed (not only first-time create)
+      contact = await upsertContactFromLead(leadData, company);
+      contactId = contact?.id || contact?.contact?.id || contactId;
 
-  if (!contactId) {
-    throw new Error("Failed to get contact ID from GHL");
-  }
+      if (!contactId) {
+        throw new Error("Failed to get contact ID from GHL");
+      }
 
-  await db.query(
-    `UPDATE leads SET ghl_contact_id = $1 WHERE id = $2`,
-    [contactId, lead.id]
-  );
-
-  lead.ghl_contact_id = contactId;
-}
-
-
-      // Save GHL contact ID to database
+      // Save GHL contact ID to database (only once it exists)
       await db.query(
         `UPDATE leads
          SET ghl_contact_id = $1
@@ -979,46 +1035,45 @@ if (!contactId) {
       // ==========================================
       // 3️⃣ CHECK FOR ESTIMATOR DATA & TAG
       // ==========================================
-      const hasEstimatorData = leadData.estimator_leads?.square_footage || 
-                                leadData.estimator_leads?.finish_type ||
-                                leadData.estimator_leads?.price;
-      
+      const hasEstimatorData =
+        leadData.estimator_leads?.square_footage ||
+        leadData.estimator_leads?.finish_type ||
+        leadData.estimator_leads?.price;
+
       if (hasEstimatorData) {
         await applyStatusTags(contactId, "estimator_lead", company);
       }
 
       // ==========================================
-// 4️⃣ APPOINTMENT CALENDAR SYNC
-console.log("📅 [DEBUG] Checking appointment sync");
-console.log("📅 [DEBUG] appointment_date:", lead.appointment_date);
-console.log("📅 [DEBUG] appointment_time:", lead.appointment_time);
-console.log("📅 [DEBUG] ghl_appt_calendar:", company.ghl_appt_calendar);
+      // 4️⃣ APPOINTMENT CALENDAR SYNC
+      // ==========================================
+if (
+  lead.appointment_date &&
+  lead.appointment_time &&
+  !alreadyCalendarSynced(lead, "appointment")
+) {
 
-if (lead.appointment_date && lead.appointment_time) {
         try {
-          // Detect what changed
           const changeType = detectAppointmentChange(
             lead,
             lead.last_synced_appointment_date,
             lead.last_synced_appointment_time
           );
 
-          console.log("📅 [APPOINTMENT] Change detected:", changeType);
-
-          if (changeType !== 'none' && changeType !== 'unchanged') {
-            const result = await syncLeadCalendarEvent(lead, company, changeType, 'appointment');
+          if (changeType !== "none" && changeType !== "unchanged") {
+            const result = await syncLeadCalendarEvent(lead, company, changeType, "appointment");
 
             if (result) {
-              // Apply lifecycle tags
-              if (result.action === 'created') {
+              markCalendarSynced(lead, "appointment");
+
+              if (result.action === "created") {
                 await applyStatusTags(contactId, "appt_date_set", company);
-              } else if (result.action === 'updated') {
+              } else if (result.action === "updated") {
                 await applyStatusTags(contactId, "appt_date_updated", company);
-              } else if (result.action === 'deleted') {
+              } else if (result.action === "deleted") {
                 await applyStatusTags(contactId, "appt_date_cancelled", company);
               }
 
-              // Update event ID if created
               if (result.calendarEventId) {
                 await db.query(
                   `UPDATE leads
@@ -1026,49 +1081,47 @@ if (lead.appointment_date && lead.appointment_time) {
                    WHERE id = $2`,
                   [result.calendarEventId, lead.id]
                 );
-              } else if (result.action === 'deleted') {
-                // Clear event ID if deleted
+              } else if (result.action === "deleted") {
                 await db.query(
                   `UPDATE leads
                    SET appointment_calendar_event_id = NULL
-                   WHERE id = $2`,
+                   WHERE id = $1`,
                   [lead.id]
                 );
               }
 
-// Update last_synced fields (only for created/updated, not deleted)
-if (result.action === 'created' || result.action === 'updated') {
-  await db.query(
-    `UPDATE leads
-     SET last_synced_appointment_date = $1,
-         last_synced_appointment_time = $2
-     WHERE id = $3`,
-    [lead.appointment_date, lead.appointment_time, lead.id]
-  );
-}
+              if (result.action === "created" || result.action === "updated") {
+                await db.query(
+                  `UPDATE leads
+                   SET last_synced_appointment_date = $1,
+                       last_synced_appointment_time = $2
+                   WHERE id = $3`,
+                  [lead.appointment_date, lead.appointment_time, lead.id]
+                );
+              }
             }
           }
         } catch (calendarErr) {
           console.error("⚠️ [APPOINTMENT SYNC] Failed:", calendarErr.message);
           await applyStatusTags(contactId, "appt_sync_fail", company);
-          await logSyncError(lead.id, company.id, 'appt_sync_fail', calendarErr.message, {
-            appointment_date: lead.appointment_date,
-            appointment_time: lead.appointment_time
-          });
+          await logSyncError(
+            lead.id,
+            company.id,
+            "appt_sync_fail",
+            calendarErr.message,
+            {
+              appointment_date: lead.appointment_date,
+              appointment_time: lead.appointment_time,
+            }
+          );
         }
       } else if (lead.appointment_calendar_event_id) {
-        // JF-initiated removal → DELETE in GHL + DB cleanup
+        // If appointment was removed in JF, remove event + clean DB
         try {
           await deleteCalendarEvent(company, lead.appointment_calendar_event_id);
 
-          // Tracking tag (exact spelling)
-          await applyStatusTags(
-            contactId,
-            "removed appt event",
-            company
-          );
+          await applyStatusTags(contactId, "removed appt event", company);
 
-          // Clear DB
           await db.query(
             `UPDATE leads
              SET appointment_date = NULL,
@@ -1085,85 +1138,56 @@ if (result.action === 'created' || result.action === 'updated') {
         }
       }
 
-
-
       // ==========================================
-// 5️⃣ INSTALL CALENDAR SYNC
-console.log("🔧 [DEBUG] Checking install sync");
-console.log("🔧 [DEBUG] install_date:", lead.install_date);
-console.log("🔧 [DEBUG] ghl_install_calendar:", company.ghl_install_calendar);
-console.log("🔧 [DEBUG] install_tentative:", lead.install_tentative);
+      // 5️⃣ INSTALL CALENDAR SYNC
+      // ==========================================
+if (
+  lead.install_date &&
+  !alreadyCalendarSynced(lead, "install")
+) {
 
-if (lead.install_date) {
         try {
-          // Detect what changed
           const changeType = detectInstallChange(
             lead,
             lead.last_synced_install_date
           );
 
-          console.log("🔧 [INSTALL] Change detected:", changeType);
+          // (Optional) if you later want to use previousInstallTentative you can,
+          // but we’re not touching that logic in this step.
 
-          // Check for tentative → confirmed transition
-          const previousTentative = lead.last_synced_install_date ? 
-            (await db.query('SELECT install_tentative FROM leads WHERE id = $1', [lead.id])).rows[0]?.install_tentative : 
-            null;
-          
-          const confirmedTransition = detectInstallConfirmation(previousTentative, lead.install_tentative);
-
-          if (changeType !== 'none' && changeType !== 'unchanged') {
-            const result = await syncLeadCalendarEvent(lead, company, changeType, 'install');
+          if (changeType !== "none" && changeType !== "unchanged") {
+            const result = await syncLeadCalendarEvent(lead, company, changeType, "install");
 
             if (result) {
-              // Apply lifecycle tags
-              if (result.action === 'created') {
+              markCalendarSynced(lead, "install");
+
+              if (result.action === "created") {
                 await applyStatusTags(contactId, "install_date_set", company);
                 if (lead.install_tentative) {
                   await applyStatusTags(contactId, "install_tentative", company);
                 }
-              } else if (result.action === 'updated') {
+              } else if (result.action === "updated") {
                 await applyStatusTags(contactId, "install_date_updated", company);
-              } else if (result.action === 'deleted') {
+              } else if (result.action === "deleted") {
                 await applyStatusTags(contactId, "install_date_cancelled", company);
               }
 
-              // Handle tentative → confirmed transition
-              if (confirmedTransition) {
-                await applyStatusTags(contactId, "install_date_final", company);
-              }
-
-              // Handle confirmed → tentative (re-apply tentative tag)
-              if (!previousTentative && lead.install_tentative) {
-                await applyStatusTags(contactId, "install_tentative", company);
-              }
-
-              // Update event ID if created
-if (result.calendarEventId) {
-  // Update the correct field based on event type
-  const fieldName = result.type === 'appointment' 
-    ? 'appointment_calendar_event_id' 
-    : 'install_calendar_event_id';
-    
-  await db.query(
-    `UPDATE leads
-     SET ${fieldName} = $1
-     WHERE id = $2`,
-    [result.calendarEventId, lead.id]
-  );
-  
-  console.log(`✅ Stored ${result.type} event ID:`, result.calendarEventId);
-
-              } else if (result.action === 'deleted') {
-                // Clear event ID if deleted
+              if (result.calendarEventId) {
+                await db.query(
+                  `UPDATE leads
+                   SET install_calendar_event_id = $1
+                   WHERE id = $2`,
+                  [result.calendarEventId, lead.id]
+                );
+              } else if (result.action === "deleted") {
                 await db.query(
                   `UPDATE leads
                    SET install_calendar_event_id = NULL
-                   WHERE id = $2`,
+                   WHERE id = $1`,
                   [lead.id]
                 );
               }
 
-              // Update last_synced fields
               await db.query(
                 `UPDATE leads
                  SET last_synced_install_date = $1
@@ -1175,13 +1199,18 @@ if (result.calendarEventId) {
         } catch (calendarErr) {
           console.error("⚠️ [INSTALL SYNC] Failed:", calendarErr.message);
           await applyStatusTags(contactId, "install_sync_fail", company);
-          await logSyncError(lead.id, company.id, 'install_sync_fail', calendarErr.message, {
-            install_date: lead.install_date,
-            install_tentative: lead.install_tentative
-          });
+          await logSyncError(
+            lead.id,
+            company.id,
+            "install_sync_fail",
+            calendarErr.message,
+            {
+              install_date: lead.install_date,
+              install_tentative: lead.install_tentative,
+            }
+          );
         }
       } else if (lead.install_calendar_event_id) {
-        // JF-initiated removal: DB-only + tracking tag
         try {
           await handleJFEventRemoval({
             lead,
@@ -1194,7 +1223,6 @@ if (result.calendarEventId) {
           await applyStatusTags(contactId, "install_sync_fail", company);
         }
       }
-
 
       // ==========================================
       // 6️⃣ MARK SYNC AS SUCCESSFUL
@@ -1210,13 +1238,18 @@ if (result.calendarEventId) {
       return contact;
     } catch (err) {
       console.error("❌ [SYNC ERROR]", err.message);
-      
-      // Log error to database
-      await logSyncError(lead.id, lead.company_id, 'general_sync_fail', err.message, {
-        lead_id: lead.id,
-        company_id: lead.company_id
-      });
-      
+
+      await logSyncError(
+        lead.id,
+        lead.company_id,
+        "general_sync_fail",
+        err.message,
+        {
+          lead_id: lead.id,
+          company_id: lead.company_id,
+        }
+      );
+
       await db.query(
         `UPDATE leads
          SET ghl_sync_status = 'error',
@@ -1224,11 +1257,34 @@ if (result.calendarEventId) {
          WHERE id = $1`,
         [lead.id]
       );
-      throw err;
-    }
-  },
 
-  
+      throw err;
+    } finally {
+  releaseLeadSyncLock(lead.id);
+  releaseSyncLock(companyId);
+}
+
+// ----------------------------------------------------------------------------
+// PER-RUN CALENDAR SYNC GUARD (appointment / install)
+// ----------------------------------------------------------------------------
+function initCalendarSyncState(lead) {
+  lead.__calendarSyncState = {
+    appointment: false,
+    install: false,
+  };
+}
+
+function markCalendarSynced(lead, type) {
+  if (!lead.__calendarSyncState) return;
+  lead.__calendarSyncState[type] = true;
+}
+
+function alreadyCalendarSynced(lead, type) {
+  return Boolean(lead.__calendarSyncState?.[type]);
+}
+
+
+  },
 
   fetchGHLContact: async function (contactId, company) {
     if (!contactId || typeof contactId !== "string" || !contactId.trim()) {
