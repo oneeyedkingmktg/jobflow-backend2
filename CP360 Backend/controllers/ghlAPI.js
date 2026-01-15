@@ -705,6 +705,8 @@ const normalizeStatus = (status) => {
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
 async function syncLeadCalendarEvent(lead, company, changeType, calendarType) {
+  if (lead.sync_source === 'GHL') return null;
+
   console.log("[CALENDAR SYNC] Lead ID:", lead.id, "| Change:", changeType);
   // ⛔ Guard: no calendar configured or no calendar data on lead
 if (

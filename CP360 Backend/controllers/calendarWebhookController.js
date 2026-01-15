@@ -312,7 +312,8 @@ await client.query(
    SET appointment_date = $1,
        appointment_time = $2::time,
        last_synced_appointment_date = $3,
-       last_synced_appointment_time = $2::time
+       last_synced_appointment_time = $2::time,
+       sync_source = 'GHL'
    WHERE id = $4`,
   [
     dateOnly,
@@ -322,14 +323,17 @@ await client.query(
   ]
 );
 
+
         } else if (eventType === 'install') {
-          await client.query(
-            `UPDATE leads 
-             SET install_date = $1,
-                 last_synced_install_date = $1
-             WHERE id = $2`,
-            [dateOnly, lead.id]
-          );
+await client.query(
+  `UPDATE leads 
+   SET install_date = $1,
+       last_synced_install_date = $1,
+       sync_source = 'GHL'
+   WHERE id = $2`,
+  [dateOnly, lead.id]
+);
+
         }
         
         console.log(`✅ Updated ${eventType} for lead ${lead.id}`);
