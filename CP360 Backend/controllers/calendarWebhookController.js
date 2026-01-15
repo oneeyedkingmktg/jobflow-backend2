@@ -172,14 +172,13 @@ const company = companyEarly;
 if (!isUpdate) {
   console.log('🆕 [CREATE] New GHL event — bypassing update path');
 
-const leadResult = await client.query(
-  `SELECT * FROM leads
-   WHERE ghl_contact_id = $1
-     AND company_id = $2
-   LIMIT 1`,
-  [contactId, company.id]
-);
-
+  const leadResult = await client.query(
+    `SELECT * FROM leads
+     WHERE ghl_contact_id = $1
+       AND company_id = $2
+     LIMIT 1`,
+    [contactId, company.id]
+  );
 
   if (leadResult.rows.length === 0) {
     console.log('⚠️ No lead found for GHL contact — stopping');
@@ -191,60 +190,93 @@ const leadResult = await client.query(
 
   const targetLead = leadResult.rows[0];
 
+  // Check if slot already has an event ID (event IDs are permanent)
   if (eventType === 'appointment') {
-await client.query(
-  `UPDATE leads
-   SET appointment_calendar_event_id = $1,
-       sync_source = 'GHL'
-   WHERE id = $2
-     AND company_id = $3`,
-  [eventId, targetLead.id, company.id]
-);
+    const existingEventId = targetLead.appointment_calendar_event_id;
+    
+    if (existingEventId) {
+      console.error(`❌ [CREATE REJECTED] Appointment slot already occupied with event ${existingEventId}`);
+      return res.status(400).json({
+        error: 'Slot occupied',
+        message: 'Lead already has an appointment event ID - cannot create new appointment'
+      });
+    }
+    
+    await client.query(
+      `UPDATE leads
+       SET appointment_calendar_event_id = $1,
+           sync_source = 'GHL'
+       WHERE id = $2
+         AND company_id = $3`,
+      [eventId, targetLead.id, company.id]
+    );
+    console.log(`✅ [CREATE] Appointment event ${eventId} linked to lead ${targetLead.id}`);
 
   } else if (eventType === 'install') {
-await client.query(
-  `UPDATE leads
-   SET install_calendar_event_id = $1,
-       sync_source = 'GHL'
-   WHERE id = $2
-     AND company_id = $3`,
-  [eventId, targetLead.id, company.id]
-);
-
+    const existingEventId = targetLead.install_calendar_event_id;
+    
+    if (existingEventId) {
+      console.error(`❌ [CREATE REJECTED] Install slot already occupied with event ${existingEventId}`);
+      return res.status(400).json({
+        error: 'Slot occupied',
+        message: 'Lead already has an install event ID - cannot create new install'
+      });
+    }
+    
+    await client.query(
+      `UPDATE leads
+       SET install_calendar_event_id = $1,
+           sync_source = 'GHL'
+       WHERE id = $2
+         AND company_id = $3`,
+      [eventId, targetLead.id, company.id]
+    );
+    console.log(`✅ [CREATE] Install event ${eventId} linked to lead ${targetLead.id}`);
   }
 
-console.log(`✅ [CREATE] Event linked to lead ${targetLead.id}`);
-
-// allow flow to continue so dates/times are written below
-lead = targetLead;
-
+  lead = targetLead;
 }
 
 // =======================================================
-// UPDATE PATH — Find lead by event ID
+// UPDATE PATH — Verify event ID matches stored ID
 // =======================================================
 
-if (isUpdate && !lead) {
-  console.log('🔄 [UPDATE] Looking up lead by event ID:', eventId);
+if (isUpdate && !lead && contactId) {
+  console.log('🔄 [UPDATE] Looking up lead by contact ID:', contactId);
   
-  if (eventType === 'appointment') {
-    const apptResult = await client.query(
-      'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
-      [company.id, eventId]
-    );
-    if (apptResult.rows.length > 0) {
-      lead = apptResult.rows[0];
-      console.log('✅ [UPDATE] Found lead by appointment event ID:', lead.id);
+  const contactResult = await client.query(
+    'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
+    [company.id, contactId]
+  );
+  
+  if (contactResult.rows.length > 0) {
+    const foundLead = contactResult.rows[0];
+    
+    // Event ID must match stored event ID (gospel rule)
+    const storedEventId = eventType === 'appointment' 
+      ? foundLead.appointment_calendar_event_id 
+      : foundLead.install_calendar_event_id;
+    
+    if (!storedEventId) {
+      console.error(`❌ [UPDATE REJECTED] Lead ${foundLead.id} has no ${eventType} event ID stored`);
+      return res.status(400).json({
+        error: 'No event ID stored',
+        message: `Lead does not have a ${eventType} event ID stored`
+      });
     }
-  } else if (eventType === 'install') {
-    const installResult = await client.query(
-      'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
-      [company.id, eventId]
-    );
-    if (installResult.rows.length > 0) {
-      lead = installResult.rows[0];
-      console.log('✅ [UPDATE] Found lead by install event ID:', lead.id);
+    
+    if (storedEventId !== eventId) {
+      console.error(`❌ [UPDATE REJECTED] Event ID mismatch for lead ${foundLead.id}`);
+      console.error(`   Stored: ${storedEventId}`);
+      console.error(`   Incoming: ${eventId}`);
+      return res.status(400).json({
+        error: 'Event ID mismatch',
+        message: 'Incoming event ID does not match stored event ID'
+      });
     }
+    
+    lead = foundLead;
+    console.log(`✅ [UPDATE] Event ID verified (${eventId}), updating lead ${lead.id}`);
   }
 }
 
