@@ -221,14 +221,34 @@ lead = targetLead;
 }
 
 // =======================================================
-
-      
-
-
+// UPDATE PATH — Find lead by event ID
 // =======================================================
 
+if (isUpdate && !lead) {
+  console.log('🔄 [UPDATE] Looking up lead by event ID:', eventId);
+  
+  if (eventType === 'appointment') {
+    const apptResult = await client.query(
+      'SELECT * FROM leads WHERE company_id = $1 AND appointment_calendar_event_id = $2',
+      [company.id, eventId]
+    );
+    if (apptResult.rows.length > 0) {
+      lead = apptResult.rows[0];
+      console.log('✅ [UPDATE] Found lead by appointment event ID:', lead.id);
+    }
+  } else if (eventType === 'install') {
+    const installResult = await client.query(
+      'SELECT * FROM leads WHERE company_id = $1 AND install_calendar_event_id = $2',
+      [company.id, eventId]
+    );
+    if (installResult.rows.length > 0) {
+      lead = installResult.rows[0];
+      console.log('✅ [UPDATE] Found lead by install event ID:', lead.id);
+    }
+  }
+}
 
-// keep previously resolved lead — DO NOT re-resolve by eventId
+// =======================================================
 
       
 if (!lead) {
