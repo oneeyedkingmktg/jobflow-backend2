@@ -1,25 +1,39 @@
 // ============================================================================
 // File: sync/dbToGhlSync.js
-// Version: v2.1.0
+// Version: v2.2.0
 // Purpose:
-// - Thin wrapper that delegates all GHL logic to controllers/ghlAPI.js
-// - syncLeadToGHL now handles contacts, tags, AND calendar events
+// - Prevent sync hangs by enforcing a hard timeout
+// - Guarantee sync never blocks the app indefinitely
 // ============================================================================
 
 const { syncLeadToGHL } = require("../controllers/ghlAPI");
 
-async function syncLeadToGhl({ lead, previousLead = null, company, previousInstallTentative = null }) {
+const GHL_SYNC_TIMEOUT_MS = 15000; // 15 seconds hard stop
+
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => {
+        reject(new Error("GHL sync timed out"));
+      }, timeoutMs)
+    ),
+  ]);
+}
+
+async function syncLeadToGhl({
+  lead,
+  previousLead = null,
+  company,
+  previousInstallTentative = null,
+}) {
   if (!lead || !company) return;
 
   try {
-    // syncLeadToGHL handles everything:
-    // - Contact create/update
-    // - Status tags
-    // - Estimator tags
-    // - Appointment calendar sync
-    // - Install calendar sync
-    // - All lifecycle tags
-    await syncLeadToGHL(lead, company, previousInstallTentative);
+    await withTimeout(
+      syncLeadToGHL(lead, company, previousInstallTentative),
+      GHL_SYNC_TIMEOUT_MS
+    );
   } catch (error) {
     console.error("GHL sync failed:", error.message);
     throw error;
