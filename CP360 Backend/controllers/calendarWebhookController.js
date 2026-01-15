@@ -29,9 +29,11 @@ const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
    WHERE (appointment_calendar_event_id = $1
           OR install_calendar_event_id = $1)
-     AND ghl_contact_id = $2`,
-  [eventId, contactId]
+     AND ghl_contact_id = $2
+     AND company_id = $3`,
+  [eventId, contactId, company.id]
 );
+
 
 ownershipClient.release();
 
@@ -154,6 +156,8 @@ if (companyResult.rows.length !== 1) {
       
       // Find lead by event ID (we already know it exists from the check above)
       let lead = null;
+      lead = null;
+
 
       // =======================================================
 // HARD CREATE GUARD — bypass update/cooldown completely
@@ -182,19 +186,25 @@ const leadResult = await client.query(
   const targetLead = leadResult.rows[0];
 
   if (eventType === 'appointment') {
-    await client.query(
-      `UPDATE leads
-       SET appointment_calendar_event_id = $1
-       WHERE id = $2`,
-      [eventId, targetLead.id]
-    );
+await client.query(
+  `UPDATE leads
+   SET appointment_calendar_event_id = $1,
+       sync_source = 'GHL'
+   WHERE id = $2
+     AND company_id = $3`,
+  [eventId, targetLead.id, company.id]
+);
+
   } else if (eventType === 'install') {
-    await client.query(
-      `UPDATE leads
-       SET install_calendar_event_id = $1
-       WHERE id = $2`,
-      [eventId, targetLead.id]
-    );
+await client.query(
+  `UPDATE leads
+   SET install_calendar_event_id = $1,
+       sync_source = 'GHL'
+   WHERE id = $2
+     AND company_id = $3`,
+  [eventId, targetLead.id, company.id]
+);
+
   }
 
 console.log(`✅ [CREATE] Event linked to lead ${targetLead.id}`);
@@ -318,26 +328,30 @@ await client.query(
        last_synced_appointment_date = $3,
        last_synced_appointment_time = $2::time,
        sync_source = 'GHL'
-   WHERE id = $4`,
+   WHERE id = $4
+     AND company_id = $5`,
   [
     dateOnly,
     appointmentTime,
     appointmentTimestamp,
-    lead.id
+    lead.id,
+    company.id
   ]
 );
+
 
 
         } else if (eventType === 'install') {
 await client.query(
   `UPDATE leads 
-   SET install_date = NULL,
-       install_calendar_event_id = NULL,
+   SET install_date = $1,
+       last_synced_install_date = $1,
        sync_source = 'GHL'
-   WHERE id = $1
-     AND company_id = $2`,
-  [lead.id, company.id]
+   WHERE id = $2
+     AND company_id = $3`,
+  [dateOnly, lead.id, company.id]
 );
+
 
 
         }
