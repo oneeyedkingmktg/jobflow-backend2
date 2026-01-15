@@ -25,27 +25,6 @@ const contactId =
 
 const ownershipClient = await pool.connect();
 
-const ownershipCheck = await ownershipClient.query(
-  `SELECT id FROM leads
-   WHERE (appointment_calendar_event_id = $1
-          OR install_calendar_event_id = $1)
-     AND ghl_contact_id = $2`,
-  [eventId, contactId]
-);
-
-
-
-ownershipClient.release();
-
-const isUpdate = ownershipCheck.rows.length > 0;
-
-
-
-console.log(
-  isUpdate
-    ? '🔄 [CALENDAR] Update event detected'
-    : '🆕 [CALENDAR] New GHL event detected — will create in JF'
-);
 
 // DO NOT RETURN HERE — creation is handled later
 // =======================================================
@@ -81,11 +60,37 @@ client = await pool.connect();
       
 
       
-      if (!locationId) {
-        console.error('❌ No locationId in calendar webhook');
-        return res.status(400).json({ error: 'Missing locationId' });
-      }
-      
+const companyResultEarly = await client.query(
+  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar 
+   FROM companies 
+   WHERE ghl_location_id = $1
+   LIMIT 1`,
+  [locationId]
+);
+
+if (companyResultEarly.rows.length !== 1) {
+  return res.status(200).json({ success: true });
+}
+
+const companyEarly = companyResultEarly.rows[0];
+
+const ownershipCheck = await client.query(
+  `SELECT id FROM leads
+   WHERE (appointment_calendar_event_id = $1
+          OR install_calendar_event_id = $1)
+     AND ghl_contact_id = $2
+     AND company_id = $3`,
+  [eventId, contactId, companyEarly.id]
+);
+
+const isUpdate = ownershipCheck.rows.length > 0;
+
+console.log(
+  isUpdate
+    ? '🔄 [CALENDAR] Update event detected'
+    : '🆕 [CALENDAR] New GHL event detected — will create in JF'
+);
+
       
       console.log('✅ [JOBFLOW EVENT] Event was created by JobFlow - processing');
       
@@ -112,7 +117,8 @@ if (companyResult.rows.length !== 1) {
         return res.status(404).json({ error: 'Company not found' });
       }
       
-      const company = companyResult.rows[0];
+const company = companyEarly;
+
       console.log(`✅ Found company: ${company.name} (ID: ${company.id})`);
       
       // Determine event type based on calendar name or by checking database
