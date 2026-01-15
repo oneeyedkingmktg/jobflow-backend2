@@ -944,12 +944,26 @@ syncLeadToGHL: async function (lead, company) {
       // ==========================================
       
       
-      const contact = await upsertContactFromLead(leadData, company);
-      const contactId = contact?.id || contact?.contact?.id;
+let contact;
+let contactId = lead.ghl_contact_id;
 
-      if (!contactId) {
-        throw new Error("Failed to get contact ID from GHL");
-      }
+// ONLY create/update contact if it does NOT already exist
+if (!contactId) {
+  contact = await upsertContactFromLead(leadData, company);
+  contactId = contact?.id || contact?.contact?.id;
+
+  if (!contactId) {
+    throw new Error("Failed to get contact ID from GHL");
+  }
+
+  await db.query(
+    `UPDATE leads SET ghl_contact_id = $1 WHERE id = $2`,
+    [contactId, lead.id]
+  );
+
+  lead.ghl_contact_id = contactId;
+}
+
 
       // Save GHL contact ID to database
       await db.query(
