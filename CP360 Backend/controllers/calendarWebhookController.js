@@ -231,10 +231,14 @@ lead = targetLead;
 // keep previously resolved lead — DO NOT re-resolve by eventId
 
       
-      if (!lead) {
-        console.log('⚠️ Lead not found (should not happen after event check)');
-        return res.status(404).json({ error: 'Lead not found' });
-      }
+if (!lead) {
+  console.log('⚠️ Lead not found — ignoring webhook');
+  return res.status(200).json({
+    success: true,
+    message: 'No matching lead — webhook acknowledged'
+  });
+}
+
       
 // Prevent duplicate calendar echoes by value comparison
 if (isUpdate && startTime) {
