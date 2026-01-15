@@ -5,7 +5,6 @@ const calendarWebhookController = {
   handleGHLCalendar: async (req, res) => {
     let client;
 
-    
     try {
       console.log('📅 GHL Calendar Webhook received:', JSON.stringify(req.body, null, 2));
       
@@ -23,15 +22,10 @@ const contactId =
   webhookData.contact_id ||
   webhookData.contact?.id;
 
-const ownershipClient = await pool.connect();
-
-
 // DO NOT RETURN HERE — creation is handled later
 // =======================================================
 // END STEP 1
 // =======================================================
-
-
       
       // Extract calendar event data - GHL nests it inside 'calendar' object
       
