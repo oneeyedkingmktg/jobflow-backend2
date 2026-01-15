@@ -29,10 +29,10 @@ const ownershipCheck = await ownershipClient.query(
   `SELECT id FROM leads
    WHERE (appointment_calendar_event_id = $1
           OR install_calendar_event_id = $1)
-     AND ghl_contact_id = $2
-     AND company_id = $3`,
-  [eventId, contactId, company.id]
+     AND ghl_contact_id = $2`,
+  [eventId, contactId]
 );
+
 
 
 ownershipClient.release();
