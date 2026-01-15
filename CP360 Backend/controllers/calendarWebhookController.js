@@ -162,13 +162,14 @@ if (companyResult.rows.length !== 1) {
 if (!isUpdate) {
   console.log('🆕 [CREATE] New GHL event — bypassing update path');
 
-  const leadResult = await client.query(
-    `SELECT * FROM leads
-     WHERE ghl_contact_id = $1
-       AND company_id = $2
-     LIMIT 1`,
-    [contactId, company.id]
-  );
+const leadResult = await client.query(
+  `SELECT * FROM leads
+   WHERE ghl_contact_id = $1
+     AND company_id = $2
+   LIMIT 1`,
+  [contactId, company.id]
+);
+
 
   if (leadResult.rows.length === 0) {
     console.log('⚠️ No lead found for GHL contact — stopping');
@@ -275,14 +276,17 @@ if (isUpdate && startTime) {
         console.log(`🗑️ [CALENDAR] Event cancelled for ${eventType}`);
         
         if (eventType === 'appointment') {
-          await client.query(
-            `UPDATE leads 
-             SET appointment_date = NULL,
-                 appointment_time = NULL,
-                 appointment_calendar_event_id = NULL
-             WHERE id = $1`,
-            [lead.id]
-          );
+await client.query(
+  `UPDATE leads 
+   SET appointment_date = NULL,
+       appointment_time = NULL,
+       appointment_calendar_event_id = NULL,
+       sync_source = 'GHL'
+   WHERE id = $1
+     AND company_id = $2`,
+  [lead.id, company.id]
+);
+
         } else if (eventType === 'install') {
           await client.query(
             `UPDATE leads 
@@ -327,12 +331,14 @@ await client.query(
         } else if (eventType === 'install') {
 await client.query(
   `UPDATE leads 
-   SET install_date = $1,
-       last_synced_install_date = $1,
+   SET install_date = NULL,
+       install_calendar_event_id = NULL,
        sync_source = 'GHL'
-   WHERE id = $2`,
-  [dateOnly, lead.id]
+   WHERE id = $1
+     AND company_id = $2`,
+  [lead.id, company.id]
 );
+
 
         }
         
