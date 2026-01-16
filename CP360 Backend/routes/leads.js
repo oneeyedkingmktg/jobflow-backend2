@@ -7,13 +7,11 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
-const { deleteGhlContact } = require("../sync/dbToGhlSync");
-const { fetchGHLContact, deleteGHLContact } = require("../sync/dbToGhlSync");
-
+const { syncLeadToGhl, deleteGhlContact } = require("../sync/dbToGhlSync");
 
 // NEW: GHL sync
-const { syncLeadToGhl, deleteGHLContact } = require("../sync/dbToGhlSync");
-const { deleteGhlContact } = require("../controllers/ghlAPI");
+
+
 
 
 
@@ -482,12 +480,16 @@ await pool.query(
   [id]
 );
 
+// 🔥 ALSO DELETE FROM GHL
 if (lead.ghl_contact_id) {
-  await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+  try {
+    await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+  } catch (err) {
+    console.error("Failed to delete GHL contact:", err.message);
+  }
 }
 
-res.json({ message: "Lead deleted successfully. Deleting this contact removes them from all systems." });
-
+res.json({ message: "Lead deleted successfully." });
 
 if (lead.ghl_contact_id) {
   await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
