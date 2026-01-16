@@ -7,9 +7,13 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
+const { deleteGhlContact } = require("../sync/dbToGhlSync");
+const { fetchGHLContact, deleteGHLContact } = require("../sync/dbToGhlSync");
+
 
 // NEW: GHL sync
-const { syncLeadToGhl } = require("../sync/dbToGhlSync");
+const { syncLeadToGhl, deleteGHLContact } = require("../sync/dbToGhlSync");
+
 
 // Apply authentication to all routes
 // Allow public estimator POSTs, protect everything else
@@ -475,7 +479,23 @@ router.delete("/:id", async (req, res) => {
       [id]
     );
 
-    res.json({ message: "Lead deleted successfully." });
+    if (lead.ghl_contact_id) {
+  await deleteGHLContact(lead.ghl_contact_id, lead.company_id);
+}
+
+
+    // DELETE CONTACT IN GHL IF IT EXISTS
+if (lead.ghl_contact_id) {
+  try {
+    await deleteGHLContact(lead.ghl_contact_id, lead.company_id);
+  } catch (err) {
+    console.error("Failed to delete GHL contact:", err.message);
+  }
+}
+
+
+res.json({ message: "Lead deleted successfully. Deleting this contact removes them from all systems." });
+
   } catch (error) {
     console.error("Error deleting lead:", error);
     res.status(500).json({ error: "Failed to delete lead." });
