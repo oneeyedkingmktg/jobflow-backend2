@@ -7,7 +7,8 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
-const { syncLeadToGhl, deleteGhlContact } = require("../sync/dbToGhlSync");
+const { syncLeadToGhl, deleteGHLContact } = require("../sync/dbToGhlSync");
+
 
 // NEW: GHL sync
 
@@ -483,7 +484,7 @@ await pool.query(
 // 🔥 ALSO DELETE FROM GHL
 if (lead.ghl_contact_id) {
   try {
-    await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+    await deleteGHLContact(lead.ghl_contact_id, lead.company_id);
   } catch (err) {
     console.error("Failed to delete GHL contact:", err.message);
   }
@@ -496,8 +497,9 @@ res.json({ message: "Lead deleted successfully." });
 // ALSO delete in GHL if contact exists
 if (lead.ghl_contact_id) {
   try {
-    const { deleteGhlContact } = require("../controllers/ghlAPI");
-    await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+    const { deleteGHLContact } = require("../controllers/ghlAPI");
+await deleteGHLContact(lead.ghl_contact_id, lead.company_id);
+
   } catch (err) {
     console.error("GHL contact delete failed:", err.message);
   }
