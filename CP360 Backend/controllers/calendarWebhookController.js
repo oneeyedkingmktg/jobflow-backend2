@@ -15,7 +15,8 @@ const calendarWebhookController = {
 // =======================================================
 
 const calendarData = webhookData.calendar || {};
-const eventId = calendarData.id || calendarData.eventId;
+// GHL uses appointmentId as the stable ID, not the calendar event id
+const eventId = calendarData.appointmentId || calendarData.id || calendarData.eventId;
 
 const contactId =
   webhookData.contactId ||
