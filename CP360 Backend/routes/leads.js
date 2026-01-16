@@ -13,6 +13,8 @@ const { fetchGHLContact, deleteGHLContact } = require("../sync/dbToGhlSync");
 
 // NEW: GHL sync
 const { syncLeadToGhl, deleteGHLContact } = require("../sync/dbToGhlSync");
+const { deleteGhlContact } = require("../controllers/ghlAPI");
+
 
 
 // Apply authentication to all routes
@@ -474,10 +476,33 @@ router.delete("/:id", async (req, res) => {
       return res.status(403).json({ error: "Access denied to this lead." });
     }
 
-    await pool.query(
-      `UPDATE leads SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [id]
-    );
+// mark deleted in JF
+await pool.query(
+  `UPDATE leads SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+  [id]
+);
+
+if (lead.ghl_contact_id) {
+  await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+}
+
+res.json({ message: "Lead deleted successfully. Deleting this contact removes them from all systems." });
+
+
+if (lead.ghl_contact_id) {
+  await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+}
+
+// ALSO delete in GHL if contact exists
+if (lead.ghl_contact_id) {
+  try {
+    const { deleteGhlContact } = require("../controllers/ghlAPI");
+    await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
+  } catch (err) {
+    console.error("GHL contact delete failed:", err.message);
+  }
+}
+
 
     if (lead.ghl_contact_id) {
   await deleteGHLContact(lead.ghl_contact_id, lead.company_id);

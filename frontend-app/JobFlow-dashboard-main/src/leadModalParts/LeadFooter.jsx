@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/leadModalParts/LeadFooter.jsx
-// Version: v1.0 – Save & Exit button in view mode
+// Version: v1.1 – Delete warning clarifies multi-system removal
 // ============================================================================
 
 import React from "react";
@@ -62,8 +62,9 @@ export default function LeadFooter({
           </button>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="text-sm text-gray-700">
-              Are you sure you want to delete?
+            <div className="text-sm text-gray-700 text-center">
+              Deleting this contact will permanently remove them from JobFlow
+              and all connected systems, including GHL.
             </div>
             <div className="flex gap-4">
               <button

@@ -1001,6 +1001,44 @@ console.log("[CALENDAR CREATE SUCCESS] Event ID:", created?.id);
 }
 
 
+async function deleteGhlContact(contactId, companyId) {
+  if (!contactId) return;
+
+  const companyResult = await db.query(
+    `SELECT * FROM companies WHERE id = $1`,
+    [companyId]
+  );
+
+  if (companyResult.rows.length === 0) return;
+
+  const company = companyResult.rows[0];
+
+  await ghlRequest(company, `/contacts/${contactId}`, {
+    method: "DELETE",
+  });
+
+  console.log("✅ GHL contact deleted:", contactId);
+}
+
+// ----------------------------------------------------------------------------
+// DELETE GHL CONTACT
+// ----------------------------------------------------------------------------
+async function deleteGhlContact(contactId, companyId) {
+  if (!contactId || !companyId) return;
+
+  const companyResult = await db.query(
+    `SELECT * FROM companies WHERE id = $1`,
+    [companyId]
+  );
+
+  if (companyResult.rows.length === 0) return;
+
+  const company = companyResult.rows[0];
+
+  await ghlRequest(company, `/contacts/${contactId}`, {
+    method: "DELETE",
+  });
+}
 
 
 // ----------------------------------------------------------------------------
@@ -1008,8 +1046,9 @@ console.log("[CALENDAR CREATE SUCCESS] Event ID:", created?.id);
 // ----------------------------------------------------------------------------
 module.exports = {
   syncLeadCalendarEvent,
-
+  deleteGhlContact,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
+
     const companyId = company?.id;
 
     if (!companyId) {
