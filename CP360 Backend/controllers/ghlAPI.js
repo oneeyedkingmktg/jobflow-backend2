@@ -754,8 +754,32 @@ const normalizeStatus = (status) => {
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
 async function syncLeadCalendarEvent(lead, company, changeType, calendarType) {
-  // Use cooldown instead of permanent sync_source block
-  const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes
+  // Compare actual dates instead of timestamps
+  // If dates match what was last synced, skip (already synced)
+  
+  if (calendarType === 'appointment' && lead.last_synced_appointment_date && lead.last_synced_appointment_time) {
+    const currentDate = lead.appointment_date;
+    const currentTime = lead.appointment_time;
+    const lastSyncedDate = lead.last_synced_appointment_date;
+    const lastSyncedTime = lead.last_synced_appointment_time;
+    
+    if (currentDate === lastSyncedDate && currentTime === lastSyncedTime) {
+      console.log(`⏭️ [ALREADY SYNCED] Skipping appointment - no change detected`);
+      return null;
+    }
+  }
+  
+  if (calendarType === 'install' && lead.last_synced_install_date) {
+    const currentDate = lead.install_date;
+    const lastSyncedDate = lead.last_synced_install_date;
+    
+    if (currentDate === lastSyncedDate) {
+      console.log(`⏭️ [ALREADY SYNCED] Skipping install - no change detected`);
+      return null;
+    }
+  }
+
+  console.log("[CALENDAR SYNC] Lead ID:", lead.id, "| Change:", changeType);
   
   if (calendarType === 'appointment' && lead.last_synced_appointment_date) {
     const timeSinceSync = Date.now() - new Date(lead.last_synced_appointment_date).getTime();
