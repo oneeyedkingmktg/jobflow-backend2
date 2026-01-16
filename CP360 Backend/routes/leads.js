@@ -491,9 +491,7 @@ if (lead.ghl_contact_id) {
 
 res.json({ message: "Lead deleted successfully." });
 
-if (lead.ghl_contact_id) {
-  await deleteGhlContact(lead.ghl_contact_id, lead.company_id);
-}
+
 
 // ALSO delete in GHL if contact exists
 if (lead.ghl_contact_id) {
