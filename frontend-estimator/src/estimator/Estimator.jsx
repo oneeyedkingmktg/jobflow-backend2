@@ -176,7 +176,7 @@ const leadData = {
   project_type: projectType,
   lead_source: "estimator",
   referral_source: "estimator",
-  status: "lead",
+  status: "pre lead",
   // 🆕 ADD ESTIMATE DATA
   estimate: {
     project_type: projectType,
