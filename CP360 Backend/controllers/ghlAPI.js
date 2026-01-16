@@ -741,8 +741,10 @@ const normalizeStatus = (status) => {
   // --------------------
   if (contactId) {
     const statusKey = String(lead.status || "").toLowerCase();
+    console.log("🔍 [DEBUG] lead.status received:", lead.status);
+    console.log("🔍 [DEBUG] statusKey after lowercase:", statusKey);
     const tagToAssign = STATUS_TAGS[statusKey] || null;
-
+    console.log("🔍 [DEBUG] tagToAssign from STATUS_TAGS:", tagToAssign);
     if (tagToAssign) {
       await applyStatusTags(contactId, tagToAssign, company);
     }
