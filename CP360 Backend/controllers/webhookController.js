@@ -84,8 +84,8 @@ const webhookController = {
         city: webhookData.city || null,
         state: webhookData.state || null,
         zip: webhookData.postal_code || webhookData.postalCode || null,
-        referral_source: webhookData['JF Referral Source'] || null,
-        lead_source: webhookData['JF Lead Source'] || null,
+        lead_source: webhookData.contactSource || webhookData.source || webhookData.contact?.source || null,
+
         project_type: webhookData['EST Project Type'] || null,
         notes: webhookData['JF Notes'] || null,
       };
@@ -193,13 +193,11 @@ const webhookController = {
           ghl_last_synced: now
         };
         
-        // WRITE-ONCE RULE: Only update referral_source if it's currently empty
-        if (!existingLead.referral_source && contactData.referral_source) {
-          fieldsToUpdate.referral_source = contactData.referral_source;
-          console.log('✍️ Setting referral_source (was empty):', contactData.referral_source);
-        } else if (existingLead.referral_source) {
-          console.log('🔒 Skipping referral_source (already set):', existingLead.referral_source);
-        }
+if (contactData.lead_source) {
+  fieldsToUpdate.lead_source = contactData.lead_source;
+  console.log('✍️ Updating lead_source from GHL:', contactData.lead_source);
+}
+
         
         // WRITE-ONCE RULE: Only update lead_source if it's currently empty
         if (!existingLead.lead_source && contactData.lead_source) {
