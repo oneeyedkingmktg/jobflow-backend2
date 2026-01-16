@@ -186,22 +186,29 @@ const groupedByDate = useMemo(() => {
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-center text-xs sm:text-sm mt-1">
-        {monthDays.map((day) => {
-          const key = formatDateKey(day);
-          const data = groupedByDate[key] || { appt: [], install: [] };
-          const apptCount = data.appt.length;
-          const installCount = data.install.length;
-          const isToday = key === formatDateKey(today);
+<div className="grid grid-cols-7 gap-2 text-center text-xs sm:text-sm mt-1">
+  {/* Add empty cells for days before the 1st */}
+  {Array(monthDays[0].getDay())
+    .fill(null)
+    .map((_, i) => (
+      <div key={`empty-${i}`} className="min-h-[70px]" />
+    ))}
+  
+  {monthDays.map((day) => {
+    const key = formatDateKey(day);
+    const data = groupedByDate[key] || { appt: [], install: [] };
+    const apptCount = data.appt.length;
+    const installCount = data.install.length;
+    const isToday = key === formatDateKey(today);
 
-          return (
-            <div
-              key={key}
-              onClick={() => handleDayClick(key)}
-              className={`border rounded-md p-2 min-h-[70px] cursor-pointer hover:bg-blue-50 flex flex-col items-center justify-between ${
-                isToday ? "border-blue-500 bg-blue-100" : "border-gray-300"
-              }`}
-            >
+    return (
+      <div
+        key={key}
+        onClick={() => handleDayClick(key)}
+        className={`border rounded-md p-2 min-h-[70px] cursor-pointer hover:bg-blue-50 flex flex-col items-center justify-between ${
+          isToday ? "border-blue-500 bg-blue-100" : "border-gray-300"
+        }`}
+      >
               <div className="font-semibold">{day.getDate()}</div>
               <div className="flex flex-col items-center mt-1">
                 {apptCount > 0 && (
