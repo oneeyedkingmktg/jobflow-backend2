@@ -754,11 +754,12 @@ const normalizeStatus = (status) => {
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
 async function syncLeadCalendarEvent(lead, company, changeType, calendarType) {
+  const SYNC_COOLDOWN = 2 * 60 * 1000; // Keep for other parts of the function
+  
   // Compare actual dates instead of timestamps
   // If dates match what was last synced, skip (already synced)
   
-  if (calendarType === 'appointment' && lead.last_synced_appointment_date && lead.last_synced_appointment_time) {
-    const currentDate = lead.appointment_date;
+  if (calendarType === 'appointment' && lead.last_synced_appointment_date && lead.last_synced_appointment_time) {    const currentDate = lead.appointment_date;
     const currentTime = lead.appointment_time;
     const lastSyncedDate = lead.last_synced_appointment_date;
     const lastSyncedTime = lead.last_synced_appointment_time;
