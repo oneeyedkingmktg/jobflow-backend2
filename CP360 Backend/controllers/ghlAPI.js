@@ -465,6 +465,7 @@ async function ghlRequest(company, endpoint, options = {}) {
 // ----------------------------------------------------------------------------
 const STATUS_TAGS = {
   status_pre_lead: "status - pre-lead",
+  "pre lead": "status - pre-lead",
   lead: "status - lead",
   appointment_set: "status - appointment set",
   sold: "status - sold",
