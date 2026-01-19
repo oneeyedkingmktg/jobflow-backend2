@@ -30,8 +30,8 @@ export default function LeadCard({ lead, onClick }) {
   let statusText = getStatusBarText(lead);
 
 if (lead.status === "appointment_set") {
-  // ✅ Only format if we actually have a date
-  if (lead.appointmentDate) {
+  // ✅ Only format if we have a valid date (not null, undefined, or empty string)
+  if (lead.appointmentDate && lead.appointmentDate !== "") {
     const apptDisplay = formatInCompanyTimezone({
       utcDate: lead.appointmentDate,
       utcTime: lead.appointmentTime,
@@ -47,8 +47,8 @@ if (lead.status === "appointment_set") {
 
 
 if (lead.status === "install_scheduled") {
-  // ✅ Only format if we actually have a date
-  if (lead.installDate) {
+  // ✅ Only format if we have a valid date (not null, undefined, or empty string)
+  if (lead.installDate && lead.installDate !== "") {
     const installDisplay = formatInCompanyTimezone({
       utcDate: lead.installDate,
       timezone: lead.timezone,
