@@ -30,30 +30,36 @@ export default function LeadCard({ lead, onClick }) {
   let statusText = getStatusBarText(lead);
 
 if (lead.status === "appointment_set") {
-  const apptDisplay = formatInCompanyTimezone({
-    utcDate: lead.appointmentDate,
-    utcTime: lead.appointmentTime,
-    timezone: lead.timezone,
-    format: "datetime",
-  });
+  // ✅ Only format if we actually have a date
+  if (lead.appointmentDate) {
+    const apptDisplay = formatInCompanyTimezone({
+      utcDate: lead.appointmentDate,
+      utcTime: lead.appointmentTime,
+      timezone: lead.timezone,
+      format: "datetime",
+    });
 
-  if (apptDisplay) {
-    statusText = `Appointment Set — ${apptDisplay}`;
+    if (apptDisplay) {
+      statusText = `Appointment Set — ${apptDisplay}`;
+    }
   }
 }
 
 
 if (lead.status === "install_scheduled") {
-  const installDisplay = formatInCompanyTimezone({
-    utcDate: lead.installDate,
-    timezone: lead.timezone,
-    format: "date",
-  });
+  // ✅ Only format if we actually have a date
+  if (lead.installDate) {
+    const installDisplay = formatInCompanyTimezone({
+      utcDate: lead.installDate,
+      timezone: lead.timezone,
+      format: "date",
+    });
 
-  const tentative = lead.installTentative ? " (tentative)" : "";
+    const tentative = lead.installTentative ? " (tentative)" : "";
 
-  if (installDisplay) {
-    statusText = `Install — ${installDisplay}${tentative}`;
+    if (installDisplay) {
+      statusText = `Install — ${installDisplay}${tentative}`;
+    }
   }
 }
 

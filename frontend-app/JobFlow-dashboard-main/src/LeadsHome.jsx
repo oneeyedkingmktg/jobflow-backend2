@@ -27,7 +27,7 @@ import { normalizePhone } from "./leadComponents/leadHelpers.js";
 // Helpers
 // --------------------------------------------------
 const normalizeDate = (d) => {
-  if (!d) return "";
+  if (!d) return null;  // ✅ Changed "" to null
   let str = String(d).trim();
   if (str.includes("T")) str = str.split("T")[0];
   return str;
