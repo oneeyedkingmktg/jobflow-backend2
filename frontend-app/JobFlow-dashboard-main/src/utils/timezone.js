@@ -9,12 +9,16 @@ export function formatInCompanyTimezone({
   timezone,       // e.g. "America/Chicago"
   format = "datetime", // "datetime" | "time" | "date"
 }) {
-  if (!utcDate) return "—";
+  // ✅ Catch null, undefined, AND empty strings
+  if (!utcDate || utcDate === "") return "—";
 
   const timePart = utcTime || "00:00";
   const isoString = `${utcDate}T${timePart}:00Z`; // force UTC
 
   const date = new Date(isoString);
+  
+  // ✅ Catch invalid dates
+  if (isNaN(date.getTime())) return "—";
 
   const options =
     format === "time"
