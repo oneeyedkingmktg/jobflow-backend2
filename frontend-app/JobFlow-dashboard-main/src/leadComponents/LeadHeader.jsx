@@ -16,12 +16,6 @@ export default function LeadsHeader({ onRefresh }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={onRefresh}
-            className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold shadow hover:bg-blue-50 transition"
-          >
-            Sync Contacts
-          </button>
 
           <SettingsMenu onRefresh={onRefresh} />
         </div>

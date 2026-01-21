@@ -2,9 +2,14 @@
 
 import React from "react";
 
-export default function LeadTabs({ activeTab, setActiveTab, counts, onAddLead }) {
-
-const tabs = [
+export default function LeadTabs({
+  activeTab,
+  setActiveTab,
+  counts,
+  onAddLead,
+  onRefresh,
+}) {
+  const tabs = [
     "Pre-Leads",
     "Leads",
     "Booked Appt",
@@ -14,22 +19,36 @@ const tabs = [
     "All",
     "+ Pre-Lead",
     "Calendar",
+    "Sync Contacts",
   ];
 
-const isStatusTab = (t) =>
-    ["Pre-Leads", "Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All"].includes(t);
+  const isStatusTab = (t) =>
+    [
+      "Pre-Leads",
+      "Leads",
+      "Booked Appt",
+      "Sold",
+      "Not Sold",
+      "Completed",
+      "All",
+    ].includes(t);
 
   const handleClick = (t) => {
-if (t === "+ Pre-Lead") {
+    if (t === "+ Pre-Lead") {
       onAddLead();
       return;
     }
+
+    if (t === "Sync Contacts") {
+      onRefresh();
+      return;
+    }
+
     setActiveTab(t);
   };
 
   return (
     <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 max-w-7xl mx-auto px-4 py-4">
-
       {tabs.map((t) => {
         const isActive = activeTab === t;
 
@@ -38,16 +57,17 @@ if (t === "+ Pre-Lead") {
             key={t}
             onClick={() => handleClick(t)}
             className={`rounded-xl px-4 py-3 shadow font-semibold text-center w-full md:w-auto
-              ${isActive ? "bg-blue-600 text-white" : "bg-white text-gray-800 border"} 
-            `}
+              ${
+                isActive
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-800 border"
+              }`}
           >
             {t}
 
             {/* print count ONLY for status tabs */}
             {isStatusTab(t) && counts && counts[t] !== undefined && (
-              <span className="ml-1 opacity-80">
-                ({counts[t]})
-              </span>
+              <span className="ml-1 opacity-80">({counts[t]})</span>
             )}
           </button>
         );

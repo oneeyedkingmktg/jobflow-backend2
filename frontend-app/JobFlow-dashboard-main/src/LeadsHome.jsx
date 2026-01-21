@@ -220,11 +220,13 @@ const matchesSearch =
 
 
 
-      <LeadTabs
+<LeadTabs
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         counts={counts}
+        onRefresh={loadLeads}
 onAddLead={() => {
+
   alert("Add Lead clicked! Company ID: " + currentCompany?.id);
   console.log("🆕 Add Lead clicked - Current company:", currentCompany);
   setSelectedLead(null);
