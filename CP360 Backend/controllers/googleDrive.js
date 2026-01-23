@@ -5,8 +5,18 @@
 
 const { google } = require("googleapis");
 
-// Create Drive auth
+// Create Drive auth from environment variable or local file
+let credentials;
+if (process.env.GOOGLE_DRIVE_CREDENTIALS) {
+  // Production: Use environment variable
+  credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
+} else {
+  // Local development: Use file
+  credentials = require("../keys/google-drive.json");
+}
+
 const auth = new google.auth.GoogleAuth({
+  credentials: credentials,
   scopes: ["https://www.googleapis.com/auth/drive"],
 });
 
