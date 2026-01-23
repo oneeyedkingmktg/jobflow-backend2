@@ -5,20 +5,22 @@
 
 const { google } = require("googleapis");
 
-// Create Drive auth from environment variable or local file
-let credentials;
+// Load credentials from environment variable or local file
+let auth;
 if (process.env.GOOGLE_DRIVE_CREDENTIALS) {
   // Production: Use environment variable
-  credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
+  const credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
+  auth = new google.auth.GoogleAuth({
+    credentials: credentials,
+    scopes: ["https://www.googleapis.com/auth/drive"],
+  });
 } else {
-  // Local development: Use file
-  credentials = require("../keys/google-drive.json");
+  // Local development: Use keyfile path
+  auth = new google.auth.GoogleAuth({
+    keyFile: "./keys/google-drive.json",
+    scopes: ["https://www.googleapis.com/auth/drive"],
+  });
 }
-
-const auth = new google.auth.GoogleAuth({
-  credentials: credentials,
-  scopes: ["https://www.googleapis.com/auth/drive"],
-});
 
 const drive = google.drive({
   version: "v3",
