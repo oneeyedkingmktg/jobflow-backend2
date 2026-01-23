@@ -152,6 +152,52 @@ const cancelDiscardChanges = () => {
   };
 
   // ------------------------------------------------------------------
+// Upload photos (placeholder – Drive logic comes later)
+// ------------------------------------------------------------------
+const handleUploadPhotos = async () => {
+  try {
+    if (!form?.id) {
+      alert("Lead must be saved before uploading photos.");
+      return;
+    }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/google-drive/lead-folder`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          leadId: form.id,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Upload failed");
+    }
+
+    const data = await res.json();
+
+    if (!data?.url) {
+      throw new Error("No Drive URL returned");
+    }
+
+    window.open(data.url, "_blank");
+  } catch (err) {
+    console.error("Upload error:", err);
+    alert("Failed to open Google Drive.");
+  }
+};
+
+
+
+
+
+  // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
   return (
@@ -178,14 +224,16 @@ const cancelDiscardChanges = () => {
 </button>
 
 
-          <LeadHeader
-            name={form.name}
-            status={form.status}
-            phone={form.phone}
-            onCall={handleCall}
-            onText={handleText}
-            onMap={handleOpenMaps}
-          />
+<LeadHeader
+  name={form.name}
+  status={form.status}
+  phone={form.phone}
+  onCall={handleCall}
+  onText={handleText}
+  onMap={handleOpenMaps}
+/>
+
+
 
           <div className="px-6 py-6 space-y-5">
             <LeadStatusBar
@@ -220,11 +268,12 @@ const cancelDiscardChanges = () => {
                 }
               />
             ) : (
-              <LeadDetailsView
-                form={form}
-                onEdit={() => setIsEditing(true)}
-                onOpenEstimate={handleOpenEstimate}
-              />
+<LeadDetailsView
+  form={form}
+  onEdit={() => setIsEditing(true)}
+  onUploadPhotos={handleUploadPhotos}
+/>
+
             )}
 
             <LeadFooter

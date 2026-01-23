@@ -259,7 +259,9 @@ const companyResult = await client.query(
 // ============================================================================
 // UPDATE COMPANY + (OPTIONAL) ESTIMATOR CONFIGS
 // ============================================================================
-router.put('/:id', requireRole('master'), async (req, res) => {
+router.put('/:id', requireRole('master', 'admin'), async (req, res) => {
+
+
   const client = await db.pool.connect();
 
   try {
@@ -298,6 +300,7 @@ router.put('/:id', requireRole('master'), async (req, res) => {
       state,
       zip,
       suspended,
+      google_drive_base_folder_id,
 
       ghl_api_key,
       ghlApiKey,
@@ -418,58 +421,67 @@ router.put('/:id', requireRole('master'), async (req, res) => {
     // Update companies (company-only)
     // -----------------------------
 const companyResult = await client.query(
-  `UPDATE companies SET
-    company_name = COALESCE($1, company_name),
-    phone = COALESCE($2, phone),
-    email = COALESCE($3, email),
-    website = COALESCE($4, website),
-    address = COALESCE($5, address),
-    city = COALESCE($6, city),
-    state = COALESCE($7, state),
-    zip = COALESCE($8, zip),
+`UPDATE companies SET
+  company_name = COALESCE($1, company_name),
+  phone = COALESCE($2, phone),
+  email = COALESCE($3, email),
+  website = COALESCE($4, website),
+  address = COALESCE($5, address),
+  city = COALESCE($6, city),
+  state = COALESCE($7, state),
+  zip = COALESCE($8, zip),
 
-    suspended = COALESCE($9, suspended),
-    estimator_enabled = COALESCE($10, estimator_enabled),
+  google_drive_base_folder_id = COALESCE($9, google_drive_base_folder_id),
 
-    ghl_api_key = COALESCE($11, ghl_api_key),
-    ghl_location_id = COALESCE($12, ghl_location_id),
-    ghl_install_calendar = COALESCE($13, ghl_install_calendar),
-    ghl_appt_calendar = COALESCE($14, ghl_appt_calendar),
-    ghl_appt_assigned_user = COALESCE($15, ghl_appt_assigned_user),
-    ghl_install_assigned_user = COALESCE($16, ghl_install_assigned_user),
-    ghl_appt_title_template = COALESCE($17, ghl_appt_title_template),
-    ghl_install_title_template = COALESCE($18, ghl_install_title_template),
-    ghl_appt_description_template = COALESCE($19, ghl_appt_description_template),
-    ghl_install_description_template = COALESCE($20, ghl_install_description_template),
+  suspended = COALESCE($10, suspended),
+  estimator_enabled = COALESCE($11, estimator_enabled),
 
-    billing_status = COALESCE($21, billing_status),
-    updated_at = CURRENT_TIMESTAMP
-   WHERE id = $22 AND deleted_at IS NULL
-   RETURNING *`,
-  [
-    finalCompanyName,
-    phone,
-    email,
-    website,
-    address,
-    city,
-    state,
-    zip,
-    suspendedValue,
-    estimatorValue,
-    encryptedApiKey,
-    ghlLocationValue,
-    ghlInstallCalValue,
-    ghlApptCalValue,
-    ghl_appt_assigned_user || null,
-    ghl_install_assigned_user || null,
-    ghl_appt_title_template || null,
-    ghl_install_title_template || null,
-    ghl_appt_description_template || null,
-    ghl_install_description_template || null,
-    billing_status,
-    companyId
-  ]
+  ghl_api_key = COALESCE($12, ghl_api_key),
+  ghl_location_id = COALESCE($13, ghl_location_id),
+  ghl_install_calendar = COALESCE($14, ghl_install_calendar),
+  ghl_appt_calendar = COALESCE($15, ghl_appt_calendar),
+  ghl_appt_assigned_user = COALESCE($16, ghl_appt_assigned_user),
+  ghl_install_assigned_user = COALESCE($17, ghl_install_assigned_user),
+  ghl_appt_title_template = COALESCE($18, ghl_appt_title_template),
+  ghl_install_title_template = COALESCE($19, ghl_install_title_template),
+  ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
+  ghl_install_description_template = COALESCE($21, ghl_install_description_template),
+
+  billing_status = COALESCE($22, billing_status),
+  updated_at = CURRENT_TIMESTAMP
+ WHERE id = $23 AND deleted_at IS NULL
+ RETURNING *`
+,
+[
+  finalCompanyName,                   // $1
+  phone,                              // $2
+  email,                              // $3
+  website,                            // $4
+  address,                            // $5
+  city,                               // $6
+  state,                              // $7
+  zip,                                // $8
+
+  google_drive_base_folder_id || null,// $9
+
+  suspendedValue,                     // $10
+  estimatorValue,                     // $11
+
+  encryptedApiKey,                    // $12
+  ghlLocationValue,                   // $13
+  ghlInstallCalValue,                 // $14
+  ghlApptCalValue,                    // $15
+  ghl_appt_assigned_user || null,     // $16
+  ghl_install_assigned_user || null,  // $17
+  ghl_appt_title_template || null,    // $18
+  ghl_install_title_template || null, // $19
+  ghl_appt_description_template || null,// $20
+  ghl_install_description_template || null,// $21
+
+  billing_status,                     // $22
+  companyId                           // $23
+]
+
 );
 
     if (companyResult.rows.length === 0) {

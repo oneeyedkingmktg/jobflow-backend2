@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "705685891033",
+    "project_id": "coatingpro360-ef76c",
+    "storage_bucket": "coatingpro360-ef76c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:705685891033:android:4532ca9633bacd50da1bc8",
+        "android_client_info": {
+          "package_name": "com.epoxyprofit.coatingpro360"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAm9C78LMMQBdi2yoZQx60ByKhwODbqtQ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

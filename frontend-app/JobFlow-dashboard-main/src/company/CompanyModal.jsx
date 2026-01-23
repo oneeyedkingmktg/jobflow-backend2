@@ -126,7 +126,13 @@ setForm({
   zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
+  googleDriveBaseFolderId:
+  company.googleDriveBaseFolderId ??
+  company.google_drive_base_folder_id ??
+  "",
+
 });
+
 
 console.log("🧠 Initializing GHL form from company:", {
   ghl_location_id: company.ghl_location_id,
@@ -195,6 +201,9 @@ if (!form) return null;
         zip: form.zip || null,
         suspended: form.suspended,
         timezone: form.timezone,
+        google_drive_base_folder_id: form.googleDriveBaseFolderId || null,
+
+
 
       };
 
@@ -350,6 +359,32 @@ const handleSaveGHLKeys = async () => {
             <div className={viewValue}>{form.website || "—"}</div>
           )}
         </div>
+
+        <div>
+  <div className={viewLabel}>GOOGLE DRIVE BASE FOLDER ID</div>
+  {isEditing ? (
+    <input
+      className={editBox}
+      value={form.googleDriveBaseFolderId}
+      onChange={(e) =>
+        handleChange("googleDriveBaseFolderId", e.target.value)
+      }
+      placeholder="Paste Google Drive folder ID"
+    />
+  ) : (
+    <div className={viewValue}>
+      {form.googleDriveBaseFolderId || "—"}
+    </div>
+  )}
+</div>
+
+{isEditing && (
+  <p className="text-xs text-gray-500 mt-1">
+    Open the folder in Google Drive and copy the ID from the browser address bar.
+  </p>
+)}
+
+
 
         <div>
           <div className={viewLabel}>ADDRESS</div>

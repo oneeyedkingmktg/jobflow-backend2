@@ -10,6 +10,8 @@ import { UsersAPI } from "./api";
 import SettingsModal from "./SettingsModal";
 import CompanyWizard from "./CompanyWizard";
 import UserProfileModal from "./UserProfileModal";
+import NotificationSettings from "./components/NotificationSettings";
+import { canUseNotifications } from "./utils/platform";
 
 // IMPORT SCREENS
 import UsersHome from "./users/UsersHome";
@@ -34,6 +36,7 @@ export default function SettingsMenu({ onRefresh }) {
   const [showCompanyWizard, setShowCompanyWizard] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   // 🔒 CRITICAL: normalize isMaster safely
   const isMasterUser =
@@ -68,6 +71,12 @@ export default function SettingsMenu({ onRefresh }) {
     setShowMenu(false);
     setShowUserProfile(true);
   };
+const handleNotificationSettings = () => {
+  setShowMenu(false);
+  setShowNotificationSettings(true);
+};
+
+
     const handleRefresh = () => {
     setShowMenu(false);
     if (typeof onRefresh === "function") {
@@ -197,6 +206,16 @@ export default function SettingsMenu({ onRefresh }) {
                     >
                       My Profile
                     </button>
+                    
+                      {canUseNotifications() && (
+  <button 
+    onClick={handleNotificationSettings} 
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+  >
+    🔔 Notification Settings
+  </button>
+)}
+
                     <button 
                       onClick={handleLogout} 
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-red-600 font-medium hover:bg-red-50 transition"
@@ -231,6 +250,16 @@ export default function SettingsMenu({ onRefresh }) {
                   >
                     My Profile
                   </button>
+                {canUseNotifications() && (
+  <button 
+    onClick={handleNotificationSettings} 
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+  >
+    🔔 Notification Settings
+  </button>
+)}
+
+
                   <button
   onClick={handleRefresh}
   className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
@@ -263,6 +292,17 @@ export default function SettingsMenu({ onRefresh }) {
                   >
                     My Profile
                   </button>
+                  {canUseNotifications() && (
+  <button 
+    onClick={handleNotificationSettings} 
+    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+  >
+    🔔 Notification Settings
+  </button>
+)}
+
+
+
                   <button 
                     onClick={handleLogout} 
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg text-red-600 font-medium hover:bg-red-50 transition"
@@ -292,6 +332,26 @@ export default function SettingsMenu({ onRefresh }) {
           onClose={() => setShowUserProfile(false)} 
         />
       )}
+
+{showNotificationSettings && (
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+      <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+        <h2 className="text-xl font-bold">Notification Settings</h2>
+        <button
+          onClick={() => setShowNotificationSettings(false)}
+          className="p-2 hover:bg-gray-100 rounded-lg transition"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="p-6">
+        <NotificationSettings />
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* FULL PAGE PANELS */}
       {showUserMgmt && (

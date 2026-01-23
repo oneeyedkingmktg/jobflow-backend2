@@ -10,6 +10,7 @@ import ResetPassword from "./ResetPassword";
 import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import "./index.css";
+import { initializePushNotifications } from "./services/pushNotificationService";
 
 /* ===========================================================
    Error Boundary (Prevents React from white-screening)
@@ -68,6 +69,13 @@ function AppContent() {
       setActiveScreen("reset-password");
     }
   }, []);
+
+  // Initialize push notifications when user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      initializePushNotifications(user);
+    }
+  }, [isAuthenticated, user]);
 
   // Expose setter for admin navigation
   if (typeof window !== "undefined") {

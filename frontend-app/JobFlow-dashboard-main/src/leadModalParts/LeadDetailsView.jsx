@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/leadModalParts/LeadDetailsView.jsx
-// Version: v1.4 – Added project type formatting
+// Version: v1.5 – Estimate + Upload buttons aligned
 // ============================================================================
 
 import React, { useState } from "react";
@@ -9,6 +9,7 @@ import EstimateModal from "../EstimateModal.jsx";
 export default function LeadDetailsView({
   form,
   onEdit,
+  onUploadPhotos,
 }) {
   const hasEstimate = form?.hasEstimate === true;
   const [showEstimateModal, setShowEstimateModal] = useState(false);
@@ -102,7 +103,7 @@ export default function LeadDetailsView({
         </div>
       </div>
 
-      {/* ESTIMATE BUTTON - Only shows if lead has estimate */}
+      {/* ONLINE ESTIMATE BUTTON */}
       {hasEstimate && (
         <button
           type="button"
@@ -114,9 +115,23 @@ export default function LeadDetailsView({
                      rounded-xl px-5 py-4 shadow-sm hover:from-blue-700 hover:to-blue-800 
                      transition font-bold"
         >
-          📊 Online Estimate Exists for this Lead
+          Online Estimate Exists for this Lead
         </button>
       )}
+
+      {/* UPLOAD PHOTOS BUTTON */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onUploadPhotos?.();
+        }}
+        className="w-full mt-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white 
+                   rounded-xl px-5 py-4 shadow-sm hover:from-blue-700 hover:to-blue-800 
+                   transition font-bold"
+      >
+        Upload Photos
+      </button>
 
       {/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (
