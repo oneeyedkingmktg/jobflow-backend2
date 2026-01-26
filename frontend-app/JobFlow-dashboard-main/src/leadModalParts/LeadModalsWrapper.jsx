@@ -6,7 +6,6 @@
 import React from "react";
 import DateModal from "../DateModal.jsx";
 import ApptDateTimeModal from "../ApptDateTimeModal.jsx";
-import ReasonNotSoldModal from "../ReasonNotSoldModal.jsx";
 
 export default function LeadModalsWrapper({
   form,
@@ -79,16 +78,6 @@ export default function LeadModalsWrapper({
         />
       )}
 
-      {/* NOT SOLD REASON MODAL */}
-      {showNotSoldModal && (
-        <ReasonNotSoldModal
-          onSelect={(reason) => {
-            onNotSoldSelect(reason);
-            setShowNotSoldModal(false);
-          }}
-          onCancel={() => setShowNotSoldModal(false)}
-        />
-      )}
     </>
   );
 }
