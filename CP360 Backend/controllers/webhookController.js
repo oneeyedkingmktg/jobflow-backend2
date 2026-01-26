@@ -162,19 +162,19 @@ const webhookController = {
       }
       
       let result;
-      const now = new Date();
-      
+const now = new Date();
       if (existingLead) {
-        // DEDUPLICATION: Check if recently synced (within 2 minutes)
+        // DEDUPLICATION: Only block if last sync was FROM GHL (prevent echo)
+        // Allow updates if last sync was FROM JF (bidirectional sync)
         const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 minutes
-        if (existingLead.ghl_last_synced) {
+        if (existingLead.ghl_last_synced && existingLead.sync_source === 'GHL') {
           const timeSinceSync = Date.now() - new Date(existingLead.ghl_last_synced).getTime();
           if (timeSinceSync < SYNC_COOLDOWN) {
-            console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate sync for lead ${existingLead.id} - synced ${Math.round(timeSinceSync / 1000)}s ago`);
-            return res.status(200).json({ 
+            console.log(`🔄 [WEBHOOK ECHO] Ignoring duplicate GHL sync for lead ${existingLead.id} - synced ${Math.round(timeSinceSync / 1000)}s ago`);
+            return res.status(200).json({
               success: true,
               message: 'Duplicate sync ignored (cooldown period)',
-              lead_id: existingLead.id 
+              lead_id: existingLead.id
             });
           }
         }
