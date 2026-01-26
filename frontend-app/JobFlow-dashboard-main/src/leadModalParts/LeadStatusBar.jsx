@@ -104,16 +104,17 @@ const renderProgressButton = () => {
             </span>
           </button>
 
-          <button
-            onClick={onOpenNotSold}
-            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
-            style={{ backgroundColor: STATUS_COLORS["not_sold"] }}
-          >
-            <span className="text-[10px] uppercase opacity-80">move to</span>
-            <span className="text-sm font-semibold">
-              {"»» Not Sold"}
-            </span>
-          </button>
+<button
+  onClick={() => setForm((prev) => ({ ...prev, status: "not_sold" }))}
+  className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+  style={{ backgroundColor: STATUS_COLORS["not_sold"] }}
+>
+  <span className="text-[10px] uppercase opacity-80">move to</span>
+  <span className="text-sm font-semibold">
+    {"»» Not Sold"}
+  </span>
+</button>
+
         </div>
       );
     }
