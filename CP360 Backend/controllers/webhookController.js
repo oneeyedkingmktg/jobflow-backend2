@@ -87,7 +87,17 @@ const webhookController = {
         lead_source: webhookData.contactSource || webhookData.source || webhookData.contact?.source || null,
 
         project_type: webhookData['EST Project Type'] || null,
-        notes: webhookData['JF Notes'] || null,
+        project_type: webhookData['EST Project Type'] || null,
+        // DEBUG: Log custom fields structure
+        _debug_custom_fields: webhookData.customField || webhookData.customFields || 'none',
+        notes: webhookData['JF Notes'] || 
+               webhookData.customField?.find(f => f.id === 'jf_notes')?.value ||
+               webhookData.customFields?.find(f => f.id === 'jf_notes')?.value ||
+               null,
+        notes: webhookData['JF Notes'] || 
+               webhookData.customField?.find(f => f.id === 'jf_notes')?.value ||
+               webhookData.customFields?.find(f => f.id === 'jf_notes')?.value ||
+               null,
       };
       
       console.log('📋 Mapped contact data:', contactData);
