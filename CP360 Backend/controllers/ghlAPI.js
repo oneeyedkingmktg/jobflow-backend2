@@ -575,7 +575,7 @@ const FIELD_IDS = {
     jf_not_sold_reason: "jf_not_sold_reason",
     jf_contract_price: "jf_contract_price",
     jf_has_estimate: "jf_has_estimate",
-    jf_buyer_type: "buyer_type",
+    buyer_type: "buyer_type",
     jf_company_name: "jf_company_name",
     jf_project_type: "jf_project_type",
     jf_last_synced_at: "jf_last_synced_at",
@@ -661,7 +661,7 @@ const normalizeStatus = (status) => {
   pushField("jf_not_sold_reason", lead.not_sold_reason);
   pushField("jf_contract_price", num(lead.contract_price));
   pushField("jf_has_estimate", yesNo(lead.has_estimate));
-  pushField("jf_buyer_type", lead.buyer_type);
+  pushField("buyer_type", lead.buyer_type);
   pushField("jf_company_name", lead.company_name);
   pushField("jf_project_type", lead.project_type);
   pushField("jf_last_synced_at", formatDateMMDDYYYY(lead.ghl_last_synced));
