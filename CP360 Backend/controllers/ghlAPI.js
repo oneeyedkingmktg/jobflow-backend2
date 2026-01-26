@@ -541,6 +541,20 @@ async function deleteCalendarEvent(company, eventId) {
 // UPSERT CONTACT FROM LEAD (GHL SAFE VERSION)
 // ----------------------------------------------------------------------------
 async function upsertContactFromLead(lead, company) {
+  // Fetch company estimator config
+  let estimatorConfig = null;
+  try {
+    const configResult = await db.query(
+      `SELECT offers_solid, offers_flake, offers_metallic, custom_project_label 
+       FROM estimator_configs 
+       WHERE company_id = $1`,
+      [company.id]
+    );
+    estimatorConfig = configResult.rows[0] || {};
+  } catch (err) {
+    console.error("Failed to fetch estimator config:", err.message);
+    estimatorConfig = {};
+  }
   const phone = normalizePhone(lead.phone);
   const email = lead.email;
 
@@ -675,15 +689,19 @@ const normalizeStatus = (status) => {
     
     pushField("est_project_type", projectTypeLabel);
     pushField("est_square_footage", num(est.square_footage) ? `${num(est.square_footage).toLocaleString()} sq ft` : null);
-    pushField("est_floor_condition", est.condition);
+    // Format condition text
+    let conditionLabel = est.condition;
+    if (est.condition === "good") conditionLabel = "Good";
+    else if (est.condition === "a few cracks") conditionLabel = "A Few Cracks";
+    else if (est.condition === "a lot of cracks") conditionLabel = "A Lot of Cracks";
+    
+    pushField("est_floor_condition", conditionLabel);
     pushField("jf_existing_coating", "No");
     
     // Get company estimator settings to determine which coating types to send
-    const companyConfig = company.estimator_config || {};
-    const offersSolid = companyConfig.offers_solid !== false; // default true
-    const offersFlake = companyConfig.offers_flake !== false; // default true
-    const offersMetallic = companyConfig.offers_metallic !== false; // default true
-    
+    const offersSolid = estimatorConfig.offers_solid === true;
+    const offersFlake = estimatorConfig.offers_flake === true;
+    const offersMetallic = estimatorConfig.offers_metallic === true;    
     // Helper to format price range
     const formatPriceRange = (label, minPrice, maxPrice) => {
       if (!minPrice && !maxPrice) return null;
