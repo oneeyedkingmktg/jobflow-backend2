@@ -572,7 +572,7 @@ const FIELD_IDS = {
     est_floor_condition: "est_floor_condition",
     est_solid_price_range: "est_solid_price_range",
     est_flake_price_range: "est_flake_price_range",
-    est_metallic_price_range: "est_metallic_price_range"
+    est_metallic_price_range: "est_metallic_price_range",
     jf_existing_coating: "jf_existing_coating"
   };
 
