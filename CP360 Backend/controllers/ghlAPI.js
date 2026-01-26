@@ -573,6 +573,7 @@ const FIELD_IDS = {
     est_solid_price_range: "est_solid_price_range",
     est_flake_price_range: "est_flake_price_range",
     est_metallic_price_range: "est_metallic_price_range"
+    jf_existing_coating: "jf_existing_coating"
   };
 
   // --------------------------------------------------
@@ -653,30 +654,69 @@ const normalizeStatus = (status) => {
   pushField("install_tentative", yesNo(lead.install_tentative));
   pushField("jf_project_type", lead.project_type);
 
-  // --------------------
+// --------------------
   // Estimator Fields
   // --------------------
   if (lead.estimator_leads) {
-    pushField("est_project_type", lead.estimator_leads.project_type);
-    pushField(
-      "est_square_footage",
-      num(lead.estimator_leads.square_footage)
-    );
-    pushField("est_floor_condition", lead.estimator_leads.condition);
-    pushField(
-      "est_solid_price_range",
-      num(lead.estimator_leads.solid_price_range)
-    );
-    pushField(
-      "est_flake_price_range",
-      num(lead.estimator_leads.flake_price_range)
-    );
-    pushField(
-      "est_metallic_price_range",
-      num(lead.estimator_leads.metallic_price_range)
-    );
+    const est = lead.estimator_leads;
+    
+    // Format project type
+    let projectTypeLabel = est.project_type;
+    if (est.project_type === "garage_1") projectTypeLabel = "1 Car Garage";
+    else if (est.project_type === "garage_2") projectTypeLabel = "2 Car Garage";
+    else if (est.project_type === "garage_3") projectTypeLabel = "3 Car Garage";
+    else if (est.project_type === "garage_4") projectTypeLabel = "4 Car Garage";
+    else if (est.project_type === "patio") projectTypeLabel = "Patio";
+    else if (est.project_type === "basement") projectTypeLabel = "Basement";
+    else if (est.project_type === "commercial") projectTypeLabel = "Commercial";
+    else if (est.project_type === "custom" && company.estimator_custom_project_label) {
+      projectTypeLabel = company.estimator_custom_project_label;
+    }
+    
+    pushField("est_project_type", projectTypeLabel);
+    pushField("est_square_footage", num(est.square_footage) ? `${num(est.square_footage).toLocaleString()} sq ft` : null);
+    pushField("est_floor_condition", est.condition);
+    pushField("jf_existing_coating", "No");
+    
+    // Get company estimator settings to determine which coating types to send
+    const companyConfig = company.estimator_config || {};
+    const offersSolid = companyConfig.offers_solid !== false; // default true
+    const offersFlake = companyConfig.offers_flake !== false; // default true
+    const offersMetallic = companyConfig.offers_metallic !== false; // default true
+    
+    // Helper to format price range
+    const formatPriceRange = (label, minPrice, maxPrice) => {
+      if (!minPrice && !maxPrice) return null;
+      const min = Number(minPrice) || 0;
+      const max = Number(maxPrice) || min;
+      return `${label} - $${min.toLocaleString()} - $${max.toLocaleString()}`;
+    };
+    
+    // Only send price fields for enabled coating types
+    if (offersSolid && est.all_price_ranges?.solid) {
+      pushField("est_solid_price_range", formatPriceRange(
+        "Solid color floor system",
+        est.all_price_ranges.solid.min,
+        est.all_price_ranges.solid.max
+      ));
+    }
+    
+    if (offersFlake && est.all_price_ranges?.flake) {
+      pushField("est_flake_price_range", formatPriceRange(
+        "Flake floor system",
+        est.all_price_ranges.flake.min,
+        est.all_price_ranges.flake.max
+      ));
+    }
+    
+    if (offersMetallic && est.all_price_ranges?.metallic) {
+      pushField("est_metallic_price_range", formatPriceRange(
+        "Metallic floor system",
+        est.all_price_ranges.metallic.min,
+        est.all_price_ranges.metallic.max
+      ));
+    }
   }
-
  
   // --------------------
   // Payloads
