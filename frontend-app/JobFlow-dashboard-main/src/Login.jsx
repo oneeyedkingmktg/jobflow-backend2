@@ -19,8 +19,14 @@ export default function Login({ onForgotPassword }) {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white shadow-md rounded-xl p-10 mt-10">
-      <h2 className="text-3xl font-bold text-center mb-6">JobFlow Login</h2>
+    <div className="max-w-md mx-auto bg-white shadow-md rounded-xl p-10 mt-[60px]">
+      <div className="flex justify-center mb-6">
+        <img 
+          src="https://coatingpro360.com/wp-content/uploads/2026/01/CP-Square-button-1024-x-1024.png"
+          alt="CoatingPro360"
+          className="w-80 h-80"
+        />
+      </div>
 
       {(localError || error) && (
         <div className="bg-red-100 text-red-700 border border-red-300 p-3 rounded mb-4">
