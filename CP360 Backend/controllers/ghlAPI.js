@@ -689,12 +689,13 @@ const normalizeStatus = (status) => {
     
     pushField("est_project_type", projectTypeLabel);
     pushField("est_square_footage", num(est.square_footage) ? `${num(est.square_footage).toLocaleString()} sq ft` : null);
-    // Format condition text
+// Format condition text - map frontend values to display labels
     let conditionLabel = est.condition;
-    if (est.condition === "good") conditionLabel = "Good";
-    else if (est.condition === "a few cracks") conditionLabel = "A Few Cracks";
-    else if (est.condition === "a lot of cracks") conditionLabel = "A Lot of Cracks";
+    if (est.condition === "none") conditionLabel = "Good";
+    else if (est.condition === "minor") conditionLabel = "A Few Cracks";
+    else if (est.condition === "major") conditionLabel = "A Lot of Cracks";
     
+    pushField("est_floor_condition", conditionLabel);
     pushField("est_floor_condition", conditionLabel);
     pushField("jf_existing_coating", "No");
     
