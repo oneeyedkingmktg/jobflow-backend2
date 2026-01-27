@@ -11,6 +11,12 @@ const { syncLeadToGhl } = require("../sync/dbToGhlSync");
 const { deleteGhlContact } = require("../controllers/ghlAPI");
 
 
+// Normalize phone to digits only for matching
+function normalizePhone(phone) {
+  if (!phone) return null;
+  return phone.replace(/\D/g, '');
+}
+
 
 
 // NEW: GHL sync
@@ -142,6 +148,7 @@ const result = await pool.query(
 // ============================================================================
 // CREATE LEAD (+ ESTIMATOR DATA)
 // ============================================================================
+
 router.post("/", async (req, res) => {
   console.log("\n═══════════════════════════════════");
   console.log("🎯 /leads POST RECEIVED");
@@ -162,13 +169,102 @@ router.post("/", async (req, res) => {
 
     const lead = req.body;
     const estimate = req.body.estimate;
-    let displayProjectType = null;
 
     const error = validateLead(lead);
     if (error) {
       console.log("❌ Validation failed:", error);
       return res.status(400).json({ error });
     }
+
+    // 🔍 CHECK FOR EXISTING LEAD BY PHONE
+    const normalizedPhone = normalizePhone(lead.phone);
+    console.log("🔍 Checking for existing lead with phone:", normalizedPhone);
+
+    const existingLeadResult = await pool.query(
+      `SELECT * FROM leads 
+       WHERE company_id = $1 
+       AND replace(replace(replace(phone, '(', ''), ')', ''), '-', '') = $2
+       AND deleted_at IS NULL
+       LIMIT 1`,
+      [companyId, normalizedPhone]
+    );
+
+    const existingLead = existingLeadResult.rows[0];
+
+    if (existingLead) {
+      console.log("✅ EXISTING LEAD FOUND - ID:", existingLead.id);
+      console.log("📌 Will append estimate data only (no status change)");
+
+      // Save estimate data if provided
+      if (estimate) {
+        console.log("💰 Saving estimate data for existing lead:", existingLead.id);
+
+        const displayProjectType =
+          estimate.length_ft && estimate.width_ft && estimate.project_type
+            ? `${estimate.length_ft}' x ${estimate.width_ft}' ${estimate.project_type.charAt(0).toUpperCase() + estimate.project_type.slice(1)}`
+            : estimate.project_type;
+
+        try {
+          await pool.query(
+            `INSERT INTO estimator_leads (
+              lead_id, company_id, project_type,
+              length_ft, width_ft, calculated_sf,
+              condition, existing_coating, selected_quality,
+              display_price_min, display_price_max,
+              all_price_ranges, minimum_job_applied
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              existingLead.id,
+              companyId,
+              displayProjectType,
+              estimate.length_ft,
+              estimate.width_ft,
+              estimate.calculated_sf,
+              estimate.condition,
+              estimate.existing_coating || false,
+              estimate.selected_quality,
+              estimate.display_price_min,
+              estimate.display_price_max,
+              JSON.stringify(estimate.all_price_ranges),
+              estimate.minimum_job_applied || false
+            ]
+          );
+          console.log("✅ ESTIMATE INSERT SUCCESSFUL");
+
+          await pool.query(
+            `UPDATE leads SET has_estimate = true WHERE id = $1`,
+            [existingLead.id]
+          );
+          console.log("✅ UPDATED has_estimate flag");
+        } catch (estimateError) {
+          console.error("❌ ESTIMATE INSERT FAILED:", estimateError);
+        }
+      }
+
+      // Add estimator_lead tag in GHL (don't change status)
+      const company = (
+        await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
+      ).rows[0];
+
+      if (company.ghl_api_key && existingLead.ghl_contact_id) {
+        try {
+          const { applyStatusTags } = require("../controllers/ghlAPI");
+          await applyStatusTags(existingLead.ghl_contact_id, "estimator_lead", company);
+          console.log("✅ Applied estimator_lead tag to existing contact");
+        } catch (tagError) {
+          console.error("❌ Failed to apply estimator_lead tag:", tagError.message);
+        }
+      }
+
+      return res.status(200).json({ 
+        lead: toCamel(existingLead), 
+        existingLead: true,
+        message: "Estimate appended to existing lead"
+      });
+    }
+
+    // 🆕 NO EXISTING LEAD - CREATE NEW ONE
+    console.log("➕ No existing lead found - creating new lead");
 
     const { first, last, full } = parseName(lead.name || lead.full_name);
     console.log("📝 Parsed name:", { first, last, full });
@@ -224,19 +320,11 @@ router.post("/", async (req, res) => {
     );
 
     const newLead = result.rows[0];
-    if (displayProjectType) {
-      await pool.query(
-        `UPDATE leads SET project_type = $1 WHERE id = $2`,
-        [displayProjectType, newLead.id]
-      );
-    }
-
     console.log("✅ LEAD INSERT SUCCESSFUL - Lead ID:", newLead.id);
 
-    // 🆕 SAVE ESTIMATE DATA if provided
+    // Save estimate data if provided
     if (estimate) {
       console.log("💰 Saving estimate data for lead:", newLead.id);
-      console.log("📊 Estimate data:", estimate);
 
       const displayProjectType =
         estimate.length_ft && estimate.width_ft && estimate.project_type
@@ -269,6 +357,7 @@ router.post("/", async (req, res) => {
           ]
         );
         console.log("✅ ESTIMATE INSERT SUCCESSFUL");
+
         await pool.query(
           `UPDATE leads SET has_estimate = true WHERE id = $1`,
           [newLead.id]
@@ -277,15 +366,13 @@ router.post("/", async (req, res) => {
       } catch (estimateError) {
         console.error("❌ ESTIMATE INSERT FAILED:", estimateError);
       }
-    } else {
-      console.log("ℹ️  No estimate data provided (non-estimator lead)");
     }
 
     const company = (
       await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
     ).rows[0];
 
-    // 🆕 CHECK IF USER HAS BYPASS FLAG
+    // Check if user has bypass flag
     let shouldBypassSync = false;
     if (userId) {
       const userResult = await pool.query(
