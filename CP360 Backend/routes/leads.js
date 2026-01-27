@@ -249,8 +249,8 @@ const existingLeadResult = await pool.query(
       if (company.ghl_api_key && existingLead.ghl_contact_id) {
         try {
           
-          await applyStatusTags(existingLead.ghl_contact_id, "estimator_lead", company);
-          console.log("✅ Applied estimator_lead tag to existing contact");
+          await applyStatusTags(existingLead.ghl_contact_id, "submitted_estimate", company);
+          console.log("✅ Applied submitted_estimate tag to existing contact");
         } catch (tagError) {
           console.error("❌ Failed to apply estimator_lead tag:", tagError.message);
         }

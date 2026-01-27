@@ -1170,6 +1170,7 @@ module.exports = {
 
       if (hasEstimatorData) {
         await applyStatusTags(contactId, "estimator_lead", company);
+        await applyStatusTags(contactId, "submitted_estimate", company);
       }
 
       // ==========================================
