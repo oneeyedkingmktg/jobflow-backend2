@@ -1109,8 +1109,8 @@ async function deleteGhlContact(contactId, companyId) {
 module.exports = {
   syncLeadCalendarEvent,
   deleteGhlContact,
+  applyStatusTags,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
-
     const companyId = company?.id;
 
     if (!companyId) {
