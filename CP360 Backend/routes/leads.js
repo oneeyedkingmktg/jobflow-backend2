@@ -180,10 +180,10 @@ router.post("/", async (req, res) => {
     const normalizedPhone = normalizePhone(lead.phone);
     console.log("🔍 Checking for existing lead with phone:", normalizedPhone);
 
-    const existingLeadResult = await pool.query(
+const existingLeadResult = await pool.query(
       `SELECT * FROM leads 
        WHERE company_id = $1 
-       AND replace(replace(replace(phone, '(', ''), ')', ''), '-', '') = $2
+       AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
        AND deleted_at IS NULL
        LIMIT 1`,
       [companyId, normalizedPhone]
