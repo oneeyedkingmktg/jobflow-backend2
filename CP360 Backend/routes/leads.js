@@ -8,7 +8,7 @@ const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { syncLeadToGhl } = require("../sync/dbToGhlSync");
-const { deleteGhlContact } = require("../controllers/ghlAPI");
+const { deleteGhlContact, applyStatusTags } = require("../controllers/ghlAPI");
 
 
 // Normalize phone to digits only for matching
@@ -248,7 +248,7 @@ const existingLeadResult = await pool.query(
 
       if (company.ghl_api_key && existingLead.ghl_contact_id) {
         try {
-          const { applyStatusTags } = require("../controllers/ghlAPI");
+          
           await applyStatusTags(existingLead.ghl_contact_id, "estimator_lead", company);
           console.log("✅ Applied estimator_lead tag to existing contact");
         } catch (tagError) {
