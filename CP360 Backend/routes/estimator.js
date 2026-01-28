@@ -426,8 +426,35 @@ router.post("/preview", async (req, res) => {
       configResult.rows = createdConfig.rows;
     }
 
-    const config = configResult.rows[0];
-    const estimate = calculateEstimate(config, req.body);
+const config = configResult.rows[0];
+    
+    // Fetch pricing configs for this company
+    const projectType = req.body.project?.type;
+    
+    // Map project type to space type
+    let spaceType = projectType;
+    if (projectType && projectType.startsWith('garage_')) {
+      spaceType = 'garage';
+    }
+    
+    const pricingResult = await query(
+      `SELECT space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled
+       FROM estimator_pricing_configs
+       WHERE company_id = $1 AND space_type = $2 AND enabled = true
+       ORDER BY finish_type`,
+      [companyId, spaceType]
+    );
+    
+    // Build pricing map by finish type
+    const pricingByFinish = {};
+    pricingResult.rows.forEach(row => {
+      pricingByFinish[row.finish_type] = {
+        min: row.min_price_per_sf,
+        max: row.max_price_per_sf
+      };
+    });
+    
+    const estimate = calculateEstimate(config, req.body, pricingByFinish);
 
     // Fetch company phone number
 const companyResult = await query(

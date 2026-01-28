@@ -4,7 +4,7 @@
 // Version: v1.2.0 – Per-finish minimum job pricing with smart display logic
 // ============================================================================
 
-function calculateEstimate(config, input) {
+function calculateEstimate(config, input, pricingByFinish = {}) {
   if (!config) throw new Error("CONFIG_REQUIRED");
   if (!input || !input.project || !input.selectedQuality) {
     throw new Error("INVALID_INPUT");
@@ -89,38 +89,21 @@ function calculateEstimate(config, input) {
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // BUILD PRICE RANGES
+// ---------------------------------------------------------------------------
+  // BUILD PRICE RANGES - Use new pricing structure
   // ---------------------------------------------------------------------------
   let priceRanges = {};
 
-  // COMMERCIAL OVERRIDE
-  if (project.type === "commercial") {
-    const commercialRange = calcRange(
-      config.commercial_price_per_sf_min,
-      config.commercial_price_per_sf_max
-    );
-
-    priceRanges = {
-      solid: commercialRange,
-      flake: commercialRange,
-      metallic: commercialRange,
-    };
-  } else {
-    priceRanges = {
-      solid: calcRange(
-        config.solid_price_per_sf_min,
-        config.solid_price_per_sf_max
-      ),
-      flake: calcRange(
-        config.flake_price_per_sf_min,
-        config.flake_price_per_sf_max
-      ),
-      metallic: calcRange(
-        config.metallic_price_per_sf_min,
-        config.metallic_price_per_sf_max
-      ),
-    };
+  // Build price ranges for all enabled finishes
+  const finishTypes = ['solid', 'flake', 'metallic', 'custom'];
+  
+  for (const finish of finishTypes) {
+    if (pricingByFinish[finish]) {
+      priceRanges[finish] = calcRange(
+        pricingByFinish[finish].min,
+        pricingByFinish[finish].max
+      );
+    }
   }
 
   if (!priceRanges[selectedQuality]) {
