@@ -544,12 +544,12 @@ async function upsertContactFromLead(lead, company) {
   // Fetch company estimator config
   let estimatorConfig = null;
   try {
-    const configResult = await db.query(
-      `SELECT offers_solid, offers_flake, offers_metallic, custom_project_label 
-       FROM estimator_configs 
-       WHERE company_id = $1`,
-      [company.id]
-    );
+const configResult = await db.query(
+  `SELECT offers_solid, offers_flake, offers_metallic, custom_project_label, custom_finish_label 
+   FROM estimator_configs 
+   WHERE company_id = $1`,
+  [company.id]
+);
     estimatorConfig = configResult.rows[0] || {};
   } catch (err) {
     console.error("Failed to fetch estimator config:", err.message);
@@ -587,6 +587,7 @@ const FIELD_IDS = {
     est_solid_price_range: "est_solid_price_range",
     est_flake_price_range: "est_flake_price_range",
     est_metallic_price_range: "est_metallic_price_range",
+    est_custom_finish_range: "est_custom_finish_range", 
     jf_existing_coating: "jf_existing_coating"
   };
 
@@ -704,37 +705,53 @@ const normalizeStatus = (status) => {
     const offersFlake = estimatorConfig.offers_flake === true;
     const offersMetallic = estimatorConfig.offers_metallic === true;    
     // Helper to format price range
-    const formatPriceRange = (label, minPrice, maxPrice) => {
-      if (!minPrice && !maxPrice) return null;
-      const min = Number(minPrice) || 0;
-      const max = Number(maxPrice) || min;
-      return `${label} - $${min.toLocaleString()} - $${max.toLocaleString()}`;
-    };
+const formatPriceRange = (label, minPrice, maxPrice) => {
+  if (!minPrice && !maxPrice) return null;
+  const min = Number(minPrice) || 0;
+  const max = Number(maxPrice) || min;
+  
+  // If same price, show single price without range
+  if (min === max) {
+    return `${label} - $${min.toLocaleString()}`;
+  }
+  
+  return `${label} - $${min.toLocaleString()} - $${max.toLocaleString()}`;
+};
     
     // Only send price fields for enabled coating types
-    if (offersSolid && est.all_price_ranges?.solid) {
-      pushField("est_solid_price_range", formatPriceRange(
-        "Solid color floor system",
-        est.all_price_ranges.solid.min,
-        est.all_price_ranges.solid.max
-      ));
-    }
-    
-    if (offersFlake && est.all_price_ranges?.flake) {
-      pushField("est_flake_price_range", formatPriceRange(
-        "Flake floor system",
-        est.all_price_ranges.flake.min,
-        est.all_price_ranges.flake.max
-      ));
-    }
-    
-    if (offersMetallic && est.all_price_ranges?.metallic) {
-      pushField("est_metallic_price_range", formatPriceRange(
-        "Metallic floor system",
-        est.all_price_ranges.metallic.min,
-        est.all_price_ranges.metallic.max
-      ));
-    }
+if (offersSolid && est.all_price_ranges?.solid) {
+  pushField("est_solid_price_range", formatPriceRange(
+    "Solid Color",
+    est.all_price_ranges.solid.min,
+    est.all_price_ranges.solid.max
+  ));
+}
+
+if (offersFlake && est.all_price_ranges?.flake) {
+  pushField("est_flake_price_range", formatPriceRange(
+    "Flake",
+    est.all_price_ranges.flake.min,
+    est.all_price_ranges.flake.max
+  ));
+}
+
+if (offersMetallic && est.all_price_ranges?.metallic) {
+  pushField("est_metallic_price_range", formatPriceRange(
+    "Metallic",
+    est.all_price_ranges.metallic.min,
+    est.all_price_ranges.metallic.max
+  ));
+}
+
+// Add custom finish
+if (est.all_price_ranges?.custom) {
+  const customLabel = estimatorConfig.custom_finish_label || "Custom";
+  pushField("est_custom_finish_range", formatPriceRange(
+    customLabel,
+    est.all_price_ranges.custom.min,
+    est.all_price_ranges.custom.max
+  ));
+}
   }
  
   // --------------------
