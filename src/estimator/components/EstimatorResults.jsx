@@ -134,9 +134,9 @@ let priceDisplay = "$0";
     <div className={cardClass}>
       <h2 className="text-2xl font-bold text-center mb-6">Your Estimated Price</h2>
 
-      {/* Tabs at top like file folders */}
+{/* Tabs at top like file folders */}
       <div className="flex justify-center gap-1">
-        {["solid", "flake", "metallic"].map((finish) => {
+        {["solid", "flake", "metallic", "custom"].map((finish) => {
 
           if (!config) return null;
 
@@ -183,7 +183,11 @@ const tabStyle = useCustomStyles
               className={tabClass}
               style={tabStyle}
             >
-              {finish.charAt(0).toUpperCase() + finish.slice(1)}
+>
+              {finish === 'custom' 
+                ? (config.custom_finish_label || 'Custom')
+                : finish.charAt(0).toUpperCase() + finish.slice(1)
+              }
             </button>
           );
         })}
