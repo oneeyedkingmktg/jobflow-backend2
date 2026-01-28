@@ -6,6 +6,10 @@ const { authenticateToken, requireSameCompany } = require('../middleware/auth');
 // GET all pricing configs for a company
 router.get('/:companyId', authenticateToken, requireSameCompany, async (req, res) => {
   const { companyId } = req.params;
+  
+  console.log('🔍 GET /api/estimator-pricing/:companyId');
+  console.log('  User:', req.user);
+  console.log('  Company ID from URL:', companyId);
 
   try {
     const result = await pool.query(
@@ -15,9 +19,10 @@ router.get('/:companyId', authenticateToken, requireSameCompany, async (req, res
       [companyId]
     );
 
+    console.log('  ✅ Found configs:', result.rows.length);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching estimator pricing configs:', error);
+    console.error('  ❌ Error fetching estimator pricing configs:', error);
     res.status(500).json({ error: 'Failed to fetch pricing configs' });
   }
 });
@@ -27,6 +32,10 @@ router.post('/:companyId', authenticateToken, requireSameCompany, async (req, re
   const { companyId } = req.params;
   const { configs } = req.body;
 
+  console.log('🔍 POST /api/estimator-pricing/:companyId');
+  console.log('  User:', req.user);
+  console.log('  Company ID from URL:', companyId);
+  console.log('  Configs count:', configs?.length);
   try {
     // Validate configs array
     if (!Array.isArray(configs)) {
