@@ -42,7 +42,7 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
         setLoading(true);
         setError("");
 
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("authToken");
 
         // Load settings from old endpoint
         const settingsRes = await fetch(
@@ -152,7 +152,7 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
       setSaving(true);
       setError("");
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("authToken");
 
       // Determine which spaces have ANY finish enabled
       const hasGarageFinish = pricingConfigs.some(
