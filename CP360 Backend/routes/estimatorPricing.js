@@ -1,18 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireSameCompany } = require('../middleware/auth');
 
 // GET all pricing configs for a company
-router.get('/:companyId', authenticateToken, async (req, res) => {
+router.get('/:companyId', authenticateToken, requireSameCompany, async (req, res) => {
   const { companyId } = req.params;
 
   try {
-    // Verify user has access to this company
-    if (req.user.company_id !== parseInt(companyId) && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     const result = await pool.query(
       `SELECT * FROM estimator_pricing_configs 
        WHERE company_id = $1 
@@ -28,16 +23,11 @@ router.get('/:companyId', authenticateToken, async (req, res) => {
 });
 
 // POST (bulk save/update) pricing configs for a company
-router.post('/:companyId', authenticateToken, async (req, res) => {
+router.post('/:companyId', authenticateToken, requireSameCompany, async (req, res) => {
   const { companyId } = req.params;
-  const { configs } = req.body; // Array of pricing config objects
+  const { configs } = req.body;
 
   try {
-    // Verify user has access to this company
-    if (req.user.company_id !== parseInt(companyId) && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     // Validate configs array
     if (!Array.isArray(configs)) {
       return res.status(400).json({ error: 'configs must be an array' });
