@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/company/EstimatorPricingModal.jsx
-// Version: v1.3.5 – Prevent partial-save nulling via pre-save merge
+// Version: v2.0.0 – Space-based pricing with 5 spaces × 4 finishes
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
@@ -11,8 +11,8 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [form, setForm] = useState({
-    // Project type toggles
+  // Settings form (kept from old structure)
+  const [settingsForm, setSettingsForm] = useState({
     allowGarage1: false,
     allowGarage2: false,
     allowGarage3: false,
@@ -21,52 +21,31 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
     allowBasement: false,
     allowCustom: false,
     customProjectLabel: "",
-
     allowCommercial: false,
 
-    // Average square footage
     avgSf1Car: null,
     avgSf2Car: null,
     avgSf3Car: null,
     avgSf4Car: null,
 
-    // Coating type toggles
-    offersSolid: false,
-    offersFlake: false,
-    offersMetallic: false,
-
-    // Minimum job price
     minimumJobPrice: null,
 
-    // Price per SF ranges
-    solidPricePerSfMin: null,
-    solidPricePerSfMax: null,
-    flakePricePerSfMin: null,
-    flakePricePerSfMax: null,
-    metallicPricePerSfMin: null,
-    metallicPricePerSfMax: null,
-    patioPricePerSfMin: null,
-    patioPricePerSfMax: null,
-    basementPricePerSfMin: null,
-    basementPricePerSfMax: null,
-    customPricePerSfMin: null,
-    customPricePerSfMax: null,
-    commercialPricePerSfMin: null,
-commercialPricePerSfMax: null,
-
-
-    // Condition multipliers
     conditionGoodMultiplier: 1.0,
     conditionMinorMultiplier: null,
     conditionMajorMultiplier: null,
 
-    // Existing coating
     existingCoatingMultiplier: null,
     existingCoatingFlatFee: null,
   });
 
+  // Pricing configs (new structure)
+  const [pricingConfigs, setPricingConfigs] = useState([]);
+
+  const SPACES = ['garage', 'patio', 'basement', 'commercial', 'custom'];
+  const FINISHES = ['solid', 'flake', 'metallic', 'custom'];
+
   useEffect(() => {
-    const loadConfig = async () => {
+    const loadData = async () => {
       if (!company?.id) return;
 
       try {
@@ -74,9 +53,10 @@ commercialPricePerSfMax: null,
         setError("");
 
         const token = localStorage.getItem("token");
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
 
+        // Load settings from old endpoint
+        const settingsRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -84,75 +64,96 @@ commercialPricePerSfMax: null,
           }
         );
 
-        // If no row exists yet, we keep defaults and allow user to edit + save.
-        if (response.status === 404) {
-          setLoading(false);
-          return;
+        if (settingsRes.ok) {
+          const d = await settingsRes.json();
+          setSettingsForm({
+            allowGarage1: d.allow_garage_1 ?? false,
+            allowGarage2: d.allow_garage_2 ?? false,
+            allowGarage3: d.allow_garage_3 ?? false,
+            allowGarage4: d.allow_garage_4 ?? false,
+            allowPatio: d.allow_patio ?? false,
+            allowBasement: d.allow_basement ?? false,
+            allowCustom: d.allow_custom ?? false,
+            customProjectLabel: d.custom_project_label ?? "Custom",
+            allowCommercial: d.allow_commercial ?? false,
+
+            avgSf1Car: d.avg_sf_1_car ?? null,
+            avgSf2Car: d.avg_sf_2_car ?? null,
+            avgSf3Car: d.avg_sf_3_car ?? null,
+            avgSf4Car: d.avg_sf_4_car ?? null,
+
+            minimumJobPrice: d.minimum_job_price ?? null,
+
+            conditionGoodMultiplier: d.condition_good_multiplier ?? 1.0,
+            conditionMinorMultiplier: d.condition_minor_multiplier ?? null,
+            conditionMajorMultiplier: d.condition_major_multiplier ?? null,
+
+            existingCoatingMultiplier: d.existing_coating_multiplier ?? null,
+            existingCoatingFlatFee: d.existing_coating_flat_fee ?? null,
+          });
         }
 
-        if (!response.ok) {
-          throw new Error("Failed to load estimator config");
+        // Load pricing from new endpoint
+        const pricingRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/estimator-pricing/${company.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (pricingRes.ok) {
+          const configs = await pricingRes.json();
+          setPricingConfigs(configs);
         }
 
-        const d = await response.json();
-
-        setForm({
-          allowGarage1: d.allow_garage_1 ?? false,
-          allowGarage2: d.allow_garage_2 ?? false,
-          allowGarage3: d.allow_garage_3 ?? false,
-          allowGarage4: d.allow_garage_4 ?? false,
-          allowPatio: d.allow_patio ?? false,
-          allowBasement: d.allow_basement ?? false,
-          allowCustom: d.allow_custom ?? false,
-          customProjectLabel: d.custom_project_label ?? "Custom",
-          allowCommercial: d.allow_commercial ?? false,
-
-          avgSf1Car: d.avg_sf_1_car ?? null,
-          avgSf2Car: d.avg_sf_2_car ?? null,
-          avgSf3Car: d.avg_sf_3_car ?? null,
-          avgSf4Car: d.avg_sf_4_car ?? null,
-
-          offersSolid: d.offers_solid ?? false,
-          offersFlake: d.offers_flake ?? false,
-          offersMetallic: d.offers_metallic ?? false,
-
-          minimumJobPrice: d.minimum_job_price ?? null,
-
-          solidPricePerSfMin: d.solid_price_per_sf_min ?? null,
-          solidPricePerSfMax: d.solid_price_per_sf_max ?? null,
-          flakePricePerSfMin: d.flake_price_per_sf_min ?? null,
-          flakePricePerSfMax: d.flake_price_per_sf_max ?? null,
-          metallicPricePerSfMin: d.metallic_price_per_sf_min ?? null,
-          metallicPricePerSfMax: d.metallic_price_per_sf_max ?? null,
-          patioPricePerSfMin: d.patio_price_per_sf_min ?? null,
-          patioPricePerSfMax: d.patio_price_per_sf_max ?? null,
-          basementPricePerSfMin: d.basement_price_per_sf_min ?? null,
-          basementPricePerSfMax: d.basement_price_per_sf_max ?? null,
-          customPricePerSfMin: d.custom_price_per_sf_min ?? null,
-          customPricePerSfMax: d.custom_price_per_sf_max ?? null,
-          commercialPricePerSfMin: d.commercial_price_per_sf_min ?? null,
-commercialPricePerSfMax: d.commercial_price_per_sf_max ?? null,
-
-
-          conditionGoodMultiplier: d.condition_good_multiplier ?? 1.0,
-          conditionMinorMultiplier: d.condition_minor_multiplier ?? null,
-          conditionMajorMultiplier: d.condition_major_multiplier ?? null,
-
-          existingCoatingMultiplier: d.existing_coating_multiplier ?? null,
-          existingCoatingFlatFee: d.existing_coating_flat_fee ?? null,
-        });
       } catch (err) {
-        setError(err.message || "Failed to load pricing");
+        setError(err.message || "Failed to load data");
       } finally {
         setLoading(false);
       }
     };
 
-    loadConfig();
+    loadData();
   }, [company]);
 
-  const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const handleSettingsChange = (field, value) => {
+    setSettingsForm((prev) => ({ ...prev, [field]: value }));
+    setError("");
+  };
+
+  const getPricingConfig = (space, finish) => {
+    return pricingConfigs.find(
+      (c) => c.space_type === space && c.finish_type === finish
+    ) || { enabled: false, min_price_per_sf: null, max_price_per_sf: null };
+  };
+
+  const updatePricingConfig = (space, finish, field, value) => {
+    setPricingConfigs((prev) => {
+      const existing = prev.find(
+        (c) => c.space_type === space && c.finish_type === finish
+      );
+
+      if (existing) {
+        return prev.map((c) =>
+          c.space_type === space && c.finish_type === finish
+            ? { ...c, [field]: value }
+            : c
+        );
+      } else {
+        return [
+          ...prev,
+          {
+            space_type: space,
+            finish_type: finish,
+            enabled: field === 'enabled' ? value : false,
+            min_price_per_sf: field === 'min_price_per_sf' ? value : null,
+            max_price_per_sf: field === 'max_price_per_sf' ? value : null,
+          },
+        ];
+      }
+    });
     setError("");
   };
 
@@ -172,105 +173,84 @@ commercialPricePerSfMax: d.commercial_price_per_sf_max ?? null,
       setError("");
 
       const token = localStorage.getItem("token");
-      const url = `${import.meta.env.VITE_API_URL}/estimator/config`;
 
-
-      // ----------------------------------------------------------------------
-      // SAFETY: fetch existing config and merge so partial saves can't null fields
-      // ----------------------------------------------------------------------
-      let existing = {};
-      try {
-        const existingRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/estimator/config?company_id=${company.id}`,
-
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (existingRes.ok) {
-          existing = await existingRes.json();
-        } else {
-          // 404 is expected for new companies; keep existing as {}
-          existing = {};
-        }
-      } catch (_) {
-        // If the read fails for any reason, we still proceed with full payload from form.
-        existing = {};
-      }
-
-      const payload = {
-        // Merge existing to protect against backend overwriting missing keys
-        ...existing,
-
+      // Save settings to old endpoint
+      const settingsPayload = {
         company_id: company.id,
+        allow_garage_1: settingsForm.allowGarage1,
+        allow_garage_2: settingsForm.allowGarage2,
+        allow_garage_3: settingsForm.allowGarage3,
+        allow_garage_4: settingsForm.allowGarage4,
+        allow_patio: settingsForm.allowPatio,
+        allow_basement: settingsForm.allowBasement,
+        allow_custom: settingsForm.allowCustom,
+        custom_project_label: settingsForm.customProjectLabel || "Custom",
+        allow_commercial: settingsForm.allowCommercial,
 
-        allow_garage_1: form.allowGarage1,
-        allow_garage_2: form.allowGarage2,
-        allow_garage_3: form.allowGarage3,
-        allow_garage_4: form.allowGarage4,
-        allow_patio: form.allowPatio,
-        allow_basement: form.allowBasement,
-        allow_custom: form.allowCustom,
-        custom_project_label: form.customProjectLabel || "Custom",
-        allow_commercial: form.allowCommercial,
+        avg_sf_1_car: toNumOrNull(settingsForm.avgSf1Car),
+        avg_sf_2_car: toNumOrNull(settingsForm.avgSf2Car),
+        avg_sf_3_car: toNumOrNull(settingsForm.avgSf3Car),
+        avg_sf_4_car: toNumOrNull(settingsForm.avgSf4Car),
 
-        avg_sf_1_car: toNumOrNull(form.avgSf1Car),
-        avg_sf_2_car: toNumOrNull(form.avgSf2Car),
-        avg_sf_3_car: toNumOrNull(form.avgSf3Car),
-        avg_sf_4_car: toNumOrNull(form.avgSf4Car),
+        minimum_job_price: toNumOrNull(settingsForm.minimumJobPrice),
 
-        offers_solid: form.offersSolid,
-        offers_flake: form.offersFlake,
-        offers_metallic: form.offersMetallic,
+        condition_good_multiplier: toNumOrNull(settingsForm.conditionGoodMultiplier),
+        condition_minor_multiplier: toNumOrNull(settingsForm.conditionMinorMultiplier),
+        condition_major_multiplier: toNumOrNull(settingsForm.conditionMajorMultiplier),
 
-        minimum_job_price: toNumOrNull(form.minimumJobPrice),
-
-        solid_price_per_sf_min: toNumOrNull(form.solidPricePerSfMin),
-        solid_price_per_sf_max: toNumOrNull(form.solidPricePerSfMax),
-        flake_price_per_sf_min: toNumOrNull(form.flakePricePerSfMin),
-        flake_price_per_sf_max: toNumOrNull(form.flakePricePerSfMax),
-        metallic_price_per_sf_min: toNumOrNull(form.metallicPricePerSfMin),
-        metallic_price_per_sf_max: toNumOrNull(form.metallicPricePerSfMax),
-
-        patio_price_per_sf_min: toNumOrNull(form.patioPricePerSfMin),
-        patio_price_per_sf_max: toNumOrNull(form.patioPricePerSfMax),
-        basement_price_per_sf_min: toNumOrNull(form.basementPricePerSfMin),
-        basement_price_per_sf_max: toNumOrNull(form.basementPricePerSfMax),
-        custom_price_per_sf_min: toNumOrNull(form.customPricePerSfMin),
-        custom_price_per_sf_max: toNumOrNull(form.customPricePerSfMax),
-        commercial_price_per_sf_min: toNumOrNull(form.commercialPricePerSfMin),
-commercial_price_per_sf_max: toNumOrNull(form.commercialPricePerSfMax),
-
-
-        condition_good_multiplier: toNumOrNull(form.conditionGoodMultiplier),
-        condition_minor_multiplier: toNumOrNull(form.conditionMinorMultiplier),
-        condition_major_multiplier: toNumOrNull(form.conditionMajorMultiplier),
-
-        existing_coating_multiplier: toNumOrNull(form.existingCoatingMultiplier),
-        existing_coating_flat_fee: toNumOrNull(form.existingCoatingFlatFee),
+        existing_coating_multiplier: toNumOrNull(settingsForm.existingCoatingMultiplier),
+        existing_coating_flat_fee: toNumOrNull(settingsForm.existingCoatingFlatFee),
       };
 
-const response = await fetch(url, {
-  method: "PUT",
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  },
-  body: JSON.stringify(payload),
-});
+      const settingsRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/estimator/config`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(settingsPayload),
+        }
+      );
 
-if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to save estimator config");
+      if (!settingsRes.ok) {
+        const data = await settingsRes.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save settings");
       }
 
-      await onSave({}); // trigger parent refresh
+      // Save pricing to new endpoint
+      const pricingPayload = {
+        configs: pricingConfigs.map((c) => ({
+          space_type: c.space_type,
+          finish_type: c.finish_type,
+          min_price_per_sf: toNumOrNull(c.min_price_per_sf),
+          max_price_per_sf: toNumOrNull(c.max_price_per_sf),
+          enabled: c.enabled ?? false,
+        })),
+      };
+
+      const pricingRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/estimator-pricing/${company.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(pricingPayload),
+        }
+      );
+
+      if (!pricingRes.ok) {
+        const data = await pricingRes.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to save pricing");
+      }
+
+      await onSave({});
       onClose();
     } catch (err) {
-      setError(err.message || "Failed to save estimator config");
+      setError(err.message || "Failed to save configuration");
     } finally {
       setSaving(false);
     }
@@ -280,8 +260,8 @@ if (!response.ok) {
     <label className="flex items-center gap-2 cursor-pointer">
       <input
         type="checkbox"
-        checked={form[field]}
-        onChange={(e) => handleChange(field, e.target.checked)}
+        checked={settingsForm[field]}
+        onChange={(e) => handleSettingsChange(field, e.target.checked)}
         disabled={mode === "view"}
         className="w-4 h-4 text-blue-600 rounded"
       />
@@ -303,8 +283,8 @@ if (!response.ok) {
         <input
           type="text"
           inputMode="decimal"
-          value={form[field] ?? ""}
-          onChange={(e) => handleChange(field, e.target.value)}
+          value={settingsForm[field] ?? ""}
+          onChange={(e) => handleSettingsChange(field, e.target.value)}
           disabled={mode === "view"}
           className={`w-full px-3 py-2 border rounded-lg text-sm disabled:bg-transparent disabled:border-transparent disabled:text-gray-900 disabled:opacity-100 disabled:cursor-default disabled:shadow-none disabled:ring-0 disabled:focus:ring-0 disabled:focus:outline-none ${
             prefix ? "pl-7" : ""
@@ -318,6 +298,92 @@ if (!response.ok) {
       </div>
     </div>
   );
+
+  const renderSpacePricing = (space, displayName) => {
+    return (
+      <div className="bg-gray-50 rounded-lg p-4" key={space}>
+        <h3 className="font-bold text-gray-900 mb-3">
+          {displayName} Pricing (per sq ft)
+        </h3>
+        <div className="space-y-4">
+          {FINISHES.map((finish) => {
+            const config = getPricingConfig(space, finish);
+            const finishLabel = finish.charAt(0).toUpperCase() + finish.slice(1);
+            
+            return (
+              <div key={finish} className="border-l-4 border-blue-300 pl-4">
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input
+                    type="checkbox"
+                    checked={config.enabled}
+                    onChange={(e) =>
+                      updatePricingConfig(space, finish, "enabled", e.target.checked)
+                    }
+                    disabled={mode === "view"}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm font-semibold text-gray-700">
+                    {finishLabel}
+                  </span>
+                </label>
+
+                {config.enabled && (
+                  <div className="grid grid-cols-2 gap-3 ml-6">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Min Price
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={config.min_price_per_sf ?? ""}
+                          onChange={(e) =>
+                            updatePricingConfig(
+                              space,
+                              finish,
+                              "min_price_per_sf",
+                              e.target.value
+                            )
+                          }
+                          disabled={mode === "view"}
+                          className="w-full pl-7 px-3 py-2 border rounded-lg text-sm disabled:bg-transparent disabled:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Max Price
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={config.max_price_per_sf ?? ""}
+                          onChange={(e) =>
+                            updatePricingConfig(
+                              space,
+                              finish,
+                              "max_price_per_sf",
+                              e.target.value
+                            )
+                          }
+                          disabled={mode === "view"}
+                          className="w-full pl-7 px-3 py-2 border rounded-lg text-sm disabled:bg-transparent disabled:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -376,98 +442,18 @@ if (!response.ok) {
             </div>
           </div>
 
-          {/* COATING TYPES */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">
-              Coating Types Offered
-            </h3>
-            <div className="grid grid-cols-3 gap-3">
-              {toggleBox("Solid Color", "offersSolid")}
-              {toggleBox("Flake", "offersFlake")}
-              {toggleBox("Metallic", "offersMetallic")}
-            </div>
-          </div>
-
           {/* MINIMUM JOB PRICE */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-bold text-gray-900 mb-3">Minimum Job Price</h3>
             {numberInput("Minimum Price", "minimumJobPrice", "$")}
           </div>
 
-          {/* GARAGE PRICING */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">
-              Garage Pricing (per sq ft)
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {numberInput("Solid Min", "solidPricePerSfMin", "$")}
-              {numberInput("Solid Max", "solidPricePerSfMax", "$")}
-              {numberInput("Flake Min", "flakePricePerSfMin", "$")}
-              {numberInput("Flake Max", "flakePricePerSfMax", "$")}
-              {numberInput("Metallic Min", "metallicPricePerSfMin", "$")}
-              {numberInput("Metallic Max", "metallicPricePerSfMax", "$")}
-            </div>
-          </div>
-
-          {/* PATIO PRICING */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">
-              Patio Pricing (per sq ft)
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {numberInput("Min", "patioPricePerSfMin", "$")}
-              {numberInput("Max", "patioPricePerSfMax", "$")}
-            </div>
-          </div>
-
-          {/* BASEMENT PRICING */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-900 mb-3">
-              Basement Pricing (per sq ft)
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {numberInput("Min", "basementPricePerSfMin", "$")}
-              {numberInput("Max", "basementPricePerSfMax", "$")}
-            </div>
-          </div>
-
-{/* CUSTOM PRICING */}
-<div className="bg-gray-50 rounded-lg p-4">
-  <h3 className="font-bold text-gray-900 mb-3">
-    {form.customProjectLabel || "Custom"} Pricing (per sq ft)
-  </h3>
-
-  <div className="mb-4">
-    <label className="block text-xs font-semibold text-gray-700 mb-1">
-      Custom Project Label
-    </label>
-    <input
-      type="text"
-      value={form.customProjectLabel ?? ""}
-      onChange={(e) => handleChange("customProjectLabel", e.target.value)}
-      disabled={mode === "view"}
-      placeholder="e.g. Dance Floors"
-      className="w-1/2 px-3 py-2 border rounded-lg text-sm disabled:bg-transparent disabled:border-transparent"
-    />
-  </div>
-
-  <div className="grid grid-cols-2 gap-4">
-    {numberInput("Min", "customPricePerSfMin", "$")}
-    {numberInput("Max", "customPricePerSfMax", "$")}
-  </div>
-</div>
-
-          {/* COMMERCIAL PRICING */}
-<div className="bg-gray-50 rounded-lg p-4">
-  <h3 className="font-bold text-gray-900 mb-3">
-    Commercial Pricing (per sq ft)
-  </h3>
-  <div className="grid grid-cols-2 gap-4">
-    {numberInput("Min", "commercialPricePerSfMin", "$")}
-    {numberInput("Max", "commercialPricePerSfMax", "$")}
-  </div>
-</div>
-
+          {/* PRICING BY SPACE */}
+          {renderSpacePricing('garage', 'Garage')}
+          {renderSpacePricing('patio', 'Patio')}
+          {renderSpacePricing('basement', 'Basement')}
+          {renderSpacePricing('commercial', 'Commercial')}
+          {renderSpacePricing('custom', settingsForm.customProjectLabel || 'Custom')}
 
           {/* CONDITION MULTIPLIERS */}
           <div className="bg-gray-50 rounded-lg p-4">
@@ -496,11 +482,10 @@ if (!response.ok) {
         {/* FOOTER */}
         <div className="border-t px-6 py-4 flex justify-between">
           <button
-            onClick={mode === "view" ? onClose : handleSave}
-            disabled={mode !== "view" && saving}
+            onClick={onClose}
             className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 font-semibold"
           >
-            Save & Exit
+            Cancel
           </button>
           {mode === "view" ? (
             <button
