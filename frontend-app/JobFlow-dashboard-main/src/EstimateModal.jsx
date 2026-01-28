@@ -3,11 +3,32 @@
 // Version: v1.6 – Fixed garage display formatting (1-4 car garage)
 // ============================================================================
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
 
 export default function EstimateModal({ estimate, onClose }) {
   if (!estimate) return null;
+
+  const [customLabels, setCustomLabels] = useState({
+    projectLabel: "Custom",
+    finishLabel: "Custom"
+  });
+
+  useEffect(() => {
+    async function loadCustomLabels() {
+      try {
+        const { apiRequest } = await import("./api.js");
+        const config = await apiRequest(`/estimator/config?company_id=${estimate.company_id}`);
+        setCustomLabels({
+          projectLabel: config.custom_project_label || "Custom",
+          finishLabel: config.custom_finish_label || "Custom"
+        });
+      } catch (err) {
+        console.error("Failed to load custom labels:", err);
+      }
+    }
+    if (estimate?.company_id) loadCustomLabels();
+  }, [estimate?.company_id]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -31,7 +52,7 @@ export default function EstimateModal({ estimate, onClose }) {
     return `$${Number(min).toLocaleString()} - $${Number(max).toLocaleString()}`;
   };
 
-  // Format project type: garage_1 -> "1 Car Garage", garage_2 -> "2 Car Garage", etc.
+// Format project type: garage_1 -> "1 Car Garage", garage_2 -> "2 Car Garage", etc.
   const formatProjectType = (type) => {
     if (!type) return "N/A";
     
@@ -39,6 +60,11 @@ export default function EstimateModal({ estimate, onClose }) {
     if (type.startsWith("garage_")) {
       const carCount = type.split("_")[1];
       return `${carCount} Car Garage`;
+    }
+    
+    // Handle custom with custom label
+    if (type === "custom") {
+      return customLabels.projectLabel;
     }
     
     // For other types (patio, basement, commercial), capitalize first letter
@@ -57,10 +83,11 @@ export default function EstimateModal({ estimate, onClose }) {
     console.error("Error parsing price ranges:", e);
   }
 
-  // Extract individual price ranges - correct field names from DB
+// Extract individual price ranges - correct field names from DB
   const solidColor = priceRanges.solid || {};
   const flake = priceRanges.flake || {};
   const metallics = priceRanges.metallic || {};
+  const custom = priceRanges.custom || {};
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center">
@@ -160,12 +187,22 @@ export default function EstimateModal({ estimate, onClose }) {
                 </div>
               </div>
 
-              {/* Metallics */}
-              <div className="flex justify-between items-center">
+{/* Metallics */}
+              <div className="flex justify-between items-center border-b pb-2">
                 <div className="font-semibold text-gray-900">Metallics</div>
                 <div className="font-bold text-gray-900">
                   {metallics.min && metallics.max
                     ? formatPrice(metallics.min, metallics.max)
+                    : "N/A"}
+                </div>
+              </div>
+
+              {/* Custom Finish */}
+              <div className="flex justify-between items-center">
+                <div className="font-semibold text-gray-900">{customLabels.finishLabel}</div>
+                <div className="font-bold text-gray-900">
+                  {custom.min && custom.max
+                    ? formatPrice(custom.min, custom.max)
                     : "N/A"}
                 </div>
               </div>
