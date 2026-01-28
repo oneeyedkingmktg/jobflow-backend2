@@ -30,7 +30,7 @@ console.log(
 const express = require("express");
 const cors = require("cors");
 const { initializeFirebase } = require('./config/firebase');
-
+const estimatorPricingRoutes = require('./routes/estimatorPricing');
 const { authenticateToken } = require("./middleware/auth");
 
 // ============================================================================
@@ -77,6 +77,7 @@ app.use("/api/webhooks", webhookRoutes); // NEW: GHL contact sync webhook
 
 // 🔓 PUBLIC ESTIMATOR PREVIEW (MUST COME FIRST)
 app.use("/estimator/preview", estimatorRoutes);
+app.use('/api/estimator-pricing', estimatorPricingRoutes);
 
 // ============================================================================
 // PROTECTED ROUTES (JWT REQUIRED)
