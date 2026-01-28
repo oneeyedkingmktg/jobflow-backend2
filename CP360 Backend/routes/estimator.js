@@ -193,6 +193,7 @@ router.put("/config", async (req, res) => {
         pricing_info_box_stripe_color,
         
         custom_project_label,
+        custom_finish_label, 
         disclaimer_text,
         min_job_info_text,
         standard_info_text,
@@ -213,8 +214,8 @@ VALUES (
   $37,$38,
   $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
   $53,$54,$55,
-  $56,$57,$58,$59,$60,
-  $61,$62,$63,$64
+$56,$57,$58,$59,$60,
+$61,$62,$63,$64,$65
 )
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
@@ -284,6 +285,7 @@ VALUES (
         pricing_info_box_stripe_color = COALESCE(EXCLUDED.pricing_info_box_stripe_color, estimator_configs.pricing_info_box_stripe_color),
         
         custom_project_label = COALESCE(EXCLUDED.custom_project_label, estimator_configs.custom_project_label),
+        custom_finish_label = COALESCE(EXCLUDED.custom_finish_label, estimator_configs.custom_finish_label), 
         disclaimer_text = COALESCE(EXCLUDED.disclaimer_text, estimator_configs.disclaimer_text),
         min_job_info_text = COALESCE(EXCLUDED.min_job_info_text, estimator_configs.min_job_info_text),
         standard_info_text = COALESCE(EXCLUDED.standard_info_text, estimator_configs.standard_info_text),
@@ -354,6 +356,7 @@ VALUES (
       b.pricing_info_box_background,
       b.pricing_info_box_stripe_color,
       b.custom_project_label,
+      b.custom_finish_label,
       b.disclaimer_text,
       b.min_job_info_text,
       b.standard_info_text,
