@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
+const db = require('../config/database');
 const { authenticateToken, requireSameCompany } = require('../middleware/auth');
 
 // GET all pricing configs for a company
@@ -12,7 +12,7 @@ router.get('/:companyId', authenticateToken, requireSameCompany, async (req, res
   console.log('  Company ID from URL:', companyId);
 
   try {
-    const result = await pool.query(
+    const result = await db.query(
       `SELECT * FROM estimator_pricing_configs 
        WHERE company_id = $1 
        ORDER BY space_type, finish_type`,
@@ -42,46 +42,35 @@ router.post('/:companyId', authenticateToken, requireSameCompany, async (req, re
       return res.status(400).json({ error: 'configs must be an array' });
     }
 
-    const client = await pool.connect();
+await db.transaction(async (client) => {
+  // Upsert each config (insert or update if exists)
+  for (const config of configs) {
+    const { space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled } = config;
 
-    try {
-      await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO estimator_pricing_configs 
+       (company_id, space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       ON CONFLICT (company_id, space_type, finish_type)
+       DO UPDATE SET
+         min_price_per_sf = EXCLUDED.min_price_per_sf,
+         max_price_per_sf = EXCLUDED.max_price_per_sf,
+         enabled = EXCLUDED.enabled,
+         updated_at = CURRENT_TIMESTAMP`,
+      [companyId, space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled]
+    );
+  }
+});
 
-      // Upsert each config (insert or update if exists)
-      for (const config of configs) {
-        const { space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled } = config;
+// Fetch and return updated configs
+const result = await db.query(
+  `SELECT * FROM estimator_pricing_configs 
+   WHERE company_id = $1 
+   ORDER BY space_type, finish_type`,
+  [companyId]
+);
 
-        await client.query(
-          `INSERT INTO estimator_pricing_configs 
-           (company_id, space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-           ON CONFLICT (company_id, space_type, finish_type)
-           DO UPDATE SET
-             min_price_per_sf = EXCLUDED.min_price_per_sf,
-             max_price_per_sf = EXCLUDED.max_price_per_sf,
-             enabled = EXCLUDED.enabled,
-             updated_at = CURRENT_TIMESTAMP`,
-          [companyId, space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled]
-        );
-      }
-
-      await client.query('COMMIT');
-
-      // Fetch and return updated configs
-      const result = await client.query(
-        `SELECT * FROM estimator_pricing_configs 
-         WHERE company_id = $1 
-         ORDER BY space_type, finish_type`,
-        [companyId]
-      );
-
-      res.json({ success: true, configs: result.rows });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+res.json({ success: true, configs: result.rows });
   } catch (error) {
     console.error('Error saving estimator pricing configs:', error);
     res.status(500).json({ error: 'Failed to save pricing configs' });
