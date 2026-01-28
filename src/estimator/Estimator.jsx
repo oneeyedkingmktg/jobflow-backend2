@@ -45,6 +45,33 @@ export default function Estimator() {
   const [modalSf, setModalSf] = useState("");
   const [sizeError, setSizeError] = useState("");
 
+// Wait for config to load
+  if (!config) {
+    return <div>Loading...</div>;
+  }
+
+  // No company parameter OR estimator not enabled - show promo
+  if (!companyId || !config.is_active) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 text-center">
+        <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
+        <img 
+          src="https://storage.googleapis.com/msgsndr/34aDq5td6waKO9PI60IX/media/695d5f8ac5c3f8ba328bae3b.png" 
+          alt="CoatingPro360" 
+          className="w-64 h-64 mx-auto mb-6"
+        />
+        <a 
+          href="https://coatingpro360.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 text-xl font-semibold underline"
+        >
+          Visit CoatingPro360.com
+        </a>
+      </div>
+    );
+  }
+
   // Modal handlers
   function openSizeModal(nextType) {
     setPendingProjectType(nextType);
@@ -114,7 +141,11 @@ export default function Estimator() {
       // 1️⃣ Get estimate preview
       console.log("🔍 Company ID from URL:", companyId);
       
-      const previewRes = await fetch("/estimator/preview", {
+const previewRes = await fetch("https://api.coatingpro360.com/estimator/preview", {
+
+
+
+
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -145,7 +176,7 @@ const leadData = {
   project_type: projectType,
   lead_source: "estimator",
   referral_source: "estimator",
-  status: "lead",
+  status: "status_pre_lead",
   // 🆕 ADD ESTIMATE DATA
   estimate: {
     project_type: projectType,
@@ -164,15 +195,25 @@ const leadData = {
       console.log("🚀 SENDING LEAD DATA WITH ESTIMATE:", leadData);
 
       // 2️⃣ Create lead (now includes estimate data)
-      const leadRes = await fetch("/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leadData)
-      });
+const leadRes = await fetch("https://api.coatingpro360.com/leads", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(leadData)
+});
+
 
       console.log("📡 LEAD RESPONSE STATUS:", leadRes.status);
       
-      const leadResData = await leadRes.json();
+let leadResData;
+const leadText = await leadRes.text();
+
+try {
+  leadResData = JSON.parse(leadText);
+} catch (e) {
+  console.error("❌ Lead response not JSON:", leadText);
+  throw new Error("Lead API did not return JSON");
+}
+
       console.log("📦 LEAD RESPONSE DATA:", leadResData);
 
       if (!leadRes.ok) {
