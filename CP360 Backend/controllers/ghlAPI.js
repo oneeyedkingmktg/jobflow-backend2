@@ -911,6 +911,11 @@ async function addAppointmentNote(company, appointmentId, bodyText) {
 module.exports = {
   syncLeadCalendarEvent,
 syncLeadToGHL: async function (lead, company) {
+  if (process.env.NODE_ENV !== "production") {
+    console.log("🚫 GHL sync skipped (local/dev environment)");
+    return;
+  }
+
     try {
       // ==========================================
       // 1️⃣ FETCH LEAD WITH ESTIMATOR DATA
