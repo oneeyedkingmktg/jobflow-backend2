@@ -55,6 +55,16 @@ disclaimerText: "",
 minJobInfoText: "",
 standardInfoText: "",
 
+// Finish-specific descriptions (Results page)
+solidFinishDescription: "",
+flakeFinishDescription: "",
+metallicFinishDescription: "",
+customFinishDescription: "",
+
+// Finish label for the 4th tab
+customFinishLabel: "",
+
+
 // Commercial pricing
 commercialPricePerSfMin: null,
 commercialPricePerSfMax: null,
@@ -127,17 +137,25 @@ setForm({
 disclaimerText: data.disclaimer_text ?? "",
 minJobInfoText: data.min_job_info_text ?? "",
 standardInfoText: data.standard_info_text ?? "",
+// Finish-specific descriptions
+solidFinishDescription: data.solid_finish_description ?? "",
+flakeFinishDescription: data.flake_finish_description ?? "",
+metallicFinishDescription: data.metallic_finish_description ?? "",
+customFinishDescription: data.custom_finish_description ?? "",
+
+// Finish label for 4th tab
+customFinishLabel: data.custom_finish_label ?? "",
 
 // Commercial pricing
 commercialPricePerSfMin: data.commercial_price_per_sf_min ?? null,
 commercialPricePerSfMax: data.commercial_price_per_sf_max ?? null,
 
 
-  // Bottom CTA
-  nextStepsButtonText: data.next_steps_button_text ?? "",
-
-  // Redirect
-  tyUrlRedirect: data.ty_url_redirect ?? "",
+// Custom CTA Buttons
+  cta1Button: data.cta1_button ?? "",
+  cta1Link: data.cta1_link ?? "",
+  cta2Button: data.cta2_button ?? "",
+  cta2Link: data.cta2_link ?? "",
 });
 
       } catch (err) {
@@ -306,16 +324,30 @@ disclaimer_text: form.disclaimerText || null,
 min_job_info_text: form.minJobInfoText || null,
 standard_info_text: form.standardInfoText || null,
 
+// Finish-specific descriptions (Results page)
+solid_finish_description: form.solidFinishDescription || null,
+flake_finish_description: form.flakeFinishDescription || null,
+metallic_finish_description: form.metallicFinishDescription || null,
+custom_finish_description: form.customFinishDescription || null,
+
+// Finish label for 4th tab
+custom_finish_label: form.customFinishLabel || null,
+
+
 // Commercial pricing
 commercial_price_per_sf_min: form.commercialPricePerSfMin,
 commercial_price_per_sf_max: form.commercialPricePerSfMax,
 
 
-  // Bottom CTA
+// Bottom CTA (deprecated - keeping for backwards compatibility)
   next_steps_button_text: form.nextStepsButtonText || null,
-
-  // Redirect
   ty_url_redirect: form.tyUrlRedirect || null,
+  
+  // Custom CTA Buttons
+  cta1_button: form.cta1Button || null,
+  cta1_link: form.cta1Link || null,
+  cta2_button: form.cta2Button || null,
+  cta2_link: form.cta2Link || null,
 };
 
 
@@ -521,25 +553,61 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
 
   <div className="space-y-4">
     {textInput("Custom Floor Display Name", "customProjectLabel", "e.g. Dance Floors")}
-    {textArea("Disclaimer Text", "disclaimerText")}
     {textArea("Minimum Job Info Text", "minJobInfoText")}
     {textArea("Standard Info Text", "standardInfoText")}
+    
+    <hr className="my-4" />
+
+    {textInput(
+      "Custom Finish Tab Label",
+      "customFinishLabel",
+      "e.g. Faux Polish"
+    )}
+    
+    <hr className="my-4" />
+    
+    <h4 className="font-semibold text-gray-700 text-sm">Call-to-Action Buttons</h4>
+    <p className="text-xs text-gray-600 mb-2">These buttons appear below the price on the results page</p>
+    
+    {textInput("CTA Button 1 Text", "cta1Button", "e.g. Schedule In-Person Estimate")}
+    {textInput("CTA Button 1 Link", "cta1Link", "https://...")}
+    
+    {textInput("CTA Button 2 Text", "cta2Button", "e.g. View Our Gallery")}
+    {textInput("CTA Button 2 Link", "cta2Link", "https://...")}
+
+{textArea(
+  "Solid Finish Description (Results Page)",
+  "solidFinishDescription",
+  "Shown when Solid tab is selected",
+  4
+)}
+
+{textArea(
+  "Flake Finish Description (Results Page)",
+  "flakeFinishDescription",
+  "Shown when Flake tab is selected",
+  4
+)}
+
+{textArea(
+  "Metallic Finish Description (Results Page)",
+  "metallicFinishDescription",
+  "Shown when Metallic tab is selected",
+  4
+)}
+
+{textArea(
+  "Custom Finish Description (Results Page)",
+  "customFinishDescription",
+  "Shown when Custom tab is selected",
+  4
+)}
+
+
   </div>
 </div>
 
 
-{/* CALL TO ACTION */}
-<div className="bg-gray-50 rounded-lg p-4">
-  <h3 className="font-bold text-gray-900 mb-3">Call To Action</h3>
-
-  <div className="grid grid-cols-2 gap-4 mb-4">
-    {textInput("Final CTA Button Text", "nextStepsButtonText", "e.g. Next Steps")}
-  </div>
-
-  <div className="mt-4">
-    {textInput("Thank You Page Redirect URL", "tyUrlRedirect")}
-  </div>
-</div>
 
         </div>
 

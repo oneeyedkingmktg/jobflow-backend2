@@ -197,10 +197,20 @@ router.put("/config", async (req, res) => {
         disclaimer_text,
         min_job_info_text,
         standard_info_text,
-        next_steps_button_text,
+        solid_finish_description,
+        flake_finish_description,
+        metallic_finish_description,
+        custom_finish_description,
+
+next_steps_button_text,
 
         allow_commercial,
-        ty_url_redirect
+        ty_url_redirect,
+        
+        cta1_button,
+        cta1_link,
+        cta2_button,
+        cta2_link
       )
 VALUES (
   $1,$2,
@@ -214,9 +224,9 @@ VALUES (
   $37,$38,
   $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
   $53,$54,$55,
-$56,$57,$58,$59,$60,
-$61,$62,$63,$64,$65
-)
+$56,$57,$58,$59,$60,$61,$62,$63,$64,
+  $65,$66,$67,$68,$69,$70,$71,$72,$73
+  )
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
 
@@ -289,11 +299,18 @@ $61,$62,$63,$64,$65
         disclaimer_text = COALESCE(EXCLUDED.disclaimer_text, estimator_configs.disclaimer_text),
         min_job_info_text = COALESCE(EXCLUDED.min_job_info_text, estimator_configs.min_job_info_text),
         standard_info_text = COALESCE(EXCLUDED.standard_info_text, estimator_configs.standard_info_text),
+        solid_finish_description = COALESCE(EXCLUDED.solid_finish_description, estimator_configs.solid_finish_description),
+        flake_finish_description = COALESCE(EXCLUDED.flake_finish_description, estimator_configs.flake_finish_description),
+        metallic_finish_description = COALESCE(EXCLUDED.metallic_finish_description, estimator_configs.metallic_finish_description),
+        custom_finish_description = COALESCE(EXCLUDED.custom_finish_description, estimator_configs.custom_finish_description),
         next_steps_button_text = COALESCE(EXCLUDED.next_steps_button_text, estimator_configs.next_steps_button_text),
-
-        allow_commercial = COALESCE(EXCLUDED.allow_commercial, estimator_configs.allow_commercial),
+allow_commercial = COALESCE(EXCLUDED.allow_commercial, estimator_configs.allow_commercial),
         ty_url_redirect = COALESCE(EXCLUDED.ty_url_redirect, estimator_configs.ty_url_redirect),
-
+        
+cta1_button = EXCLUDED.cta1_button,
+cta1_link = EXCLUDED.cta1_link,
+cta2_button = EXCLUDED.cta2_button,
+cta2_link = EXCLUDED.cta2_link,
         updated_at = now()
     `;
 
@@ -360,9 +377,17 @@ $61,$62,$63,$64,$65
       b.disclaimer_text,
       b.min_job_info_text,
       b.standard_info_text,
-      b.next_steps_button_text,
+      b.solid_finish_description,
+      b.flake_finish_description,
+      b.metallic_finish_description,
+      b.custom_finish_description,
+b.next_steps_button_text,
       b.allow_commercial,
-      b.ty_url_redirect
+      b.ty_url_redirect,
+      b.cta1_button,
+      b.cta1_link,
+      b.cta2_button,
+      b.cta2_link
     ];
 
     console.log("SQL placeholders:", (sql.match(/\$/g) || []).length);
