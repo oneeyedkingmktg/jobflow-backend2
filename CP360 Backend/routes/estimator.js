@@ -307,10 +307,10 @@ $56,$57,$58,$59,$60,$61,$62,$63,$64,
 allow_commercial = COALESCE(EXCLUDED.allow_commercial, estimator_configs.allow_commercial),
         ty_url_redirect = COALESCE(EXCLUDED.ty_url_redirect, estimator_configs.ty_url_redirect),
         
-cta1_button = EXCLUDED.cta1_button,
-cta1_link = EXCLUDED.cta1_link,
-cta2_button = EXCLUDED.cta2_button,
-cta2_link = EXCLUDED.cta2_link,
+cta1_button = COALESCE(EXCLUDED.cta1_button, estimator_configs.cta1_button),
+cta1_link = COALESCE(EXCLUDED.cta1_link, estimator_configs.cta1_link),
+cta2_button = COALESCE(EXCLUDED.cta2_button, estimator_configs.cta2_button),
+cta2_link = COALESCE(EXCLUDED.cta2_link, estimator_configs.cta2_link),
         updated_at = now()
     `;
 
