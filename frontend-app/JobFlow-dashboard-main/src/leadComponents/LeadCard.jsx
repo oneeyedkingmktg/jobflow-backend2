@@ -1,10 +1,10 @@
 // File: src/leadComponents/LeadCard.jsx
-// Version: v1.2 – Added estimator lead indicator
+// Version: v1.3 – Fixed appointment time display to match modal
 
 import React from "react";
 import { STATUS_COLORS } from "../leadModalParts/statusConfig.js";
 import { getStatusBarText } from "./leadHelpers.js";
-import { formatInCompanyTimezone } from "../utils/timezone";
+import { formatDate, formatTime } from "../utils/formatting.js";
 
 
 
@@ -32,13 +32,10 @@ export default function LeadCard({ lead, onClick }) {
 if (lead.status === "appointment_set") {
   // ✅ Only format if we have a valid date (not null, undefined, or empty string)
   if (lead.appointmentDate && lead.appointmentDate !== "") {
-    const apptDisplay = formatInCompanyTimezone({
-      utcDate: lead.appointmentDate,
-      utcTime: lead.appointmentTime,
-      timezone: lead.timezone,
-      format: "datetime",
-    });
-
+    const dateStr = formatDate(lead.appointmentDate);
+    const timeStr = lead.appointmentTime ? formatTime(lead.appointmentTime) : "";
+    const apptDisplay = timeStr ? `${dateStr} ${timeStr}` : dateStr;
+    
     if (apptDisplay) {
       statusText = `Appointment Set — ${apptDisplay}`;
     }
@@ -49,12 +46,7 @@ if (lead.status === "appointment_set") {
 if (lead.status === "install_scheduled") {
   // ✅ Only format if we have a valid date (not null, undefined, or empty string)
   if (lead.installDate && lead.installDate !== "") {
-    const installDisplay = formatInCompanyTimezone({
-      utcDate: lead.installDate,
-      timezone: lead.timezone,
-      format: "date",
-    });
-
+    const installDisplay = formatDate(lead.installDate);
     const tentative = lead.installTentative ? " (tentative)" : "";
 
     if (installDisplay) {
