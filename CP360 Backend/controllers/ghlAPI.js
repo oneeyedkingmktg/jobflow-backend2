@@ -1003,7 +1003,7 @@ const createPayload = {
   endTime: endDateTime.toISOString(),
 
   // ✅ THIS is the field GHL actually displays
-  notes: description,
+  description: description,
 };
 
 
@@ -1021,6 +1021,7 @@ const updatePayload = {
   title,
   startTime: startDateTime.toISOString(),
   endTime: endDateTime.toISOString(),
+  description: description, 
 };
 
 
