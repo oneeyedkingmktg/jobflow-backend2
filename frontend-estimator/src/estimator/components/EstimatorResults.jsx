@@ -248,14 +248,9 @@ const infoBoxClass = useCustomStyles
 
       {/* Tabs at top like file folders */}
       <div className="flex justify-center gap-1">
-        {finishTabs.map((finish) => {
+{finishTabs.map((finish) => {
           if (!config) return null;
-
-          if (finish === "flake" && config.offers_flake === false) return null;
-          if (finish === "solid" && config.offers_solid === false) return null;
-          if (finish === "metallic" && config.offers_metallic === false) return null;
-          if (finish === "custom" && config.offers_custom === false) return null;
-
+          // Check if finish has pricing in new system
           if (!estimate || !estimate.allPriceRanges || !estimate.allPriceRanges[finish]) {
             return null;
           }
