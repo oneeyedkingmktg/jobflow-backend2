@@ -178,11 +178,10 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
         custom_finish_label: settingsForm.customFinishLabel || "Custom",
 
                 // Finish descriptions
-        solid_finish_description: settingsForm.solidFinishDescription || "",
-        flake_finish_description: settingsForm.flakeFinishDescription || "",
-        metallic_finish_description: settingsForm.metallicFinishDescription || "",
-        custom_finish_description: settingsForm.customFinishDescription || "",
-
+solid_finish_description: settingsForm.solidFinishDescription || undefined,
+        flake_finish_description: settingsForm.flakeFinishDescription || undefined,
+        metallic_finish_description: settingsForm.metallicFinishDescription || undefined,
+        custom_finish_description: settingsForm.customFinishDescription || undefined,
         // Auto-enable garage types if ANY garage finish is enabled
         allow_garage_1: hasGarageFinish,
         allow_garage_2: hasGarageFinish,
