@@ -212,9 +212,9 @@ export default function EstimateModal({ estimate, onClose }) {
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t">
-          <button
+<button
             onClick={onClose}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
+            className="w-full px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
           >
             Back
           </button>

@@ -1,19 +1,21 @@
 // ============================================================================
 // File: src/leadModalParts/LeadDetailsView.jsx
-// Version: v1.5 – Estimate + Upload buttons aligned
+// Version: v1.6 – Added Conversations button and modal
 // ============================================================================
-
 import React, { useState } from "react";
 import EstimateModal from "../EstimateModal.jsx";
+import ConversationModal from "./ConversationModal.jsx";
 
 export default function LeadDetailsView({
   form,
   onEdit,
   onUploadPhotos,
+  showConversations = false,
 }) {
-  const hasEstimate = form?.hasEstimate === true;
+const hasEstimate = form?.hasEstimate === true;
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
+  const [showConversationModal, setShowConversationModal] = useState(false);
 
   const loadEstimate = async () => {
     try {
@@ -103,6 +105,20 @@ export default function LeadDetailsView({
         </div>
       </div>
 
+{/* CONVERSATIONS BUTTON */}
+{showConversations && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowConversationModal(true);
+          }}
+          className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+        >
+          View Conversation History
+        </button>
+      )}
+
       {/* ONLINE ESTIMATE BUTTON */}
       {hasEstimate && (
         <button
@@ -111,11 +127,9 @@ export default function LeadDetailsView({
             e.stopPropagation();
             loadEstimate();
           }}
-          className="w-full mt-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white 
-                     rounded-xl px-5 py-4 shadow-sm hover:from-blue-700 hover:to-blue-800 
-                     transition font-bold"
+          className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
         >
-          Online Estimate Exists for this Lead
+          View Online Estimate
         </button>
       )}
 
@@ -126,18 +140,23 @@ export default function LeadDetailsView({
           e.stopPropagation();
           onUploadPhotos?.();
         }}
-        className="w-full mt-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white 
-                   rounded-xl px-5 py-4 shadow-sm hover:from-blue-700 hover:to-blue-800 
-                   transition font-bold"
+        className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
       >
-        Upload Photos
+        Photos and Files
       </button>
-
-      {/* ESTIMATE MODAL */}
+{/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (
         <EstimateModal
           estimate={estimateData}
           onClose={() => setShowEstimateModal(false)}
+        />
+      )}
+
+      {/* CONVERSATION MODAL */}
+      {showConversationModal && (
+        <ConversationModal
+          lead={form}
+          onClose={() => setShowConversationModal(false)}
         />
       )}
     </>
