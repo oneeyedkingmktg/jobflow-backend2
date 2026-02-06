@@ -289,7 +289,7 @@ router.put('/:id', requireRole('master', 'admin'), async (req, res) => {
     console.log('  ghl_appt_description_template:', sanitizedBody.ghl_appt_description_template?.substring(0, 50) + '...');
     console.log('  ghl_install_description_template:', sanitizedBody.ghl_install_description_template?.substring(0, 50) + '...');
 
-    const {
+const {
       company_name,
       name,
       phone,
@@ -301,7 +301,6 @@ router.put('/:id', requireRole('master', 'admin'), async (req, res) => {
       zip,
       suspended,
       google_drive_base_folder_id,
-
       ghl_api_key,
       ghlApiKey,
       ghl_location_id,
@@ -316,7 +315,7 @@ router.put('/:id', requireRole('master', 'admin'), async (req, res) => {
       ghl_install_title_template,
       ghl_appt_description_template,
       ghl_install_description_template,
-
+      show_conversations,
       estimator_enabled,
       estimatorEnabled,
 
@@ -430,12 +429,9 @@ const companyResult = await client.query(
   city = COALESCE($6, city),
   state = COALESCE($7, state),
   zip = COALESCE($8, zip),
-
   google_drive_base_folder_id = COALESCE($9, google_drive_base_folder_id),
-
   suspended = COALESCE($10, suspended),
   estimator_enabled = COALESCE($11, estimator_enabled),
-
   ghl_api_key = COALESCE($12, ghl_api_key),
   ghl_location_id = COALESCE($13, ghl_location_id),
   ghl_install_calendar = COALESCE($14, ghl_install_calendar),
@@ -446,10 +442,10 @@ const companyResult = await client.query(
   ghl_install_title_template = COALESCE($19, ghl_install_title_template),
   ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
   ghl_install_description_template = COALESCE($21, ghl_install_description_template),
-
-  billing_status = COALESCE($22, billing_status),
+  show_conversations = COALESCE($22, show_conversations),
+  billing_status = COALESCE($23, billing_status),
   updated_at = CURRENT_TIMESTAMP
- WHERE id = $23 AND deleted_at IS NULL
+ WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
 ,
 [
@@ -461,12 +457,9 @@ const companyResult = await client.query(
   city,                               // $6
   state,                              // $7
   zip,                                // $8
-
   google_drive_base_folder_id || null,// $9
-
   suspendedValue,                     // $10
   estimatorValue,                     // $11
-
   encryptedApiKey,                    // $12
   ghlLocationValue,                   // $13
   ghlInstallCalValue,                 // $14
@@ -477,9 +470,9 @@ const companyResult = await client.query(
   ghl_install_title_template || null, // $19
   ghl_appt_description_template || null,// $20
   ghl_install_description_template || null,// $21
-
-  billing_status,                     // $22
-  companyId                           // $23
+  show_conversations || false,        // $22
+  billing_status,                     // $23
+  companyId                           // $24
 ]
 
 );

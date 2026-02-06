@@ -609,4 +609,46 @@ router.get("/estimator/:leadId", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch estimate" });
   }
 });
+// ============================================================================
+// GET CONVERSATIONS FOR A LEAD
+// ============================================================================
+router.get("/:id/conversations", authenticateToken, async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Get lead with company info
+    const leadResult = await pool.query(
+      `SELECT l.*, c.ghl_location_id, c.ghl_api_key 
+       FROM leads l 
+       JOIN companies c ON l.company_id = c.id 
+       WHERE l.id = $1 AND l.deleted_at IS NULL`,
+      [leadId]
+    );
+    
+    if (leadResult.rows.length === 0) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+    
+    const lead = leadResult.rows[0];
+    
+    // Verify user has access
+    if (req.user.role !== "master" && lead.company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    if (!lead.ghl_contact_id) {
+      return res.json({ messages: [] });
+    }
+    
+const { getConversationMessages } = require("../controllers/ghlAPI");
+    const messages = await getConversationMessages(lead.ghl_contact_id, lead, limit);
+    
+    res.json({ messages });
+  } catch (error) {
+    console.error("Error fetching conversations:", error);
+    res.status(500).json({ error: "Failed to fetch conversations" });
+  }
+});
+
 module.exports = router;

@@ -272,6 +272,7 @@ const handleUploadPhotos = async () => {
   form={form}
   onEdit={() => setIsEditing(true)}
   onUploadPhotos={handleUploadPhotos}
+  showConversations={currentCompany?.showConversations || false}
 />
 
             )}

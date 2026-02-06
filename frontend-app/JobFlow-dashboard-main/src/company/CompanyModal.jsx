@@ -93,6 +93,7 @@ setGhlForm({
   ghlInstallTitleTemplate: "",
   ghlApptDescriptionTemplate: "",
   ghlInstallDescriptionTemplate: "",
+  showConversations: false,
 });
 
     setSuspendedTouched(false);
@@ -140,19 +141,19 @@ console.log("🧠 Initializing GHL form from company:", {
   ghl_install_calendar: company.ghl_install_calendar,
 });
 
-    setGhlForm({
-      ghlApiKey: company.ghl_api_key || "",
-      ghlLocationId: company.ghl_location_id || "",
-      ghlInstallCalendar: company.ghl_install_calendar || "",
-      ghlApptCalendar: company.ghl_appt_calendar || "",
-      ghlApptAssignedUser: company.ghl_appt_assigned_user || "",
-      ghlInstallAssignedUser: company.ghl_install_assigned_user || "",
-      ghlApptTitleTemplate: company.ghl_appt_title_template ?? "",
-      ghlInstallTitleTemplate: company.ghl_install_title_template ?? "",
-
-     ghlApptDescriptionTemplate: company.ghl_appt_description_template ?? "",
-ghlInstallDescriptionTemplate: company.ghl_install_description_template ?? "",
-    });
+setGhlForm({
+    ghlApiKey: company.ghlApiKey || "",
+    ghlLocationId: company.ghlLocationId || "",
+    ghlInstallCalendar: company.ghlInstallCalendar || "",
+    ghlApptCalendar: company.ghlApptCalendar || "",
+    ghlApptAssignedUser: company.ghlApptAssignedUser || "",
+    ghlInstallAssignedUser: company.ghlInstallAssignedUser || "",
+    ghlApptTitleTemplate: company.ghlApptTitleTemplate ?? "",
+    ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
+    ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
+    ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
+    showConversations: company.showConversations || false,
+  });
     
     console.log("🔍 setGhlForm called with data");
 
@@ -264,10 +265,13 @@ const handleSaveGHLKeys = async () => {
     if (ghlForm.ghlApptDescriptionTemplate) {
       payload.ghl_appt_description_template = ghlForm.ghlApptDescriptionTemplate;
     }
-    if (ghlForm.ghlInstallDescriptionTemplate) {
+if (ghlForm.ghlInstallDescriptionTemplate) {
       payload.ghl_install_description_template = ghlForm.ghlInstallDescriptionTemplate;
     }
-
+    
+    // Always include showConversations (boolean)
+    payload.show_conversations = ghlForm.showConversations || false;
+    
     await onSave(payload);
     setError("");
   } catch (err) {
@@ -632,10 +636,26 @@ const renderGHLKeys = () => {
               onChange={(e) => handleGhlChange("ghlInstallDescriptionTemplate", e.target.value)}
               placeholder="Customer: {{full_name}}&#10;Phone: {{phone}}&#10;Email: {{email}}&#10;&#10;Service Address:&#10;{{address}}&#10;{{city}}, {{state}} {{zip}}"
             />
-            <p className="text-xs text-gray-500 mt-1">
+<p className="text-xs text-gray-500 mt-1">
               Available fields: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
             </p>
           </div>
+        </div>
+
+        {/* Conversations Feature Toggle */}
+        <div className="border-t pt-4 mt-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ghlForm.showConversations}
+              onChange={(e) => handleGhlChange("showConversations", e.target.checked)}
+              className="w-5 h-5 text-blue-600 rounded"
+            />
+            <div>
+              <div className="font-semibold text-gray-700">Show Conversations Feature</div>
+              <div className="text-sm text-gray-500">Display message history button on lead cards</div>
+            </div>
+          </label>
         </div>
       </div>
     );
@@ -672,7 +692,7 @@ onClick={() => {
   setActiveSection("ghl");
   setSectionMode("edit");
 
-  setGhlForm({
+setGhlForm({
     ghlApiKey: company.ghlApiKey || "",
     ghlLocationId: company.ghlLocationId || "",
     ghlInstallCalendar: company.ghlInstallCalendar || "",
@@ -683,6 +703,7 @@ onClick={() => {
     ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
+    showConversations: company.showConversations || false,
   });
 }}
 

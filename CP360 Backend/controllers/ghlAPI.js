@@ -1433,13 +1433,41 @@ function alreadyCalendarSynced(lead, type) {
 
   },
 
-  fetchGHLContact: async function (contactId, company) {
+fetchGHLContact: async function (contactId, company) {
     if (!contactId || typeof contactId !== "string" || !contactId.trim()) {
       return null;
     }
-
     return await ghlRequest(company, `/contacts/${contactId.trim()}`, {
       method: "GET",
     });
+  },
+
+getConversationMessages: async function (contactId, company, limit = 20) {
+    if (!contactId || !company) {
+      throw new Error("Contact ID and company required");
+    }
+    
+    // Step 1: Get conversations for this contact
+    const convResponse = await ghlRequest(
+      company,
+      `/conversations/search?contactId=${contactId}&limit=5`,
+      { method: "GET" }
+    );
+    
+    const conversations = convResponse?.conversations || [];
+    
+    if (conversations.length === 0) {
+      return [];
+    }
+    
+    // Step 2: Get messages from the first conversation
+    const conversationId = conversations[0].id;
+    const msgResponse = await ghlRequest(
+      company,
+      `/conversations/${conversationId}/messages?limit=${limit}`,
+      { method: "GET" }
+    );
+    
+    return msgResponse?.messages || [];
   },
 };
