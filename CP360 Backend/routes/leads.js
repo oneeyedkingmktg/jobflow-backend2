@@ -189,21 +189,17 @@ const existingLeadResult = await pool.query(
       [companyId, normalizedPhone]
     );
 
-    const existingLead = existingLeadResult.rows[0];
-
+const existingLead = existingLeadResult.rows[0];
     if (existingLead) {
       console.log("✅ EXISTING LEAD FOUND - ID:", existingLead.id);
       console.log("📌 Will append estimate data only (no status change)");
-
       // Save estimate data if provided
       if (estimate) {
         console.log("💰 Saving estimate data for existing lead:", existingLead.id);
-
         const displayProjectType =
           estimate.length_ft && estimate.width_ft && estimate.project_type
             ? `${estimate.length_ft}' x ${estimate.width_ft}' ${estimate.project_type.charAt(0).toUpperCase() + estimate.project_type.slice(1)}`
             : estimate.project_type;
-
         try {
           await pool.query(
             `INSERT INTO estimator_leads (
@@ -230,34 +226,30 @@ const existingLeadResult = await pool.query(
             ]
           );
           console.log("✅ ESTIMATE INSERT SUCCESSFUL");
-
           await pool.query(
             `UPDATE leads SET has_estimate = true WHERE id = $1`,
             [existingLead.id]
           );
           console.log("✅ UPDATED has_estimate flag");
+
+          // Add estimator_lead tag in GHL (only after successful save)
+          const company = (
+            await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
+          ).rows[0];
+          if (company.ghl_api_key && existingLead.ghl_contact_id) {
+            try {
+              await applyStatusTags(existingLead.ghl_contact_id, "submitted_estimate", company);
+              console.log("✅ Applied submitted_estimate tag to existing contact");
+            } catch (tagError) {
+              console.error("❌ Failed to apply estimator_lead tag:", tagError.message);
+            }
+          }
         } catch (estimateError) {
           console.error("❌ ESTIMATE INSERT FAILED:", estimateError);
         }
       }
-
-      // Add estimator_lead tag in GHL (don't change status)
-      const company = (
-        await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
-      ).rows[0];
-
-      if (company.ghl_api_key && existingLead.ghl_contact_id) {
-        try {
-          
-          await applyStatusTags(existingLead.ghl_contact_id, "submitted_estimate", company);
-          console.log("✅ Applied submitted_estimate tag to existing contact");
-        } catch (tagError) {
-          console.error("❌ Failed to apply estimator_lead tag:", tagError.message);
-        }
-      }
-
-      return res.status(200).json({ 
-        lead: toCamel(existingLead), 
+      return res.status(200).json({
+        lead: toCamel(existingLead),
         existingLead: true,
         message: "Estimate appended to existing lead"
       });
