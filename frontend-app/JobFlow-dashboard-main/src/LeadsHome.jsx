@@ -169,13 +169,13 @@ const loadLeads = async () => {
   // --------------------------------------------------
 const counts = useMemo(
     () => ({
-      "Pre-Leads": leads.filter((l) => l.status === "status_pre_lead").length,
-      Leads: leads.filter((l) => l.status === "lead").length,
-      "Booked Appt": leads.filter((l) => l.status === "appointment_set").length,
-      Sold: leads.filter((l) => l.status === "sold").length,
-      "Not Sold": leads.filter((l) => l.status === "not_sold").length,
-      Completed: leads.filter((l) => l.status === "complete").length,
-      All: leads.filter((l) => l.status !== "status_junk").length,
+      "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead").length,
+      Leads: leads.filter((l) => !l.deletedAt && l.status === "lead").length,
+      "Booked Appt": leads.filter((l) => !l.deletedAt && l.status === "appointment_set").length,
+      Sold: leads.filter((l) => !l.deletedAt && l.status === "sold").length,
+      "Not Sold": leads.filter((l) => !l.deletedAt && l.status === "not_sold").length,
+      Completed: leads.filter((l) => !l.deletedAt && l.status === "complete").length,
+      All: leads.filter((l) => !l.deletedAt && l.status !== "status_junk").length,
       Deleted: leads.filter((l) => l.deletedAt).length,
     }),
     [leads]
