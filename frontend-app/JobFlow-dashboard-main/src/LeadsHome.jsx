@@ -74,6 +74,7 @@ const convertLeadFromBackend = (lead) => ({
   installTentative: lead.installTentative,
 
 hasEstimate: lead.hasEstimate === true,
+deletedAt: lead.deletedAt || lead.deleted_at,
 });
 
 const convertLeadToBackend = (lead) => ({
@@ -121,6 +122,7 @@ const convertLeadToBackend = (lead) => ({
 export default function LeadsHome() {
   const { currentCompany } = useCompany();
   const { user } = useAuth();
+  const isMasterAdmin = user?.role === "master";
 
   const [leads, setLeads] = useState([]);
   const [activeTab, setActiveTab] = useState("Leads");
@@ -133,13 +135,14 @@ export default function LeadsHome() {
   // --------------------------------------------------
   // Load leads
   // --------------------------------------------------
-  const loadLeads = async () => {
+const loadLeads = async () => {
     if (!currentCompany?.id) return;
 
     setLoading(true);
     try {
+      const includeDeleted = isMasterAdmin ? '&include_deleted=true' : '';
       const res = await apiRequest(
-        `/leads?company_id=${currentCompany.id}`
+        `/leads?company_id=${currentCompany.id}${includeDeleted}`
       );
 
       const rawLeads = Array.isArray(res)
@@ -173,10 +176,10 @@ const counts = useMemo(
       "Not Sold": leads.filter((l) => l.status === "not_sold").length,
       Completed: leads.filter((l) => l.status === "complete").length,
       All: leads.filter((l) => l.status !== "status_junk").length,
+      Deleted: leads.filter((l) => l.deletedAt).length,
     }),
     [leads]
   );
-
   // --------------------------------------------------
   // Filtering
   // --------------------------------------------------
@@ -187,9 +190,22 @@ const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       // Always exclude junk leads
       if (lead.status === "status_junk") return false;
+      
+      // Handle deleted leads visibility
+      if (activeTab === "Deleted") {
+        // Deleted tab: show ONLY deleted contacts
+        if (!lead.deletedAt) return false;
+      } else if (searchTerm) {
+        // When searching: master can see deleted, others cannot
+        if (lead.deletedAt && !isMasterAdmin) return false;
+      } else {
+        // Normal tabs (not searching): EXCLUDE deleted contacts
+        if (lead.deletedAt) return false;
+      }
 
       const matchesTab =
         activeTab === "All" ||
+        activeTab === "Deleted" ||
         (activeTab === "Pre-Leads" && lead.status === "status_pre_lead") ||
         (activeTab === "Leads" && lead.status === "lead") ||
         (activeTab === "Booked Appt" && lead.status === "appointment_set") ||
@@ -209,7 +225,7 @@ const matchesSearch =
 
       return matchesTab && matchesSearch;
     });
-  }, [leads, activeTab, searchTerm]);
+  }, [leads, activeTab, searchTerm, isMasterAdmin]);
 
   // --------------------------------------------------
   // Render
@@ -225,6 +241,7 @@ const matchesSearch =
         setActiveTab={setActiveTab}
         counts={counts}
         onRefresh={loadLeads}
+        isMasterAdmin={isMasterAdmin}
 onAddLead={() => {
 
   alert("Add Lead clicked! Company ID: " + currentCompany?.id);
@@ -257,7 +274,7 @@ onAddLead={() => {
     <div className="py-10 text-center text-gray-500">No leads found.</div>
   ) : (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {filteredLeads.map((lead) => (
+{filteredLeads.map((lead) => (
         <LeadCard
           key={lead.id}
           lead={lead}
@@ -265,6 +282,21 @@ onAddLead={() => {
             setSelectedLead(lead);
             setIsNewLead(false);
           }}
+          onReinstate={isMasterAdmin ? async (lead) => {
+            if (!confirm(`Reinstate ${lead.name}? This will restore the contact in both JobFlow and GoHighLevel.`)) {
+              return;
+            }
+            try {
+              await apiRequest(`/leads/${lead.id}/reinstate`, {
+                method: "POST"
+              });
+              alert("Contact reinstated successfully!");
+              await loadLeads();
+            } catch (error) {
+              console.error("Reinstate error:", error);
+              alert("Failed to reinstate contact");
+            }
+          } : null}
         />
       ))}
     </div>
@@ -274,6 +306,23 @@ onAddLead={() => {
 {(selectedLead || isNewLead) && !showPhoneLookup && (
   <LeadModal
           lead={selectedLead}
+          onReinstate={isMasterAdmin && selectedLead?.deletedAt ? async (lead) => {
+            if (!confirm(`Reinstate ${lead.name}? This will restore the contact in both JobFlow and GoHighLevel.`)) {
+              return;
+            }
+            try {
+              await apiRequest(`/leads/${lead.id}/reinstate`, {
+                method: "POST"
+              });
+              alert("Contact reinstated successfully!");
+              await loadLeads();
+              setSelectedLead(null);
+              setIsNewLead(false);
+            } catch (error) {
+              console.error("Reinstate error:", error);
+              alert("Failed to reinstate contact");
+            }
+          } : null}
 onSave={async (data) => {
   const backendData = convertLeadToBackend(data);
   const res = data.id

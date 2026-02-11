@@ -24,6 +24,7 @@ export default function LeadModal({
   onSave,
   onSaveAndExit,
   onDelete,
+  onReinstate,
   onClose,
 }) {
   const { currentCompany } = useCompany();
@@ -277,12 +278,13 @@ const handleUploadPhotos = async () => {
 
             )}
 
-            <LeadFooter
+<LeadFooter
               isEditing={isEditing}
               onSave={handleSave}
               onExit={handleSaveAndExit}
               onEdit={() => setIsEditing(true)}
               onDelete={() => onDelete(form)}
+              onReinstate={onReinstate ? () => onReinstate(form) : null}
               deleteConfirm={deleteConfirm}
               setDeleteConfirm={setDeleteConfirm}
               saving={saving}

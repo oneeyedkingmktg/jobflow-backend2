@@ -73,9 +73,9 @@ const toCamel = (row) => ({
   installDate: row.install_date,
   installTentative: row.install_tentative,
 
-  createdAt: row.created_at,
+createdAt: row.created_at,
   updatedAt: row.updated_at,
-
+  deletedAt: row.deleted_at,
   hasEstimate: row.has_estimate === true,
 });
 
@@ -105,18 +105,17 @@ router.get("/", async (req, res) => {
   console.log("🔍 GET /leads");
   console.log("📦 Query params:", req.query);
   console.log("═══════════════════════════════════\n");
-
   try {
     // ✅ FIX: GET requests use query params, not body
     const companyId = req.query.company_id;
-
+    const includeDeleted = req.query.include_deleted === 'true';
     console.log("✅ Company ID from query:", companyId);
-
+    console.log("✅ Include deleted:", includeDeleted);
     if (!companyId) {
       console.log("❌ Missing company_id in query");
       return res.status(400).json({ error: "company_id required" });
     }
-
+const deletedFilter = includeDeleted ? '' : 'AND l.deleted_at IS NULL';
 const result = await pool.query(
   `
   SELECT
@@ -125,7 +124,7 @@ const result = await pool.query(
   FROM leads l
   JOIN companies c ON c.id = l.company_id
   WHERE l.company_id = $1
-    AND l.deleted_at IS NULL
+    ${deletedFilter}
     AND l.status != 'status_junk'
   ORDER BY l.created_at DESC
   `,
@@ -642,5 +641,78 @@ const { getConversationMessages } = require("../controllers/ghlAPI");
     res.status(500).json({ error: "Failed to fetch conversations" });
   }
 });
+
+// ============================================================================
+// REINSTATE DELETED LEAD (Master Admin Only)
+// ============================================================================
+router.post("/:id/reinstate", async (req, res) => {
+  console.log("\n═══════════════════════════════════");
+  console.log("🔄 POST /leads/:id/reinstate");
+  console.log("═══════════════════════════════════\n");
+  
+  try {
+    const leadId = req.params.id;
+    
+    // Verify user is master admin
+    if (req.user.role !== "master") {
+      return res.status(403).json({ error: "Only master admin can reinstate contacts" });
+    }
+    
+    // Get the deleted lead
+    const leadResult = await pool.query(
+      `SELECT l.*, c.ghl_location_id, c.ghl_api_key
+       FROM leads l
+       JOIN companies c ON l.company_id = c.id
+       WHERE l.id = $1 AND l.deleted_at IS NOT NULL`,
+      [leadId]
+    );
+    
+    if (leadResult.rows.length === 0) {
+      return res.status(404).json({ error: "Deleted lead not found" });
+    }
+    
+    const lead = leadResult.rows[0];
+    
+// Step 1: Try to restore in GHL if we have GHL ID and API key
+    let ghlRestored = false;
+    if (lead.ghl_contact_id && lead.ghl_api_key) {
+      const { restoreGhlContact } = require("../controllers/ghlAPI");
+      const company = {
+        ghl_api_key: lead.ghl_api_key,
+        ghl_location_id: lead.ghl_location_id
+      };
+      const result = await restoreGhlContact(lead.ghl_contact_id, company);
+      if (result) {
+        ghlRestored = true;
+      } else {
+        console.log("⚠️ Contact not found in GHL, clearing ghl_contact_id");
+        // Clear invalid GHL ID so next sync creates new contact
+        await pool.query(
+          `UPDATE leads SET ghl_contact_id = NULL WHERE id = $1`,
+          [leadId]
+        );
+      }
+    }
+    
+    // Step 2: Remove deleted_at from database
+    await pool.query(
+      `UPDATE leads SET deleted_at = NULL WHERE id = $1`,
+      [leadId]
+    );
+    
+    console.log("✅ Lead reinstated:", leadId);
+    const message = ghlRestored 
+      ? "Contact reinstated successfully in JobFlow and GoHighLevel"
+      : "Contact reinstated in JobFlow (will sync to GoHighLevel on next update)";
+    res.json({ success: true, message });
+    
+  } catch (error) {
+    console.error("❌ Reinstate error:", error);
+    res.status(500).json({ error: "Failed to reinstate contact" });
+  }
+});
+
+module.exports = router;
+
 
 module.exports = router;

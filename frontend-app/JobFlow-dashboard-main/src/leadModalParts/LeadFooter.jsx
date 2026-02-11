@@ -13,6 +13,7 @@ export default function LeadFooter({
   deleteConfirm,
   setDeleteConfirm,
   onDelete,
+  onReinstate,
   saving = false,
 }) {
   return (
@@ -49,9 +50,18 @@ export default function LeadFooter({
         )}
       </div>
 
-      {/* DELETE */}
+{/* DELETE OR REINSTATE */}
       <div className="mt-4 flex justify-center">
-        {!deleteConfirm ? (
+        {onReinstate ? (
+          <button
+            type="button"
+            onClick={onReinstate}
+            disabled={saving}
+            className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
+          >
+            Reinstate Contact
+          </button>
+        ) : !deleteConfirm ? (
           <button
             type="button"
             onClick={() => setDeleteConfirm(true)}

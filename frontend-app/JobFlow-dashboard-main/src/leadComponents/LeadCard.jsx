@@ -23,8 +23,8 @@ function formatProjectType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-export default function LeadCard({ lead, onClick }) {
-  const headerColor = STATUS_COLORS[lead.status] || STATUS_COLORS.lead;
+export default function LeadCard({ lead, onClick, onReinstate }) {
+  const headerColor = lead.deletedAt ? "#6b7280" : STATUS_COLORS[lead.status] || STATUS_COLORS.lead;
   const cityState = [lead.city, lead.state].filter(Boolean).join(", ");
 
   let statusText = getStatusBarText(lead);
@@ -78,11 +78,22 @@ if (lead.status === "install_scheduled") {
         )}
       </div>
 
-      {/* CARD BODY */}
+{/* CARD BODY */}
       <div className="p-4 space-y-2">
         <h3 className="text-base font-bold text-gray-900 truncate">
           {lead.name || "Unnamed Lead"}
         </h3>
+        {lead.deletedAt && onReinstate && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onReinstate(lead);
+            }}
+            className="w-full mt-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+          >
+            Reinstate Contact
+          </button>
+        )}
 
         {(lead.buyerType || lead.projectType) && (
           <div className="flex items-center gap-2 text-xs mt-1">

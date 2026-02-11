@@ -15,8 +15,11 @@ export default function LeadSearchBar({
           placeholder="Search by name, phone or city"
           value={searchTerm}
 onChange={(e) => {
-  setSearchTerm(e.target.value);
-  setActiveTab("All");
+  const value = e.target.value;
+  setSearchTerm(value);
+  if (value) {
+    setActiveTab("All");
+  }
 }}
 
           className="w-full px-4 py-3 border rounded-lg shadow-sm"

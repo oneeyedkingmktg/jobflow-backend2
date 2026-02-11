@@ -1,13 +1,12 @@
 // LeadTabs.jsx – FIXED so non-status tabs do NOT require counts
-
 import React from "react";
-
 export default function LeadTabs({
   activeTab,
   setActiveTab,
   counts,
   onAddLead,
   onRefresh,
+  isMasterAdmin,
 }) {
   const tabs = [
     "Pre-Leads",
@@ -17,12 +16,13 @@ export default function LeadTabs({
     "Not Sold",
     "Completed",
     "All",
+    ...(isMasterAdmin ? ["Deleted"] : []),
     "+ Pre-Lead",
     "Calendar",
     "Sync Contacts",
   ];
 
-  const isStatusTab = (t) =>
+const isStatusTab = (t) =>
     [
       "Pre-Leads",
       "Leads",
@@ -31,6 +31,7 @@ export default function LeadTabs({
       "Not Sold",
       "Completed",
       "All",
+      "Deleted",
     ].includes(t);
 
   const handleClick = (t) => {

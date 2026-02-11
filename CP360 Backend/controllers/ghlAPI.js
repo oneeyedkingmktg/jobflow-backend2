@@ -1461,13 +1461,33 @@ getConversationMessages: async function (contactId, company, limit = 20) {
     }
     
     // Step 2: Get messages from the first conversation
-    const conversationId = conversations[0].id;
+const conversationId = conversations[0].id;
     const msgResponse = await ghlRequest(
       company,
       `/conversations/${conversationId}/messages?limit=${limit}`,
       { method: "GET" }
     );
-    
     return msgResponse?.messages || [];
+  },
+  
+restoreGhlContact: async function (contactId, company) {
+    console.log("🔄 Restoring GHL contact:", contactId);
+    
+    try {
+      const response = await ghlRequest(
+        company,
+        `/contacts/${contactId}`,
+        {
+          method: "PUT",
+          body: { deleted: false },
+        }
+      );
+      
+      console.log("✅ GHL contact restored");
+      return response;
+    } catch (error) {
+      console.error("❌ Error restoring GHL contact:", error);
+      return null;
+    }
   },
 };
