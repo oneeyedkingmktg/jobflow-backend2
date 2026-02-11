@@ -28,6 +28,7 @@ console.log(
 
 
 const express = require("express");
+const { startMonitoring } = require('./monitoring/scheduler');
 const cors = require("cors");
 const { initializeFirebase } = require('./config/firebase');
 const estimatorPricingRoutes = require('./routes/estimatorPricing');
@@ -113,6 +114,10 @@ app.listen(PORT, () => {
 ║        Environment: ${process.env.NODE_ENV || "development"}
 ╚════════════════════════════════════════╝
 `);
+  console.log('DEBUG - KEY_MONITOR_ENABLED:', process.env.KEY_MONITOR_ENABLED);
+  console.log('DEBUG - ALERT_EMAIL:', process.env.ALERT_EMAIL);
+  startMonitoring();
+
 });
 
 module.exports = app;
