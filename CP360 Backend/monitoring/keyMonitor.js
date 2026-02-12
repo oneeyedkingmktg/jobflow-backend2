@@ -69,27 +69,25 @@ async function sendDailySummary(noErrors) {
 }
 
 async function sendEmail(subject, body) {
-  const nodemailer = require('nodemailer');
-  
-  const transporter = nodemailer.createTransport({
+     const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
+    port: 465,
     secure: true,
     auth: {
       user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    },
-    tls: {
-      rejectUnauthorized: false
+      pass: process.env.SMTP_PASS,
     }
   });
-  
+
   await transporter.sendMail({
-    from: process.env.SMTP_USER,
-    to: ALERT_EMAIL,
+    from: process.env.EMAIL_FROM,
+   to: process.env.SMTP_USER,
+
     subject,
     text: body
   });
 }
+
+
 
 module.exports = { checkKeys };
