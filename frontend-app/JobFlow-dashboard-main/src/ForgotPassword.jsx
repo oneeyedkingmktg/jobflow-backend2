@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiRequest } from './api';
 
 export default function ForgotPassword({ onBack }) {
   const [email, setEmail] = useState('');
@@ -13,23 +14,15 @@ export default function ForgotPassword({ onBack }) {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const data = await apiRequest("/auth/forgot-password", {
+        method: "POST",
         body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage(data.message);
-        setEmail('');
-      } else {
-        setError(data.message || 'Unable to process request');
-      }
+      setMessage(data.message || "If that email exists, a reset link has been sent.");
+      setEmail('');
     } catch (err) {
-      setError('Unable to connect to server');
+      setError(err.message || "Unable to connect to server");
     } finally {
       setLoading(false);
     }
@@ -39,7 +32,7 @@ export default function ForgotPassword({ onBack }) {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h2 className="text-2xl font-bold text-center mb-6">Forgot Password</h2>
-        
+
         <p className="text-gray-600 text-sm mb-6 text-center">
           Enter your email address and we'll send you a link to reset your password.
         </p>
