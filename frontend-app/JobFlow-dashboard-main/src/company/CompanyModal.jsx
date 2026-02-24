@@ -48,9 +48,17 @@ export default function CompanyModal({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // MODAL STATE
+// MODAL STATE
   const [showEstimatorPricing, setShowEstimatorPricing] = useState(false);
   const [showEstimatorMaster, setShowEstimatorMaster] = useState(false);
+
+  // TRACKING FORM STATE
+  const [trackingForm, setTrackingForm] = useState({
+    google_base_tag: "",
+    meta_base_tag: "",
+    google_conversion_event: "",
+    meta_conversion_event: "",
+  });
 
   // Track checkbox interaction
   const [suspendedTouched, setSuspendedTouched] = useState(false);
@@ -156,6 +164,13 @@ setGhlForm({
   });
     
     console.log("🔍 setGhlForm called with data");
+
+setTrackingForm({
+      google_base_tag: company.googleBaseTag || company.google_base_tag || "",
+      meta_base_tag: company.metaBaseTag || company.meta_base_tag || "",
+      google_conversion_event: company.googleConversionEvent || company.google_conversion_event || "",
+      meta_conversion_event: company.metaConversionEvent || company.meta_conversion_event || "",
+    });
 
     setSuspendedTouched(false);
     setPrevCompanyId(company.id);
@@ -283,8 +298,92 @@ if (ghlForm.ghlInstallDescriptionTemplate) {
 };
 
   // ------------------------------------------------------------
+const handleSaveTracking = async () => {
+    if (saving) return;
+    try {
+      setSaving(true);
+      setError("");
+      const payload = {
+        name: form.name,
+        google_base_tag: trackingForm.google_base_tag || null,
+        meta_base_tag: trackingForm.meta_base_tag || null,
+        google_conversion_event: trackingForm.google_conversion_event || null,
+        meta_conversion_event: trackingForm.meta_conversion_event || null,
+      };
+      await onSave(payload);
+      setError("");
+    } catch (err) {
+      console.error("Tracking save error:", err);
+      setError(err.message || "Failed to save tracking codes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderTracking = () => (
+    <div className="space-y-5">
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-600 p-3 text-red-800 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 text-yellow-800 text-sm">
+        <strong>Conversion Tracking</strong>
+        <p className="mt-1">Paste tracking codes here. Base tags inject into the estimator &lt;head&gt;. Conversion events fire on form submit success.</p>
+      </div>
+
+      <div>
+        <div className={viewLabel}>GOOGLE / GA4 BASE TAG</div>
+        <p className="text-xs text-gray-500 mb-1">Full &lt;script&gt; block from Google Tag Manager or gtag.js setup.</p>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="4"
+          value={trackingForm.google_base_tag}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, google_base_tag: e.target.value }))}
+          placeholder={'<script async src="https://www.googletagmanager.com/gtag/js?id=AW-XXXXXXXXX"></script>'}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>META BASE TAG</div>
+        <p className="text-xs text-gray-500 mb-1">Full Facebook Pixel base &lt;script&gt; block.</p>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="4"
+          value={trackingForm.meta_base_tag}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, meta_base_tag: e.target.value }))}
+          placeholder={'<script>!function(f,b,e,v,n,t,s){...}fbq("init","XXXXXXXXXXXXXXX");</script>'}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>GOOGLE CONVERSION EVENT CODE</div>
+        <p className="text-xs text-gray-500 mb-1">Fires on form submit success. No &lt;script&gt; tags — event call only.</p>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="2"
+          value={trackingForm.google_conversion_event}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, google_conversion_event: e.target.value }))}
+          placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX', value: 875, currency: 'USD' });"}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>META CONVERSION EVENT CODE</div>
+        <p className="text-xs text-gray-500 mb-1">Fires on form submit success. No &lt;script&gt; tags — event call only.</p>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="2"
+          value={trackingForm.meta_conversion_event}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, meta_conversion_event: e.target.value }))}
+          placeholder={"fbq('track', 'Lead');"}
+        />
+      </div>
+    </div>
+  );
+
   // UI HELPERS
-  // ------------------------------------------------------------
   const sectionBtn = (active) =>
     `px-4 py-2 rounded-lg font-semibold text-sm transition ${
       active
@@ -722,13 +821,31 @@ setGhlForm({
   </button>
 )}
 {isMasterUser && (
-  <button
-    className={sectionBtn(false)}
-    onClick={() => setShowEstimatorMaster(true)}
-  >
-    Estimator Admin
-  </button>
-)}
+              <button
+                className={sectionBtn(false)}
+                onClick={() => setShowEstimatorMaster(true)}
+              >
+                Estimator Admin
+              </button>
+            )}
+
+{isMasterUser && (
+              <button
+                className={sectionBtn(activeSection === "tracking")}
+                onClick={() => {
+                  setActiveSection("tracking");
+                  setSectionMode("edit");
+setTrackingForm({
+                    google_base_tag: company.googleBaseTag || company.google_base_tag || "",
+                    meta_base_tag: company.metaBaseTag || company.meta_base_tag || "",
+                    google_conversion_event: company.googleConversionEvent || company.google_conversion_event || "",
+                    meta_conversion_event: company.metaConversionEvent || company.meta_conversion_event || "",
+                  });
+                }}
+              >
+                Tracking
+              </button>
+            )}
 
 
 
@@ -748,7 +865,8 @@ setGhlForm({
 
           <div className="flex-1 overflow-y-auto px-6 py-5">
             {activeSection === "info" && renderCompanyInfo()}
-            {activeSection === "ghl" && renderGHLKeys()}
+{activeSection === "ghl" && renderGHLKeys()}
+            {activeSection === "tracking" && renderTracking()}
 {activeSection === "users" && (
   <UsersHome
     scopedCompany={company}
@@ -788,13 +906,23 @@ setGhlForm({
               </button>
             )}
 
-            {activeSection === "ghl" && (
+{activeSection === "ghl" && (
               <button
                 onClick={handleSaveGHLKeys}
                 className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold"
                 disabled={saving}
               >
                 {saving ? "Saving…" : "Save GHL Keys"}
+              </button>
+            )}
+
+            {activeSection === "tracking" && (
+              <button
+                onClick={handleSaveTracking}
+                className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold"
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save Tracking Codes"}
               </button>
             )}
           </div>

@@ -4,7 +4,7 @@
 // Version: v2.1.0 - FIXED: Now saves estimate to estimator_leads table
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useEstimatorConfig from "./hooks/useEstimatorConfig";
 import SizeModal from "./components/SizeModal";
 import EstimatorForm from "./components/EstimatorForm";
@@ -45,7 +45,42 @@ export default function Estimator() {
   const [modalSf, setModalSf] = useState("");
   const [sizeError, setSizeError] = useState("");
 
-// Wait for config to load
+// Inject base tracking tags into <head> once config loads
+  useEffect(() => {
+    if (!config) return;
+
+    if (config.google_base_tag) {
+      const div = document.createElement("div");
+      div.innerHTML = config.google_base_tag;
+      Array.from(div.querySelectorAll("script")).forEach((oldScript) => {
+        const newScript = document.createElement("script");
+        if (oldScript.src) {
+          newScript.src = oldScript.src;
+          newScript.async = true;
+        } else {
+          newScript.textContent = oldScript.textContent;
+        }
+        document.head.appendChild(newScript);
+      });
+    }
+
+    if (config.meta_base_tag) {
+      const div = document.createElement("div");
+      div.innerHTML = config.meta_base_tag;
+      Array.from(div.querySelectorAll("script")).forEach((oldScript) => {
+        const newScript = document.createElement("script");
+        if (oldScript.src) {
+          newScript.src = oldScript.src;
+          newScript.async = true;
+        } else {
+          newScript.textContent = oldScript.textContent;
+        }
+        document.head.appendChild(newScript);
+      });
+    }
+  }, [config]);
+
+  // Wait for config to load
   if (!config) {
     return <div>Loading...</div>;
   }
@@ -221,7 +256,26 @@ try {
         throw new Error(leadResData.error || "Failed to create lead");
       }
 
-      // 3️⃣ Show results
+// 3️⃣ Fire conversion events
+      try {
+        if (config.google_conversion_event) {
+          // eslint-disable-next-line no-new-func
+          new Function(config.google_conversion_event)();
+        }
+      } catch (e) {
+        console.warn("Google conversion event error:", e);
+      }
+
+      try {
+        if (config.meta_conversion_event) {
+          // eslint-disable-next-line no-new-func
+          new Function(config.meta_conversion_event)();
+        }
+      } catch (e) {
+        console.warn("Meta conversion event error:", e);
+      }
+
+      // 4️⃣ Show results
       setEstimate(previewData.estimate);
       setCompanyPhone(previewData.companyPhone || "");
       setScreen(2);

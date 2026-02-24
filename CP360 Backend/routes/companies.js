@@ -442,8 +442,12 @@ const companyResult = await client.query(
   ghl_install_title_template = COALESCE($19, ghl_install_title_template),
   ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
   ghl_install_description_template = COALESCE($21, ghl_install_description_template),
-  show_conversations = COALESCE($22, show_conversations),
+show_conversations = COALESCE($22, show_conversations),
   billing_status = COALESCE($23, billing_status),
+  google_base_tag = COALESCE($25, google_base_tag),
+  meta_base_tag = COALESCE($26, meta_base_tag),
+  google_conversion_event = COALESCE($27, google_conversion_event),
+  meta_conversion_event = COALESCE($28, meta_conversion_event),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -472,7 +476,11 @@ const companyResult = await client.query(
   ghl_install_description_template || null,// $21
   show_conversations || false,        // $22
   billing_status,                     // $23
-  companyId                           // $24
+  companyId,                          // $24
+  sanitizedBody.google_base_tag || null,        // $25
+  sanitizedBody.meta_base_tag || null,          // $26
+  sanitizedBody.google_conversion_event || null,// $27
+  sanitizedBody.meta_conversion_event || null   // $28
 ]
 
 );

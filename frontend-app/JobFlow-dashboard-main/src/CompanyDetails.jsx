@@ -19,8 +19,12 @@ const [formData, setFormData] = useState({
     ghl_appt_title_template: "",
     ghl_install_title_template: "",
     ghl_appt_description_template: "",
-    ghl_install_description_template: "",
+ghl_install_description_template: "",
     suspended: false,
+    google_base_tag: "",
+    meta_base_tag: "",
+    google_conversion_event: "",
+    meta_conversion_event: "",
   });
 
   const [error, setError] = useState("");
@@ -45,8 +49,12 @@ setFormData({
       ghl_appt_title_template: company.ghl_appt_title_template ?? "",
       ghl_install_title_template: company.ghl_install_title_template || "{{full_name}} - Install",
       ghl_appt_description_template: company.ghl_appt_description_template || "",
-      ghl_install_description_template: company.ghl_install_description_template || "",
+ghl_install_description_template: company.ghl_install_description_template || "",
       suspended: !!company.suspended,
+      google_base_tag: company.google_base_tag || "",
+      meta_base_tag: company.meta_base_tag || "",
+      google_conversion_event: company.google_conversion_event || "",
+      meta_conversion_event: company.meta_conversion_event || "",
     });
     setError("");
     setSuccess("");
@@ -369,6 +377,59 @@ setFormData({
                 Available: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
               </div>
             </div>
+          </div>
+        </div>
+
+{/* CONVERSION TRACKING */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="text-lg font-bold text-gray-800">Conversion Tracking</h3>
+
+          <div>
+            <label className="font-semibold">Google / GA4 Base Tag</label>
+            <p className="text-xs text-gray-500 mb-1">Paste the full &lt;script&gt; block from Google Tag Manager or gtag.js setup. Injected into the estimator &lt;head&gt;.</p>
+            <textarea
+              value={formData.google_base_tag}
+              onChange={(e) => handleChange("google_base_tag", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="4"
+              placeholder={'<script async src="https://www.googletagmanager.com/gtag/js?id=AW-XXXXXXXXX"></script>\n<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","AW-XXXXXXXXX");</script>'}
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold">Meta Base Tag</label>
+            <p className="text-xs text-gray-500 mb-1">Paste the full Facebook Pixel base &lt;script&gt; block. Injected into the estimator &lt;head&gt;.</p>
+            <textarea
+              value={formData.meta_base_tag}
+              onChange={(e) => handleChange("meta_base_tag", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="4"
+              placeholder={'<script>!function(f,b,e,v,n,t,s){...}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","XXXXXXXXXXXXXXX");fbq("track","PageView");</script>'}
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold">Google Conversion Event Code</label>
+            <p className="text-xs text-gray-500 mb-1">Fires on form submit success. Paste the gtag conversion or GA4 event line only — no &lt;script&gt; tags.</p>
+            <textarea
+              value={formData.google_conversion_event}
+              onChange={(e) => handleChange("google_conversion_event", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="2"
+              placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX', value: 875, currency: 'USD' });"}
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold">Meta Conversion Event Code</label>
+            <p className="text-xs text-gray-500 mb-1">Fires on form submit success. Paste the fbq Lead event line only — no &lt;script&gt; tags.</p>
+            <textarea
+              value={formData.meta_conversion_event}
+              onChange={(e) => handleChange("meta_conversion_event", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="2"
+              placeholder={"fbq('track', 'Lead');"}
+            />
           </div>
         </div>
 
