@@ -458,11 +458,11 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                   readOnly
                   rows={3}
                   className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
-                 value={`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  src="https://estimator.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>`}
+                 value={`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>`}
                 />
                 <button
                   onClick={() => {
-navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  src="https://estimator.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>`);                  }}
+navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>`);                  }}
                   className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
                 >
                   Copy
