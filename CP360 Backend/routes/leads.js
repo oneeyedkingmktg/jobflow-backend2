@@ -155,15 +155,28 @@ router.post("/", async (req, res) => {
   console.log("═══════════════════════════════════\n");
 
   try {
-    const userId = req.user?.id || null;
-    const companyId = req.body.company_id;
+const userId = req.user?.id || null;
+    let companyId = req.body.company_id;
 
-    console.log("✅ Company ID:", companyId);
+    console.log("✅ Company ID (raw):", companyId);
     console.log("✅ User ID:", userId);
 
     if (!companyId) {
       console.log("❌ Missing company_id");
       return res.status(400).json({ error: "company_id required" });
+    }
+
+    // Resolve estimator_code to numeric company_id if needed
+    if (isNaN(companyId)) {
+      const codeResult = await pool.query(
+        `SELECT id FROM companies WHERE estimator_code = $1 AND deleted_at IS NULL LIMIT 1`,
+        [companyId]
+      );
+      if (codeResult.rows.length === 0) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      companyId = codeResult.rows[0].id;
+      console.log("✅ Resolved estimator_code to company_id:", companyId);
     }
 
     const lead = req.body;

@@ -422,7 +422,7 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
             </div>
           )}
 
-          {/* ENABLE ESTIMATOR */}
+{/* ENABLE ESTIMATOR */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             {mode === "view"
               ? viewBlock("Enable Estimator", form.estimatorEnabled ? "Yes" : "No")
@@ -447,6 +447,30 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                 </label>
               )}
           </div>
+
+          {/* EMBED CODE */}
+          {company?.estimatorCode && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="font-bold text-gray-900 mb-2">Estimator Embed Code</h3>
+              <p className="text-xs text-gray-500 mb-2">Copy and paste this into any website or page to embed your estimator.</p>
+              <div className="relative">
+                <textarea
+                  readOnly
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+                  value={`<iframe src="https://estimator.coatingpro360.com?company=${company.estimatorCode}" width="100%" height="700" frameborder="0" scrolling="no"></iframe>`}
+                />
+                <button
+                  onClick={() => {
+navigator.clipboard.writeText(`<iframe src="https://estimator.coatingpro360.com?company=${company.estimatorCode}" width="100%" height="700" frameborder="0" scrolling="no"></iframe>`);
+                  }}
+                  className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* TYPOGRAPHY */}
           <div className="bg-gray-50 rounded-lg p-4">

@@ -10,6 +10,15 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+const generateEstimatorCode = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 router.use(authenticateToken);
 // 🔧 SURGICAL CHANGE: removed global master-only gate
 // router.use(requireRole('master'));
@@ -149,9 +158,11 @@ const {
         ? encryptApiKey(ghl_api_key)
         : null;
 
-    const client = await db.pool.connect();
+const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
+
+      const estimatorCode = generateEstimatorCode();
 
 const companyResult = await client.query(
         `INSERT INTO companies (
@@ -175,9 +186,10 @@ const companyResult = await client.query(
           ghl_appt_description_template,
           ghl_install_description_template,
           estimator_enabled,
-          billing_status
+          billing_status,
+          estimator_code
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
         RETURNING *`,
         [
           finalCompanyName,
@@ -200,7 +212,8 @@ const companyResult = await client.query(
           ghl_appt_description_template || null,
           ghl_install_description_template || null,
           estimator_enabled || false,
-          billing_status || 'active'
+          billing_status || 'active',
+          estimatorCode
         ]
       );
 

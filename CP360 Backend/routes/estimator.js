@@ -30,10 +30,23 @@ function buildDefaultEstimatorConfig(companyId) {
 router.get("/config", async (req, res) => {
   try {
     // FIXED: Accept both 'company' and 'company_id' for backwards compatibility
-    const companyId = req.query.company || req.query.company_id;
+    const rawCompany = req.query.company || req.query.company_id;
 
-    if (!companyId) {
+    if (!rawCompany) {
       return res.status(400).json({ error: "company parameter required" });
+    }
+
+    // Resolve estimator_code to numeric company_id if needed
+    let companyId = rawCompany;
+    if (isNaN(rawCompany)) {
+      const codeResult = await query(
+        `SELECT id FROM companies WHERE estimator_code = $1 AND deleted_at IS NULL LIMIT 1`,
+        [rawCompany]
+      );
+      if (codeResult.rows.length === 0) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      companyId = codeResult.rows[0].id;
     }
 
     console.log("Fetching estimator config for company:", companyId);
@@ -425,7 +438,18 @@ b.next_steps_button_text,
 
 router.post("/preview", async (req, res) => {
   try {
-    const companyId = req.body.company_id;
+    let companyId = req.body.company_id;
+
+    if (companyId && isNaN(companyId)) {
+      const codeResult = await query(
+        `SELECT id FROM companies WHERE estimator_code = $1 AND deleted_at IS NULL LIMIT 1`,
+        [companyId]
+      );
+      if (codeResult.rows.length === 0) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      companyId = codeResult.rows[0].id;
+    }
 
     const configResult = await query(
       `
