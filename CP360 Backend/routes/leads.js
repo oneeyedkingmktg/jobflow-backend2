@@ -273,7 +273,7 @@ const existingLead = existingLeadResult.rows[0];
     const { first, last, full } = parseName(lead.name || lead.full_name);
     console.log("📝 Parsed name:", { first, last, full });
 
-    const insertValues = [
+const insertValues = [
       companyId,
       userId,
       full,
@@ -300,12 +300,15 @@ const existingLead = existingLeadResult.rows[0];
       clean(lead.appointment_time),
       clean(lead.install_date),
       lead.install_tentative || false,
+      lead.utm_source || null,
+      lead.utm_medium || null,
+      lead.utm_campaign || null,
     ];
 
     console.log("💾 INSERT LEAD VALUES:", insertValues);
 
     const result = await pool.query(
-      `INSERT INTO leads (
+`INSERT INTO leads (
         company_id, created_by_user_id,
         name, full_name, first_name, last_name,
         phone, email, preferred_contact,
@@ -314,10 +317,12 @@ const existingLead = existingLeadResult.rows[0];
         lead_source, referral_source,
         status, not_sold_reason, notes, contract_price,
         appointment_date, appointment_time,
-        install_date, install_tentative
+        install_date, install_tentative,
+        utm_source, utm_medium, utm_campaign
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-        $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
+        $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
+        $27,$28,$29
       )
       RETURNING *`,
       insertValues

@@ -12,6 +12,9 @@ import EstimatorResults from "./components/EstimatorResults";
 
 const params = new URLSearchParams(window.location.search);
 const companyId = params.get("company");
+const utmSource = params.get("utm_source") || null;
+const utmMedium = params.get("utm_medium") || null;
+const utmCampaign = params.get("utm_campaign") || null;
 
 export default function Estimator() {
   // Config hook - handles fetching and style generation
@@ -212,6 +215,9 @@ const leadData = {
   lead_source: "estimator",
   referral_source: "estimator",
   status: "status_pre_lead",
+  utm_source: utmSource,
+  utm_medium: utmMedium,
+  utm_campaign: utmCampaign,
   // 🆕 ADD ESTIMATE DATA
   estimate: {
     project_type: projectType,
