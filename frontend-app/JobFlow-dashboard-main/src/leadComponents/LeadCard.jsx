@@ -61,21 +61,20 @@ if (lead.status === "install_scheduled") {
       className="bg-white rounded-xl shadow cursor-pointer hover:shadow-lg transition border overflow-hidden"
       onClick={onClick}
     >
-      {/* STATUS BAR */}
+{/* STATUS BAR */}
       <div
-        className="relative px-4 py-2 text-xs font-semibold text-white uppercase tracking-wide"
+        className="px-4 py-2 text-xs font-semibold text-white uppercase tracking-wide flex items-center justify-between"
         style={{ backgroundColor: headerColor }}
       >
-        {statusText}
-
-        {lead.hasEstimate === true && (
-          <span
-            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-80"
-            style={{ fontSize: "0.9em" }}
-          >
-            📐
-          </span>
-        )}
+        <span>{statusText}</span>
+        <div className="flex items-center gap-2">
+          {lead.pauseStatus === "Paused" && (
+            <span style={{ fontSize: "1.2em", color: "#000", fontWeight: "900" }}>⏸</span>
+          )}
+          {lead.hasEstimate === true && (
+            <span style={{ fontSize: "1em" }}>📐</span>
+          )}
+        </div>
       </div>
 
 {/* CARD BODY */}

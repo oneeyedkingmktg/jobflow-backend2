@@ -9,19 +9,24 @@ export default function LeadHeader({
   onText,
   onMap,
   onUploadPhotos,
+  isPaused,
 }) {
   const bgColor = STATUS_COLORS[status] || "#59687d"; // fallback color
-
   return (
     <div className="w-full">
       {/* TOP HEADER WITH NAME */}
       <div
-        className="px-6 py-4"
+        className="px-6 py-4 flex items-center gap-3"
         style={{ backgroundColor: bgColor }}
       >
         <h2 className="text-xl font-bold text-white">
           {name || "New Lead"}
         </h2>
+        {isPaused && (
+          <span className="flex items-center gap-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">
+            ⏸ PAUSED
+          </span>
+        )}
       </div>
 
       {/* ACTION BUTTONS */}

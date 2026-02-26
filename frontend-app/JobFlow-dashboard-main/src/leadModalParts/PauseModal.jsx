@@ -1,0 +1,140 @@
+// File: src/leadModalParts/PauseModal.jsx
+import React, { useState } from "react";
+
+export default function PauseModal({ form, onSave, onClose }) {
+  const isPaused = form.pauseStatus === "Paused";
+
+  const [toggleOn, setToggleOn] = useState(isPaused);
+  const [pauseUntil, setPauseUntil] = useState(form.pauseUntil || "");
+  const [resumeAction, setResumeAction] = useState(form.resumeAction || "Notify Only");
+  const [pauseNotes, setPauseNotes] = useState(form.pauseNotes || "");
+
+const handleSave = () => {
+    if (toggleOn && !pauseUntil) {
+      alert("Pause Until date is required.");
+      return;
+    }
+    if (toggleOn && !resumeAction) {
+      alert("Resume behavior selection is required.");
+      return;
+    }
+    if (toggleOn) {
+      onSave({
+        pauseStatus: "Paused",
+        pauseUntil,
+        resumeAction,
+        pauseNotes,
+      });
+    } else {
+      onSave({
+        pauseStatus: "Unpaused",
+        pauseUntil: null,
+        resumeAction: form.resumeAction,
+        pauseNotes: form.pauseNotes,
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+        <h3 className="text-lg font-semibold text-gray-900">Pause Lead</h3>
+
+        {/* TOGGLE */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">Paused</span>
+          <button
+            onClick={() => setToggleOn((v) => !v)}
+            className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+              toggleOn ? "bg-yellow-500" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                toggleOn ? "translate-x-8" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+
+        {toggleOn && (
+          <>
+            <p className="text-xs text-gray-500">
+              Lead will not get any further messages until the selected date.
+            </p>
+
+            {/* DATE */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Pause Until
+              </label>
+<input
+                type="date"
+                value={pauseUntil}
+                onChange={(e) => setPauseUntil(e.target.value)}
+                required
+                className={`w-full border rounded-lg px-3 py-2 text-sm ${!pauseUntil ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+              />
+              {!pauseUntil && (
+                <p className="text-xs text-red-500 mt-1">Required</p>
+              )}
+            </div>
+
+            {/* RESUME ACTION */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Resume Behavior
+              </label>
+              <div className="space-y-2">
+                {["Notify Only", "Notify & Restart Messages"].map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="resumeAction"
+                      value={opt}
+                      checked={resumeAction === opt}
+                      onChange={() => setResumeAction(opt)}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* NOTES */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={pauseNotes}
+                onChange={(e) => setPauseNotes(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                placeholder="Optional notes..."
+              />
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-800 hover:bg-gray-200 text-sm"
+          >
+            Cancel
+          </button>
+<button
+            onClick={handleSave}
+            disabled={toggleOn && !pauseUntil}
+            className="px-4 py-2 rounded-xl bg-yellow-500 text-white hover:bg-yellow-600 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

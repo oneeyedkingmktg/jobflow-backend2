@@ -77,6 +77,11 @@ createdAt: row.created_at,
   updatedAt: row.updated_at,
   deletedAt: row.deleted_at,
   hasEstimate: row.has_estimate === true,
+
+  pauseStatus: row.pause_status,
+  pauseUntil: row.pause_until,
+  resumeAction: row.resume_action,
+  pauseNotes: row.pause_notes,
 });
 
 function parseName(full) {
@@ -470,14 +475,18 @@ const result = await pool.query(
     appointment_date = $21,
     appointment_time = $22,
     install_date = $23,
-    install_tentative = COALESCE($24, install_tentative),
+install_tentative = COALESCE($24, install_tentative),
+    pause_status = $25,
+    pause_until = $26,
+    resume_action = $27,
+    pause_notes = $28,
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $25
+  WHERE id = $29
   RETURNING *`,
 
       [
@@ -505,6 +514,10 @@ const result = await pool.query(
         clean(lead.appointment_time),
         clean(lead.install_date),
         lead.install_tentative,
+        clean(lead.pause_status),
+        clean(lead.pause_until),
+        clean(lead.resume_action),
+        clean(lead.pause_notes),
         id,
       ]
     );

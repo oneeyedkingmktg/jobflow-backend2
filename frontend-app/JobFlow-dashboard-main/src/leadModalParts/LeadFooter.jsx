@@ -10,6 +10,7 @@ export default function LeadFooter({
   onSave,
   onEdit,
   onExit,
+  onPause,
   deleteConfirm,
   setDeleteConfirm,
   onDelete,
@@ -18,23 +19,32 @@ export default function LeadFooter({
 }) {
   return (
     <div className="pt-6 border-t border-gray-200">
-      <div className="flex items-center justify-between w-full">
-        {/* LEFT BUTTON */}
+      <div className="flex items-center justify-between w-full gap-3">
+        {/* SAVE & EXIT */}
         <button
           type="button"
           onClick={onExit}
           disabled={saving}
-          className="px-4 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save & Exit"}
         </button>
 
-        {/* RIGHT BUTTON */}
+        {/* PAUSE */}
+        <button
+          type="button"
+          onClick={onPause}
+          className="flex-1 py-3 bg-yellow-400 text-gray-900 rounded-xl font-semibold text-sm hover:bg-yellow-500 transition"
+        >
+          ⏸ Pause
+        </button>
+
+        {/* SAVE / EDIT */}
         {!isEditing ? (
           <button
             type="button"
             onClick={onEdit}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
           >
             Edit
           </button>
@@ -43,7 +53,7 @@ export default function LeadFooter({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="px-5 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
+            className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save"}
           </button>

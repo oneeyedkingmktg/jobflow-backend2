@@ -10,10 +10,30 @@ export default function LeadStatusBar({
   onOpenInstallModal,
 }) {
 
+  const [pauseBlockAction, setPauseBlockAction] = React.useState(null);
+
   const currentStatus = form.status || "lead";
 
   const setStatus = (status) => {
     setForm((prev) => ({ ...prev, status }));
+  };
+
+  const guardedSetStatus = (status) => {
+    if (form.pauseStatus === "Paused") {
+      setPauseBlockAction(() => () => setStatus(status));
+      return;
+    }
+    setStatus(status);
+  };
+
+  const handleUnpauseAndAdvance = () => {
+    setForm((prev) => ({ ...prev, pauseStatus: "Unpaused", pauseUntil: null }));
+    if (pauseBlockAction) pauseBlockAction();
+    setPauseBlockAction(null);
+  };
+
+  const handleKeepPaused = () => {
+    setPauseBlockAction(null);
   };
 
   const NEXT_STATUS = {
@@ -30,16 +50,27 @@ export default function LeadStatusBar({
     complete: "Archive",
   };
 
-  const handleProgression = () => {
+const handleProgression = () => {
     const next = NEXT_STATUS[currentStatus];
     if (!next) return;
 
-if (currentStatus === "appointment_set" && next === "sold") {
-  setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
-  if (onOpenInstallModal) onOpenInstallModal();
-  return;
-}
+    if (form.pauseStatus === "Paused") {
+      setPauseBlockAction(() => () => {
+        if (currentStatus === "appointment_set" && next === "sold") {
+          setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
+          if (onOpenInstallModal) onOpenInstallModal();
+          return;
+        }
+        setStatus(next);
+      });
+      return;
+    }
 
+    if (currentStatus === "appointment_set" && next === "sold") {
+      setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
+      if (onOpenInstallModal) onOpenInstallModal();
+      return;
+    }
 
     setStatus(next);
   };
@@ -48,73 +79,61 @@ const renderProgressButton = () => {
     if (currentStatus === "archived" || currentStatus === "status_junk" || currentStatus === "complete") return null;
 
     // Pre-Lead status: show Move to Lead + Mark as Junk
-    if (currentStatus === "status_pre_lead") {
+if (currentStatus === "status_pre_lead") {
       return (
-        <div className="flex gap-3">
-          <button
-            onClick={() => setStatus("lead")}
-            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+        <div className="flex gap-3 flex-1">
+         <button
+            onClick={() => guardedSetStatus("lead")}
+            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
             style={{ backgroundColor: STATUS_COLORS["lead"] }}
           >
             <span className="text-[10px] uppercase opacity-80">move to</span>
-            <span className="text-sm font-semibold">
-              {"→ Lead"}
-            </span>
+            <span className="text-sm font-semibold">{">>" + " Lead"}</span>
           </button>
 
           <button
-            onClick={() => setStatus("status_junk")}
-            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+            onClick={() => guardedSetStatus("status_junk")}
+            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
             style={{ backgroundColor: STATUS_COLORS["status_junk"] }}
           >
-            <span className="text-sm font-semibold">
-              Mark as Junk
-            </span>
+            <span className="text-sm font-semibold">Mark as Junk</span>
           </button>
         </div>
       );
     }
 
-    if (currentStatus === "not_sold") {
+if (currentStatus === "not_sold") {
       return (
         <button
-          onClick={() => setStatus("sold")}
-          className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+          onClick={() => guardedSetStatus("sold")}
+          className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
           style={{ backgroundColor: STATUS_COLORS["sold"] }}
         >
           <span className="text-[10px] uppercase opacity-80">move to</span>
-          <span className="text-sm font-semibold">
-            {"»» Sold"}
-          </span>
+          <span className="text-sm font-semibold">{"»» Sold"}</span>
         </button>
       );
     }
 
     if (currentStatus === "appointment_set") {
       return (
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-1">
           <button
             onClick={handleProgression}
-            className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
             style={{ backgroundColor: STATUS_COLORS["sold"] }}
           >
             <span className="text-[10px] uppercase opacity-80">move to</span>
-            <span className="text-sm font-semibold">
-              {"»» Sold"}
-            </span>
+            <span className="text-sm font-semibold">{"»» Sold"}</span>
           </button>
-
-<button
-  onClick={() => setForm((prev) => ({ ...prev, status: "not_sold" }))}
-  className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
-  style={{ backgroundColor: STATUS_COLORS["not_sold"] }}
->
-  <span className="text-[10px] uppercase opacity-80">move to</span>
-  <span className="text-sm font-semibold">
-    {"»» Not Sold"}
-  </span>
-</button>
-
+          <button
+            onClick={() => guardedSetStatus("not_sold")}
+            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
+            style={{ backgroundColor: STATUS_COLORS["not_sold"] }}
+          >
+            <span className="text-[10px] uppercase opacity-80">move to</span>
+            <span className="text-sm font-semibold">{"»» Not Sold"}</span>
+          </button>
         </div>
       );
     }
@@ -125,19 +144,41 @@ const renderProgressButton = () => {
     return (
       <button
         onClick={handleProgression}
-        className="px-5 py-3 rounded-lg text-white shadow flex flex-col"
+        className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
         style={{ backgroundColor: STATUS_COLORS[next] }}
       >
         <span className="text-[10px] uppercase opacity-80">move to</span>
-        <span className="text-sm font-semibold">
-          {"»» " + label}
-        </span>
+        <span className="text-sm font-semibold">{"»» " + label}</span>
       </button>
     );
   };
 
-  return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+return (
+    <>
+    {pauseBlockAction && (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Lead is paused.</h3>
+          <p className="text-sm text-gray-600 mb-6">Do you want to unpause them?</p>
+          <div className="flex gap-3">
+            <button
+              onClick={handleUnpauseAndAdvance}
+              className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
+            >
+              Unpause & Advance
+            </button>
+            <button
+              onClick={handleKeepPaused}
+              className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-800 font-semibold text-sm hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    <div className="flex items-center justify-between gap-3 w-full">
       <div className="flex flex-col">
         <div
           className="text-black text-[10px] uppercase font-semibold mb-1"
@@ -149,12 +190,7 @@ const renderProgressButton = () => {
         <div className="relative w-full sm:w-auto">
 <select
             value={form.status}
-            onChange={(e) =>
-              setForm((p) => ({
-                ...p,
-                status: e.target.value,
-              }))
-            }
+            onChange={(e) => guardedSetStatus(e.target.value)}
             className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
             style={{
               backgroundColor: STATUS_COLORS[form.status],
@@ -189,6 +225,7 @@ const renderProgressButton = () => {
       </div>
 
       {renderProgressButton()}
-    </div>
+</div>
+    </>
   );
 }

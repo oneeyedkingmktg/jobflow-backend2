@@ -18,6 +18,7 @@ import LeadFooter from "./leadModalParts/LeadFooter.jsx";
 import LeadModalsWrapper from "./leadModalParts/LeadModalsWrapper.jsx";
 import LeadStatusBar from "./leadModalParts/LeadStatusBar.jsx";
 import EstimateModal from "./EstimateModal.jsx";
+import PauseModal from "./leadModalParts/PauseModal.jsx";
 
 export default function LeadModal({
   lead,
@@ -52,7 +53,8 @@ export default function LeadModal({
   const [showDateModal, setShowDateModal] = useState(null);
   const [showApptModal, setShowApptModal] = useState(false);
   const [showNotSoldModal, setShowNotSoldModal] = useState(false);
-  const [showDiscardModal, setShowDiscardModal] = useState(false);
+const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
 
 
   const isDirty =
@@ -138,6 +140,10 @@ const cancelDiscardChanges = () => {
         "_blank"
       );
     }
+  };
+
+const handlePauseSave = (pauseFields) => {
+    setForm((prev) => ({ ...prev, ...pauseFields }));
   };
 
   const handleOpenEstimate = async () => {
@@ -232,6 +238,7 @@ const handleUploadPhotos = async () => {
   onCall={handleCall}
   onText={handleText}
   onMap={handleOpenMaps}
+  isPaused={form.pauseStatus === "Paused"}
 />
 
 
@@ -285,6 +292,7 @@ const handleUploadPhotos = async () => {
               onEdit={() => setIsEditing(true)}
               onDelete={() => onDelete(form)}
               onReinstate={onReinstate ? () => onReinstate(form) : null}
+              onPause={() => setShowPauseModal(true)}
               deleteConfirm={deleteConfirm}
               setDeleteConfirm={setDeleteConfirm}
               saving={saving}
@@ -292,6 +300,14 @@ const handleUploadPhotos = async () => {
           </div>
         </div>
       </div>
+
+      {showPauseModal && (
+        <PauseModal
+          form={form}
+          onSave={handlePauseSave}
+          onClose={() => setShowPauseModal(false)}
+        />
+      )}
 
       {showEstimateModal && estimateData && (
         <EstimateModal
