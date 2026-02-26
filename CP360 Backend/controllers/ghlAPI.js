@@ -589,9 +589,13 @@ const FIELD_IDS = {
     est_metallic_price_range: "est_metallic_price_range",
     est_custom_finish_range: "est_custom_finish_range", 
 jf_existing_coating: "jf_existing_coating",
-    utm_source: "utm_source",
+utm_source: "utm_source",
     utm_medium: "utm_medium",
-    utm_campaign: "utm_campaign"
+    utm_campaign: "utm_campaign",
+    pause_status: "pause_status",
+    pause_until: "pause_until",
+    resume_action: "resume_action",
+    pause_notes: "pause_notes"
   };
 
   // --------------------------------------------------
@@ -671,9 +675,13 @@ const normalizeStatus = (status) => {
   pushField("jf_last_synced_at", formatDateMMDDYYYY(lead.ghl_last_synced));
 pushField("install_tentative", yesNo(lead.install_tentative));
   pushField("jf_project_type", lead.project_type);
-  pushField("utm_source", lead.utm_source);
+pushField("utm_source", lead.utm_source);
   pushField("utm_medium", lead.utm_medium);
   pushField("utm_campaign", lead.utm_campaign);
+  pushField("pause_status", lead.pause_status);
+  pushField("pause_until", lead.pause_until);
+  pushField("resume_action", lead.resume_action);
+  pushField("pause_notes", lead.pause_notes);
 
 // --------------------
   // Estimator Fields
