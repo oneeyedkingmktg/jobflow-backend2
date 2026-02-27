@@ -37,7 +37,8 @@ export default function Estimator() {
   const [estimate, setEstimate] = useState(null);
   const [companyPhone, setCompanyPhone] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+const [submitting, setSubmitting] = useState(false);
+  const [outOfServiceArea, setOutOfServiceArea] = useState(false);
 
   // Size modal state
   const [showSizeModal, setShowSizeModal] = useState(false);
@@ -171,10 +172,17 @@ export default function Estimator() {
   }
 
   // Form submission
-  async function submitEstimate() {
+async function submitEstimate() {
+    setOutOfServiceArea(false);
+    const serviceZips = config?.service_area_zips;
+if (serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0) {
+      if (!serviceZips.map(String).includes(zip.trim())) {
+        setOutOfServiceArea(true);
+        return;
+      }
+    }
     setSubmitting(true);
     setError("");
-
     try {
       // 1️⃣ Get estimate preview
       console.log("🔍 Company ID from URL:", companyId);
@@ -319,6 +327,7 @@ try {
         />
 
         {screen === 1 && (
+          <>
           <EstimatorForm
             config={config}
             useCustomStyles={useCustomStyles}
@@ -345,8 +354,25 @@ try {
             setWidth={setWidth}
             setSquareFeet={setSquareFeet}
           />
+          {outOfServiceArea && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+                <div className="text-4xl mb-4">📍</div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Outside Service Area</h2>
+                <p className="text-gray-600 mb-6">
+                  We're sorry, but we don't currently service the zip code <strong>{zip}</strong>. Please contact us to learn more about our coverage area.
+                </p>
+                <button
+                  onClick={() => setOutOfServiceArea(false)}
+                  className="px-6 py-2 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-700"
+                >
+                  Close
+                </button>
+</div>
+            </div>
+          )}
+          </>
         )}
-
         {screen === 2 && estimate && (
           <EstimatorResults
             config={config}

@@ -92,26 +92,24 @@ router.get("/config", async (req, res) => {
 
 console.log("Created default config:", created.rows[0]);
 
-      const trackingResult2 = await query(
-        `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event
+const trackingResult2 = await query(
+        `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, service_area_zips
          FROM companies WHERE id = $1 LIMIT 1`,
         [companyId]
       );
       const tracking2 = trackingResult2.rows[0] || {};
-
       return res.json({ ...created.rows[0], ...tracking2 });
     }
 
 console.log("Config found for company:", companyId);
 
     // Fetch tracking fields from companies table
-    const trackingResult = await query(
-      `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event
+const trackingResult = await query(
+      `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, service_area_zips
        FROM companies WHERE id = $1 LIMIT 1`,
       [companyId]
     );
     const tracking = trackingResult.rows[0] || {};
-
     res.json({ ...result.rows[0], ...tracking });
   } catch (err) {
     console.error("Estimator config error:", err);

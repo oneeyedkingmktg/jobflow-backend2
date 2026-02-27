@@ -88,6 +88,7 @@ setForm({
   zip: "",
   timezone: "America/New_York",
   suspended: false,
+  service_area_zips: "",
 });
 
 setGhlForm({
@@ -132,14 +133,16 @@ setForm({
   address: company.address || "",
   city: company.city || "",
   state: company.state || "",
-  zip: company.zip || "",
+zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
   googleDriveBaseFolderId:
   company.googleDriveBaseFolderId ??
   company.google_drive_base_folder_id ??
   "",
-
+service_area_zips: Array.isArray(company.serviceAreaZips ?? company.service_area_zips)
+    ? (company.serviceAreaZips ?? company.service_area_zips).join(", ")
+    : (company.serviceAreaZips ?? company.service_area_zips) || "",
 });
 
 
@@ -175,7 +178,7 @@ setTrackingForm({
     setSuspendedTouched(false);
     setPrevCompanyId(company.id);
   }
-}, [isCreate, company, company?.id, company?.updatedAt]);
+}, [isCreate, company, company?.id, company?.updatedAt, company?.updated_at]);
 
 if (!form) return null;
   // ------------------------------------------------------------
@@ -206,6 +209,12 @@ if (!form) return null;
       setSaving(true);
       setError("");
 
+const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
+      const zipsArray = rawZips
+        .split(",")
+        .map((z) => z.trim())
+        .filter((z) => z.length > 0 && !isNaN(z));
+
       const payload = {
         name: form.name,
         phone: form.phone || null,
@@ -218,9 +227,7 @@ if (!form) return null;
         suspended: form.suspended,
         timezone: form.timezone,
         google_drive_base_folder_id: form.googleDriveBaseFolderId || null,
-
-
-
+        service_area_zips: zipsArray.length > 0 ? zipsArray : null,
       };
 
       await onSave(payload);
@@ -562,6 +569,24 @@ const handleSaveTracking = async () => {
   )}
 </div>
 
+        </div>
+
+<div className="pt-4 border-t">
+          <div className={viewLabel}>SERVICE AREA ZIP CODES</div>
+          {isEditing ? (
+            <>
+              <textarea
+                className={editBox}
+                rows={3}
+                value={form.service_area_zips}
+                onChange={(e) => handleChange("service_area_zips", e.target.value)}
+                placeholder="60457, 60458, 60459"
+              />
+              <div className="text-xs text-gray-500 mt-1">Enter zip codes separated by commas. Leave blank to allow all zip codes.</div>
+            </>
+          ) : (
+            <div className={viewValue}>{form.service_area_zips || "All zip codes allowed"}</div>
+          )}
         </div>
 
         {isMasterUser && sectionMode === "edit" && (
