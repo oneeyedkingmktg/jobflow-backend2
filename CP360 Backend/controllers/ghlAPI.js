@@ -434,19 +434,36 @@ async function ghlRequest(company, endpoint, options = {}) {
       data = raw;
     }
 
-    if (!res.ok) {
-      console.error("❌ [GHL API ERROR]", {
-        status: res.status,
-        url: url.toString(),
-        response: data
-      });
+      if (!res.ok) {
+        const isDuplicateContact =
+          res.status === 400 &&
+          data &&
+          typeof data === "object" &&
+          data.message &&
+          data.message.includes("does not allow duplicated contacts") &&
+          data.meta &&
+          data.meta.contactId;
 
-      const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
-      error.status = res.status;
-      error.response = data;
-      throw error;
-    }
+        if (isDuplicateContact) {
+          console.log("ℹ️ [GHL DUPLICATE CONTACT - EXPECTED UPSERT]", {
+            status: res.status,
+            url: url.toString(),
+            contactId: data.meta.contactId
+          });
+          return data;
+        }
 
+        console.error("❌ [GHL API ERROR]", {
+          status: res.status,
+          url: url.toString(),
+          response: data
+        });
+
+        const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
+        error.status = res.status;
+        error.response = data;
+        throw error;
+      }
     return data;
   } catch (err) {
     if (err.name === "AbortError") {
