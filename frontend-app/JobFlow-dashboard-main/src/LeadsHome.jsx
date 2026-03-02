@@ -73,13 +73,16 @@ const convertLeadFromBackend = (lead) => ({
   installDate: normalizeDate(lead.installDate),
   installTentative: lead.installTentative,
 
-hasEstimate: lead.hasEstimate === true,
-deletedAt: lead.deletedAt || lead.deleted_at,
+  hasEstimate: lead.hasEstimate === true,
+  deletedAt: lead.deletedAt || lead.deleted_at,
 
-pauseStatus: lead.pauseStatus || null,
-pauseUntil: lead.pauseUntil || null,
-resumeAction: lead.resumeAction || null,
-pauseNotes: lead.pauseNotes || null,
+  pauseStatus: lead.pauseStatus || null,
+  pauseUntil: lead.pauseUntil || null,
+  resumeAction: lead.resumeAction || null,
+  pauseNotes: lead.pauseNotes || null,
+
+  proceedWithAutomation:
+    lead.proceedWithAutomation ?? lead.proceed_with_automation ?? true,
 });
 
 const convertLeadToBackend = (lead) => ({
@@ -117,12 +120,14 @@ const convertLeadToBackend = (lead) => ({
   install_date: lead.installDate || null,
   install_tentative: lead.installTentative || false,
 
-has_estimate: lead.hasEstimate || false,
+  has_estimate: lead.hasEstimate || false,
 
   pause_status: lead.pauseStatus || null,
   pause_until: lead.pauseUntil || null,
   resume_action: lead.resumeAction || null,
   pause_notes: lead.pauseNotes || null,
+
+  proceed_with_automation: lead.proceedWithAutomation ?? null,
 });
 
 

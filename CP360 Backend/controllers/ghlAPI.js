@@ -587,15 +587,19 @@ const FIELD_IDS = {
     est_solid_price_range: "est_solid_price_range",
     est_flake_price_range: "est_flake_price_range",
     est_metallic_price_range: "est_metallic_price_range",
-    est_custom_finish_range: "est_custom_finish_range", 
-jf_existing_coating: "jf_existing_coating",
-utm_source: "utm_source",
+    est_custom_finish_range: "est_custom_finish_range",
+    jf_existing_coating: "jf_existing_coating",
+
+    utm_source: "utm_source",
     utm_medium: "utm_medium",
     utm_campaign: "utm_campaign",
+
     pause_status: "pause_status",
     pause_until: "pause_until",
     resume_action: "resume_action",
-    pause_notes: "pause_notes"
+    pause_notes: "pause_notes",
+
+    proceed_with_automation: "proceed_with_automation",
   };
 
   // --------------------------------------------------
@@ -678,10 +682,13 @@ pushField("install_tentative", yesNo(lead.install_tentative));
 pushField("utm_source", lead.utm_source);
   pushField("utm_medium", lead.utm_medium);
   pushField("utm_campaign", lead.utm_campaign);
+
   pushField("pause_status", lead.pause_status);
   pushField("pause_until", lead.pause_until);
   pushField("resume_action", lead.resume_action);
   pushField("pause_notes", lead.pause_notes);
+
+  pushField("proceed_with_automation", yesNo(lead.proceed_with_automation));
 
 // --------------------
   // Estimator Fields

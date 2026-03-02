@@ -1,4 +1,4 @@
-// LeadStatusBar.jsx (Updated FIXED — JSX-safe text)
+// LeadStatusBar.jsx (Updated — Completed Modal + proceedWithAutomation control)
 import React from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "./statusConfig.js";
 
@@ -11,6 +11,7 @@ export default function LeadStatusBar({
 }) {
 
   const [pauseBlockAction, setPauseBlockAction] = React.useState(null);
+  const [showCompleteModal, setShowCompleteModal] = React.useState(false);
 
   const currentStatus = form.status || "lead";
 
@@ -23,6 +24,13 @@ export default function LeadStatusBar({
       setPauseBlockAction(() => () => setStatus(status));
       return;
     }
+
+    // 🔒 Intercept move to Complete
+    if (status === "complete") {
+      setShowCompleteModal(true);
+      return;
+    }
+
     setStatus(status);
   };
 
@@ -34,6 +42,15 @@ export default function LeadStatusBar({
 
   const handleKeepPaused = () => {
     setPauseBlockAction(null);
+  };
+
+  const handleCompleteDecision = (proceed) => {
+    setForm((prev) => ({
+      ...prev,
+      status: "complete",
+      proceedWithAutomation: proceed
+    }));
+    setShowCompleteModal(false);
   };
 
   const NEXT_STATUS = {
@@ -50,7 +67,7 @@ export default function LeadStatusBar({
     complete: "Archive",
   };
 
-const handleProgression = () => {
+  const handleProgression = () => {
     const next = NEXT_STATUS[currentStatus];
     if (!next) return;
 
@@ -61,7 +78,7 @@ const handleProgression = () => {
           if (onOpenInstallModal) onOpenInstallModal();
           return;
         }
-        setStatus(next);
+        guardedSetStatus(next);
       });
       return;
     }
@@ -72,23 +89,27 @@ const handleProgression = () => {
       return;
     }
 
-    setStatus(next);
+    guardedSetStatus(next);
   };
 
-const renderProgressButton = () => {
-    if (currentStatus === "archived" || currentStatus === "status_junk" || currentStatus === "complete") return null;
+  const renderProgressButton = () => {
+    if (
+      currentStatus === "archived" ||
+      currentStatus === "status_junk" ||
+      currentStatus === "complete"
+    )
+      return null;
 
-    // Pre-Lead status: show Move to Lead + Mark as Junk
-if (currentStatus === "status_pre_lead") {
+    if (currentStatus === "status_pre_lead") {
       return (
         <div className="flex gap-3 flex-1">
-         <button
+          <button
             onClick={() => guardedSetStatus("lead")}
             className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
             style={{ backgroundColor: STATUS_COLORS["lead"] }}
           >
             <span className="text-[10px] uppercase opacity-80">move to</span>
-            <span className="text-sm font-semibold">{">>" + " Lead"}</span>
+            <span className="text-sm font-semibold">{">> Lead"}</span>
           </button>
 
           <button
@@ -102,7 +123,7 @@ if (currentStatus === "status_pre_lead") {
       );
     }
 
-if (currentStatus === "not_sold") {
+    if (currentStatus === "not_sold") {
       return (
         <button
           onClick={() => guardedSetStatus("sold")}
@@ -153,53 +174,82 @@ if (currentStatus === "not_sold") {
     );
   };
 
-return (
+  return (
     <>
-    {pauseBlockAction && (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Lead is paused.</h3>
-          <p className="text-sm text-gray-600 mb-6">Do you want to unpause them?</p>
-          <div className="flex gap-3">
-            <button
-              onClick={handleUnpauseAndAdvance}
-              className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
-            >
-              Unpause & Advance
-            </button>
-            <button
-              onClick={handleKeepPaused}
-              className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-800 font-semibold text-sm hover:bg-gray-200"
-            >
-              Cancel
-            </button>
+      {showCompleteModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Send Follow-Up?
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Do you want to send review and follow-up messages?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleCompleteDecision(true)}
+                className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => handleCompleteDecision(false)}
+                className="flex-1 py-2 rounded-xl bg-gray-200 text-gray-800 font-semibold text-sm hover:bg-gray-300"
+              >
+                No
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
-    <div className="flex items-center justify-between gap-3 w-full">
-      <div className="flex flex-col">
-        <div
-          className="text-black text-[10px] uppercase font-semibold mb-1"
-          style={{ paddingLeft: "25px" }}
-        >
-          CURRENT STATUS
-        </div>
+      )}
 
-        <div className="relative w-full sm:w-auto">
-<select
-            value={form.status}
-            onChange={(e) => guardedSetStatus(e.target.value)}
-            className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
-            style={{
-              backgroundColor: STATUS_COLORS[form.status],
-              color: "#FFFFFF",
-              height: "48px",
-              fontSize: "1.05rem",
-            }}
+      {pauseBlockAction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Lead is paused.</h3>
+            <p className="text-sm text-gray-600 mb-6">Do you want to unpause them?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleUnpauseAndAdvance}
+                className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
+              >
+                Unpause & Advance
+              </button>
+              <button
+                onClick={handleKeepPaused}
+                className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-800 font-semibold text-sm hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 w-full">
+        <div className="flex flex-col">
+          <div
+            className="text-black text-[10px] uppercase font-semibold mb-1"
+            style={{ paddingLeft: "25px" }}
           >
-{Object.keys(STATUS_LABELS).map((s) => (
+            CURRENT STATUS
+          </div>
+
+          <div className="relative w-full sm:w-auto">
+            <select
+              value={form.status}
+              onChange={(e) => guardedSetStatus(e.target.value)}
+              className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
+              style={{
+                backgroundColor: STATUS_COLORS[form.status],
+                color: "#FFFFFF",
+                height: "48px",
+                fontSize: "1.05rem",
+              }}
+            >
+              {Object.keys(STATUS_LABELS).map((s) => (
                 <option
                   key={s}
                   value={s}
@@ -213,19 +263,19 @@ return (
                   {STATUS_LABELS[s]}
                 </option>
               ))}
-          </select>
+            </select>
 
-          <div
-            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white"
-            style={{ fontSize: "18px" }}
-          >
-            ▼
+            <div
+              className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white"
+              style={{ fontSize: "18px" }}
+            >
+              ▼
+            </div>
           </div>
         </div>
-      </div>
 
-      {renderProgressButton()}
-</div>
+        {renderProgressButton()}
+      </div>
     </>
   );
 }

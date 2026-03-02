@@ -239,6 +239,7 @@ const handleUploadPhotos = async () => {
   onText={handleText}
   onMap={handleOpenMaps}
   isPaused={form.pauseStatus === "Paused"}
+  proceedWithAutomation={form.proceedWithAutomation}
 />
 
 

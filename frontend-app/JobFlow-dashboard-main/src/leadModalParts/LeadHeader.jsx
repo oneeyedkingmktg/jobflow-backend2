@@ -10,8 +10,13 @@ export default function LeadHeader({
   onMap,
   onUploadPhotos,
   isPaused,
+  proceedWithAutomation,
 }) {
-  const bgColor = STATUS_COLORS[status] || "#59687d"; // fallback color
+  const bgColor = STATUS_COLORS[status] || "#59687d";
+
+  const showFollowupSkipped =
+    status === "complete" && proceedWithAutomation === false;
+
   return (
     <div className="w-full">
       {/* TOP HEADER WITH NAME */}
@@ -22,9 +27,16 @@ export default function LeadHeader({
         <h2 className="text-xl font-bold text-white">
           {name || "New Lead"}
         </h2>
+
         {isPaused && (
           <span className="flex items-center gap-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">
             ⏸ PAUSED
+          </span>
+        )}
+
+        {showFollowupSkipped && (
+          <span className="flex items-center gap-1 bg-black/30 text-white text-xs font-bold px-2 py-1 rounded-full">
+            * Follow up Skipped
           </span>
         )}
       </div>
@@ -34,28 +46,26 @@ export default function LeadHeader({
         className="px-6 py-4 grid grid-cols-3 gap-3 w-full"
         style={{ backgroundColor: bgColor }}
       >
-<button
-  onClick={onCall}
-  className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
->
-  Call
-</button>
+        <button
+          onClick={onCall}
+          className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
+        >
+          Call
+        </button>
 
-<button
-  onClick={onText}
-  className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
->
-  Text
-</button>
+        <button
+          onClick={onText}
+          className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
+        >
+          Text
+        </button>
 
-<button
-  onClick={onMap}
-  className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
->
-  Maps
-</button>
-
-
+        <button
+          onClick={onMap}
+          className="flex-1 bg-white text-gray-800 py-2 rounded-lg shadow font-semibold text-sm hover:bg-gray-100"
+        >
+          Maps
+        </button>
       </div>
     </div>
   );

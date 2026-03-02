@@ -73,7 +73,7 @@ const toCamel = (row) => ({
   installDate: row.install_date,
   installTentative: row.install_tentative,
 
-createdAt: row.created_at,
+  createdAt: row.created_at,
   updatedAt: row.updated_at,
   deletedAt: row.deleted_at,
   hasEstimate: row.has_estimate === true,
@@ -82,6 +82,8 @@ createdAt: row.created_at,
   pauseUntil: row.pause_until,
   resumeAction: row.resume_action,
   pauseNotes: row.pause_notes,
+
+  proceedWithAutomation: row.proceed_with_automation
 });
 
 function parseName(full) {
@@ -308,6 +310,7 @@ const insertValues = [
       lead.utm_source || null,
       lead.utm_medium || null,
       lead.utm_campaign || null,
+      lead.proceed_with_automation ?? true
     ];
 
     console.log("💾 INSERT LEAD VALUES:", insertValues);
@@ -323,11 +326,12 @@ const insertValues = [
         status, not_sold_reason, notes, contract_price,
         appointment_date, appointment_time,
         install_date, install_tentative,
-        utm_source, utm_medium, utm_campaign
+        utm_source, utm_medium, utm_campaign,
+        proceed_with_automation
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
         $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-        $27,$28,$29
+        $27,$28,$29,$30
       )
       RETURNING *`,
       insertValues
@@ -475,18 +479,19 @@ const result = await pool.query(
     appointment_date = $21,
     appointment_time = $22,
     install_date = $23,
-install_tentative = COALESCE($24, install_tentative),
+    install_tentative = COALESCE($24, install_tentative),
     pause_status = $25,
     pause_until = $26,
     resume_action = $27,
     pause_notes = $28,
+    proceed_with_automation = COALESCE($29, proceed_with_automation),
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $29
+  WHERE id = $30
   RETURNING *`,
 
       [
@@ -518,6 +523,7 @@ install_tentative = COALESCE($24, install_tentative),
         clean(lead.pause_until),
         clean(lead.resume_action),
         clean(lead.pause_notes),
+        lead.proceed_with_automation ?? null,
         id,
       ]
     );
