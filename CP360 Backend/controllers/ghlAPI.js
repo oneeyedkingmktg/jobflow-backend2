@@ -599,7 +599,7 @@ const FIELD_IDS = {
     resume_action: "resume_action",
     pause_notes: "pause_notes",
 
-    pcompleted_proceed_with_automation: "completed_proceed_with_automation",
+    completed_proceed_with_automation: "completed_proceed_with_automation",
   };
 
   // --------------------------------------------------
