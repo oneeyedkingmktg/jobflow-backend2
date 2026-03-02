@@ -599,7 +599,7 @@ const FIELD_IDS = {
     resume_action: "resume_action",
     pause_notes: "pause_notes",
 
-    proceed_with_automation: "proceed_with_automation",
+    pcompleted_proceed_with_automation: "completed_proceed_with_automation",
   };
 
   // --------------------------------------------------
@@ -688,7 +688,7 @@ pushField("utm_source", lead.utm_source);
   pushField("resume_action", lead.resume_action);
   pushField("pause_notes", lead.pause_notes);
 
-  pushField("proceed_with_automation", yesNo(lead.proceed_with_automation));
+pushField("completed_proceed_with_automation", yesNo(lead.proceed_with_automation));
 
 // --------------------
   // Estimator Fields
