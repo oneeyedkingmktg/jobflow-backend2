@@ -101,8 +101,13 @@ const webhookController = {
       };
       
       console.log('📋 Mapped contact data:', contactData);
-      console.log('🔍 [DEBUG] Extracted ghl_contact_id:', contactData.ghl_contact_id, 'Type:', typeof contactData.ghl_contact_id);
-      
+
+      // Guard: must have at least one identifier to match or create a lead
+      if (!contactData.ghl_contact_id && !contactData.phone && !contactData.email) {
+        console.log('⚠️ [WEBHOOK] Contact has no identifiers (no ghl_contact_id, phone, or email) - skipping');
+        return res.status(200).json({ success: true, message: 'Skipped - no identifiers' });
+      }
+
       // Find existing lead - check ghl_contact_id first, then phone, then email
       let existingLead = null;
       

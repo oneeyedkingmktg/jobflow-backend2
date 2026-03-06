@@ -825,25 +825,31 @@ if (est.all_price_ranges?.custom) {
       body: createPayload
     });
 
-    contact = response.contact || response;
-    contactId = contact.id;
+    // ghlRequest returns the 400 duplicate response instead of throwing —
+    // detect it here and do the PUT update in the try block
+    const duplicateId = response?.meta?.contactId;
+    if (duplicateId) {
+      console.log(`[UPSERT] Duplicate detected in try block — updating contact ${duplicateId}`);
+      contactId = duplicateId;
+      const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
+        method: "PUT",
+        body: updatePayload,
+      });
+      contact = updateResponse.contact || updateResponse;
+    } else {
+      contact = response.contact || response;
+      contactId = contact.id;
+    }
 
   } catch (err) {
+    // Fallback: some GHL versions throw instead of returning on duplicate
     const meta = err?.response?.meta || err?.meta;
-
     if (meta?.contactId) {
       contactId = meta.contactId;
-
-          
-      const updateResponse = await ghlRequest(
-        company,
-        `/contacts/${contactId}`,
-        {
-          method: "PUT",
-          body: updatePayload
-        }
-      );
-
+      const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
+        method: "PUT",
+        body: updatePayload,
+      });
       contact = updateResponse.contact || updateResponse;
     } else {
       throw err;
@@ -1190,6 +1196,38 @@ module.exports = {
       const leadData = await fetchLeadWithEstimator(lead.id);
       initCalendarSyncState(lead);
 
+      // ==========================================
+      // 1b️⃣ GUARD: skip if no identifier
+      // ==========================================
+      if (!leadData.phone && !leadData.email && !leadData.ghl_contact_id) {
+        console.warn(`⚠️ [SYNC GUARD] Lead ${lead.id} has no phone, email, or ghl_contact_id — skipping GHL sync`);
+        return null;
+      }
+
+      // ==========================================
+      // 1c️⃣ PHONE SEARCH: find GHL contact if no ID
+      // ==========================================
+      if (!leadData.ghl_contact_id && leadData.phone) {
+        try {
+          const phone = normalizePhone(leadData.phone);
+          console.log(`[SMART SYNC] Searching GHL by phone: ${phone}`);
+          const searchResult = await ghlRequest(company, "/contacts/", {
+            method: "GET",
+            params: { locationId: company.ghl_location_id, query: phone },
+          });
+          console.log(`[SMART SYNC] Search result count: ${searchResult?.contacts?.length ?? 0}`);
+          const found = searchResult?.contacts?.[0];
+          if (found?.id) {
+            leadData.ghl_contact_id = found.id;
+            lead.ghl_contact_id = found.id;
+            console.log(`✅ [SMART SYNC] Linked lead ${lead.id} to GHL contact ${found.id} via phone search`);
+          } else {
+            console.warn(`[SMART SYNC] No GHL contact found for phone ${phone}`);
+          }
+        } catch (err) {
+          console.warn("[SMART SYNC] Phone search failed:", err.message);
+        }
+      }
 
       // ==========================================
       // 2️⃣ CREATE/UPDATE CONTACT
@@ -1215,6 +1253,36 @@ module.exports = {
 
       // Update lead object in memory
       lead.ghl_contact_id = contactId;
+
+      // ==========================================
+      // 2b️⃣ 2-WAY MERGE: pull missing fields from GHL into CP360
+      // ==========================================
+      try {
+        const ghlContact = await ghlRequest(company, `/contacts/${contactId}`, { method: "GET" });
+        const ghlData = ghlContact?.contact || ghlContact;
+
+        const fieldsToUpdate = {};
+        if (!leadData.email && ghlData.email) fieldsToUpdate.email = ghlData.email;
+        if (!leadData.phone && ghlData.phone) fieldsToUpdate.phone = normalizePhone(ghlData.phone);
+        if (!leadData.first_name && ghlData.firstName) fieldsToUpdate.first_name = ghlData.firstName;
+        if (!leadData.last_name && ghlData.lastName) fieldsToUpdate.last_name = ghlData.lastName;
+        if (!leadData.address && ghlData.address1) fieldsToUpdate.address = ghlData.address1;
+        if (!leadData.city && ghlData.city) fieldsToUpdate.city = ghlData.city;
+        if (!leadData.state && ghlData.state) fieldsToUpdate.state = ghlData.state;
+        if (!leadData.zip && ghlData.postalCode) fieldsToUpdate.zip = ghlData.postalCode;
+
+        if (Object.keys(fieldsToUpdate).length > 0) {
+          const setClause = Object.keys(fieldsToUpdate).map((k, i) => `${k} = $${i + 1}`).join(", ");
+          const values = [...Object.values(fieldsToUpdate), lead.id];
+          await db.query(
+            `UPDATE leads SET ${setClause} WHERE id = $${values.length}`,
+            values
+          );
+          console.log("[SMART SYNC] Pulled from GHL into CP360:", Object.keys(fieldsToUpdate));
+        }
+      } catch (err) {
+        console.warn("[SMART SYNC] 2-way merge failed:", err.message);
+      }
 
       // ==========================================
       // 3️⃣ CHECK FOR ESTIMATOR DATA & TAG
