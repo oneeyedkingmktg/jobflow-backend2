@@ -127,8 +127,6 @@ export default function MessagesPage({ onUnreadCount, onSelectConversation }) {
   useEffect(() => {
     if (!currentCompany?.id) return;
     loadConversations();
-    const interval = setInterval(loadConversations, 60_000);
-    return () => clearInterval(interval);
   }, [currentCompany?.id]);
 
   async function loadConversations() {
