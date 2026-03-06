@@ -88,7 +88,7 @@ if (lead.status === "install_scheduled") {
               e.stopPropagation();
               onReinstate(lead);
             }}
-            className="w-full mt-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+            className="w-full mt-2 px-4 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition"
           >
             Reinstate Contact
           </button>

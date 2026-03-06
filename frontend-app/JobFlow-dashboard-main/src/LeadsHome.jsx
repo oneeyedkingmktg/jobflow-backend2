@@ -178,6 +178,17 @@ const loadLeads = async () => {
     loadLeads();
   }, [currentCompany?.id]);
 
+  // Open a specific lead when navigating from Messages → Go to Lead
+  useEffect(() => {
+    if (!window.__pendingLeadId || leads.length === 0) return;
+    const lead = leads.find((l) => l.id === window.__pendingLeadId);
+    if (lead) {
+      setSelectedLead(lead);
+      setIsNewLead(false);
+      window.__pendingLeadId = null;
+    }
+  }, [leads]);
+
 
   // --------------------------------------------------
   // Counts

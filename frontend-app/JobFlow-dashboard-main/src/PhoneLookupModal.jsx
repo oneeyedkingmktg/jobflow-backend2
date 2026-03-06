@@ -59,20 +59,20 @@ export default function PhoneLookupModal({
           ✕
         </button>
 
-        <h2 className="text-xl font-bold mb-4 text-center">Phone Lookup</h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 text-center">Phone Lookup</h2>
 
         <input
           type="text"
           value={phoneInput}
           placeholder="Enter phone number"
           onChange={(e) => setPhoneInput(formatPhoneNumber(e.target.value))}
-          className="w-full border rounded-lg p-3 shadow-inner mb-4"
+          className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl mb-4"
         />
 
         <button
           onClick={handleSearch}
           disabled={loading}
-          className="w-full bg-emerald-600 text-white py-2 rounded-lg shadow hover:bg-emerald-700"
+          className="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition"
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -99,13 +99,13 @@ export default function PhoneLookupModal({
           <div className="mt-6 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 py-2 rounded shadow hover:bg-gray-300"
+              className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
             >
               Cancel
             </button>
             <button
               onClick={handleProceed}
-              className="flex-1 bg-emerald-600 text-white py-2 rounded shadow hover:bg-emerald-700"
+              className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition"
             >
               Continue
             </button>

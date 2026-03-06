@@ -88,13 +88,24 @@ export function formatTime(value, timezone = null) {
   }
 }
 
+export function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function formatPhoneNumber(value) {
   if (!value) return "";
-  const phone = value.replace(/[^\d]/g, "");
-  const len = phone.length;
+  let digits = value.replace(/[^\d]/g, "");
 
-  if (len < 4) return phone;
-  if (len < 7) return `(${phone.slice(0, 3)}) ${phone.slice(3)}`;
+  // Strip US country code (1 + 10 digits = 11 digits starting with 1)
+  if (digits.length === 11 && digits.startsWith("1")) {
+    digits = digits.slice(1);
+  }
 
-  return `(${phone.slice(0, 3)}) ${phone.slice(3, 6)}-${phone.slice(6, 10)}`;
+  const len = digits.length;
+  if (len < 4) return digits;
+  if (len < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }

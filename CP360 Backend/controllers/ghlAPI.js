@@ -1528,4 +1528,43 @@ restoreGhlContact: async function (contactId, company) {
       return null;
     }
   },
+
+  // Search all conversations for a GHL location
+  searchConversations: async function (company, params = {}) {
+    return await ghlRequest(company, "/conversations/search", {
+      method: "GET",
+      params: {
+        locationId: company.ghl_location_id,
+        ...params,
+      },
+    });
+  },
+
+  // Mark a conversation as read (unreadCount = 0)
+  markConversationRead: async function (conversationId, company) {
+    return await ghlRequest(company, `/conversations/${conversationId}`, {
+      method: "PUT",
+      body: { locationId: company.ghl_location_id, unreadCount: 0 },
+    });
+  },
+
+  // Fetch messages for a specific conversation by ID
+  getMessagesByConversationId: async function (conversationId, company, limit = 20) {
+    return await ghlRequest(
+      company,
+      `/conversations/${conversationId}/messages`,
+      {
+        method: "GET",
+        params: { limit },
+      }
+    );
+  },
+
+  // Send a message in a conversation
+  sendMessage: async function (company, payload) {
+    return await ghlRequest(company, "/conversations/messages", {
+      method: "POST",
+      body: payload,
+    });
+  },
 };

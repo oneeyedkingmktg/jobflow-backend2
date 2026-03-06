@@ -9,6 +9,7 @@ import ForgotPassword from "./ForgotPassword";
 import ResetPassword from "./ResetPassword";
 import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
+import MessagesPage from "./pages/MessagesPage.jsx";
 import "./index.css";
 import { initializePushNotifications } from "./services/pushNotificationService";
 
@@ -60,6 +61,7 @@ function AppContent() {
 
   // App-level screen control (default = leads)
   const [activeScreen, setActiveScreen] = useState("leads");
+  const [totalUnread, setTotalUnread] = useState(0);
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
@@ -158,8 +160,70 @@ function AppContent() {
      6. Main App (default)
      --------------------------------------- */
   return (
-    <div className="min-h-screen bg-gray-50">
-      <LeadsHome currentUser={user} />
+    <div className="min-h-screen bg-gray-50 pb-16">
+      {activeScreen === "messages" ? (
+        <MessagesPage onUnreadCount={setTotalUnread} />
+      ) : (
+        <LeadsHome currentUser={user} />
+      )}
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex">
+        <button
+          onClick={() => setActiveScreen("leads")}
+          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors ${
+            activeScreen === "leads" ? "text-blue-600" : "text-gray-500"
+          }`}
+        >
+          {/* Person icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={activeScreen === "leads" ? 2.5 : 1.8}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"
+            />
+          </svg>
+          Leads
+        </button>
+
+        <button
+          onClick={() => setActiveScreen("messages")}
+          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors relative ${
+            activeScreen === "messages" ? "text-blue-600" : "text-gray-500"
+          }`}
+        >
+          {/* Speech bubble icon */}
+          <div className="relative">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={activeScreen === "messages" ? 2.5 : 1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8 10h.01M12 10h.01M16 10h.01M21 16a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v11z"
+              />
+            </svg>
+            {totalUnread > 0 && (
+              <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                {totalUnread > 99 ? "99+" : totalUnread}
+              </span>
+            )}
+          </div>
+          Messages
+        </button>
+      </nav>
     </div>
   );
 }

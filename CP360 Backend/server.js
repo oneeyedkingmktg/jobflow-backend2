@@ -52,6 +52,7 @@ const leadsRoutes = require("./routes/leads");
 const usersRoutes = require("./routes/users");
 const companiesRoutes = require("./routes/companies");
 const ghlRoutes = require("./routes/ghl");
+const messagesRoutes = require("./routes/messages");
 
 
 
@@ -90,6 +91,7 @@ app.use("/ghl", authenticateToken, ghlRoutes);
 app.use("/estimator", estimatorRoutes);
 app.use("/api/push", authenticateToken, pushNotificationRoutes);
 app.use("/api/drive", authenticateToken, googleDriveRoutes);
+app.use("/api/messages", messagesRoutes);
 app.use("/google-drive", googleDriveRoutes);
 
 

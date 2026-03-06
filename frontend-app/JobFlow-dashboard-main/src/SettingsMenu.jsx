@@ -48,6 +48,7 @@ export default function SettingsMenu({ onRefresh }) {
   const handleSwitchCompany = (e) => {
     const companyId = parseInt(e.target.value, 10);
     switchCompany(companyId);
+    setShowMenu(false);
   };
 
   const handleManageCompanies = () => {

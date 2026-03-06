@@ -29,24 +29,24 @@ export default function Login({ onForgotPassword }) {
       </div>
 
       {(localError || error) && (
-        <div className="bg-red-100 text-red-700 border border-red-300 p-3 rounded mb-4">
+        <div className="rounded-lg bg-red-50 text-red-700 px-4 py-3 text-sm mb-4">
           {localError || error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        <label>Email</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
         <input
           type="email"
-          className="w-full border p-3 rounded mb-4"
+          className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl mb-4"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
 
-        <label>Password</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
         <input
           type="password"
-          className="w-full border p-3 rounded mb-6"
+          className="w-full px-4 py-3 text-lg border border-gray-300 rounded-xl mb-6"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -54,7 +54,7 @@ export default function Login({ onForgotPassword }) {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded"
+          className="w-full px-4 py-3 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-700 transition"
         >
           {isLoading ? "Loading..." : "Login"}
         </button>
