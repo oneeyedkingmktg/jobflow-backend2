@@ -270,7 +270,7 @@ export default function MessagesPage({ onUnreadCount, onSelectConversation }) {
       {activeConversation && (
         <ConversationThread
           conversation={activeConversation}
-          onBack={() => setActiveConversation(null)}
+          onBack={() => { setActiveConversation(null); loadConversations(); }}
           onGoToLead={(lead) => {
             window.__pendingLeadId = lead.id;
             window.__setAppScreen("leads");
