@@ -6,12 +6,21 @@ const initializeFirebase = () => {
   if (firebaseApp) return firebaseApp;
 
   try {
-    // Load the service account file
-    const serviceAccount = require('../firebase-service-account.json');
+    let credential;
 
-    firebaseApp = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    // Use env vars in production (Render), fall back to JSON file in local dev
+    if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+      credential = admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      });
+    } else {
+      const serviceAccount = require('../firebase-service-account.json');
+      credential = admin.credential.cert(serviceAccount);
+    }
+
+    firebaseApp = admin.initializeApp({ credential });
 
     console.log('✅ Firebase Admin SDK initialized');
     return firebaseApp;

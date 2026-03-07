@@ -42,9 +42,17 @@ export const initializePushNotifications = async (user) => {
       console.log('📬 Push notification received:', notification);
     });
 
-    // Listen for push notification tapped
-    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('📬 Push notification tapped:', notification);
+    // Listen for push notification tapped — deep link to contact record
+    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      const data = action.notification.data || {};
+      console.log('📬 Push notification tapped:', data);
+
+      if (data.contactId) {
+        window.__pendingGhlContactId = data.contactId;
+        if (typeof window.__setAppScreen === 'function') {
+          window.__setAppScreen('leads');
+        }
+      }
     });
 
     return { success: true };
@@ -83,11 +91,11 @@ const registerDeviceToken = async (user, deviceToken) => {
 };
 
 /**
- * Get notification preferences
+ * Get notification preferences for the logged-in user
  */
-export const getNotificationPreferences = async (companyId) => {
+export const getNotificationPreferences = async () => {
   try {
-    const response = await apiRequest(`/api/push/notification-preferences/${companyId}`);
+    const response = await apiRequest('/api/push/notification-preferences');
     const data = await response.json();
     return data;
   } catch (error) {
@@ -97,11 +105,11 @@ export const getNotificationPreferences = async (companyId) => {
 };
 
 /**
- * Update notification preferences
+ * Update notification preferences for the logged-in user
  */
-export const updateNotificationPreferences = async (companyId, preferences) => {
+export const updateNotificationPreferences = async (preferences) => {
   try {
-    const response = await apiRequest(`/api/push/notification-preferences/${companyId}`, {
+    const response = await apiRequest('/api/push/notification-preferences', {
       method: 'PUT',
       body: JSON.stringify(preferences)
     });

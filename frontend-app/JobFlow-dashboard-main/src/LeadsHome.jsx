@@ -81,6 +81,8 @@ const convertLeadFromBackend = (lead) => ({
   resumeAction: lead.resumeAction || null,
   pauseNotes: lead.pauseNotes || null,
 
+  ghlContactId: lead.ghlContactId || lead.ghl_contact_id || null,
+
   proceedWithAutomation:
     lead.proceedWithAutomation ?? lead.proceed_with_automation ?? true,
 });
@@ -186,6 +188,17 @@ const loadLeads = async () => {
       setSelectedLead(lead);
       setIsNewLead(false);
       window.__pendingLeadId = null;
+    }
+  }, [leads]);
+
+  // Open a specific lead when tapping a push notification (matched by GHL contact ID)
+  useEffect(() => {
+    if (!window.__pendingGhlContactId || leads.length === 0) return;
+    const lead = leads.find((l) => l.ghlContactId === window.__pendingGhlContactId);
+    if (lead) {
+      setSelectedLead(lead);
+      setIsNewLead(false);
+      window.__pendingGhlContactId = null;
     }
   }, [leads]);
 

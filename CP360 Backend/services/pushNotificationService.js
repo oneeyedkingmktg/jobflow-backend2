@@ -6,25 +6,38 @@ const db = require('../config/database'); // Your existing database connection
  */
 async function sendPushToCompany(companyId, notification) {
   try {
-    // Check if notifications are enabled for this type
-    const prefs = await getNotificationPreferences(companyId);
-    if (!prefs || !shouldSendNotification(prefs, notification.type)) {
-      console.log(`Push notification ${notification.type} disabled for company ${companyId}`);
-      return { success: false, reason: 'disabled' };
-    }
-
-    // Get all device tokens for this company
-    const tokens = await getCompanyDeviceTokens(companyId);
-    if (tokens.length === 0) {
-      console.log(`No device tokens found for company ${companyId}`);
-      return { success: false, reason: 'no_tokens' };
-    }
-
-    // Send to Firebase Cloud Messaging
     const messaging = getMessaging();
     if (!messaging) {
       console.error('Firebase messaging not initialized');
       return { success: false, reason: 'firebase_not_initialized' };
+    }
+
+    // Get all device tokens for this company, grouped by user
+    const result = await db.query(
+      'SELECT user_id, device_token FROM device_tokens WHERE company_id = $1',
+      [companyId]
+    );
+
+    if (result.rows.length === 0) {
+      console.log(`No device tokens found for company ${companyId}`);
+      return { success: false, reason: 'no_tokens' };
+    }
+
+    // Filter tokens to only users who have this notification type enabled
+    const eligibleTokens = [];
+    for (const row of result.rows) {
+      const prefs = await getNotificationPreferences(row.user_id);
+      if (!prefs) {
+        // No prefs set yet — default is ON, include them
+        eligibleTokens.push(row.device_token);
+      } else if (shouldSendNotification(prefs, notification.type)) {
+        eligibleTokens.push(row.device_token);
+      }
+    }
+
+    if (eligibleTokens.length === 0) {
+      console.log(`Push notification ${notification.type} disabled by all users for company ${companyId}`);
+      return { success: false, reason: 'disabled' };
     }
 
     const message = {
@@ -33,16 +46,15 @@ async function sendPushToCompany(companyId, notification) {
         body: notification.body,
       },
       data: notification.data || {},
-      tokens: tokens,
+      tokens: eligibleTokens,
     };
 
     const response = await messaging.sendEachForMulticast(message);
-    
-    console.log(`✅ Push sent to ${response.successCount}/${tokens.length} devices`);
-    
-    // Clean up failed tokens
+
+    console.log(`✅ Push sent to ${response.successCount}/${eligibleTokens.length} devices`);
+
     if (response.failureCount > 0) {
-      await cleanupFailedTokens(response.responses, tokens);
+      await cleanupFailedTokens(response.responses, eligibleTokens);
     }
 
     return {
@@ -57,12 +69,12 @@ async function sendPushToCompany(companyId, notification) {
 }
 
 /**
- * Get notification preferences for a company
+ * Get notification preferences for a user
  */
-async function getNotificationPreferences(companyId) {
+async function getNotificationPreferences(userId) {
   const result = await db.query(
-    'SELECT * FROM notification_preferences WHERE company_id = $1',
-    [companyId]
+    'SELECT * FROM notification_preferences WHERE user_id = $1',
+    [userId]
   );
   return result.rows[0];
 }
@@ -72,11 +84,14 @@ async function getNotificationPreferences(companyId) {
  */
 function shouldSendNotification(prefs, type) {
   const typeMap = {
+    'new_estimator_lead': prefs.notify_new_estimator_lead,
     'new_lead': prefs.notify_new_lead,
+    'missed_call': prefs.notify_missed_call,
+    'voicemail_left': prefs.notify_voicemail_left,
     'appointment_reminder': prefs.notify_appointment_reminder,
+    'install_reminder': prefs.notify_install_reminder,
     'job_sold': prefs.notify_job_sold,
-    'job_complete': prefs.notify_job_complete,
-    'payment_received': prefs.notify_payment_received,
+    'new_message': prefs.notify_new_message,
   };
   return typeMap[type] !== false;
 }

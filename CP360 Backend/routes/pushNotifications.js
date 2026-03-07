@@ -48,24 +48,21 @@ router.post('/register-device', async (req, res) => {
 });
 
 /**
- * Get notification preferences for a company
- * GET /api/notification-preferences/:companyId
+ * Get notification preferences for the logged-in user
+ * GET /api/push/notification-preferences
  */
-router.get('/notification-preferences/:companyId', async (req, res) => {
+router.get('/notification-preferences', async (req, res) => {
   try {
-    const { companyId } = req.params;
+    const userId = req.user.id;
 
-    const prefs = await getNotificationPreferences(companyId);
+    let prefs = await getNotificationPreferences(userId);
 
     if (!prefs) {
-      // Create default preferences if none exist
       await db.query(
-        `INSERT INTO notification_preferences (company_id) VALUES ($1)`,
-        [companyId]
+        `INSERT INTO notification_preferences (user_id) VALUES ($1)`,
+        [userId]
       );
-      
-      const newPrefs = await getNotificationPreferences(companyId);
-      return res.json(newPrefs);
+      prefs = await getNotificationPreferences(userId);
     }
 
     res.json(prefs);
@@ -77,33 +74,45 @@ router.get('/notification-preferences/:companyId', async (req, res) => {
 });
 
 /**
- * Update notification preferences
- * PUT /api/notification-preferences/:companyId
+ * Update notification preferences for the logged-in user
+ * PUT /api/push/notification-preferences
  */
-router.put('/notification-preferences/:companyId', async (req, res) => {
+router.put('/notification-preferences', async (req, res) => {
   try {
-    const { companyId } = req.params;
+    const userId = req.user.id;
     const {
+      notifyNewEstimatorLead,
       notifyNewLead,
+      notifyMissedCall,
+      notifyVoicemailLeft,
       notifyAppointmentReminder,
+      notifyInstallReminder,
       notifyJobSold,
-      notifyJobComplete,
-      notifyPaymentReceived
+      notifyNewMessage,
     } = req.body;
 
     await db.query(
-      `UPDATE notification_preferences 
-       SET notify_new_lead = $1,
-           notify_appointment_reminder = $2,
-           notify_job_sold = $3,
-           notify_job_complete = $4,
-           notify_payment_received = $5,
-           updated_at = NOW()
-       WHERE company_id = $6`,
-      [notifyNewLead, notifyAppointmentReminder, notifyJobSold, notifyJobComplete, notifyPaymentReceived, companyId]
+      `INSERT INTO notification_preferences
+         (user_id, notify_new_estimator_lead, notify_new_lead, notify_missed_call,
+          notify_voicemail_left, notify_appointment_reminder, notify_install_reminder,
+          notify_job_sold, notify_new_message, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         notify_new_estimator_lead = $2,
+         notify_new_lead = $3,
+         notify_missed_call = $4,
+         notify_voicemail_left = $5,
+         notify_appointment_reminder = $6,
+         notify_install_reminder = $7,
+         notify_job_sold = $8,
+         notify_new_message = $9,
+         updated_at = NOW()`,
+      [userId, notifyNewEstimatorLead, notifyNewLead, notifyMissedCall,
+       notifyVoicemailLeft, notifyAppointmentReminder, notifyInstallReminder,
+       notifyJobSold, notifyNewMessage]
     );
 
-    console.log(`✅ Notification preferences updated for company ${companyId}`);
+    console.log(`✅ Notification preferences updated for user ${userId}`);
     res.json({ message: 'Preferences updated successfully' });
 
   } catch (error) {

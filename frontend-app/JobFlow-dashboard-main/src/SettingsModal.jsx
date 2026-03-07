@@ -11,6 +11,7 @@ import CompanyDetails from "./CompanyDetails";
 import CompanyModal from "./company/CompanyModal";
 import UsersHome from "./users/UsersHome";
 import UserProfileModal from "./UserProfileModal";
+import NotificationSettings from "./components/NotificationSettings";
 
 export default function SettingsModal({ onClose }) {
   const { logout, isMaster, user } = useAuth();
@@ -32,6 +33,7 @@ export default function SettingsModal({ onClose }) {
   const openManageUsers = () => setScreen("manage_users");
   const openMyProfile = () => setScreen("my_profile");
   const openCompanySettings = () => setScreen("company_settings");
+  const openNotifications = () => setScreen("notifications");
   const openSuperAdmin = () => setScreen("superadmin");
 
   const handleBack = () => {
@@ -134,9 +136,15 @@ const renderHome = () => (
         <button
           onClick={openMyProfile}
           className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
-
         >
           My Profile
+        </button>
+
+        <button
+          onClick={openNotifications}
+          className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+        >
+          Notifications
         </button>
 
         <button
@@ -203,6 +211,10 @@ const renderHome = () => (
           onSave={handleSaveCompany}
         />
       );
+      break;
+
+    case "notifications":
+      content = <NotificationSettings />;
       break;
 
     case "superadmin":

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
-import { useCompany } from '../CompanyContext';
 import { 
   getNotificationPreferences, 
   updateNotificationPreferences,
@@ -10,37 +9,40 @@ import { canUseNotifications, isDemoAccount } from '../utils/platform';
 
 export default function NotificationSettings() {
   const { user } = useAuth();
-  const { currentCompany } = useCompany();
   const [preferences, setPreferences] = useState({
+    notifyNewEstimatorLead: true,
     notifyNewLead: true,
+    notifyMissedCall: true,
+    notifyVoicemailLeft: true,
     notifyAppointmentReminder: true,
+    notifyInstallReminder: true,
     notifyJobSold: true,
-    notifyJobComplete: false,
-    notifyPaymentReceived: false,
+    notifyNewMessage: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const [message, setMessage] = useState('');
 
-  const companyId = currentCompany?.id || user?.company_id || user?.companyId;
-
   // Load preferences on mount
   useEffect(() => {
     loadPreferences();
-  }, [companyId]);
+  }, []);
 
   const loadPreferences = async () => {
     try {
       setLoading(true);
-      const prefs = await getNotificationPreferences(companyId);
+      const prefs = await getNotificationPreferences();
       
       setPreferences({
+        notifyNewEstimatorLead: prefs.notify_new_estimator_lead,
         notifyNewLead: prefs.notify_new_lead,
+        notifyMissedCall: prefs.notify_missed_call,
+        notifyVoicemailLeft: prefs.notify_voicemail_left,
         notifyAppointmentReminder: prefs.notify_appointment_reminder,
+        notifyInstallReminder: prefs.notify_install_reminder,
         notifyJobSold: prefs.notify_job_sold,
-        notifyJobComplete: prefs.notify_job_complete,
-        notifyPaymentReceived: prefs.notify_payment_received,
+        notifyNewMessage: prefs.notify_new_message,
       });
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -63,7 +65,7 @@ export default function NotificationSettings() {
   const savePreferences = async (prefs) => {
     try {
       setSaving(true);
-      await updateNotificationPreferences(companyId, prefs);
+      await updateNotificationPreferences(prefs);
       setMessage('✅ Settings saved');
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -78,7 +80,7 @@ export default function NotificationSettings() {
   const handleTestPush = async () => {
     try {
       setTestingPush(true);
-      await sendTestPush(companyId, user.id);
+      await sendTestPush(user.companyId || user.company_id, user.id);
       setMessage('🎉 Test notification sent! Check your device.');
       setTimeout(() => setMessage(''), 5000);
     } catch (error) {
@@ -129,6 +131,21 @@ export default function NotificationSettings() {
       )}
 
       <div className="space-y-4">
+        {/* New Estimator Lead */}
+        <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={preferences.notifyNewEstimatorLead}
+            onChange={() => handleToggle('notifyNewEstimatorLead')}
+            className="w-5 h-5 text-blue-600 rounded"
+            disabled={saving}
+          />
+          <div className="ml-3">
+            <div className="font-semibold">New Estimator Lead</div>
+            <div className="text-sm text-gray-600">Get notified when a lead submits via your estimator form</div>
+          </div>
+        </label>
+
         {/* New Lead */}
         <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
           <input
@@ -140,9 +157,37 @@ export default function NotificationSettings() {
           />
           <div className="ml-3">
             <div className="font-semibold">New Lead</div>
-            <div className="text-sm text-gray-600">
-              Get notified when a new lead is added to your pipeline
-            </div>
+            <div className="text-sm text-gray-600">Get notified when a new lead is added to your pipeline</div>
+          </div>
+        </label>
+
+        {/* Missed Call */}
+        <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={preferences.notifyMissedCall}
+            onChange={() => handleToggle('notifyMissedCall')}
+            className="w-5 h-5 text-blue-600 rounded"
+            disabled={saving}
+          />
+          <div className="ml-3">
+            <div className="font-semibold">Missed Call</div>
+            <div className="text-sm text-gray-600">Get notified when you miss a call from a contact</div>
+          </div>
+        </label>
+
+        {/* Voicemail Left */}
+        <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={preferences.notifyVoicemailLeft}
+            onChange={() => handleToggle('notifyVoicemailLeft')}
+            className="w-5 h-5 text-blue-600 rounded"
+            disabled={saving}
+          />
+          <div className="ml-3">
+            <div className="font-semibold">Voicemail Left</div>
+            <div className="text-sm text-gray-600">Get notified when a contact leaves a voicemail</div>
           </div>
         </label>
 
@@ -157,13 +202,26 @@ export default function NotificationSettings() {
           />
           <div className="ml-3">
             <div className="font-semibold">Appointment Reminder</div>
-            <div className="text-sm text-gray-600">
-              Get notified 2 hours before scheduled appointments
-            </div>
+            <div className="text-sm text-gray-600">Get notified before a scheduled appointment</div>
           </div>
         </label>
 
-        {/* Job Sold */}
+        {/* Install Reminder */}
+        <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={preferences.notifyInstallReminder}
+            onChange={() => handleToggle('notifyInstallReminder')}
+            className="w-5 h-5 text-blue-600 rounded"
+            disabled={saving}
+          />
+          <div className="ml-3">
+            <div className="font-semibold">Install Reminder</div>
+            <div className="text-sm text-gray-600">Get notified before a scheduled installation</div>
+          </div>
+        </label>
+
+        {/* Job Marked Sold */}
         <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
           <input
             type="checkbox"
@@ -173,44 +231,23 @@ export default function NotificationSettings() {
             disabled={saving}
           />
           <div className="ml-3">
-            <div className="font-semibold">Job Sold</div>
-            <div className="text-sm text-gray-600">
-              Get notified when a job is marked as sold/won
-            </div>
+            <div className="font-semibold">Job Marked Sold</div>
+            <div className="text-sm text-gray-600">Get notified when a job is marked as sold/won</div>
           </div>
         </label>
 
-        {/* Job Complete */}
+        {/* New Message / SMS Reply */}
         <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
           <input
             type="checkbox"
-            checked={preferences.notifyJobComplete}
-            onChange={() => handleToggle('notifyJobComplete')}
+            checked={preferences.notifyNewMessage}
+            onChange={() => handleToggle('notifyNewMessage')}
             className="w-5 h-5 text-blue-600 rounded"
             disabled={saving}
           />
           <div className="ml-3">
-            <div className="font-semibold">Job Complete</div>
-            <div className="text-sm text-gray-600">
-              Get notified when installation is marked complete
-            </div>
-          </div>
-        </label>
-
-        {/* Payment Received */}
-        <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={preferences.notifyPaymentReceived}
-            onChange={() => handleToggle('notifyPaymentReceived')}
-            className="w-5 h-5 text-blue-600 rounded"
-            disabled={saving}
-          />
-          <div className="ml-3">
-            <div className="font-semibold">Payment Received</div>
-            <div className="text-sm text-gray-600">
-              Get notified when payment is logged
-            </div>
+            <div className="font-semibold">New Message / SMS Reply</div>
+            <div className="text-sm text-gray-600">Get notified when a contact sends you a message or SMS reply</div>
           </div>
         </label>
       </div>
