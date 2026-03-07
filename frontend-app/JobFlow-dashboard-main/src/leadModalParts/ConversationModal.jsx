@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import MessageList from "../messages/MessageList.jsx";
+import { useCompany } from "../CompanyContext";
 
 export default function ConversationModal({ lead, onClose }) {
+  const { currentCompany } = useCompany();
+  const companyId = currentCompany?.id;
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -112,6 +115,7 @@ const loadMore = async () => {
               loadingMore={loadingMore}
               autoScroll={shouldScroll}
               contactName={lead.name || lead.fullName}
+              companyId={companyId}
             />
           )}
         </div>
