@@ -1635,4 +1635,34 @@ restoreGhlContact: async function (contactId, company) {
       body: payload,
     });
   },
+
+  // Get call transcription
+  getCallTranscription: async function (messageId, company) {
+    return await ghlRequest(
+      company,
+      `/conversations/locations/${company.ghl_location_id}/messages/${messageId}/transcription`,
+      { method: "GET" }
+    );
+  },
+
+  // Proxy call recording binary stream directly to Express response
+  proxyCallRecording: async function (messageId, company, expressRes) {
+    const apiKey = resolveApiKey(company.ghl_api_key);
+    const url = `${GHL_BASE_URL}/conversations/messages/${messageId}/locations/${company.ghl_location_id}/recording`;
+    console.log("[RECORDING PROXY]", url);
+    const ghlRes = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: String(GHL_API_VERSION).trim(),
+      },
+    });
+    console.log("[RECORDING PROXY] status:", ghlRes.status, "content-type:", ghlRes.headers.get("content-type"));
+    if (!ghlRes.ok) {
+      expressRes.status(404).json({ error: "No recording found" });
+      return;
+    }
+    expressRes.setHeader("Content-Type", ghlRes.headers.get("content-type") || "audio/mpeg");
+    expressRes.setHeader("Content-Disposition", "inline");
+    ghlRes.body.pipe(expressRes);
+  },
 };

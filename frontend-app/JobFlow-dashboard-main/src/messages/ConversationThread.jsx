@@ -170,6 +170,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
             loadingMore={loadingMore}
             autoScroll={shouldScroll}
             contactName={conversation.contactName}
+            companyId={companyId}
           />
         )}
       </div>

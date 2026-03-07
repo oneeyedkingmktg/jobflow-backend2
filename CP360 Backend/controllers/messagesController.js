@@ -4,7 +4,7 @@
 // ============================================================================
 
 const pool = require("../config/database");
-const { searchConversations, getMessagesByConversationId, markConversationRead, sendMessage: sendMessageGHL } = require("./ghlAPI");
+const { searchConversations, getMessagesByConversationId, markConversationRead, sendMessage: sendMessageGHL, proxyCallRecording, getCallTranscription } = require("./ghlAPI");
 
 // GET /api/messages/conversations
 async function getConversations(req, res) {
@@ -239,4 +239,67 @@ async function sendMessage(req, res) {
   }
 }
 
-module.exports = { getConversations, getThreadMessages, lookupLeadByContact, markAsRead, sendMessage };
+// GET /api/messages/:messageId/recording  — proxies binary audio from GHL
+async function getRecording(req, res) {
+  try {
+    const { messageId } = req.params;
+    const companyId = req.query.company_id || req.user?.company_id;
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+    if (req.user.role !== "master" && parseInt(req.user.company_id) !== parseInt(companyId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const companyResult = await pool.query(
+      `SELECT id, ghl_api_key, ghl_location_id FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+      [companyId]
+    );
+    if (companyResult.rows.length === 0) return res.status(404).json({ error: "Company not found" });
+    const company = companyResult.rows[0];
+    if (!company.ghl_api_key || !company.ghl_location_id) return res.status(404).json({ error: "Not configured" });
+    await proxyCallRecording(messageId, company, res);
+  } catch (error) {
+    console.error("Error fetching call recording:", error.message);
+    if (!res.headersSent) res.status(500).json({ error: "Failed to fetch recording" });
+  }
+}
+
+// GET /api/messages/:messageId/transcription
+async function getTranscription(req, res) {
+  try {
+    const { messageId } = req.params;
+    const companyId = req.query.company_id || req.user?.company_id;
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+    if (req.user.role !== "master" && parseInt(req.user.company_id) !== parseInt(companyId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const companyResult = await pool.query(
+      `SELECT id, ghl_api_key, ghl_location_id FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+      [companyId]
+    );
+    if (companyResult.rows.length === 0) return res.status(404).json({ error: "Company not found" });
+    const company = companyResult.rows[0];
+    if (!company.ghl_api_key || !company.ghl_location_id) return res.json({ text: null });
+    const data = await getCallTranscription(messageId, company);
+    // GHL returns an array of sentence objects at the root level
+let text = null;
+    if (Array.isArray(data)) {
+      text = data.map((s) => s.transcript || s.text || "").filter(Boolean).join("\n\n");
+    } else if (typeof data === "string") {
+      text = data;
+    } else if (data?.text && typeof data.text === "string") {
+      text = data.text;
+    } else if (data?.transcript && typeof data.transcript === "string") {
+      text = data.transcript;
+    } else if (Array.isArray(data?.transcription)) {
+      text = data.transcription.map((s) => s.transcript || s.text || "").join(" ").trim();
+    } else if (Array.isArray(data?.segments)) {
+      text = data.segments.map((s) => s.transcript || s.text || "").join(" ").trim();
+    }
+
+    res.json({ text: text || null });
+  } catch (error) {
+    console.error("Error fetching call transcription:", error.message);
+    res.json({ text: null });
+  }
+}
+
+module.exports = { getConversations, getThreadMessages, lookupLeadByContact, markAsRead, sendMessage, getRecording, getTranscription };

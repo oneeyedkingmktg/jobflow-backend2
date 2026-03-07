@@ -4,8 +4,9 @@
 // Used by ConversationModal (lead screen) and ConversationThread (messages screen)
 // ============================================================================
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatPhoneNumber, getInitials } from "../utils/formatting.js";
+import { apiRequest } from "../api";
 
 const CHANNEL_LABELS = {
   TYPE_SMS:       { label: "SMS",       color: "bg-blue-100 text-blue-700" },
@@ -61,7 +62,133 @@ function resolveDisplayText(msg) {
   return msg.body || "";
 }
 
-function MessageBubble({ msg, idx, contactName }) {
+function CallCard({ msg, idx, companyId }) {
+  const callStatus = msg.status || msg.meta?.call?.status;
+  const callDuration = msg.meta?.call?.duration || 0;
+  const isInbound = (msg.direction || "inbound") === "inbound";
+  const isCompleted = callStatus === "completed";
+
+  const [recordingUrl, setRecordingUrl] = useState(null);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
+
+  const [transcript, setTranscript] = useState(null);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+
+  const statusLabel = {
+    completed: "Completed",
+    "no-answer": "No Answer",
+    missed: "Missed",
+    busy: "Busy",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  }[callStatus] || callStatus || "";
+
+  const statusColor = isCompleted ? "text-green-600" : "text-red-500";
+
+  const formatDuration = (secs) => {
+    if (!secs) return null;
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  async function handlePlayRecording() {
+    if (showPlayer) { setShowPlayer(false); return; }
+    if (recordingUrl) { setShowPlayer(true); return; }
+    setRecordingLoading(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      const base = import.meta.env.VITE_API_URL;
+      const response = await fetch(`${base}/api/messages/${msg.id}/recording?company_id=${companyId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("No recording");
+      const blob = await response.blob();
+      setRecordingUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      console.error("Recording fetch failed:", err);
+      setRecordingUrl(null);
+    } finally {
+      setShowPlayer(true);
+      setRecordingLoading(false);
+    }
+  }
+
+  async function handleViewTranscript() {
+    if (showTranscript) { setShowTranscript(false); return; }
+    if (transcript !== null) { setShowTranscript(true); return; }
+    setTranscriptLoading(true);
+    try {
+      const res = await apiRequest(`/api/messages/${msg.id}/transcription?company_id=${companyId}`);
+      setTranscript(res?.text || "No transcript available.");
+      setShowTranscript(true);
+    } catch { setTranscript("Could not load transcript."); setShowTranscript(true); }
+    finally { setTranscriptLoading(false); }
+  }
+
+  return (
+    <div key={idx} className="flex justify-start">
+      <div className="max-w-[75%]">
+        <div className="p-3 rounded-xl bg-gray-100 text-gray-800 border border-gray-200">
+          <div className="flex items-center gap-2 mb-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            <span className="text-sm font-semibold text-gray-700">
+              {isInbound ? "Inbound Call" : "Outbound Call"}
+            </span>
+            {statusLabel && (
+              <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">{formatPhoneNumber(msg.from || "")}</p>
+          {formatDuration(callDuration) && (
+            <p className="text-xs text-gray-500 mt-0.5">Duration: {formatDuration(callDuration)}</p>
+          )}
+          {isCompleted && (
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={handlePlayRecording}
+                disabled={recordingLoading}
+                className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                {recordingLoading ? "Loading..." : showPlayer ? "Hide Recording" : "Play Recording"}
+              </button>
+              <button
+                onClick={handleViewTranscript}
+                disabled={transcriptLoading}
+                className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                {transcriptLoading ? "Loading..." : showTranscript ? "Hide Transcript" : "View Transcript"}
+              </button>
+            </div>
+          )}
+          {showPlayer && (
+            <div className="mt-2">
+              {recordingUrl
+                ? <audio controls src={recordingUrl} className="w-full mt-1" />
+                : <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">No recording available for this call.</p>
+              }
+            </div>
+          )}
+          {showTranscript && (
+            <div className="mt-2 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2">
+              <p className="text-xs text-gray-700 whitespace-pre-wrap">{transcript}</p>
+            </div>
+          )}
+        </div>
+        <div className="text-xs text-gray-400 mt-1 px-1 flex items-center">
+          {new Date(msg.dateAdded).toLocaleString()}
+          <ChannelPill messageType={msg.messageType} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ msg, idx, contactName, companyId }) {
   const isEmail = msg.messageType === "TYPE_EMAIL";
   const isSMS = msg.messageType === "TYPE_SMS";
   const isCall = msg.messageType === "TYPE_CALL";
@@ -73,55 +200,7 @@ function MessageBubble({ msg, idx, contactName }) {
 
   // Call card
   if (isCall) {
-    const callStatus = msg.status || msg.meta?.call?.status;
-    const callDuration = msg.meta?.call?.duration || 0;
-    const isInbound = (msg.direction || "inbound") === "inbound";
-
-    const statusLabel = {
-      completed: "Completed",
-      "no-answer": "No Answer",
-      missed: "Missed",
-      busy: "Busy",
-      failed: "Failed",
-      cancelled: "Cancelled",
-    }[callStatus] || callStatus || "";
-
-    const statusColor = callStatus === "completed" ? "text-green-600" : "text-red-500";
-
-    const formatDuration = (secs) => {
-      if (!secs) return null;
-      const m = Math.floor(secs / 60);
-      const s = secs % 60;
-      return `${m}:${s.toString().padStart(2, "0")}`;
-    };
-
-    return (
-      <div key={idx} className="flex justify-start">
-        <div className="max-w-[75%]">
-          <div className="p-3 rounded-xl bg-gray-100 text-gray-800 border border-gray-200">
-            <div className="flex items-center gap-2 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <span className="text-sm font-semibold text-gray-700">
-                {isInbound ? "Inbound Call" : "Outbound Call"}
-              </span>
-              {statusLabel && (
-                <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
-              )}
-            </div>
-            <p className="text-sm text-gray-600">{displayText}</p>
-            {formatDuration(callDuration) && (
-              <p className="text-xs text-gray-500 mt-1">Duration: {formatDuration(callDuration)}</p>
-            )}
-          </div>
-          <div className="text-xs text-gray-400 mt-1 px-1 flex items-center">
-            {new Date(msg.dateAdded).toLocaleString()}
-            <ChannelPill messageType={msg.messageType} />
-          </div>
-        </div>
-      </div>
-    );
+    return <CallCard key={idx} msg={msg} idx={idx} companyId={companyId} />;
   }
 
   // Standard SMS / Email / Workflow bubble
@@ -176,6 +255,7 @@ export default function MessageList({
   loadingMore = false,
   autoScroll = true,
   contactName = "",
+  companyId = null,
 }) {
   const endRef = useRef(null);
 
@@ -206,7 +286,7 @@ export default function MessageList({
       )}
 
       {messages.map((msg, idx) => (
-        <MessageBubble key={msg.id || idx} msg={msg} idx={idx} contactName={contactName} />
+        <MessageBubble key={msg.id || idx} msg={msg} idx={idx} contactName={contactName} companyId={companyId} />
       ))}
 
       <div ref={endRef} />
