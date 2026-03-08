@@ -46,6 +46,22 @@ async function sendPushToCompany(companyId, notification) {
         body: notification.body,
       },
       data: notification.data || {},
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          priority: 'high',
+          channelId: 'default',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
       tokens: eligibleTokens,
     };
 
