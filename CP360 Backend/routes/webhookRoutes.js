@@ -15,16 +15,19 @@ router.post('/push', async (req, res) => {
     console.log('🔔 Push webhook received:', JSON.stringify(req.body));
     const payload = req.body.customData || req.body;
     const { type, locationId, title, body, contactId } = payload;
+    console.log('🔔 Parsed payload:', { type, locationId, title });
 
     if (!type || !locationId) {
       return res.status(400).json({ error: 'Missing type or locationId' });
     }
 
     // Look up company by GHL location ID
+    console.log('🔔 Looking up company for locationId:', locationId);
     const result = await pool.query(
       'SELECT id FROM companies WHERE ghl_location_id = $1',
       [locationId]
     );
+    console.log('🔔 Company lookup result:', result.rows);
 
     if (result.rows.length === 0) {
       console.log(`No company found for location_id: ${locationId}`);
@@ -32,6 +35,7 @@ router.post('/push', async (req, res) => {
     }
 
     const companyId = result.rows[0].id;
+    console.log('🔔 Sending push for companyId:', companyId);
 
     const data = { type };
     if (contactId) data.contactId = String(contactId);
