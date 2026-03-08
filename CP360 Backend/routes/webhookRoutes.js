@@ -14,8 +14,12 @@ router.post('/push', async (req, res) => {
   try {
     console.log('🔔 Push webhook received:', JSON.stringify(req.body));
     const payload = req.body.customData || req.body;
-    const { type, locationId, title, body, contactId } = payload;
-    console.log('🔔 Parsed payload:', { type, locationId, title });
+    const { type, locationId, title, contactId } = payload;
+    const contactName = req.body.full_name || req.body.contact?.full_name || '';
+    const body = contactName
+      ? `${contactName} ${payload.body || ''}`.trim()
+      : payload.body || '';
+    console.log('🔔 Parsed payload:', { type, locationId, title, body });
 
     if (!type || !locationId) {
       return res.status(400).json({ error: 'Missing type or locationId' });
