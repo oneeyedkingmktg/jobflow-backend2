@@ -13,7 +13,8 @@ router.post('/ghl/calendar', calendarWebhookController.handleGHLCalendar);
 router.post('/push', async (req, res) => {
   try {
     console.log('🔔 Push webhook received:', JSON.stringify(req.body));
-    const { type, locationId, title, body, contactId } = req.body;
+    const payload = req.body.customData || req.body;
+    const { type, locationId, title, body, contactId } = payload;
 
     if (!type || !locationId) {
       return res.status(400).json({ error: 'Missing type or locationId' });
