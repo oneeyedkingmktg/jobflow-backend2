@@ -28,7 +28,7 @@ export const initializePushNotifications = async (user) => {
     PushNotifications.addListener('registration', async (token) => {
       console.log('✅ Push registration success, token:', token.value);
       
-      // Send token to backend
+        // Send token to backend
       await registerDeviceToken(user, token.value);
     });
 
@@ -70,7 +70,7 @@ const registerDeviceToken = async (user, deviceToken) => {
   try {
     const platform = getPlatform();
     
-    const response = await apiRequest('/api/push/register-device', {
+    const data = await apiRequest('/api/push/register-device', {
       method: 'POST',
       body: JSON.stringify({
         userId: user.id,
@@ -80,7 +80,6 @@ const registerDeviceToken = async (user, deviceToken) => {
       })
     });
 
-    const data = await response.json();
     console.log('✅ Device token registered with backend');
     return data;
 
@@ -95,8 +94,7 @@ const registerDeviceToken = async (user, deviceToken) => {
  */
 export const getNotificationPreferences = async () => {
   try {
-    const response = await apiRequest('/api/push/notification-preferences');
-    const data = await response.json();
+    const data = await apiRequest('/api/push/notification-preferences');
     return data;
   } catch (error) {
     console.error('Error getting notification preferences:', error);
@@ -109,11 +107,10 @@ export const getNotificationPreferences = async () => {
  */
 export const updateNotificationPreferences = async (preferences) => {
   try {
-    const response = await apiRequest('/api/push/notification-preferences', {
+    const data = await apiRequest('/api/push/notification-preferences', {
       method: 'PUT',
       body: JSON.stringify(preferences)
     });
-    const data = await response.json();
     return data;
   } catch (error) {
     console.error('Error updating notification preferences:', error);
@@ -126,14 +123,10 @@ export const updateNotificationPreferences = async (preferences) => {
  */
 export const sendTestPush = async (companyId, userId) => {
   try {
-    const response = await apiRequest('/api/push/test-push', {
+    const data = await apiRequest('/api/push/test-push', {
       method: 'POST',
-      body: JSON.stringify({
-        companyId,
-        userId
-      })
+      body: JSON.stringify({ companyId, userId })
     });
-    const data = await response.json();
     return data;
   } catch (error) {
     console.error('Error sending test push:', error);

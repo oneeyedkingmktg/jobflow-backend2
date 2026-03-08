@@ -114,6 +114,7 @@ async function cleanupFailedTokens(responses, tokens) {
   const failedTokens = [];
   responses.forEach((resp, idx) => {
     if (!resp.success) {
+      console.error(`❌ FCM error for token ${tokens[idx].substring(0, 20)}...: ${resp.error?.code} - ${resp.error?.message}`);
       failedTokens.push(tokens[idx]);
     }
   });

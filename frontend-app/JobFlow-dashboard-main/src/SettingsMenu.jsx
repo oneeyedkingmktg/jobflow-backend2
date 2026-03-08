@@ -335,20 +335,18 @@ const handleNotificationSettings = () => {
       )}
 
 {showNotificationSettings && (
-  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-      <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-        <h2 className="text-xl font-bold">Notification Settings</h2>
-        <button
-          onClick={() => setShowNotificationSettings(false)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition"
-        >
-          ✕
-        </button>
-      </div>
-      <div className="p-6">
-        <NotificationSettings />
-      </div>
+  <div className="fixed inset-0 bg-white z-50 flex flex-col">
+    <div className="sticky top-0 bg-white border-b px-4 py-4 flex items-center gap-3">
+      <button
+        onClick={() => setShowNotificationSettings(false)}
+        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-gray-700 transition"
+      >
+        ← Back
+      </button>
+      <h2 className="text-lg font-bold">Notification Settings</h2>
+    </div>
+    <div className="flex-1 overflow-auto p-4">
+      <NotificationSettings />
     </div>
   </div>
 )}
