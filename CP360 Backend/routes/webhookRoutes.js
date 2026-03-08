@@ -12,6 +12,7 @@ router.post('/ghl/calendar', calendarWebhookController.handleGHLCalendar);
 // Push notification trigger — called by GHL automations
 router.post('/push', async (req, res) => {
   try {
+    console.log('🔔 Push webhook received:', JSON.stringify(req.body));
     const { type, locationId, title, body, contactId } = req.body;
 
     if (!type || !locationId) {
