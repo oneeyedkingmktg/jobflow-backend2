@@ -24,8 +24,8 @@ function startMonitoring() {
     await checkKeys();
   });
   
-  // Initial check on startup
-  checkKeys();
+  // Initial check on startup — delay 10s to let the DB pool stabilize after cold start
+  setTimeout(() => checkKeys(), 10000);
 }
 
 module.exports = { startMonitoring };
