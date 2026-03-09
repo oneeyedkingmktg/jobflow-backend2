@@ -65,7 +65,7 @@ function resolveDisplayText(msg) {
 function CallCard({ msg, idx, companyId }) {
   const callStatus = msg.status || msg.meta?.call?.status;
   const callDuration = msg.meta?.call?.duration || 0;
-  const isInbound = (msg.direction || "inbound") === "inbound";
+  const isInbound = resolveDirection(msg) !== "outbound";
   const isCompleted = callStatus === "completed";
 
   const [recordingUrl, setRecordingUrl] = useState(null);
@@ -129,7 +129,7 @@ function CallCard({ msg, idx, companyId }) {
   }
 
   return (
-    <div key={idx} className="flex justify-start">
+    <div key={idx} className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
       <div className="max-w-[75%]">
         <div className="p-3 rounded-xl bg-gray-100 text-gray-800 border border-gray-200">
           <div className="flex items-center gap-2 mb-1">
