@@ -557,19 +557,20 @@ async function updateCalendarEvent(company, eventId, payload) {
 // ----------------------------------------------------------------------------
 async function deleteCalendarEvent(company, eventId) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
-  
+
   console.log("🗑️ [CALENDAR] Deleting event:", eventId);
-  
-  await ghlRequest(
-    company,
-    `/calendars/events/appointments/${eventId}`,
-    {
-      method: "DELETE",
-    }
-  );
-  
-  console.log("✅ [CALENDAR] Event deleted successfully");
-  return true;
+
+  // Try the standard events endpoint first; fall back to the appointments sub-path
+  try {
+    await ghlRequest(company, `/calendars/events/${eventId}`, { method: "DELETE" });
+    console.log("✅ [CALENDAR] Event deleted successfully");
+    return true;
+  } catch (err) {
+    // If GHL rejects the delete (IAM not supported, etc.) log and return false
+    // Callers should clear the local event ID so the next sync creates a fresh event
+    console.warn("⚠️ [CALENDAR DELETE] GHL rejected delete, clearing local event ID:", err.message);
+    return false;
+  }
 }
 // ----------------------------------------------------------------------------
 // UPSERT CONTACT FROM LEAD (GHL SAFE VERSION)
