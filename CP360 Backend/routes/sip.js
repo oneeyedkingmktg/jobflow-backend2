@@ -15,8 +15,11 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "change-this-encryption-key
 const decryptSipPassword = (enc) => {
   if (!enc) return null;
   try {
-    return CryptoJS.AES.decrypt(enc, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8) || null;
-  } catch { return null; }
+    const decrypted = CryptoJS.AES.decrypt(enc, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8);
+    // If decryption produces a valid string, use it; otherwise treat as plaintext (dev/manual entry)
+    if (decrypted && decrypted.length >= 4) return decrypted;
+    return enc; // fallback: return as-is (plaintext saved directly in DB)
+  } catch { return enc; } // fallback: return as-is
 };
 
 // ============================================================================
