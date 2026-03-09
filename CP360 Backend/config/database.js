@@ -14,7 +14,7 @@ const pool = new Pool({
   keepAliveInitialDelayMillis: 10000,
   // Limit pool size and idle time to avoid stale connections
   max: 10,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: 60000,   // close connections idle >60s before Railway kills them (~5min)
   connectionTimeoutMillis: 15000,
 });
 
@@ -29,8 +29,13 @@ pool.on('error', (err) => {
   console.error('❌ Database pool error (non-fatal):', err.message);
 });
 
-// Query helper function — retries once on connection errors (Railway cold-start / stale connection)
-const RETRYABLE = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'CONNECTION_TERMINATED'];
+// Query helper — retries up to 3 times on connection errors.
+// Railway kills idle DB connections after ~5 min; on hourly crons ALL pool connections
+// can be stale. Each retry waits longer to let the pool flush dead connections and
+// establish fresh ones.
+const isRetryable = (err) =>
+  ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(err.code) ||
+  /terminated|timeout|reset/i.test(err.message || '');
 
 const query = async (text, params, _attempt = 1) => {
   const start = Date.now();
@@ -44,14 +49,11 @@ const query = async (text, params, _attempt = 1) => {
 
     return res;
   } catch (error) {
-    const isRetryable = RETRYABLE.some(code =>
-      error.code === code || (error.message || '').includes('terminated') || (error.message || '').includes('timeout')
-    );
-
-    if (_attempt === 1 && isRetryable) {
-      console.warn('⚠️ DB connection error, retrying once:', error.message);
-      await new Promise(r => setTimeout(r, 500));
-      return query(text, params, 2);
+    if (_attempt < 4 && isRetryable(error)) {
+      const delay = _attempt * 2000; // 2s, 4s, 6s
+      console.warn(`⚠️ DB connection error (attempt ${_attempt}/3), retrying in ${delay}ms:`, error.message);
+      await new Promise(r => setTimeout(r, delay));
+      return query(text, params, _attempt + 1);
     }
 
     console.error('Database query error:', error);
