@@ -30,7 +30,10 @@ const decryptSipPassword = (enc) => {
 router.get("/credentials", async (req, res) => {
   try {
     const userId = req.user.id;
-    const companyId = req.user.company_id;
+    // Master admin can pass company_id to get SIP domain for the company they're viewing
+    const companyId = (req.user.role === 'master' && req.query.company_id)
+      ? parseInt(req.query.company_id)
+      : req.user.company_id;
 
     // Fetch user SIP fields + company SIP domain in one query
     const result = await db.query(

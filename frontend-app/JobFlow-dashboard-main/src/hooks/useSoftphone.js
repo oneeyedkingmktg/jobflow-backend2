@@ -8,10 +8,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Softphone } from '../plugins/Softphone';
 import { apiRequest } from '../api';
 import { isNativeApp } from '../utils/platform';
+import { useCompany } from '../CompanyContext';
 
 const IDLE_STATES = ['idle', 'released', 'end', 'error', ''];
 
 export function useSoftphone() {
+  const { currentCompany } = useCompany();
   const [initialized, setInitialized] = useState(false);
   const [registrationState, setRegistrationState] = useState('none'); // none | progress | ok | failed
   const [callState, setCallState] = useState('idle');
@@ -36,7 +38,8 @@ export function useSoftphone() {
   const initialize = useCallback(async () => {
     if (!isNativeApp()) return;
     try {
-      const res = await apiRequest('/api/sip/credentials');
+      const companyParam = currentCompany?.id ? `?company_id=${currentCompany.id}` : '';
+      const res = await apiRequest(`/api/sip/credentials${companyParam}`);
       if (!res?.sip_domain) return; // SIP not configured for this user
 
       await Softphone.initialize({
@@ -106,8 +109,8 @@ export function useSoftphone() {
 
     listenersRef.current = [regListener, callListener, errListener];
 
-    // Initialize on mount
-    initialize();
+    // Do NOT auto-initialize on mount — initialize only when makeCall is called
+    // This prevents the microphone permission dialog from blocking UI on open
 
     return () => {
       listenersRef.current.forEach((l) => l?.remove?.());
@@ -122,8 +125,12 @@ export function useSoftphone() {
     if (!isNativeApp()) return;
     setCallerName(displayName);
     setCallerNumber(phoneNumber);
+    // Initialize SIP on first call if not already done
+    if (!initialized) {
+      await initialize();
+    }
     await Softphone.makeCall({ phoneNumber });
-  }, []);
+  }, [initialized, initialize]);
 
   const hangup = useCallback(async () => {
     await Softphone.hangup();
