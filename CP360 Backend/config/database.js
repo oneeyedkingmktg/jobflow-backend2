@@ -8,9 +8,15 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  // Keep connections alive so Railway doesn't drop them after idle timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+  // Limit pool size and idle time to avoid stale connections
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
-
 
 // Test connection on startup
 pool.on('connect', () => {
@@ -18,8 +24,9 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Unexpected database error:', err);
-  process.exit(-1);
+  // Log but do NOT exit — stale connections get dropped by Railway periodically.
+  // The pool will automatically create a fresh connection on the next query.
+  console.error('❌ Database pool error (non-fatal):', err.message);
 });
 
 // Query helper function
