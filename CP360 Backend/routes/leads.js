@@ -739,9 +739,13 @@ router.get("/:id/conversations", authenticateToken, async (req, res) => {
     }
     
 const { getConversationMessages } = require("../controllers/ghlAPI");
-    const messages = await getConversationMessages(lead.ghl_contact_id, lead, limit);
-    
-    res.json({ messages });
+    const result = await getConversationMessages(lead.ghl_contact_id, lead, limit);
+
+    res.json({
+      messages: result.messages || result, // backwards compat if result is plain array
+      conversationId: result.conversationId || null,
+      contactId: lead.ghl_contact_id,
+    });
   } catch (error) {
     console.error("Error fetching conversations:", error);
     res.status(500).json({ error: "Failed to fetch conversations" });

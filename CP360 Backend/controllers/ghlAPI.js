@@ -1591,7 +1591,7 @@ const conversationId = conversations[0].id;
       `/conversations/${conversationId}/messages?limit=${limit}`,
       { method: "GET" }
     );
-    return msgResponse?.messages || [];
+    return { messages: msgResponse?.messages || [], conversationId };
   },
   
 restoreGhlContact: async function (contactId, company) {
