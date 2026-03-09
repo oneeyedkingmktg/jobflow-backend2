@@ -187,4 +187,13 @@ export const LeadsAPI = {
     apiRequest(`/leads/${id}`, {
       method: "DELETE",
     }),
+
+  getCalendarDots: (companyId) =>
+    apiRequest(`/leads?company_id=${companyId}`),
+
+  checkApptSlot: (companyId, date, time, excludeLeadId = null) => {
+    const params = new URLSearchParams({ company_id: companyId, date, time });
+    if (excludeLeadId) params.append("exclude_lead_id", excludeLeadId);
+    return apiRequest(`/leads/appt-slot-check?${params.toString()}`);
+  },
 };

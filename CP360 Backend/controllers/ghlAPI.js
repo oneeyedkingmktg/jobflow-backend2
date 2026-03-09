@@ -284,7 +284,7 @@ function detectAppointmentChange(currentLead, lastSyncedDate, lastSyncedTime) {
 }
 
 function detectInstallChange(currentLead, lastSyncedDate) {
-  const hasInstall = currentLead.install_date && !currentLead.install_tentative;
+  const hasInstall = !!currentLead.install_date;
   const hadInstall = lastSyncedDate;
   const hasEventId = currentLead.install_calendar_event_id;
 
@@ -511,6 +511,23 @@ async function applyStatusTags(contactId, newStatusTag, company) {
     console.error("❌ [GHL TAG] Failed to apply tag:", err.message);
     console.error("   Status:", err.status);
     console.error("   Response:", err.response);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// REMOVE STATUS TAG FROM GHL CONTACT
+// ----------------------------------------------------------------------------
+async function removeStatusTags(contactId, tag, company) {
+  if (!contactId || !tag) return;
+  console.log("🏷️  [GHL TAG] Removing tag:", tag, "from contact:", contactId);
+  try {
+    await ghlRequest(company, `/contacts/${contactId}/tags`, {
+      method: "DELETE",
+      body: { tags: [tag] },
+    });
+    console.log("✅ [GHL TAG] Successfully removed:", tag);
+  } catch (err) {
+    console.error("❌ [GHL TAG] Failed to remove tag:", err.message);
   }
 }
 
@@ -963,7 +980,7 @@ if (calendarType === 'appointment') {
     
     // Create date in company's timezone and convert to UTC
     startDateTime = convertToUTC(localDateTimeString, companyTimezone);
-    endDateTime = new Date(startDateTime.getTime() + 60 * 60000); // 1 hour
+    endDateTime = new Date(startDateTime.getTime() + 15 * 60000); // 15 minutes
 }
 
 // -------------------------------
@@ -982,6 +999,7 @@ else if (calendarType === 'install') {
     existingEventId = lead.install_calendar_event_id;
 
     title = processTemplate(titleTemplate, leadData);
+    if (lead.install_tentative) title += ' - Tentative';
 
     const dateOnly = new Date(lead.install_date)
       .toISOString()
@@ -990,34 +1008,23 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // Handle tentative installs with staggered times
-    if (lead.install_tentative) {
-      const weekStart = new Date(lead.install_date);
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-      
-      const result = await db.query(
-        `SELECT COUNT(*) as count
-         FROM leads
-         WHERE company_id = $1
-           AND install_date >= $2
-           AND install_date < $2::date + INTERVAL '7 days'
-           AND install_tentative = true
-           AND id < $3`,
-        [lead.company_id, weekStart.toISOString().split('T')[0], lead.id]
-      );
-      
-      const offset = parseInt(result.rows[0].count) || 0;
-      const hours = 8 + Math.floor(offset / 2);
-      const minutes = (offset % 2) * 30;
-      
-      const localDateTime = `${dateOnly}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-      startDateTime = convertToUTC(localDateTime, companyTimezone);
-      endDateTime = new Date(startDateTime.getTime() + 8 * 60 * 60000);
-    } else {
-      const localDateTime = `${dateOnly}T08:00:00`;
-      startDateTime = convertToUTC(localDateTime, companyTimezone);
-      endDateTime = new Date(startDateTime.getTime() + 8 * 60 * 60000);
-    }
+    // Count all installs on this date (15-min staggered slots starting at 8:00 AM)
+    const slotResult = await db.query(
+      `SELECT COUNT(*) as count
+       FROM leads
+       WHERE company_id = $1
+         AND install_date = $2
+         AND id != $3
+         AND deleted_at IS NULL`,
+      [lead.company_id, dateOnly, lead.id]
+    );
+    const slotOffset = parseInt(slotResult.rows[0].count) || 0;
+    const slotHours = 8 + Math.floor((slotOffset * 15) / 60);
+    const slotMinutes = (slotOffset * 15) % 60;
+
+    const localDateTime = `${dateOnly}T${slotHours.toString().padStart(2, '0')}:${slotMinutes.toString().padStart(2, '0')}:00`;
+    startDateTime = convertToUTC(localDateTime, companyTimezone);
+    endDateTime = new Date(startDateTime.getTime() + 15 * 60000);
 }
 
 else {
@@ -1172,6 +1179,7 @@ module.exports = {
   syncLeadCalendarEvent,
   deleteGhlContact,
   applyStatusTags,
+  removeStatusTags,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
     const companyId = company?.id;
 
@@ -1405,9 +1413,6 @@ if (
             lead.last_synced_install_date
           );
 
-          // (Optional) if you later want to use previousInstallTentative you can,
-          // but we’re not touching that logic in this step.
-
           if (changeType !== "none" && changeType !== "unchanged") {
             const result = await syncLeadCalendarEvent(lead, company, changeType, "install");
 
@@ -1420,9 +1425,21 @@ if (
                   await applyStatusTags(contactId, "install_tentative", company);
                 }
               } else if (result.action === "updated") {
-                await applyStatusTags(contactId, "install_date_updated", company);
+                const wasConfirmed = detectInstallConfirmation(previousInstallTentative, lead.install_tentative);
+                if (wasConfirmed) {
+                  await removeStatusTags(contactId, "install_tentative", company);
+                  await applyStatusTags(contactId, "install_date_confirmed", company);
+                } else {
+                  await applyStatusTags(contactId, "install_date_updated", company);
+                  if (lead.install_tentative) {
+                    await applyStatusTags(contactId, "install_tentative", company);
+                  } else {
+                    await removeStatusTags(contactId, "install_tentative", company);
+                  }
+                }
               } else if (result.action === "deleted") {
                 await applyStatusTags(contactId, "install_date_cancelled", company);
+                await removeStatusTags(contactId, "install_tentative", company);
               }
 
               if (result.calendarEventId) {

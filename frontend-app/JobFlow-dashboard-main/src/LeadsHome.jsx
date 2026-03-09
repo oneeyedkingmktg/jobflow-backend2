@@ -202,6 +202,21 @@ const loadLeads = async () => {
     }
   }, [leads]);
 
+  // Also listen for real-time event when leads are already loaded
+  useEffect(() => {
+    const handleOpenLead = (e) => {
+      const { ghlContactId } = e.detail;
+      const lead = leads.find((l) => l.ghlContactId === ghlContactId);
+      if (lead) {
+        setSelectedLead(lead);
+        setIsNewLead(false);
+        window.__pendingGhlContactId = null;
+      }
+    };
+    window.addEventListener('openLeadByGhlContact', handleOpenLead);
+    return () => window.removeEventListener('openLeadByGhlContact', handleOpenLead);
+  }, [leads]);
+
 
   // --------------------------------------------------
   // Counts

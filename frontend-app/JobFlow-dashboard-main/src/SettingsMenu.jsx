@@ -339,7 +339,7 @@ const handleNotificationSettings = () => {
     <div className="sticky top-0 bg-white border-b px-4 py-4 flex items-center gap-3">
       <button
         onClick={() => setShowNotificationSettings(false)}
-        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-gray-700 transition"
+        className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg font-medium transition"
       >
         ← Back
       </button>

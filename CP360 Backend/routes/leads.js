@@ -105,6 +105,64 @@ const validateLead = (lead) => {
 };
 
 // ============================================================================
+// GET CALENDAR DOTS DATA (for date picker mini-calendar) - MOVED TO TOP
+// ============================================================================
+router.get("/calendar-dots", async (req, res) => {
+  try {
+    const { company_id } = req.query;
+    if (!company_id) return res.status(400).json({ error: "company_id required" });
+
+    const result = await pool.query(
+      `SELECT id, name, install_date, install_tentative, appointment_date, appointment_time
+       FROM leads
+       WHERE company_id = $1
+         AND deleted_at IS NULL
+         AND status != 'status_junk'
+         AND (install_date IS NOT NULL OR appointment_date IS NOT NULL)`,
+      [company_id]
+    );
+
+    res.json({ dots: result.rows });
+  } catch (error) {
+    console.error("Error fetching calendar dots:", error);
+    res.status(500).json({ error: "Failed to fetch calendar dots." });
+  }
+});
+
+// ============================================================================
+// CHECK APPOINTMENT SLOT (hard block collision check) - MOVED TO TOP
+// ============================================================================
+router.get("/appt-slot-check", async (req, res) => {
+  try {
+    const { company_id, date, time, exclude_lead_id } = req.query;
+    if (!company_id || !date || !time) {
+      return res.status(400).json({ error: "company_id, date, and time required" });
+    }
+
+    let query = `
+      SELECT id, name FROM leads
+      WHERE company_id = $1
+        AND appointment_date = $2
+        AND appointment_time = $3
+        AND deleted_at IS NULL
+        AND status != 'status_junk'
+    `;
+    const params = [company_id, date, time];
+
+    if (exclude_lead_id) {
+      query += ` AND id != $4`;
+      params.push(exclude_lead_id);
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ taken: result.rows.length > 0, conflict: result.rows[0] || null });
+  } catch (error) {
+    console.error("Error checking appointment slot:", error);
+    res.status(500).json({ error: "Failed to check appointment slot." });
+  }
+});
+
+// ============================================================================
 // GET LEADS - FIXED: Use req.query not req.body
 // ============================================================================
 router.get("/", async (req, res) => {
@@ -444,6 +502,17 @@ router.put("/:id", async (req, res) => {
 
     const previousLead = prevResult.rows[0];
     const previousInstallTentative = previousLead.install_tentative;
+
+    // Snap tentative install date to Monday of selected week
+    if (lead.install_tentative && lead.install_date) {
+      const d = new Date(lead.install_date + "T12:00:00");
+      const day = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+      if (day !== 1) {
+        const offsetDays = day === 0 ? 1 : -(day - 1);
+        d.setDate(d.getDate() + offsetDays);
+        lead.install_date = d.toISOString().split("T")[0];
+      }
+    }
 
     if (
       req.user.role !== "master" &&

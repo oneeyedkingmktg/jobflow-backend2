@@ -58,6 +58,8 @@ export default function LeadModalsWrapper({
         <ApptDateTimeModal
           apptDate={form.appointmentDate}
           apptTime={form.appointmentTime}
+          companyId={form.companyId}
+          excludeLeadId={form.id || null}
           onConfirm={(date, time) => {
             setForm((prev) => ({
               ...prev,

@@ -212,27 +212,29 @@ const groupedByDate = useMemo(() => {
               <div className="font-semibold">{day.getDate()}</div>
               <div className="flex flex-col items-center mt-1">
                 {apptCount > 0 && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap justify-center">
                     {Array(apptCount)
                       .fill(0)
                       .map((_, i) => (
                         <div
                           key={`a-${i}`}
-                          className="w-2 h-2 bg-blue-500 rounded-full"
+                          className="w-3 h-3 bg-blue-500 rounded-full"
                         />
                       ))}
                   </div>
                 )}
                 {installCount > 0 && (
-                  <div className="flex gap-1 mt-1">
-                    {Array(installCount)
-                      .fill(0)
-                      .map((_, i) => (
-                        <div
-                          key={`i-${i}`}
-                          className="w-2 h-2 bg-green-500 rounded-full"
-                        />
-                      ))}
+                  <div className="flex gap-1 mt-1 flex-wrap justify-center">
+                    {data.install.map((lead, i) => (
+                      <div
+                        key={`i-${i}`}
+                        className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center"
+                      >
+                        {lead.installTentative && (
+                          <span className="text-white font-bold leading-none" style={{ fontSize: "7px" }}>T</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

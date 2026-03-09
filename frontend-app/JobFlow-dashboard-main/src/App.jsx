@@ -11,7 +11,10 @@ import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
 import "./index.css";
-import { initializePushNotifications } from "./services/pushNotificationService";
+import { initializePushNotifications, setupPushListeners } from "./services/pushNotificationService";
+
+// Register push listeners immediately at module load — before React renders
+setupPushListeners();
 
 /* ===========================================================
    Error Boundary (Prevents React from white-screening)
