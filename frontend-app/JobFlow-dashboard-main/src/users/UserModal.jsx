@@ -299,18 +299,6 @@ export default function UserModal({
                 />
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={form.sip_incoming_enabled}
-                  onChange={(e) => handleChange("sip_incoming_enabled", e.target.checked)}
-                  className="w-5 h-5"
-                />
-                <div>
-                  <div className="text-sm font-semibold text-gray-700">Enable Incoming Calls</div>
-                  <div className="text-xs text-gray-500">Register SIP for inbound call handling</div>
-                </div>
-              </label>
             </div>
           )}
 
