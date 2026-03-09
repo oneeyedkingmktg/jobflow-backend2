@@ -21,8 +21,8 @@ pool.on('error', (err) => {
   console.error('❌ Database pool error (non-fatal):', err.message);
 });
 
-// Query helper function
-const query = async (text, params) => {
+// Query helper function — retries once on stale connection errors (Railway drops idle connections)
+const query = async (text, params, _retry = false) => {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
@@ -34,6 +34,12 @@ const query = async (text, params) => {
 
     return res;
   } catch (error) {
+    const stale = error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED';
+    if (!_retry && stale) {
+      // Wait 200ms for the pool to create a fresh connection, then try once more
+      await new Promise(r => setTimeout(r, 200));
+      return query(text, params, true);
+    }
     console.error('Database query error:', error);
     throw error;
   }
