@@ -40,13 +40,16 @@ function ChannelPill({ messageType }) {
 
 function resolveDirection(msg) {
   const isEmail = msg.messageType === "TYPE_EMAIL";
-  const isCall = msg.messageType === "TYPE_CALL";
-  const isSystemMessage = isEmail || msg.messageType === "TYPE_SMS";
+  const isSMS = msg.messageType === "TYPE_SMS";
 
+  // Email: prefer meta direction field
   if (isEmail && msg.meta?.email?.direction) return msg.meta.email.direction;
-  if (isCall) return "inbound";
-  if (isSystemMessage && !msg.direction) return "outbound";
-  return msg.direction || "outbound";
+  // Use explicit direction from GHL if present (covers calls, SMS, etc.)
+  if (msg.direction) return msg.direction;
+  // SMS with no direction field = sent by the user (outbound)
+  if (isSMS) return "outbound";
+  // Everything else (calls with no direction) = inbound
+  return "inbound";
 }
 
 function resolveDisplayText(msg) {
