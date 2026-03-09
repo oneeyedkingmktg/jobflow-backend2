@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import MessageList from "../messages/MessageList.jsx";
 import ReplyBox from "../messages/ReplyBox.jsx";
 import { useCompany } from "../CompanyContext";
@@ -93,8 +94,8 @@ export default function ConversationModal({ lead, onClose }) {
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-white z-[110] flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 bg-white z-[500] flex flex-col">
       {/* Softphone overlay */}
       <SoftphoneWidget
         callState={softphone.callState}
@@ -190,6 +191,7 @@ export default function ConversationModal({ lead, onClose }) {
           onSent={() => fetchConversations()}
         />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
