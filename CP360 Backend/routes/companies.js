@@ -353,7 +353,8 @@ const {
       ty_url_redirect,
 
 billing_status,
-      service_area_zips
+      service_area_zips,
+      sip_domain,
     } = sanitizedBody;
 
     const companyId = req.params.id;
@@ -463,6 +464,7 @@ show_conversations = COALESCE($22, show_conversations),
 google_conversion_event = COALESCE($27, google_conversion_event),
   meta_conversion_event = COALESCE($28, meta_conversion_event),
   service_area_zips = COALESCE($29, service_area_zips),
+  sip_domain = COALESCE($30, sip_domain),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -496,7 +498,8 @@ sanitizedBody.google_base_tag || null,        // $25
   sanitizedBody.meta_base_tag || null,          // $26
   sanitizedBody.google_conversion_event || null,// $27
   sanitizedBody.meta_conversion_event || null,  // $28
-service_area_zips ? JSON.stringify(service_area_zips) : null // $29
+service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
+  sip_domain || null,                                          // $30
 ]
 
 );

@@ -5,8 +5,18 @@
 
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const CryptoJS = require("crypto-js");
 const db = require("../config/database");
 const { authenticateToken, requireRole } = require("../middleware/auth");
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "change-this-encryption-key";
+const encryptSipPassword = (pw) => CryptoJS.AES.encrypt(pw, ENCRYPTION_KEY).toString();
+const decryptSipPassword = (enc) => {
+  if (!enc) return null;
+  try {
+    return CryptoJS.AES.decrypt(enc, ENCRYPTION_KEY).toString(CryptoJS.enc.Utf8) || null;
+  } catch { return null; }
+};
 
 const router = express.Router();
 
@@ -30,7 +40,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     if (req.user.role === "master") {
       if (req.query.company_id) {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+                 sip_username, sip_password, sip_incoming_enabled
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -38,7 +49,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
         params = [req.query.company_id];
       } else {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+                 sip_username, sip_password, sip_incoming_enabled
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -55,7 +67,12 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     }
 
     const result = await db.query(query, params);
-    res.json({ users: result.rows });
+    // Mask SIP password — never send raw encrypted value to frontend
+    const users = result.rows.map((u) => ({
+      ...u,
+      sip_password: u.sip_password ? "***hidden***" : null,
+    }));
+    res.json({ users });
   } catch (err) {
     console.error("Get users error:", err);
     res.status(500).json({ error: "Failed to fetch users" });
@@ -124,7 +141,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id, 10);
-    const { name, phone, role, is_active, company_id, password } = req.body;
+    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled } = req.body;
 
     // 🔴 BLOCK PASSWORD ATTEMPTS HERE
     if (password !== undefined && password !== "") {
@@ -215,6 +232,22 @@ router.put("/:id", async (req, res) => {
     if (req.user.role === "master" && company_id !== undefined && !isSelf) {
       updates.push(`company_id = $${i++}`);
       values.push(company_id);
+    }
+
+    // SIP fields (only master)
+    if (req.user.role === "master") {
+      if (sip_username !== undefined) {
+        updates.push(`sip_username = $${i++}`);
+        values.push(clean(sip_username));
+      }
+      if (sip_password !== undefined && sip_password !== "" && sip_password !== "***hidden***") {
+        updates.push(`sip_password = $${i++}`);
+        values.push(encryptSipPassword(sip_password));
+      }
+      if (sip_incoming_enabled !== undefined) {
+        updates.push(`sip_incoming_enabled = $${i++}`);
+        values.push(sip_incoming_enabled);
+      }
     }
 
     if (!updates.length) {

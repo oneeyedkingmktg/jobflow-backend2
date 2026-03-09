@@ -9,6 +9,9 @@ import { useCompany } from "../CompanyContext";
 import MessageList from "./MessageList.jsx";
 import ReplyBox from "./ReplyBox.jsx";
 import { formatPhoneNumber } from "../utils/formatting.js";
+import { useSoftphone } from "../hooks/useSoftphone.js";
+import SoftphoneWidget from "../components/SoftphoneWidget.jsx";
+import { isNativeApp } from "../utils/platform.js";
 
 export default function ConversationThread({ conversation, onBack, onGoToLead, onRead }) {
   const { currentCompany } = useCompany();
@@ -21,6 +24,8 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
   const [matchedLead, setMatchedLead] = useState(undefined); // undefined = loading, null = not found
 
   const companyId = currentCompany?.id;
+
+  const softphone = useSoftphone();
 
   // Fetch messages on mount + mark as read
   useEffect(() => {
@@ -109,6 +114,23 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
   return (
     <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+      {/* Softphone overlay — shown during active/incoming calls */}
+      <SoftphoneWidget
+        callState={softphone.callState}
+        callerNumber={softphone.callerNumber}
+        callerName={softphone.callerName}
+        formattedTime={softphone.formattedTime}
+        isMuted={softphone.isMuted}
+        isSpeaker={softphone.isSpeaker}
+        isConnected={softphone.isConnected}
+        isDialing={softphone.isDialing}
+        isIncoming={softphone.isIncoming}
+        onHangup={softphone.hangup}
+        onAnswer={softphone.answerCall}
+        onDecline={softphone.declineCall}
+        onToggleMute={softphone.toggleMute}
+        onToggleSpeaker={softphone.toggleSpeaker}
+      />
       {/* Header */}
       <div className="bg-[#225ce5] text-white shadow-md flex-shrink-0">
         <div className="px-4 py-4 flex items-center gap-3">
@@ -132,6 +154,20 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
               <p className="text-blue-100 text-xs truncate">{formatPhoneNumber(conversation.phone)}</p>
             )}
           </div>
+
+          {/* Call button — native app only, requires phone number */}
+          {isNativeApp() && conversation.phone && softphone.initialized && (
+            <button
+              onClick={() => softphone.makeCall(conversation.phone, conversation.contactName)}
+              disabled={softphone.isActive}
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 disabled:opacity-40 flex items-center justify-center transition"
+              title={`Call ${formatPhoneNumber(conversation.phone)}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path fillRule="evenodd" d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
 
           {/* Go to Lead button — only shown when lead found */}
           {matchedLead && (
