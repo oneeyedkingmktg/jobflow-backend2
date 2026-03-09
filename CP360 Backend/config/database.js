@@ -8,14 +8,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  },
-  // Keep connections alive so Railway doesn't drop them after idle timeout
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 10000,
-  // Limit pool size and idle time to avoid stale connections
-  max: 10,
-  idleTimeoutMillis: 60000,   // close connections idle >60s before Railway kills them (~5min)
-  connectionTimeoutMillis: 15000,
+  }
 });
 
 // Test connection on startup
@@ -24,20 +17,12 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  // Log but do NOT exit — stale connections get dropped by Railway periodically.
-  // The pool will automatically create a fresh connection on the next query.
+  // Log but do NOT exit — pg-pool will create a fresh connection on the next query
   console.error('❌ Database pool error (non-fatal):', err.message);
 });
 
-// Query helper — retries up to 3 times on connection errors.
-// Railway kills idle DB connections after ~5 min; on hourly crons ALL pool connections
-// can be stale. Each retry waits longer to let the pool flush dead connections and
-// establish fresh ones.
-const isRetryable = (err) =>
-  ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(err.code) ||
-  /terminated|timeout|reset/i.test(err.message || '');
-
-const query = async (text, params, _attempt = 1) => {
+// Query helper function
+const query = async (text, params) => {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
@@ -49,13 +34,6 @@ const query = async (text, params, _attempt = 1) => {
 
     return res;
   } catch (error) {
-    if (_attempt < 4 && isRetryable(error)) {
-      const delay = _attempt * 2000; // 2s, 4s, 6s
-      console.warn(`⚠️ DB connection error (attempt ${_attempt}/3), retrying in ${delay}ms:`, error.message);
-      await new Promise(r => setTimeout(r, delay));
-      return query(text, params, _attempt + 1);
-    }
-
     console.error('Database query error:', error);
     throw error;
   }
