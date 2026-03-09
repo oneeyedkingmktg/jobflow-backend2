@@ -34,6 +34,9 @@ export default function UserModal({
     company_id: defaultCompanyId || null,
     is_active: true,
     password: "",
+    sip_username: "",
+    sip_password: "",
+    sip_incoming_enabled: false,
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -60,6 +63,9 @@ export default function UserModal({
         company_id: user.companyId || user.company_id || null,
         is_active: user.isActive ?? user.is_active ?? true,
         password: "",
+        sip_username: user.sip_username || user.sipUsername || "",
+        sip_password: "",  // never pre-fill password
+        sip_incoming_enabled: user.sip_incoming_enabled ?? user.sipIncomingEnabled ?? false,
       });
     }
   }, [mode, user, defaultCompanyId]);
@@ -264,6 +270,47 @@ export default function UserModal({
                   Only enter if changing password
                 </p>
               )}
+            </div>
+          )}
+
+          {/* SIP CREDENTIALS — master edit only */}
+          {isMaster && viewMode === "edit" && (
+            <div className="pt-4 border-t space-y-3">
+              <div className="text-sm font-bold text-gray-700">SIP Softphone Credentials</div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">SIP Username</label>
+                <input
+                  value={form.sip_username}
+                  onChange={(e) => handleChange("sip_username", e.target.value)}
+                  className="w-full rounded-lg border px-4 py-3"
+                  placeholder="e.g. john.doe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">SIP Password</label>
+                <input
+                  type="password"
+                  value={form.sip_password}
+                  onChange={(e) => handleChange("sip_password", e.target.value)}
+                  className="w-full rounded-lg border px-4 py-3"
+                  placeholder={user?.sip_username || user?.sipUsername ? "Leave blank to keep existing" : "Set SIP password"}
+                />
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={form.sip_incoming_enabled}
+                  onChange={(e) => handleChange("sip_incoming_enabled", e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-gray-700">Enable Incoming Calls</div>
+                  <div className="text-xs text-gray-500">Register SIP for inbound call handling</div>
+                </div>
+              </label>
             </div>
           )}
 

@@ -164,6 +164,7 @@ setGhlForm({
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
     showConversations: company.showConversations || false,
+    sipDomain: company.sipDomain || company.sip_domain || "",
   });
     
     console.log("🔍 setGhlForm called with data");
@@ -293,7 +294,8 @@ if (ghlForm.ghlInstallDescriptionTemplate) {
     
     // Always include showConversations (boolean)
     payload.show_conversations = ghlForm.showConversations || false;
-    
+    payload.sip_domain = ghlForm.sipDomain || null;
+
     await onSave(payload);
     setError("");
   } catch (err) {
@@ -766,6 +768,23 @@ const renderGHLKeys = () => {
           </div>
         </div>
 
+        {/* SIP Domain */}
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-bold text-gray-700 mb-3">Softphone (SIP)</h4>
+          <div>
+            <div className={viewLabel}>SIP DOMAIN</div>
+            <input
+              className={editBox}
+              value={ghlForm.sipDomain}
+              onChange={(e) => handleGhlChange("sipDomain", e.target.value)}
+              placeholder="e.g. company.sip.ashburn.twilio.com"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Twilio SIP Domain for outgoing calls. Set per-user credentials in User Management.
+            </p>
+          </div>
+        </div>
+
         {/* Conversations Feature Toggle */}
         <div className="border-t pt-4 mt-4">
           <label className="flex items-center gap-3 cursor-pointer">
@@ -828,6 +847,7 @@ setGhlForm({
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
     showConversations: company.showConversations || false,
+    sipDomain: company.sipDomain || company.sip_domain || "",
   });
 }}
 
