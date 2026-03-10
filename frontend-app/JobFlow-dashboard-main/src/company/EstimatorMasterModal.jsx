@@ -54,6 +54,7 @@ customProjectLabel: "",
 disclaimerText: "",
 minJobInfoText: "",
 standardInfoText: "",
+combinedProjectMessage: "",
 
 // Finish-specific descriptions (Results page)
 solidFinishDescription: "",
@@ -137,6 +138,7 @@ setForm({
 disclaimerText: data.disclaimer_text ?? "",
 minJobInfoText: data.min_job_info_text ?? "",
 standardInfoText: data.standard_info_text ?? "",
+combinedProjectMessage: data.combined_project_message ?? "",
 // Finish-specific descriptions
 solidFinishDescription: data.solid_finish_description ?? "",
 flakeFinishDescription: data.flake_finish_description ?? "",
@@ -323,6 +325,7 @@ custom_project_label: form.customProjectLabel || null,
 disclaimer_text: form.disclaimerText || null,
 min_job_info_text: form.minJobInfoText || null,
 standard_info_text: form.standardInfoText || null,
+combined_project_message: form.combinedProjectMessage || null,
 
 // Finish-specific descriptions (Results page)
 solid_finish_description: form.solidFinishDescription || null,
@@ -578,7 +581,8 @@ navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n 
     {textInput("Custom Floor Display Name", "customProjectLabel", "e.g. Dance Floors")}
     {textArea("Minimum Job Info Text", "minJobInfoText")}
     {textArea("Standard Info Text", "standardInfoText")}
-    
+    {textArea("Combined Project Message", "combinedProjectMessage", "Message shown between two estimates on the dual-estimate results page")}
+
     <hr className="my-4" />
 
     {textInput(

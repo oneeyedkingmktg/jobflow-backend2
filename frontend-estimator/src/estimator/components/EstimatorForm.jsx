@@ -67,8 +67,8 @@ export default function EstimatorForm({
 
   // Button styling
   const selectedBtnClass = useCustomStyles
-    ? "rounded-lg border px-4 py-3 font-medium"
-    : "rounded-lg border px-4 py-3 font-medium bg-orange-500 text-white border-orange-500";
+    ? "rounded-lg border px-4 py-3 font-medium text-2xl"
+    : "rounded-lg border px-4 py-3 font-medium text-2xl bg-orange-500 text-white border-orange-500";
 
   const selectedBtnStyle = useCustomStyles
     ? {
@@ -79,8 +79,8 @@ export default function EstimatorForm({
     : {};
 
   const unselectedBtnClass = useCustomStyles
-    ? "rounded-lg border px-4 py-3 font-medium"
-    : "rounded-lg border px-4 py-3 font-medium bg-white hover:bg-gray-50 border-gray-300";
+    ? "rounded-lg border px-4 py-3 font-medium text-2xl"
+    : "rounded-lg border px-4 py-3 font-medium text-2xl bg-white hover:bg-gray-50 border-gray-300";
 
   const unselectedBtnStyle = useCustomStyles
     ? {

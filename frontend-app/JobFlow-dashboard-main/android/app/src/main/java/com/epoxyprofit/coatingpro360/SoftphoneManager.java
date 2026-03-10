@@ -2,6 +2,7 @@ package com.epoxyprofit.coatingpro360;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 
@@ -34,7 +35,8 @@ public class SoftphoneManager {
     private static SoftphoneManager instance;
 
     private Core core;
-    private final Handler iterateHandler = new Handler(Looper.getMainLooper());
+    private HandlerThread iterateThread;
+    private Handler iterateHandler;
     private SoftphoneListener listener;
     private boolean initialized = false;
 
@@ -44,7 +46,9 @@ public class SoftphoneManager {
             if (core != null) {
                 core.iterate();
             }
-            iterateHandler.postDelayed(this, 20);
+            if (iterateHandler != null) {
+                iterateHandler.postDelayed(this, 20);
+            }
         }
     };
 
@@ -85,10 +89,15 @@ public class SoftphoneManager {
             // Register with SIP server
             register(sipDomain, sipUser, sipPassword);
 
+            // Start background thread for iterate loop (keeps off UI thread)
+            iterateThread = new HandlerThread("LinphoneIterate");
+            iterateThread.start();
+            iterateHandler = new Handler(iterateThread.getLooper());
+
             // Start Core
             core.start();
 
-            // Start the iterate loop (drives SIP event processing)
+            // Start the iterate loop
             iterateHandler.post(iterateRunnable);
 
             initialized = true;
@@ -244,7 +253,14 @@ public class SoftphoneManager {
     // UNREGISTER / DESTROY
     // =========================================================================
     public void destroy() {
-        iterateHandler.removeCallbacks(iterateRunnable);
+        if (iterateHandler != null) {
+            iterateHandler.removeCallbacks(iterateRunnable);
+            iterateHandler = null;
+        }
+        if (iterateThread != null) {
+            iterateThread.quitSafely();
+            iterateThread = null;
+        }
         if (core != null) {
             core.stop();
             core = null;

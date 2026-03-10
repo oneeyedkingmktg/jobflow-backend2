@@ -81,7 +81,7 @@ useEffect(() => {
   
   console.log("🔥 estimator config useEffect fired, company:", companyId);
   
-  fetch(`${import.meta.env.VITE_API_BASE_URL}/estimator/config?company=${companyId}`)
+  fetch(`${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`)
     .then(res => res.json())
     .then(data => {
       console.log("✅ estimator config response", data);

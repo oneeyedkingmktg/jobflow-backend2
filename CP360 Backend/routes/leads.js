@@ -8,7 +8,7 @@ const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { syncLeadToGhl } = require("../sync/dbToGhlSync");
-const { deleteGhlContact, applyStatusTags } = require("../controllers/ghlAPI");
+const { deleteGhlContact, applyStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
 
 
 // Normalize phone to digits only for matching
@@ -30,6 +30,9 @@ function normalizePhone(phone) {
 router.use((req, res, next) => {
   if (req.method === "POST" && req.path === "/") {
     return next(); // public estimator lead submit
+  }
+  if (req.method === "POST" && /^\/\d+\/second-estimate$/.test(req.path)) {
+    return next(); // public second estimate submit (no contact info collected)
   }
   return authenticateToken(req, res, next);
 });
@@ -269,26 +272,48 @@ const existingLeadResult = await pool.query(
 const existingLead = existingLeadResult.rows[0];
     if (existingLead) {
       console.log("✅ EXISTING LEAD FOUND - ID:", existingLead.id);
-      console.log("📌 Will append estimate data only (no status change)");
+
+      // Check how many estimates already exist for this lead
+      const existingEstimatesResult = await pool.query(
+        `SELECT * FROM estimator_leads WHERE lead_id = $1 ORDER BY estimate_number ASC`,
+        [existingLead.id]
+      );
+      const existingEstimates = existingEstimatesResult.rows;
+      const estimateCount = existingEstimates.length;
+
+      // If 2 estimates already exist — block and return them for display
+      if (estimateCount >= 2) {
+        console.log("🚫 Two estimates already exist for lead:", existingLead.id);
+        return res.status(200).json({
+          lead: toCamel(existingLead),
+          existingLead: true,
+          twoEstimatesExist: true,
+          estimates: existingEstimates,
+          message: "Two estimates already exist"
+        });
+      }
+
       // Save estimate data if provided
       if (estimate) {
-        console.log("💰 Saving estimate data for existing lead:", existingLead.id);
+        console.log("💰 Saving estimate data for existing lead:", existingLead.id, "as estimate #", estimateCount + 1);
         const displayProjectType =
           estimate.length_ft && estimate.width_ft && estimate.project_type
             ? `${estimate.length_ft}' x ${estimate.width_ft}' ${estimate.project_type.charAt(0).toUpperCase() + estimate.project_type.slice(1)}`
             : estimate.project_type;
+        const nextEstimateNumber = estimateCount + 1;
         try {
           await pool.query(
             `INSERT INTO estimator_leads (
-              lead_id, company_id, project_type,
+              lead_id, company_id, estimate_number, project_type,
               length_ft, width_ft, calculated_sf,
               condition, existing_coating, selected_quality,
               display_price_min, display_price_max,
               all_price_ranges, minimum_job_applied
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
             [
               existingLead.id,
               companyId,
+              nextEstimateNumber,
               displayProjectType,
               estimate.length_ft,
               estimate.width_ft,
@@ -302,29 +327,61 @@ const existingLead = existingLeadResult.rows[0];
               estimate.minimum_job_applied || false
             ]
           );
-          console.log("✅ ESTIMATE INSERT SUCCESSFUL");
+          console.log("✅ ESTIMATE INSERT SUCCESSFUL as #", nextEstimateNumber);
           await pool.query(
             `UPDATE leads SET has_estimate = true WHERE id = $1`,
             [existingLead.id]
           );
-          console.log("✅ UPDATED has_estimate flag");
 
-          // Add estimator_lead tag in GHL (only after successful save)
+          // Add GHL tag
           const company = (
             await pool.query(`SELECT * FROM companies WHERE id = $1`, [companyId])
           ).rows[0];
           if (company.ghl_api_key && existingLead.ghl_contact_id) {
             try {
               await applyStatusTags(existingLead.ghl_contact_id, "submitted_estimate", company);
-              console.log("✅ Applied submitted_estimate tag to existing contact");
             } catch (tagError) {
               console.error("❌ Failed to apply estimator_lead tag:", tagError.message);
             }
+            // If returning customer is submitting their 2nd estimate, update EST2 GHL fields
+            if (estimateCount === 1) {
+              try {
+                const conditionLabel = estimate.condition === "minor" ? "A Few Cracks" : estimate.condition === "major" ? "A Lot of Cracks" : "Good";
+                const ranges = typeof estimate.all_price_ranges === "string" ? JSON.parse(estimate.all_price_ranges) : (estimate.all_price_ranges || {});
+                const fmtRange = (r) => r ? (r.min === r.max ? `$${r.min.toLocaleString()}` : `$${r.min.toLocaleString()} – $${r.max.toLocaleString()}`) : "";
+                await updateContactCustomFields(existingLead.ghl_contact_id, {
+                  est2_square_footage: estimate.calculated_sf ? String(estimate.calculated_sf) : "",
+                  est2_floor_condition: conditionLabel,
+                  est2_solid_price_range: fmtRange(ranges.solid),
+                  est2_flake_price_range: fmtRange(ranges.flake),
+                  est2_metallic_price_range: fmtRange(ranges.metallic),
+                  est2_custom_finish_range: fmtRange(ranges.custom),
+                }, company);
+              } catch (fieldErr) {
+                console.error("❌ GHL EST2 custom fields failed (returning customer):", fieldErr.message);
+              }
+            }
+          }
+
+          // If this was a second estimate (returning customer had 1), return both
+          if (estimateCount === 1) {
+            const allEstimatesResult = await pool.query(
+              `SELECT * FROM estimator_leads WHERE lead_id = $1 ORDER BY estimate_number ASC`,
+              [existingLead.id]
+            );
+            return res.status(200).json({
+              lead: toCamel(existingLead),
+              existingLead: true,
+              hasExistingEstimate: true,
+              estimates: allEstimatesResult.rows,
+              message: "Second estimate added for returning customer"
+            });
           }
         } catch (estimateError) {
           console.error("❌ ESTIMATE INSERT FAILED:", estimateError);
         }
       }
+
       return res.status(200).json({
         lead: toCamel(existingLead),
         existingLead: true,
@@ -692,18 +749,98 @@ res.json({
 router.get("/estimator/:leadId", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM estimator_leads WHERE lead_id = $1`,
+      `SELECT * FROM estimator_leads WHERE lead_id = $1 ORDER BY estimate_number ASC`,
       [req.params.leadId]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "No estimate found" });
     }
-    
-    res.json(result.rows[0]);
+
+    res.json(result.rows);
   } catch (error) {
     console.error("Error fetching estimate:", error);
     res.status(500).json({ error: "Failed to fetch estimate" });
+  }
+});
+
+// ============================================================================
+// POST SECOND ESTIMATE FOR A LEAD
+// ============================================================================
+router.post("/:id/second-estimate", async (req, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { project_type, condition, length_ft, width_ft, calculated_sf, existing_coating, selected_quality, display_price_min, display_price_max, all_price_ranges, minimum_job_applied } = req.body;
+
+    // Load lead + company
+    const leadResult = await pool.query(
+      `SELECT l.*, c.ghl_api_key, c.ghl_location_id FROM leads l JOIN companies c ON l.company_id = c.id WHERE l.id = $1 AND l.deleted_at IS NULL`,
+      [leadId]
+    );
+    if (leadResult.rows.length === 0) return res.status(404).json({ error: "Lead not found" });
+    const lead = leadResult.rows[0];
+
+    // Check there's already estimate #1 and no #2 yet
+    const existing = await pool.query(
+      `SELECT estimate_number FROM estimator_leads WHERE lead_id = $1 ORDER BY estimate_number ASC`,
+      [leadId]
+    );
+    if (existing.rows.length === 0) return res.status(400).json({ error: "No first estimate found" });
+    if (existing.rows.some(r => r.estimate_number === 2)) return res.status(400).json({ error: "Only 2 estimate requests are allowed, please contact us for more estimates" });
+
+    const displayProjectType = length_ft && width_ft && project_type
+      ? `${length_ft}' x ${width_ft}' ${project_type.charAt(0).toUpperCase() + project_type.slice(1)}`
+      : project_type;
+
+    await pool.query(
+      `INSERT INTO estimator_leads (
+        lead_id, company_id, estimate_number, project_type,
+        length_ft, width_ft, calculated_sf,
+        condition, existing_coating, selected_quality,
+        display_price_min, display_price_max,
+        all_price_ranges, minimum_job_applied
+      ) VALUES ($1, $2, 2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [
+        leadId, lead.company_id, displayProjectType,
+        length_ft, width_ft, calculated_sf,
+        condition, existing_coating || false, selected_quality,
+        display_price_min, display_price_max,
+        JSON.stringify(all_price_ranges), minimum_job_applied || false
+      ]
+    );
+
+    // Apply GHL tag + custom fields for second estimate
+    if (lead.ghl_api_key && lead.ghl_contact_id) {
+      try {
+        await applyStatusTags(lead.ghl_contact_id, "submitted_second_estimate", lead);
+      } catch (ghlErr) {
+        console.error("❌ GHL tag failed for second estimate:", ghlErr.message);
+      }
+      try {
+        const conditionLabel = condition === "minor" ? "A Few Cracks" : condition === "major" ? "A Lot of Cracks" : "Good";
+        const ranges = typeof all_price_ranges === "string" ? JSON.parse(all_price_ranges) : (all_price_ranges || {});
+        const fmtRange = (r) => r ? (r.min === r.max ? `$${r.min.toLocaleString()}` : `$${r.min.toLocaleString()} – $${r.max.toLocaleString()}`) : "";
+        await updateContactCustomFields(lead.ghl_contact_id, {
+          est2_square_footage: calculated_sf ? String(calculated_sf) : "",
+          est2_floor_condition: conditionLabel,
+          est2_solid_price_range: fmtRange(ranges.solid),
+          est2_flake_price_range: fmtRange(ranges.flake),
+          est2_metallic_price_range: fmtRange(ranges.metallic),
+          est2_custom_finish_range: fmtRange(ranges.custom),
+        }, lead);
+      } catch (fieldErr) {
+        console.error("❌ GHL EST2 custom fields failed:", fieldErr.message);
+      }
+    }
+
+    const allRows = await pool.query(
+      `SELECT * FROM estimator_leads WHERE lead_id = $1 ORDER BY estimate_number ASC`,
+      [leadId]
+    );
+    res.json({ success: true, estimates: allRows.rows });
+  } catch (error) {
+    console.error("Error saving second estimate:", error);
+    res.status(500).json({ error: "Failed to save second estimate" });
   }
 });
 // ============================================================================

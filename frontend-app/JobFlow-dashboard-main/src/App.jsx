@@ -12,9 +12,18 @@ import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
 import "./index.css";
 import { initializePushNotifications, setupPushListeners } from "./services/pushNotificationService";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { isNativeApp } from "./utils/platform";
 
 // Register push listeners immediately at module load — before React renders
 setupPushListeners();
+
+// Fix Capacitor 6 edge-to-edge: prevent status bar from overlapping WebView content
+if (isNativeApp()) {
+  StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+  StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+  StatusBar.setBackgroundColor({ color: "#225ce5" }).catch(() => {});
+}
 
 /* ===========================================================
    Error Boundary (Prevents React from white-screening)

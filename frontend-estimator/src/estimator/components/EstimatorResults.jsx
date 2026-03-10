@@ -69,7 +69,9 @@ export default function EstimatorResults({
   squareFeet,
   companyPhone,
   activeFinish,
-  setActiveFinish
+  setActiveFinish,
+  onSecondEstimate,
+  estimateCount = 1,
 }) {
   // Get labels from config
   const customProjectLabel = config?.custom_project_label || "Other Project";
@@ -353,6 +355,25 @@ const infoBoxClass = useCustomStyles
     </a>
   )}
 </div>
+
+{/* Have another space? — only if fewer than 2 estimates exist */}
+{estimateCount >= 2 ? (
+  <div className="mt-4 text-center">
+    <p className="text-sm text-gray-500">
+      Here are the 2 estimates you requested — if you need more areas estimated, call us.
+    </p>
+  </div>
+) : onSecondEstimate ? (
+  <div className="mt-4 text-center">
+    <button
+      type="button"
+      onClick={onSecondEstimate}
+      className="text-sm font-semibold underline text-gray-600 hover:text-gray-900"
+    >
+      Have another space? Add a second estimate
+    </button>
+  </div>
+) : null}
 
     </div>
   );

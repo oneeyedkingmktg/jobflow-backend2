@@ -1174,6 +1174,24 @@ async function deleteGhlContact(contactId, companyId) {
 
 
 // ----------------------------------------------------------------------------
+// UPDATE CONTACT CUSTOM FIELDS
+// Accepts: contactId (string), fields (object: { fieldKey: value }), company (row)
+// Skips null/undefined/empty values automatically.
+// ----------------------------------------------------------------------------
+async function updateContactCustomFields(contactId, fields, company) {
+  const customFields = Object.entries(fields)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([key, value]) => ({ id: key, field_value: String(value) }));
+
+  if (customFields.length === 0) return;
+
+  await ghlRequest(company, `/contacts/${contactId}`, {
+    method: "PUT",
+    body: { customFields },
+  });
+}
+
+// ----------------------------------------------------------------------------
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
 module.exports = {
@@ -1181,6 +1199,7 @@ module.exports = {
   deleteGhlContact,
   applyStatusTags,
   removeStatusTags,
+  updateContactCustomFields,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
     const companyId = company?.id;
 

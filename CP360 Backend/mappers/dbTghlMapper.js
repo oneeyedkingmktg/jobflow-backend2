@@ -45,6 +45,14 @@ const CUSTOM_FIELDS = Object.freeze({
   estimate_high: "estimate_high",
   estimate_mid: "estimate_mid", // optional
   contract_price: "contract_price", // optional
+
+  // Second estimate fields
+  est2_square_footage: "est2_square_footage",
+  est2_floor_condition: "est2_floor_condition",
+  est2_solid_price_range: "est2_solid_price_range",
+  est2_flake_price_range: "est2_flake_price_range",
+  est2_metallic_price_range: "est2_metallic_price_range",
+  est2_custom_finish_range: "est2_custom_finish_range",
 });
 
 // -----------------------------------------------------------------------------

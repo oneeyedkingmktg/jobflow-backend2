@@ -351,6 +351,7 @@ const {
       min_job_info_text,
       standard_info_text,
       ty_url_redirect,
+      combined_project_message,
 
 billing_status,
       service_area_zips,
@@ -426,7 +427,8 @@ billing_status,
       disclaimer_text,
       min_job_info_text,
       standard_info_text,
-      ty_url_redirect
+      ty_url_redirect,
+      combined_project_message
     ].some((v) => v !== undefined);
 
     await client.query('BEGIN');
@@ -538,6 +540,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
           min_job_info_text = COALESCE($16, min_job_info_text),
           standard_info_text = COALESCE($17, standard_info_text),
           ty_url_redirect = COALESCE($18, ty_url_redirect),
+          combined_project_message = COALESCE($20, combined_project_message),
           updated_at = CURRENT_TIMESTAMP
          WHERE company_id = $19
          RETURNING id`,
@@ -560,7 +563,8 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
           min_job_info_text,
           standard_info_text,
           ty_url_redirect,
-          companyId
+          companyId,
+          combined_project_message
         ]
       );
 
@@ -586,9 +590,10 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
             disclaimer_text,
             min_job_info_text,
             standard_info_text,
-            ty_url_redirect
+            ty_url_redirect,
+            combined_project_message
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
           [
             companyId,
             text_color || null,
@@ -608,7 +613,8 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
             disclaimer_text || null,
             min_job_info_text || null,
             standard_info_text || null,
-            ty_url_redirect || null
+            ty_url_redirect || null,
+            combined_project_message || null
           ]
         );
       }

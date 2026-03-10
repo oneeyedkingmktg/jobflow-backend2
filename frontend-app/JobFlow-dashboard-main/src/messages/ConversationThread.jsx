@@ -133,7 +133,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
       />
       {/* Header */}
       <div className="bg-[#225ce5] text-white shadow-md flex-shrink-0">
-        <div className="px-4 py-4 flex items-center gap-3">
+        <div className="px-4 pt-16 pb-4 flex items-center gap-3">
           {/* Back */}
           <button
             onClick={onBack}
@@ -156,7 +156,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
           </div>
 
           {/* Call button — native app only, requires phone number */}
-          {isNativeApp() && conversation.phone && softphone.initialized && (
+          {isNativeApp() && conversation.phone && (
             <button
               onClick={() => softphone.makeCall(conversation.phone, conversation.contactName)}
               disabled={softphone.isActive}

@@ -16,6 +16,348 @@ const utmSource = params.get("utm_source") || null;
 const utmMedium = params.get("utm_medium") || null;
 const utmCampaign = params.get("utm_campaign") || null;
 
+// ============================================================================
+// Modal shown when a returning customer already has 2 estimates on file
+// ============================================================================
+function TwoEstimatesModal({ estimates, config, onClose }) {
+  const cta1Button = config?.cta1_button || "";
+  const cta1Link = config?.cta1_link || "";
+  const cta2Button = config?.cta2_button || "";
+  const cta2Link = config?.cta2_link || "";
+
+  function formatPrice(min, max) {
+    if (!min || !max) return "N/A";
+    return `$${Number(min).toLocaleString()} – $${Number(max).toLocaleString()}`;
+  }
+
+  function getProjectLabel(type) {
+    if (!type) return "Unknown";
+    if (type.startsWith("garage_")) return type.split("_")[1] + " Car Garage";
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+        <div className="text-4xl mb-4">📋</div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">You Already Have 2 Estimates</h2>
+        <p className="text-gray-600 mb-6 text-sm">
+          Here are the estimates we have on file for you. If you need additional areas estimated, please give us a call.
+        </p>
+        <div className="space-y-3 text-left mb-6">
+          {estimates.map((est, idx) => {
+            let pr = {};
+            try { pr = typeof est.all_price_ranges === "string" ? JSON.parse(est.all_price_ranges) : est.all_price_ranges || {}; } catch (e) {}
+            const flake = pr.flake || {};
+            return (
+              <div key={est.id || idx} className="bg-gray-50 rounded-xl p-3">
+                <div className="text-xs font-bold text-gray-500 uppercase mb-1">{getProjectLabel(est.project_type)}</div>
+                <div className="font-bold text-gray-900">{formatPrice(flake.min || est.display_price_min, flake.max || est.display_price_max)}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="space-y-2">
+          {cta1Button && cta1Link && (
+            <a href={cta1Link} className="block w-full px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold text-center hover:bg-orange-600">{cta1Button}</a>
+          )}
+          {cta2Button && cta2Link && (
+            <a href={cta2Link} className="block w-full px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold text-center hover:bg-orange-600">{cta2Button}</a>
+          )}
+          <button onClick={onClose} className="block w-full px-6 py-2 text-gray-500 text-sm font-semibold hover:text-gray-700">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Second estimate mini-form (project type + condition + size — no contact info)
+// ============================================================================
+function SecondEstimateForm({ config, useCustomStyles, projectType2, setProjectType2, condition2, setCondition2, length2, width2, squareFeet2, openSizeModal, setLength2, setWidth2, setSquareFeet2, onSubmit, onBack, submitting, error }) {
+  const customProjectLabel = config?.custom_project_label || "Other Project";
+  const conditionGoodLabel = config?.condition_good_label || "Good";
+  const conditionMinorLabel = config?.condition_minor_label || "A Few Cracks";
+  const conditionMajorLabel = config?.condition_major_label || "A Lot of Cracks";
+  const selectedButtonColor = config?.selected_button_color || "#f97316";
+  const selectedButtonTextColor = config?.selected_button_text_color || "#ffffff";
+  const unselectedButtonColor = config?.unselected_button_color || "#ffffff";
+  const unselectedButtonTextColor = config?.unselected_button_text_color || "#4b5563";
+
+  const cardClass = useCustomStyles ? "estimator-card p-6 space-y-6" : "bg-white rounded-xl shadow p-6 space-y-6";
+  const selectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-2xl" : "rounded-lg border px-4 py-3 font-medium text-2xl bg-orange-500 text-white border-orange-500";
+  const selectedBtnStyle = useCustomStyles ? { backgroundColor: selectedButtonColor, color: selectedButtonTextColor, borderColor: selectedButtonColor } : {};
+  const unselectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-2xl" : "rounded-lg border px-4 py-3 font-medium text-2xl bg-white hover:bg-gray-50 border-gray-300";
+  const unselectedBtnStyle = useCustomStyles ? { backgroundColor: unselectedButtonColor, color: unselectedButtonTextColor, borderColor: "#d1d5db" } : {};
+
+  const needsSize = ["patio", "basement", "custom", "commercial"].includes(projectType2);
+  const hasSize = (Number(length2) > 0 && Number(width2) > 0) || Number(squareFeet2) > 0;
+  const formValid = projectType2 && condition2 && (!needsSize || hasSize);
+
+  const projectTypes = ["garage_1", "garage_2", "garage_3", "garage_4", "patio", "basement", "commercial", "custom"];
+  const projectLabels = { garage_1: "1 Car Garage", garage_2: "2 Car Garage", garage_3: "3 Car Garage", garage_4: "4 Car Garage", patio: "Patio", basement: "Basement", commercial: "Commercial", custom: customProjectLabel };
+  const visibilityKeys = { garage_1: "allow_garage_1", garage_2: "allow_garage_2", garage_3: "allow_garage_3", garage_4: "allow_garage_4", patio: "allow_patio", basement: "allow_basement", commercial: "allow_commercial", custom: "allow_custom" };
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onBack} className="text-gray-500 hover:text-gray-800 text-sm font-semibold">← Back</button>
+        <h2 className="text-2xl font-bold">Add a Second Space</h2>
+      </div>
+
+      <div>
+        <label className="font-semibold block mb-2">Project Type</label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {projectTypes.map((type) => {
+            if (!config) return null;
+            if (config[visibilityKeys[type]] === false) return null;
+            const isSelected = projectType2 === type;
+            return (
+              <button key={type} type="button"
+                onClick={() => {
+                  if (["patio", "basement", "custom", "commercial"].includes(type)) {
+                    openSizeModal(type);
+                  } else {
+                    setProjectType2(type);
+                    setLength2(""); setWidth2(""); setSquareFeet2("");
+                  }
+                }}
+                className={isSelected ? selectedBtnClass : unselectedBtnClass}
+                style={isSelected ? selectedBtnStyle : unselectedBtnStyle}
+              >
+                {projectLabels[type]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <label className="font-semibold block mb-2">Condition of Concrete</label>
+        <div className="grid grid-cols-3 gap-3">
+          {[{ value: "none", label: conditionGoodLabel }, { value: "minor", label: conditionMinorLabel }, { value: "major", label: conditionMajorLabel }].map((opt) => {
+            const isSelected = condition2 === opt.value;
+            return (
+              <button key={opt.value} type="button" onClick={() => setCondition2(opt.value)}
+                className={isSelected ? selectedBtnClass : unselectedBtnClass}
+                style={isSelected ? selectedBtnStyle : unselectedBtnStyle}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={!formValid || submitting}
+        className={formValid && !submitting ? (useCustomStyles ? "estimator-primary-btn w-full font-bold py-3 rounded-lg" : "bg-orange-500 hover:bg-orange-600 text-white w-full font-bold py-3 rounded-lg") : "w-full font-bold py-3 rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed"}
+      >
+        {submitting ? "Calculating..." : "Get My Second Estimate"}
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Combined results view — both estimates stacked
+// ============================================================================
+function CombinedResults({ config, useCustomStyles, estimate, projectType, condition, length, width, squareFeet, estimate2, projectType2, condition2, length2, width2, squareFeet2, activeFinish, setActiveFinish, activeFinish2, setActiveFinish2, companyPhone }) {
+  const customProjectLabel = config?.custom_project_label || "Other Project";
+  const conditionGoodLabel = config?.condition_good_label || "Good";
+  const conditionMinorLabel = config?.condition_minor_label || "A Few Cracks";
+  const conditionMajorLabel = config?.condition_major_label || "A Lot of Cracks";
+  const combinedProjectMessage = config?.combined_project_message || "";
+  const minJobInfoText = config?.min_job_info_text || "Minimum job pricing applied.";
+  const standardInfoText = config?.standard_info_text || "This is an estimate based on the information provided.";
+  const minimumJobPrice = Number(config?.minimum_job_price) || 0;
+  const cta1Button = config?.cta1_button || "";
+  const cta1Link = config?.cta1_link || "";
+  const cta2Button = config?.cta2_button || "";
+  const cta2Link = config?.cta2_link || "";
+
+  const priceBoxBorderColor = config?.price_box_border_color || "#fdba74";
+  const pricingInfoBoxBackground = config?.pricing_info_box_background || "#fefce8";
+  const pricingInfoBoxStripeColor = config?.pricing_info_box_stripe_color || "#fb923c";
+  const unselectedButtonTextColor = config?.unselected_button_text_color || "#4b5563";
+  const primaryBtnClass = useCustomStyles ? "estimator-primary-btn font-bold py-3 rounded-lg" : "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg";
+  const cardClass = useCustomStyles ? "estimator-card p-6" : "bg-white rounded-xl shadow p-6";
+  const selectedButtonColor = config?.selected_button_color || "#f97316";
+  const selectedButtonTextColor = config?.selected_button_text_color || "#ffffff";
+  const customFinishLabel = config?.custom_finish_label || "Custom";
+  const finishTabs = ["solid", "flake", "metallic", "custom"];
+
+  const priceBoxClass = useCustomStyles ? "rounded-lg overflow-hidden" : "border border-orange-300 rounded-lg overflow-hidden";
+  const priceBoxStyle = useCustomStyles ? { borderColor: priceBoxBorderColor, borderWidth: "1px", borderStyle: "solid" } : {};
+
+  const infoBoxClass = useCustomStyles
+    ? "rounded-md px-4 py-3 text-sm"
+    : "bg-yellow-50 border-l-4 border-orange-400 rounded-md px-4 py-3 text-sm";
+  const infoBoxStyle = useCustomStyles
+    ? { backgroundColor: pricingInfoBoxBackground, borderLeftColor: pricingInfoBoxStripeColor, borderLeftWidth: "4px", borderLeftStyle: "solid" }
+    : {};
+
+  function getProjectLabel(pt, l, w, sf) {
+    if (!pt) return "";
+    if (pt.startsWith("garage_")) return pt.split("_")[1] + " car garage";
+    if (["patio", "basement"].includes(pt)) {
+      if (Number(l) > 0 && Number(w) > 0) return `${l}' × ${w}' ${pt}`;
+      if (Number(sf) > 0) return `${Number(sf).toLocaleString()} sq ft ${pt}`;
+      return pt;
+    }
+    if (pt === "commercial") return Number(sf) > 0 ? `Commercial space (${Number(sf).toLocaleString()} sq ft)` : "Commercial space";
+    if (pt === "custom") {
+      if (Number(l) > 0 && Number(w) > 0) return `${l}' × ${w}' ${customProjectLabel}`;
+      if (Number(sf) > 0) return `${Number(sf).toLocaleString()} sq ft ${customProjectLabel}`;
+      return customProjectLabel;
+    }
+    return pt;
+  }
+
+  function getConditionLabel(c) {
+    if (c === "minor") return conditionMinorLabel;
+    if (c === "major") return conditionMajorLabel;
+    return conditionGoodLabel;
+  }
+
+  function getFinishLabel(f) {
+    return f === "custom" ? customFinishLabel : f.charAt(0).toUpperCase() + f.slice(1);
+  }
+
+  function getRanges(est) {
+    if (!est) return {};
+    return est.allPriceRanges || (typeof est.all_price_ranges === "string" ? JSON.parse(est.all_price_ranges) : est.all_price_ranges) || {};
+  }
+
+  function renderTabs(est, active, setActive) {
+    return (
+      <div className="flex justify-center gap-1 mb-3">
+        {finishTabs.map((finish) => {
+          const ranges = getRanges(est);
+          if (!ranges[finish]) return null;
+          const isActive = active === finish;
+          const tabClass = useCustomStyles
+            ? "px-4 py-2 text-sm font-semibold rounded-lg border"
+            : isActive
+              ? "px-4 py-2 text-sm font-semibold rounded-lg border bg-orange-500 text-white border-orange-500"
+              : "px-4 py-2 text-sm font-semibold rounded-lg border bg-gray-100 text-gray-600 border-gray-300";
+          const tabStyle = useCustomStyles
+            ? isActive
+              ? { backgroundColor: selectedButtonColor, color: selectedButtonTextColor, borderColor: selectedButtonColor }
+              : { backgroundColor: "#f3f4f6", color: unselectedButtonTextColor, borderColor: "#d1d5db" }
+            : {};
+          return (
+            <button key={finish} onClick={() => setActive(finish)} className={tabClass} style={tabStyle}>
+              {getFinishLabel(finish)}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Per-space range data
+  const est1Ranges = getRanges(estimate);
+  const est2Ranges = getRanges(estimate2);
+  const r1 = est1Ranges[activeFinish];
+  const r2 = est2Ranges[activeFinish2];
+
+  // Per-space min job check: minimumApplied flag AND flat price (min === max)
+  const space1MinApplied = r1?.minimumApplied && r1?.min === r1?.max;
+  const space2MinApplied = r2?.minimumApplied && r2?.min === r2?.max;
+
+  // Per-space price display
+  function spacePrice(r) {
+    if (!r) return "—";
+    if (r.min === r.max) return `$${r.min.toLocaleString()}`;
+    return `$${r.min.toLocaleString()} – $${r.max.toLocaleString()}`;
+  }
+
+  // Combined total
+  const totalMin = (r1?.min || 0) + (r2?.min || 0);
+  const totalMax = (r1?.max || 0) + (r2?.max || 0);
+
+  // Combined min job check: if the combined total is below the minimum job price
+  const combinedBelowMin = minimumJobPrice > 0 && totalMin < minimumJobPrice;
+  const effectiveTotalMin = combinedBelowMin ? minimumJobPrice : totalMin;
+  const effectiveTotalMax = combinedBelowMin ? minimumJobPrice : totalMax;
+  const totalDisplay = effectiveTotalMin === effectiveTotalMax
+    ? `$${effectiveTotalMin.toLocaleString()}`
+    : `$${effectiveTotalMin.toLocaleString()} – $${effectiveTotalMax.toLocaleString()}`;
+  const showCombinedMinNotice = combinedBelowMin || (space1MinApplied && space2MinApplied);
+
+  return (
+    <div className={cardClass}>
+      <h2 className="text-xl font-bold text-center mb-6 leading-snug">The 2 Estimates You Requested</h2>
+
+      {/* Estimate 1 card */}
+      <div className={`${priceBoxClass} mb-3`} style={priceBoxStyle}>
+        <div className="pt-4 px-4">
+          {renderTabs(estimate, activeFinish, setActiveFinish)}
+        </div>
+        <div className="px-4 pb-4 text-center">
+          <div className="text-sm font-semibold text-gray-700">{getProjectLabel(projectType, length, width, squareFeet)}</div>
+          <div className="text-xl font-bold mt-1">
+            {spacePrice(r1)}<span className="text-xs align-super">*</span>
+          </div>
+          <div className="text-sm text-gray-600 mt-1">Condition: {getConditionLabel(condition)}</div>
+          {space1MinApplied && (
+            <p className="text-xs text-gray-500 italic mt-2">{minJobInfoText}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Estimate 2 card */}
+      <div className={`${priceBoxClass} mb-4`} style={priceBoxStyle}>
+        <div className="pt-4 px-4">
+          {renderTabs(estimate2, activeFinish2, setActiveFinish2)}
+        </div>
+        <div className="px-4 pb-4 text-center">
+          <div className="text-sm font-semibold text-gray-700">{getProjectLabel(projectType2, length2, width2, squareFeet2)}</div>
+          <div className="text-xl font-bold mt-1">
+            {spacePrice(r2)}<span className="text-xs align-super">*</span>
+          </div>
+          <div className="text-sm text-gray-600 mt-1">Condition: {getConditionLabel(condition2)}</div>
+          {space2MinApplied && (
+            <p className="text-xs text-gray-500 italic mt-2">{minJobInfoText}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Combined total */}
+      <div className="text-center mb-3">
+        <div className="text-sm font-semibold text-gray-500 uppercase">Combined Total</div>
+        <div className="text-3xl font-bold mt-1">{totalDisplay}</div>
+        {showCombinedMinNotice && (
+          <p className="text-xs text-gray-500 italic mt-1">{minJobInfoText}</p>
+        )}
+      </div>
+
+      {/* Combined project message — below total */}
+      {combinedProjectMessage && (
+        <div className={`${infoBoxClass} mb-4`} style={infoBoxStyle}>
+          {combinedProjectMessage}
+        </div>
+      )}
+
+      {/* CTAs */}
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
+        {cta1Button && cta1Link && <a href={cta1Link} className={`w-full md:w-1/2 ${primaryBtnClass} text-center`}>{cta1Button}</a>}
+        {cta2Button && cta2Link && <a href={cta2Link} className={`w-full md:w-1/2 ${primaryBtnClass} text-center`}>{cta2Button}</a>}
+      </div>
+
+      {/* Standard info text footnote */}
+      {standardInfoText && (
+        <p className="text-xs text-gray-500 italic text-center">* {standardInfoText}</p>
+      )}
+    </div>
+  );
+}
+
 export default function Estimator() {
   // Config hook - handles fetching and style generation
   const { config, customStyles, useCustomStyles } = useEstimatorConfig();
@@ -23,8 +365,9 @@ export default function Estimator() {
   // Screen state
   const [screen, setScreen] = useState(1);
   const [activeFinish, setActiveFinish] = useState("flake");
+  const [activeFinish2, setActiveFinish2] = useState("flake");
 
-  // Form state
+  // Form state (estimate 1)
   const [projectType, setProjectType] = useState("");
   const [condition, setCondition] = useState("");
   const [length, setLength] = useState("");
@@ -37,11 +380,30 @@ export default function Estimator() {
   const [estimate, setEstimate] = useState(null);
   const [companyPhone, setCompanyPhone] = useState("");
   const [error, setError] = useState("");
-const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [outOfServiceArea, setOutOfServiceArea] = useState(false);
+  const [leadId, setLeadId] = useState(null);
 
-  // Size modal state
+  // Second estimate state
+  const [projectType2, setProjectType2] = useState("");
+  const [condition2, setCondition2] = useState("");
+  const [length2, setLength2] = useState("");
+  const [width2, setWidth2] = useState("");
+  const [squareFeet2, setSquareFeet2] = useState("");
+  const [estimate2, setEstimate2] = useState(null);
+  const [submitting2, setSubmitting2] = useState(false);
+  const [error2, setError2] = useState("");
+
+  // Returning customer state
+  const [estimateCount, setEstimateCount] = useState(0); // how many estimates exist for this lead
+  const [showTwoEstimatesModal, setShowTwoEstimatesModal] = useState(false);
+  const [existingEstimatesForModal, setExistingEstimatesForModal] = useState([]);
+  // estimate1FromDB — used when returning customer has 1 existing estimate
+  const [estimate1FromDB, setEstimate1FromDB] = useState(null);
+
+  // Size modal state (shared, sizeModalFor tracks which form it belongs to)
   const [showSizeModal, setShowSizeModal] = useState(false);
+  const [sizeModalFor, setSizeModalFor] = useState(1);
   const [pendingProjectType, setPendingProjectType] = useState("");
   const [sizeMode, setSizeMode] = useState("dims");
   const [modalLength, setModalLength] = useState("");
@@ -112,7 +474,8 @@ const [submitting, setSubmitting] = useState(false);
   }
 
   // Modal handlers
-  function openSizeModal(nextType) {
+  function openSizeModal(nextType, forForm = 1) {
+    setSizeModalFor(forForm);
     setPendingProjectType(nextType);
     setShowSizeModal(true);
     setSizeError("");
@@ -126,50 +489,54 @@ const [submitting, setSubmitting] = useState(false);
     setShowSizeModal(false);
     setPendingProjectType("");
     setSizeError("");
-    setProjectType("");
-    setLength("");
-    setWidth("");
-    setSquareFeet("");
+    if (sizeModalFor === 1) {
+      setProjectType("");
+      setLength("");
+      setWidth("");
+      setSquareFeet("");
+    } else {
+      setProjectType2("");
+      setLength2("");
+      setWidth2("");
+      setSquareFeet2("");
+    }
   }
 
   function saveSizeModal() {
     if (!pendingProjectType) return;
+    const setType = sizeModalFor === 1 ? setProjectType : setProjectType2;
+    const setSf = sizeModalFor === 1 ? setSquareFeet : setSquareFeet2;
+    const setL = sizeModalFor === 1 ? setLength : setLength2;
+    const setW = sizeModalFor === 1 ? setWidth : setWidth2;
 
     if (pendingProjectType === "commercial") {
       const sf = Number(modalSf);
-      if (!sf || sf <= 0) {
-        setSizeError("Square footage is required.");
-        return;
-      }
-      setProjectType(pendingProjectType);
-      setSquareFeet(String(sf));
+      if (!sf || sf <= 0) { setSizeError("Square footage is required."); return; }
+      setType(pendingProjectType);
+      setSf(String(sf));
     } else if (sizeMode === "dims") {
       const l = Number(modalLength);
       const w = Number(modalWidth);
-      if (!l || !w) {
-        setSizeError("Length and width are required.");
-        return;
-      }
-      setProjectType(pendingProjectType);
-      setLength(String(l));
-      setWidth(String(w));
-      setSquareFeet("");
+      if (!l || !w) { setSizeError("Length and width are required."); return; }
+      setType(pendingProjectType);
+      setL(String(l));
+      setW(String(w));
+      setSf("");
     } else {
       const sf = Number(modalSf);
-      if (!sf) {
-        setSizeError("Square footage is required.");
-        return;
-      }
-      setProjectType(pendingProjectType);
-      setSquareFeet(String(sf));
-      setLength("");
-      setWidth("");
+      if (!sf) { setSizeError("Square footage is required."); return; }
+      setType(pendingProjectType);
+      setSf(String(sf));
+      setL("");
+      setW("");
     }
 
     setShowSizeModal(false);
     setPendingProjectType("");
     setSizeError("");
   }
+
+  const API_BASE = import.meta.env.VITE_API_URL || "https://api.coatingpro360.com";
 
   // Form submission
 async function submitEstimate() {
@@ -187,7 +554,7 @@ if (serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0) {
       // 1️⃣ Get estimate preview
       console.log("🔍 Company ID from URL:", companyId);
       
-const previewRes = await fetch("https://api.coatingpro360.com/estimator/preview", {
+const previewRes = await fetch(`${API_BASE}/estimator/preview`, {
 
 
 
@@ -244,7 +611,7 @@ const leadData = {
       console.log("🚀 SENDING LEAD DATA WITH ESTIMATE:", leadData);
 
       // 2️⃣ Create lead (now includes estimate data)
-const leadRes = await fetch("https://api.coatingpro360.com/leads", {
+const leadRes = await fetch(`${API_BASE}/leads`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(leadData)
@@ -289,9 +656,38 @@ try {
         console.warn("Meta conversion event error:", e);
       }
 
-      // 4️⃣ Show results
-      setEstimate(previewData.estimate);
+      // 4️⃣ Handle response
+      if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
       setCompanyPhone(previewData.companyPhone || "");
+
+      // Returning customer — 2 estimates already exist: show modal, don't proceed
+      if (leadResData?.twoEstimatesExist) {
+        setExistingEstimatesForModal(leadResData.estimates || []);
+        setShowTwoEstimatesModal(true);
+        return;
+      }
+
+      // Returning customer — had 1 existing estimate, new one saved as #2
+      if (leadResData?.hasExistingEstimate && leadResData?.estimates?.length === 2) {
+        const dbEst1 = leadResData.estimates[0];
+        const pr1 = typeof dbEst1.all_price_ranges === "string" ? JSON.parse(dbEst1.all_price_ranges) : dbEst1.all_price_ranges;
+        setEstimate1FromDB({ allPriceRanges: pr1, minimumJobApplied: dbEst1.minimum_job_applied });
+        setEstimate(previewData.estimate); // new submission = estimate 2 visually
+        setProjectType2(projectType);
+        setCondition2(condition);
+        setLength2(length);
+        setWidth2(width);
+        setSquareFeet2(squareFeet);
+        setEstimate2(previewData.estimate);
+        // populate estimate 1 display data from DB row
+        setEstimateCount(2);
+        setScreen(4);
+        return;
+      }
+
+      // Normal first estimate
+      setEstimate(previewData.estimate);
+      setEstimateCount(1);
       setScreen(2);
 
     } catch (err) {
@@ -302,6 +698,64 @@ try {
     }
   }
 
+  async function submitSecondEstimate() {
+    if (!projectType2 || !condition2) { setError2("Please select a project type and condition."); return; }
+    const needsSize = ["patio", "basement", "custom", "commercial"].includes(projectType2);
+    const hasSize = (Number(length2) > 0 && Number(width2) > 0) || Number(squareFeet2) > 0;
+    if (needsSize && !hasSize) { setError2("Please enter the size of the space."); return; }
+
+    setSubmitting2(true);
+    setError2("");
+    try {
+      const previewRes = await fetch(`${API_BASE}/estimator/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          project: { type: projectType2, condition: condition2 },
+          length: length2,
+          width: width2,
+          squareFeet: squareFeet2,
+          selectedQuality: activeFinish,
+          zip
+        })
+      });
+      const previewData = await previewRes.json();
+      if (!previewRes.ok) throw new Error(previewData.error || "Unable to generate estimate");
+
+      const token = localStorage.getItem("authToken");
+      const saveRes = await fetch(`${API_BASE}/leads/${leadId}/second-estimate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          project_type: projectType2,
+          condition: condition2,
+          length_ft: length2 ? parseFloat(length2) : null,
+          width_ft: width2 ? parseFloat(width2) : null,
+          calculated_sf: previewData.estimate.calculatedSf,
+          existing_coating: false,
+          selected_quality: activeFinish,
+          display_price_min: previewData.estimate.displayPriceMin,
+          display_price_max: previewData.estimate.displayPriceMax,
+          all_price_ranges: previewData.estimate.allPriceRanges,
+          minimum_job_applied: previewData.estimate.minimumJobApplied || false
+        })
+      });
+      if (!saveRes.ok) {
+        const errData = await saveRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to save second estimate");
+      }
+
+      setEstimate2(previewData.estimate);
+      setEstimateCount(2);
+      setScreen(4);
+    } catch (err) {
+      console.error("💥 SECOND ESTIMATE ERROR:", err);
+      setError2(err.message);
+    } finally {
+      setSubmitting2(false);
+    }
+  }
 
   return (
     <>
@@ -373,6 +827,15 @@ try {
           )}
           </>
         )}
+        {/* Two estimates modal */}
+        {showTwoEstimatesModal && (
+          <TwoEstimatesModal
+            estimates={existingEstimatesForModal}
+            config={config}
+            onClose={() => setShowTwoEstimatesModal(false)}
+          />
+        )}
+
         {screen === 2 && estimate && (
           <EstimatorResults
             config={config}
@@ -386,6 +849,56 @@ try {
             companyPhone={companyPhone}
             activeFinish={activeFinish}
             setActiveFinish={setActiveFinish}
+            onSecondEstimate={leadId && estimateCount < 2 ? () => setScreen(3) : undefined}
+            estimateCount={estimateCount}
+          />
+        )}
+
+        {/* Screen 3: Second estimate mini-form */}
+        {screen === 3 && (
+          <SecondEstimateForm
+            config={config}
+            useCustomStyles={useCustomStyles}
+            projectType2={projectType2}
+            setProjectType2={setProjectType2}
+            condition2={condition2}
+            setCondition2={setCondition2}
+            length2={length2}
+            width2={width2}
+            squareFeet2={squareFeet2}
+            openSizeModal={(type) => openSizeModal(type, 2)}
+            setLength2={setLength2}
+            setWidth2={setWidth2}
+            setSquareFeet2={setSquareFeet2}
+            onSubmit={submitSecondEstimate}
+            onBack={() => setScreen(2)}
+            submitting={submitting2}
+            error={error2}
+          />
+        )}
+
+        {/* Screen 4: Combined results */}
+        {screen === 4 && estimate2 && (
+          <CombinedResults
+            config={config}
+            useCustomStyles={useCustomStyles}
+            estimate={estimate1FromDB || estimate}
+            projectType={estimate1FromDB ? (existingEstimatesForModal[0]?.project_type || "") : projectType}
+            condition={estimate1FromDB ? (existingEstimatesForModal[0]?.condition || "") : condition}
+            length={""}
+            width={""}
+            squareFeet={""}
+            estimate2={estimate2}
+            projectType2={projectType2}
+            condition2={condition2}
+            length2={length2}
+            width2={width2}
+            squareFeet2={squareFeet2}
+            activeFinish={activeFinish}
+            setActiveFinish={setActiveFinish}
+            activeFinish2={activeFinish2}
+            setActiveFinish2={setActiveFinish2}
+            companyPhone={companyPhone}
           />
         )}
       </div>
