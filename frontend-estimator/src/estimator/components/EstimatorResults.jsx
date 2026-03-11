@@ -301,7 +301,7 @@ const infoBoxClass = useCustomStyles
 {/* Price box connects to active tab */}
 <div className={priceBoxClass} style={{ ...priceBoxStyle, marginTop: "-1px" }}>
   <div className="p-5 text-center space-y-2">
-    <div className="text-sm font-semibold text-gray-700">
+    <div className="text-lg font-semibold text-gray-700">
       {projectLabel}
     </div>
 

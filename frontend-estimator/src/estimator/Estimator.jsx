@@ -85,9 +85,9 @@ function SecondEstimateForm({ config, useCustomStyles, projectType2, setProjectT
   const unselectedButtonTextColor = config?.unselected_button_text_color || "#4b5563";
 
   const cardClass = useCustomStyles ? "estimator-card p-6 space-y-6" : "bg-white rounded-xl shadow p-6 space-y-6";
-  const selectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-2xl" : "rounded-lg border px-4 py-3 font-medium text-2xl bg-orange-500 text-white border-orange-500";
+  const selectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-sm" : "rounded-lg border px-4 py-3 font-medium text-sm bg-orange-500 text-white border-orange-500";
   const selectedBtnStyle = useCustomStyles ? { backgroundColor: selectedButtonColor, color: selectedButtonTextColor, borderColor: selectedButtonColor } : {};
-  const unselectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-2xl" : "rounded-lg border px-4 py-3 font-medium text-2xl bg-white hover:bg-gray-50 border-gray-300";
+  const unselectedBtnClass = useCustomStyles ? "rounded-lg border px-4 py-3 font-medium text-sm" : "rounded-lg border px-4 py-3 font-medium text-sm bg-white hover:bg-gray-50 border-gray-300";
   const unselectedBtnStyle = useCustomStyles ? { backgroundColor: unselectedButtonColor, color: unselectedButtonTextColor, borderColor: "#d1d5db" } : {};
 
   const needsSize = ["patio", "basement", "custom", "commercial"].includes(projectType2);
@@ -300,7 +300,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
           {renderTabs(estimate, activeFinish, setActiveFinish)}
         </div>
         <div className="px-4 pb-4 text-center">
-          <div className="text-sm font-semibold text-gray-700">{getProjectLabel(projectType, length, width, squareFeet)}</div>
+          <div className="text-lg font-semibold text-gray-700">{getProjectLabel(projectType, length, width, squareFeet)}</div>
           <div className="text-xl font-bold mt-1">
             {spacePrice(r1)}<span className="text-xs align-super">*</span>
           </div>
@@ -317,7 +317,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
           {renderTabs(estimate2, activeFinish2, setActiveFinish2)}
         </div>
         <div className="px-4 pb-4 text-center">
-          <div className="text-sm font-semibold text-gray-700">{getProjectLabel(projectType2, length2, width2, squareFeet2)}</div>
+          <div className="text-lg font-semibold text-gray-700">{getProjectLabel(projectType2, length2, width2, squareFeet2)}</div>
           <div className="text-xl font-bold mt-1">
             {spacePrice(r2)}<span className="text-xs align-super">*</span>
           </div>
