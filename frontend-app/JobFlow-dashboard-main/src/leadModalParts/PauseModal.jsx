@@ -5,23 +5,20 @@ export default function PauseModal({ form, onSave, onClose }) {
   const isPaused = form.pauseStatus === "Paused";
 
   const [toggleOn, setToggleOn] = useState(isPaused);
+  const [pauseMode, setPauseMode] = useState(form.pauseUntil ? "date" : "indefinite");
   const [pauseUntil, setPauseUntil] = useState(form.pauseUntil || "");
   const [resumeAction, setResumeAction] = useState(form.resumeAction || "Notify Only");
   const [pauseNotes, setPauseNotes] = useState(form.pauseNotes || "");
 
-const handleSave = () => {
-    if (toggleOn && !pauseUntil) {
-      alert("Pause Until date is required.");
-      return;
-    }
-    if (toggleOn && !resumeAction) {
-      alert("Resume behavior selection is required.");
+  const handleSave = () => {
+    if (toggleOn && pauseMode === "date" && !pauseUntil) {
+      alert("Please select a date or choose 'Until Unpaused'.");
       return;
     }
     if (toggleOn) {
       onSave({
         pauseStatus: "Paused",
-        pauseUntil,
+        pauseUntil: pauseMode === "date" ? pauseUntil : null,
         resumeAction,
         pauseNotes,
       });
@@ -62,25 +59,52 @@ const handleSave = () => {
         {toggleOn && (
           <>
             <p className="text-xs text-gray-500">
-              Lead will not get any further messages until the selected date.
+              Lead will not get any further messages until unpaused or the selected date.
             </p>
 
-            {/* DATE */}
+            {/* PAUSE DURATION */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Pause Until
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pause Duration
               </label>
-<input
-                type="date"
-                value={pauseUntil}
-                onChange={(e) => setPauseUntil(e.target.value)}
-                required
-                className={`w-full border rounded-lg px-3 py-2 text-sm ${!pauseUntil ? "border-red-400 bg-red-50" : "border-gray-300"}`}
-              />
-              {!pauseUntil && (
-                <p className="text-xs text-red-500 mt-1">Required</p>
-              )}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pauseMode"
+                    value="indefinite"
+                    checked={pauseMode === "indefinite"}
+                    onChange={() => setPauseMode("indefinite")}
+                  />
+                  Until Unpaused
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="pauseMode"
+                    value="date"
+                    checked={pauseMode === "date"}
+                    onChange={() => setPauseMode("date")}
+                  />
+                  Until a specific date
+                </label>
+              </div>
             </div>
+
+            {/* DATE — only shown when "date" mode selected */}
+            {pauseMode === "date" && (
+              <div>
+                <input
+                  type="date"
+                  value={pauseUntil}
+                  onChange={(e) => setPauseUntil(e.target.value)}
+                  className={`w-full border rounded-lg px-3 py-2 text-sm ${!pauseUntil ? "border-red-400 bg-red-50" : "border-gray-300"}`}
+                />
+                {!pauseUntil && (
+                  <p className="text-xs text-red-500 mt-1">Required</p>
+                )}
+              </div>
+            )}
 
             {/* RESUME ACTION */}
             <div>
@@ -126,9 +150,9 @@ const handleSave = () => {
           >
             Cancel
           </button>
-<button
+          <button
             onClick={handleSave}
-            disabled={toggleOn && !pauseUntil}
+            disabled={toggleOn && pauseMode === "date" && !pauseUntil}
             className="px-4 py-2 rounded-xl bg-yellow-500 text-white hover:bg-yellow-600 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Save
