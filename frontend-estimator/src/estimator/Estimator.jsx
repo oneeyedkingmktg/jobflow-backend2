@@ -656,6 +656,13 @@ try {
         console.warn("Meta conversion event error:", e);
       }
 
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ event: 'estimate_submitted' });
+      } catch (e) {
+        console.warn("dataLayer push error:", e);
+      }
+
       // 4️⃣ Handle response
       if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
       setCompanyPhone(previewData.companyPhone || "");
