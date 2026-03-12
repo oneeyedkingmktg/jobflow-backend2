@@ -11,9 +11,15 @@ npm run build
 echo ">>> Syncing Capacitor..."
 npx cap sync ios
 
-echo ">>> Resolving SPM package dependencies..."
-xcodebuild -resolvePackageDependencies \
-  -project "$CI_WORKSPACE/frontend-app/JobFlow-dashboard-main/ios/App/App.xcodeproj" \
-  -scheme App
+echo ">>> Resolving SPM packages..."
+PACKAGE_DIR="$CI_WORKSPACE/frontend-app/JobFlow-dashboard-main/ios/App/CapApp-SPM"
+RESOLVED_DEST="$CI_WORKSPACE/frontend-app/JobFlow-dashboard-main/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
 
+cd "$PACKAGE_DIR"
+swift package resolve
+
+mkdir -p "$RESOLVED_DEST"
+cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
+
+echo ">>> Package.resolved placed at: $RESOLVED_DEST/Package.resolved"
 echo ">>> Pre-build steps complete."
