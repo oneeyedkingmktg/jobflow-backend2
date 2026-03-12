@@ -657,10 +657,11 @@ try {
       }
 
       try {
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({ event: 'estimate_submitted' });
+        if (typeof gtag === 'function') {
+          gtag('event', 'estimate_submitted');
+        }
       } catch (e) {
-        console.warn("dataLayer push error:", e);
+        console.warn("GA4 event error:", e);
       }
 
       // 4️⃣ Handle response
