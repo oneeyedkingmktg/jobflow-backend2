@@ -648,7 +648,7 @@ try {
       }
 
       try {
-        if (config.meta_conversion_event) {
+        if (config.meta_conversion_event && typeof fbq === 'function') {
           // eslint-disable-next-line no-new-func
           new Function(config.meta_conversion_event)();
         }
