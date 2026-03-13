@@ -86,7 +86,9 @@ const toCamel = (row) => ({
   resumeAction: row.resume_action,
   pauseNotes: row.pause_notes,
 
-  proceedWithAutomation: row.proceed_with_automation
+  proceedWithAutomation: row.proceed_with_automation,
+
+  ghlContactId: row.ghl_contact_id,
 });
 
 function parseName(full) {
