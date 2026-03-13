@@ -1,13 +1,14 @@
 #!/bin/sh
 set -e
 
-# Diagnostics
-echo ">>> Current PATH: $PATH"
-echo ">>> which node: $(which node 2>/dev/null || echo NOT FOUND)"
-echo ">>> which npm: $(which npm 2>/dev/null || echo NOT FOUND)"
-echo ">>> ls /opt/homebrew/bin/node: $(ls /opt/homebrew/bin/node 2>/dev/null || echo NOT FOUND)"
-echo ">>> ls /usr/local/bin/node: $(ls /usr/local/bin/node 2>/dev/null || echo NOT FOUND)"
-find /usr/local /opt/homebrew -name "npm" 2>/dev/null | head -5 || echo "npm not found in common dirs"
+# Add Homebrew to PATH (Xcode Cloud uses /Users/local/Homebrew)
+export PATH="/Users/local/Homebrew/bin:/Users/local/Homebrew/sbin:$PATH"
+
+echo ">>> Installing Node.js via Homebrew..."
+brew install node
+
+echo ">>> Node version: $(node -v)"
+echo ">>> npm version: $(npm -v)"
 
 # Navigate relative to this script's location
 # Script is at ios/App/ci_scripts/ so ../../.. = JobFlow-dashboard-main/
