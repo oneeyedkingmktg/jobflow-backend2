@@ -21,10 +21,18 @@ export const setupPushListeners = () => {
 
     if (data.contactId) {
       window.__pendingGhlContactId = data.contactId;
-      window.dispatchEvent(new CustomEvent('openLeadByGhlContact', { detail: { ghlContactId: data.contactId } }));
-      if (typeof window.__setAppScreen === 'function') {
-        window.__setAppScreen('leads');
-      }
+
+      // Retry navigation until React has rendered and __setAppScreen is available
+      // (handles cold-start where this fires before the app renders)
+      const tryNavigate = (attempts = 0) => {
+        if (typeof window.__setAppScreen === 'function') {
+          window.__setAppScreen('leads');
+          window.dispatchEvent(new CustomEvent('openLeadByGhlContact', { detail: { ghlContactId: data.contactId } }));
+        } else if (attempts < 20) {
+          setTimeout(() => tryNavigate(attempts + 1), 250);
+        }
+      };
+      tryNavigate();
     }
   });
 };
