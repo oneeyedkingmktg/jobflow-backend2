@@ -25,4 +25,16 @@ npm run build
 echo ">>> Syncing Capacitor..."
 npx cap sync ios
 
+echo ">>> Regenerating Package.resolved after cap sync..."
+PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
+RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+
+cd "$PACKAGE_DIR"
+swift package resolve
+
+mkdir -p "$RESOLVED_DEST"
+cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
+cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
+echo ">>> Package.resolved updated at $RESOLVED_DEST"
+
 echo ">>> Post-clone steps complete."
