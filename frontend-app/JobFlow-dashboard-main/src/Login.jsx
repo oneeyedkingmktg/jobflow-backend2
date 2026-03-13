@@ -72,8 +72,8 @@ export default function Login({ onForgotPassword }) {
 
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-500 leading-relaxed">
-          Built by an epoxy contractor for epoxy contractors.<br />
-          Make more of the leads you are already getting.
+          Built by a contractor for contractors.<br />
+          Turn more leads you already have into paying customers.
         </p>
         <a
           href="https://coatingpro360.com"
