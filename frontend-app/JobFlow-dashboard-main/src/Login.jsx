@@ -69,6 +69,21 @@ export default function Login({ onForgotPassword }) {
           Forgot Password?
         </button>
       </div>
+
+      <div className="mt-10 pt-6 border-t border-gray-100 text-center">
+        <p className="text-sm text-gray-500 leading-relaxed">
+          Built by an epoxy contractor for epoxy contractors.<br />
+          Make more of the leads you are already getting.
+        </p>
+        <a
+          href="https://coatingpro360.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block mt-3 text-sm font-semibold text-red-600 hover:text-red-800"
+        >
+          Get yours at CoatingPro360.com →
+        </a>
+      </div>
     </div>
   );
 }
