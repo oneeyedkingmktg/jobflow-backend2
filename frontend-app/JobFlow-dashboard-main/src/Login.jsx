@@ -19,8 +19,8 @@ export default function Login({ onForgotPassword }) {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white shadow-md rounded-xl p-10 mt-[60px]">
-      <div className="flex justify-center mb-6">
+    <div className="max-w-md mx-auto bg-white shadow-md rounded-xl p-10 mt-[30px]">
+      <div className="flex justify-center mb-3">
         <img 
           src="https://coatingpro360.com/wp-content/uploads/2026/01/CP-Square-button-1024-x-1024.png"
           alt="CoatingPro360"
@@ -70,7 +70,7 @@ export default function Login({ onForgotPassword }) {
         </button>
       </div>
 
-      <div className="mt-10 pt-6 border-t border-gray-100 text-center">
+      <div className="mt-6 text-center">
         <p className="text-sm text-gray-500 leading-relaxed">
           Built by an epoxy contractor for epoxy contractors.<br />
           Make more of the leads you are already getting.
@@ -79,7 +79,7 @@ export default function Login({ onForgotPassword }) {
           href="https://coatingpro360.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block mt-3 text-sm font-semibold text-red-600 hover:text-red-800"
+          className="inline-block mt-2 text-sm font-semibold text-red-600 hover:text-red-800"
         >
           Get yours at CoatingPro360.com →
         </a>
