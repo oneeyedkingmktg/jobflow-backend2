@@ -15,11 +15,13 @@ router.post('/push', async (req, res) => {
     console.log('🔔 Push webhook received:', JSON.stringify(req.body));
     const payload = req.body.customData || req.body;
     const { type, locationId, title, contactId } = payload;
+    // GHL sends contact_id (snake_case) at the root level of the webhook body
+    const ghlContactId = contactId || req.body.contact_id;
     const contactName = req.body.full_name || req.body.contact?.full_name || '';
     const body = contactName
       ? `${contactName} ${payload.body || ''}`.trim()
       : payload.body || '';
-    console.log('🔔 Parsed payload:', { type, locationId, title, body });
+    console.log('🔔 Parsed payload:', { type, locationId, title, body, ghlContactId });
 
     if (!type || !locationId) {
       return res.status(400).json({ error: 'Missing type or locationId' });
@@ -42,7 +44,7 @@ router.post('/push', async (req, res) => {
     console.log('🔔 Sending push for companyId:', companyId);
 
     const data = { type };
-    if (contactId) data.contactId = String(contactId);
+    if (ghlContactId) data.contactId = String(ghlContactId);
 
     await sendPushToCompany(companyId, { type, title, body, data });
 
