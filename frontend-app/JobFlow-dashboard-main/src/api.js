@@ -9,7 +9,7 @@
    v1.3 – Added changePassword method for secure password updates
 ============================================================================ */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
 
 
 /* Utility to convert camelCase → snake_case for payloads */
