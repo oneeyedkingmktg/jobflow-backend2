@@ -615,6 +615,7 @@ const FIELD_IDS = {
     jf_project_type: "jf_project_type",
     jf_last_synced_at: "jf_last_synced_at",
     install_tentative: "install_tentative",
+    install_date: "install_date",
 
     est_project_type: "est_project_type",
     est_square_footage: "est_square_footage",
@@ -713,6 +714,8 @@ const normalizeStatus = (status) => {
   pushField("jf_project_type", lead.project_type);
   pushField("jf_last_synced_at", formatDateMMDDYYYY(lead.ghl_last_synced));
 pushField("install_tentative", yesNo(lead.install_tentative));
+// Always push install_date — send empty string to explicitly clear it in GHL when cancelled
+customFields.push({ id: FIELD_IDS.install_date, field_value: formatDateMMDDYYYY(lead.install_date) || "" });
   pushField("jf_project_type", lead.project_type);
 pushField("utm_source", lead.utm_source);
   pushField("utm_medium", lead.utm_medium);
@@ -1191,6 +1194,16 @@ async function updateContactCustomFields(contactId, fields, company) {
   });
 }
 
+// Like updateContactCustomFields but allows empty string to explicitly clear a field in GHL.
+async function clearContactCustomFields(contactId, fieldKeys, company) {
+  const customFields = fieldKeys.map((key) => ({ id: key, field_value: "" }));
+
+  await ghlRequest(company, `/contacts/${contactId}`, {
+    method: "PUT",
+    body: { customFields },
+  });
+}
+
 // ----------------------------------------------------------------------------
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
@@ -1200,6 +1213,7 @@ module.exports = {
   applyStatusTags,
   removeStatusTags,
   updateContactCustomFields,
+  clearContactCustomFields,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
     const companyId = company?.id;
 

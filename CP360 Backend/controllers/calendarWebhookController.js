@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { clearContactCustomFields } = require('./ghlAPI');
 
 const calendarWebhookController = {
   // Handle GHL calendar event webhook (appointments AND installs)
@@ -56,8 +57,8 @@ client = await pool.connect();
 
       
 const companyResultEarly = await client.query(
-  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar 
-   FROM companies 
+  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar, ghl_api_key, ghl_location_id
+   FROM companies
    WHERE ghl_location_id = $1
    LIMIT 1`,
   [locationId]
@@ -339,14 +340,23 @@ await client.query(
 
         } else if (eventType === 'install') {
           await client.query(
-            `UPDATE leads 
+            `UPDATE leads
              SET install_date = NULL,
                  install_calendar_event_id = NULL
              WHERE id = $1`,
             [lead.id]
           );
+          // Clear install_date custom field on the GHL contact
+          if (contactId) {
+            try {
+              await clearContactCustomFields(contactId, ['install_date'], company);
+              console.log(`✅ [CALENDAR] Cleared install_date custom field on GHL contact ${contactId}`);
+            } catch (ghlErr) {
+              console.error(`⚠️ [CALENDAR] Failed to clear install_date on GHL contact:`, ghlErr.message);
+            }
+          }
         }
-        
+
         console.log(`✅ Cleared ${eventType} from lead ${lead.id}`);
         
       } else if (startTime) {
