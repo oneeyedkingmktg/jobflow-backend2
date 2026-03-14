@@ -55,27 +55,53 @@ function convertToUTC(localDateTimeString, timezone) {
   // Parse the local date/time string
   const [datePart, timePart] = localDateTimeString.split('T');
   const [year, month, day] = datePart.split('-').map(Number);
-  const [hour, minute] = timePart.split(':').map(Number);
-  
-  // Timezone offset map (hours from UTC)
-  const timezoneOffsets = {
-    'America/New_York': -5,    // EST (winter)
-    'America/Chicago': -6,     // CST (winter)
-    'America/Denver': -7,      // MST (winter)
-    'America/Phoenix': -7,     // MST (no DST)
-    'America/Los_Angeles': -8, // PST (winter)
-    'America/Anchorage': -9,   // AKST (winter)
-    'Pacific/Honolulu': -10,   // HST (no DST)
+  const [hour, minute, second = 0] = timePart.split(':').map(Number);
+
+  // Step 1: treat the local values as if they were UTC (a "fake UTC" anchor)
+  const fakeUTC = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+
+  // Step 2: ask Intl what that UTC instant looks like in the target timezone
+  // This gives us the actual local time that corresponds to our fake UTC anchor,
+  // including the correct DST offset for that specific date.
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(fakeUTC);
+  const p = {};
+  parts.forEach(({ type, value }) => { if (type !== 'literal') p[type] = parseInt(value, 10); });
+  const localHour = p.hour === 24 ? 0 : p.hour; // guard midnight edge case
+
+  // Step 3: compute the offset between fakeUTC and the local-equivalent instant
+  const fakeLocal = new Date(Date.UTC(p.year, p.month - 1, p.day, localHour, p.minute, p.second));
+  const offsetMs = fakeUTC.getTime() - fakeLocal.getTime();
+
+  // Step 4: apply the offset — this converts local time → true UTC
+  const trueUTC = new Date(fakeUTC.getTime() + offsetMs);
+
+  console.log(`🌍 [TIMEZONE] Converting ${localDateTimeString} ${timezone} → ${trueUTC.toISOString()}`);
+  return trueUTC;
+}
+
+// Inverse of convertToUTC — given a UTC Date, return { dateOnly, timeOnly } in the company's local timezone.
+// Handles DST correctly via Intl.DateTimeFormat.
+function convertFromUTC(utcDate, timezone) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(utcDate);
+  const p = {};
+  parts.forEach(({ type, value }) => { if (type !== 'literal') p[type] = value; });
+  const hour = p.hour === '24' ? '00' : p.hour; // guard midnight edge case
+  return {
+    dateOnly: `${p.year}-${p.month}-${p.day}`,
+    timeOnly: `${hour}:${p.minute}:${p.second}`,
   };
-  
-  const offset = timezoneOffsets[timezone] || -5; // Default to EST
-  
-  // Create UTC date by adding the offset
-  const utcDate = new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
-  
-  console.log(`🌍 [TIMEZONE] Converting ${localDateTimeString} ${timezone} → ${utcDate.toISOString()}`);
-  
-  return utcDate;
 }
 
 // ----------------------------------------------------------------------------
@@ -1214,6 +1240,7 @@ module.exports = {
   removeStatusTags,
   updateContactCustomFields,
   clearContactCustomFields,
+  convertFromUTC,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
     const companyId = company?.id;
 

@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { clearContactCustomFields } = require('./ghlAPI');
+const { clearContactCustomFields, convertFromUTC } = require('./ghlAPI');
 
 const calendarWebhookController = {
   // Handle GHL calendar event webhook (appointments AND installs)
@@ -57,7 +57,7 @@ client = await pool.connect();
 
       
 const companyResultEarly = await client.query(
-  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar, ghl_api_key, ghl_location_id
+  `SELECT id, name, ghl_appt_calendar, ghl_install_calendar, ghl_api_key, ghl_location_id, timezone
    FROM companies
    WHERE ghl_location_id = $1
    LIMIT 1`,
@@ -360,19 +360,17 @@ await client.query(
         console.log(`✅ Cleared ${eventType} from lead ${lead.id}`);
         
       } else if (startTime) {
-        // Event was created or updated
-        const eventDate = new Date(startTime);
-        const dateOnly = eventDate.toISOString().split('T')[0];
-        const timeOnly = eventDate.toISOString().split('T')[1].substring(0, 5); // HH:MM
-        
-        console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly);
-        
+        // Event was created or updated — convert UTC timestamp to company local time (DST-aware)
+        const companyTimezone = company.timezone || 'America/New_York';
+        const { dateOnly, timeOnly } = convertFromUTC(new Date(startTime), companyTimezone);
+
+        console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly, `(${companyTimezone})`);
+
         if (eventType === 'appointment') {
 const appointmentTimestamp = new Date(startTime);
-const appointmentTime = appointmentTimestamp.toISOString().substring(11, 19); // HH:MM:SS
 
 await client.query(
-  `UPDATE leads 
+  `UPDATE leads
    SET appointment_date = $1,
        appointment_time = $2::time,
        last_synced_appointment_date = $3,
@@ -382,18 +380,16 @@ await client.query(
      AND company_id = $5`,
   [
     dateOnly,
-    appointmentTime,
+    timeOnly,
     appointmentTimestamp,
     lead.id,
     company.id
   ]
 );
 
-
-
         } else if (eventType === 'install') {
 await client.query(
-  `UPDATE leads 
+  `UPDATE leads
    SET install_date = $1,
        last_synced_install_date = $1,
        sync_source = 'GHL'
