@@ -1,4 +1,4 @@
-import { PushNotifications } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { isNativeApp, getPlatform } from '../utils/platform';
 import { apiRequest } from '../api';
 
@@ -9,14 +9,14 @@ export const setupPushListeners = () => {
   if (!isNativeApp()) return;
 
   // Listen for push notifications received (foreground)
-  PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('📬 Push notification received:', notification);
+  FirebaseMessaging.addListener('notificationReceived', (event) => {
+    console.log('📬 Push notification received:', event.notification);
   });
 
   // Listen for push notification tapped — deep link to contact record
-  PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-    console.log('📬 Full action object:', JSON.stringify(action));
-    const data = action.notification.data || {};
+  FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+    console.log('📬 Full action object:', JSON.stringify(event));
+    const data = event.notification.data || {};
     console.log('📬 Push notification tapped:', data);
 
     if (data.contactId) {
@@ -47,22 +47,20 @@ export const initializePushNotifications = async (user) => {
   }
 
   try {
-    const permissionStatus = await PushNotifications.requestPermissions();
+    const permissionStatus = await FirebaseMessaging.requestPermissions();
 
     if (permissionStatus.receive !== 'granted') {
       console.log('Push notification permission denied');
       return { success: false, reason: 'permission_denied' };
     }
 
-    await PushNotifications.register();
+    const { token } = await FirebaseMessaging.getToken();
+    console.log('✅ Push registration success, token:', token);
+    await registerDeviceToken(user, token);
 
-    PushNotifications.addListener('registration', async (token) => {
-      console.log('✅ Push registration success, token:', token.value);
-      await registerDeviceToken(user, token.value);
-    });
-
-    PushNotifications.addListener('registrationError', (error) => {
-      console.error('❌ Push registration error:', error);
+    FirebaseMessaging.addListener('tokenReceived', async (event) => {
+      console.log('🔄 Push token refreshed:', event.token);
+      await registerDeviceToken(user, event.token);
     });
 
     return { success: true };
