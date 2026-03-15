@@ -34,10 +34,12 @@ PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
 RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
 
 cd "$PACKAGE_DIR"
+# Delete stale Package.resolved so swift package resolve creates a fresh one
+rm -f "$PACKAGE_DIR/Package.resolved"
+rm -f "$RESOLVED_DEST/Package.resolved"
 swift package resolve
 
 mkdir -p "$RESOLVED_DEST"
-cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
 cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
 echo ">>> Package.resolved updated at $RESOLVED_DEST"
 
