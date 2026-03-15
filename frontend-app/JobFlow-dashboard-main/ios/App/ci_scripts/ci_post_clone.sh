@@ -34,10 +34,10 @@ PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
 RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
 
 cd "$PACKAGE_DIR"
-# Delete stale Package.resolved so swift package resolve creates a fresh one
+# Force update to regenerate Package.resolved including new firebase-ios-sdk dep
 rm -f "$PACKAGE_DIR/Package.resolved"
 rm -f "$RESOLVED_DEST/Package.resolved"
-swift package resolve
+swift package update
 
 mkdir -p "$RESOLVED_DEST"
 cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
