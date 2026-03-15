@@ -25,6 +25,10 @@ npm run build
 echo ">>> Syncing Capacitor..."
 npx cap sync ios
 
+echo ">>> Adding GoogleService-Info.plist to Xcode project target..."
+gem install xcodeproj --no-document 2>/dev/null || true
+ruby "$SCRIPT_DIR/add_google_services.rb" "$SCRIPT_DIR/../App.xcodeproj"
+
 echo ">>> Regenerating Package.resolved after cap sync..."
 PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
 RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
