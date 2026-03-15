@@ -25,20 +25,16 @@ npm run build
 echo ">>> Syncing Capacitor..."
 npx cap sync ios
 
-echo ">>> Adding GoogleService-Info.plist to Xcode project target..."
-gem install xcodeproj --no-document 2>/dev/null || true
-ruby "$SCRIPT_DIR/add_google_services.rb" "$SCRIPT_DIR/../App.xcodeproj"
-
-echo ">>> Resolving Xcode project package dependencies..."
-PROJECT_PATH="$SCRIPT_DIR/../App.xcodeproj"
+echo ">>> Regenerating Package.resolved after cap sync..."
+PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
 RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
 
-echo ">>> Deleting stale Package.resolved files..."
-rm -f "$RESOLVED_DEST/Package.resolved"
-rm -f "$SCRIPT_DIR/../CapApp-SPM/Package.resolved"
+cd "$PACKAGE_DIR"
+swift package resolve
 
-echo ">>> Running xcodebuild -resolvePackageDependencies..."
-xcodebuild -resolvePackageDependencies -project "$PROJECT_PATH"
-echo ">>> Package dependencies resolved."
+mkdir -p "$RESOLVED_DEST"
+cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
+cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
+echo ">>> Package.resolved updated at $RESOLVED_DEST"
 
 echo ">>> Post-clone steps complete."

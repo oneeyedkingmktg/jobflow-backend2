@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx cap:*)",
+      "Bash(npm run:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(cd \"D:/AGF Files/Local - CoatingPro360_CLEAN/backend/CP360 Backend\" && node scripts/migrate-push-notifications.js)",
+      "Bash(cd \"D:/AGF Files/Local - CoatingPro360_CLEAN/backend/frontend-app/JobFlow-dashboard-main\" && npx @capacitor/assets generate --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#ffffff\" --no-pwa)",
+      "Bash(cd \"D:/AGF Files/Local - CoatingPro360_CLEAN/backend/frontend-app/JobFlow-dashboard-main\" && npx @capacitor/assets generate --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#ffffff\" --android --ios 2>&1)",
+      "WebFetch(domain:coatingpro360.com)",
+      "Bash(npm show:*)",
+      "Bash(cd \"D:\\\\AGF Files\\\\Local - CoatingPro360_CLEAN\\\\backend\\\\frontend-app\\\\JobFlow-dashboard-main\" && npm install 2>&1)",
+      "Bash(cd \"D:\\\\AGF Files\\\\Local - CoatingPro360_CLEAN\\\\backend\\\\frontend-app\\\\JobFlow-dashboard-main\" && npm install firebase 2>&1)",
+      "Bash(cd \"D:\\\\AGF Files\\\\Local - CoatingPro360_CLEAN\\\\backend\\\\frontend-app\\\\JobFlow-dashboard-main\" && npm install 2>&1 | tail -5)"
+    ]
+  }
+}

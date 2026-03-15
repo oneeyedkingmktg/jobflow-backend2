@@ -206,7 +206,10 @@ const loadLeads = async () => {
   useEffect(() => {
     const handleOpenLead = (e) => {
       const { ghlContactId } = e.detail;
+      console.log('🔍 openLeadByGhlContact fired, looking for:', ghlContactId);
+      console.log('🔍 leads loaded:', leads.length, 'sample ghlContactIds:', leads.slice(0,3).map(l => l.ghlContactId));
       const lead = leads.find((l) => l.ghlContactId === ghlContactId);
+      console.log('🔍 lead found:', lead ? lead.id : 'NOT FOUND');
       if (lead) {
         setSelectedLead(lead);
         setIsNewLead(false);
