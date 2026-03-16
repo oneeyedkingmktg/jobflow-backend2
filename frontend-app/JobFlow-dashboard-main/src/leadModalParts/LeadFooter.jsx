@@ -4,6 +4,7 @@
 // ============================================================================
 
 import React from "react";
+import { useAuth } from "../AuthContext";
 
 export default function LeadFooter({
   isEditing,
@@ -17,6 +18,9 @@ export default function LeadFooter({
   onReinstate,
   saving = false,
 }) {
+  const { user } = useAuth();
+  const isEstimatorOnly = user?.planType === 'estimator_only';
+
   return (
     <div className="pt-6 border-t border-gray-200">
       <div className="flex items-center justify-between w-full gap-3">
@@ -29,6 +33,17 @@ export default function LeadFooter({
         >
           {saving ? "Saving..." : "Save & Exit"}
         </button>
+
+        {/* PAUSE */}
+        {!isEstimatorOnly && (
+          <button
+            type="button"
+            onClick={onPause}
+            className="flex-1 py-3 bg-yellow-400 text-gray-900 rounded-xl font-semibold text-sm hover:bg-yellow-500 transition"
+          >
+            ⏸ Pause
+          </button>
+        )}
 
         {/* SAVE / EDIT */}
         {!isEditing ? (
