@@ -9,6 +9,7 @@ export default function PauseModal({ form, onSave, onClose }) {
   const [pauseUntil, setPauseUntil] = useState(form.pauseUntil || "");
   const [resumeAction, setResumeAction] = useState(form.resumeAction || "Notify Only");
   const [pauseNotes, setPauseNotes] = useState(form.pauseNotes || "");
+  const [showUnpauseChoice, setShowUnpauseChoice] = useState(false);
 
   const handleSave = () => {
     if (toggleOn && pauseMode === "date" && !pauseUntil) {
@@ -22,17 +23,59 @@ export default function PauseModal({ form, onSave, onClose }) {
         resumeAction,
         pauseNotes,
       });
+      onClose();
     } else {
-      onSave({
-        pauseStatus: "Unpaused",
-        pauseUntil: null,
-        resumeAction: resumeAction,
-        pauseNotes: form.pauseNotes,
-      });
+      // Show the unpause choice modal instead of saving immediately
+      setShowUnpauseChoice(true);
     }
+  };
+
+  const handleUnpauseWithAction = (action) => {
+    onSave({
+      pauseStatus: "Unpaused",
+      pauseUntil: null,
+      resumeAction: action,
+      pauseNotes: form.pauseNotes,
+    });
     onClose();
   };
 
+  // ── UNPAUSE CHOICE SCREEN ──────────────────────────────────────────
+  if (showUnpauseChoice) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+          <h3 className="text-lg font-semibold text-gray-900">Unpause — What should happen?</h3>
+          <p className="text-sm text-gray-600">
+            Choose what happens now that this lead is being unpaused.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => handleUnpauseWithAction("Notify Only")}
+              className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition"
+            >
+              Notify Only
+            </button>
+            <button
+              onClick={() => handleUnpauseWithAction("Notify & Restart Messages")}
+              className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700 transition"
+            >
+              Notify &amp; Restart Messages
+            </button>
+            <button
+              onClick={() => setShowUnpauseChoice(false)}
+              className="w-full py-2 rounded-xl bg-gray-100 text-gray-700 text-sm hover:bg-gray-200 transition"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── MAIN PAUSE SCREEN ─────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
@@ -91,7 +134,7 @@ export default function PauseModal({ form, onSave, onClose }) {
               </div>
             </div>
 
-            {/* DATE — only shown when "date" mode selected */}
+            {/* DATE */}
             {pauseMode === "date" && (
               <div>
                 <input
