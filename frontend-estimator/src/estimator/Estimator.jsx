@@ -451,6 +451,21 @@ export default function Estimator() {
     return <div>Loading...</div>;
   }
 
+  // Account suspended — show promo instead of estimator
+  if (config.plan_type === 'suspended') {
+    return (
+      <div className="max-w-2xl mx-auto p-8 text-center">
+        <h1 className="text-3xl font-bold mb-4">Get an Instant Estimate for Your Epoxy Floor</h1>
+        <p className="text-gray-600 mb-6">
+          This estimator is temporarily unavailable. Contact the contractor directly for a quote.
+        </p>
+        <p className="text-sm text-gray-400 mt-8">
+          Powered by <a href="https://coatingpro360.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">CoatingPro360</a>
+        </p>
+      </div>
+    );
+  }
+
   // No company parameter OR estimator not enabled - show promo
   if (!companyId || !config.is_active) {
     return (
