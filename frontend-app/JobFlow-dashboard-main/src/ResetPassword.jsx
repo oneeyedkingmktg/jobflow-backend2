@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiRequest } from './api';
 
 export default function ResetPassword({ onBack }) {
   const [token, setToken] = useState('');
@@ -37,26 +38,18 @@ export default function ResetPassword({ onBack }) {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-
+      await apiRequest('/auth/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword: password }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage('Password reset successfully! Redirecting to login...');
-        setTimeout(() => {
-          window.history.replaceState({}, '', '/');
-          onBack();
-        }, 2000);
-      } else {
-        setError(data.message || 'Unable to reset password');
-      }
+      setMessage('Password reset successfully! Redirecting to login...');
+      setTimeout(() => {
+        window.history.replaceState({}, '', '/');
+        onBack();
+      }, 2000);
     } catch (err) {
-      setError('Unable to connect to server');
+      setError(err.message || 'Unable to reset password');
     } finally {
       setLoading(false);
     }
