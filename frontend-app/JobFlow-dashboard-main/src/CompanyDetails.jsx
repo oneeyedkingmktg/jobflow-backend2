@@ -142,8 +142,8 @@ ghl_install_description_template: company.ghl_install_description_template || ""
         )}
 
         {/* STATUS */}
-        <div className="flex items-center justify-between border-b pb-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 border-b pb-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span
               className={`px-3 py-1 rounded-full text-xs font-semibold ${
                 isSuspended
