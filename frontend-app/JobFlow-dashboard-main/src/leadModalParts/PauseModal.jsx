@@ -26,7 +26,7 @@ export default function PauseModal({ form, onSave, onClose }) {
       onSave({
         pauseStatus: "Unpaused",
         pauseUntil: null,
-        resumeAction: form.resumeAction,
+        resumeAction: resumeAction,
         pauseNotes: form.pauseNotes,
       });
     }
