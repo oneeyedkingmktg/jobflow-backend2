@@ -45,8 +45,11 @@ export default function UserManagement({ onBack }) {
       phone: editForm.phone,
       role: editForm.role,
       is_active: editForm.is_active,
-      ...(editForm.newPassword ? { password: editForm.newPassword } : {}),
     });
+
+    if (editForm.newPassword) {
+      await UsersAPI.setPassword(selectedUser.id, editForm.newPassword);
+    }
 
     setSelectedUser(null);
     setIsEditing(false);
