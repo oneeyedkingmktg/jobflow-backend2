@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { useAuth } from "./AuthContext";
 import { useCompany } from "./CompanyContext";
-import { UsersAPI } from "./api";
+import { UsersAPI, CompaniesAPI } from "./api";
 
 import CompanyManagement from "./CompanyManagement";
 import CompanyDetails from "./CompanyDetails";
@@ -188,7 +188,7 @@ const renderHome = () => (
         <CompanyDetails
           company={selectedCompany}
           onBack={handleBack}
-          onSave={() => {}}
+          onSave={async (id, payload) => { await CompaniesAPI.update(id, payload); }}
         />
       );
       break;
