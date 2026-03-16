@@ -1,6 +1,7 @@
 // LeadStatusBar.jsx (Updated — Completed Modal + proceedWithAutomation control)
 import React from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "./statusConfig.js";
+import { useAuth } from "../AuthContext";
 
 export default function LeadStatusBar({
   form,
@@ -9,6 +10,9 @@ export default function LeadStatusBar({
   onOpenApptModal,
   onOpenInstallModal,
 }) {
+
+  const { user } = useAuth();
+  const isEstimatorOnly = user?.planType === 'estimator_only';
 
   const [pauseBlockAction, setPauseBlockAction] = React.useState(null);
   const [showCompleteModal, setShowCompleteModal] = React.useState(false);
@@ -228,6 +232,20 @@ export default function LeadStatusBar({
         </div>
       )}
 
+      {isEstimatorOnly ? (
+        <div className="relative w-full">
+          <div className="opacity-30 pointer-events-none select-none flex items-center justify-between gap-3 w-full">
+            <div className="flex flex-col">
+              <div className="text-black text-[10px] uppercase font-semibold mb-1" style={{ paddingLeft: "25px" }}>CURRENT STATUS</div>
+              <div className="bg-gray-400 rounded-2xl px-6 py-3 text-white font-semibold">Status</div>
+            </div>
+            <div className="bg-gray-200 rounded-xl px-4 py-2 text-gray-400 font-semibold">Move To</div>
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-semibold text-gray-500 bg-white/80 px-3 py-1 rounded-full border border-gray-200">🔒 Upgrade to Pro</span>
+          </div>
+        </div>
+      ) : (
       <div className="flex items-center justify-between gap-3 w-full">
         <div className="flex flex-col">
           <div
@@ -276,6 +294,7 @@ export default function LeadStatusBar({
 
         {renderProgressButton()}
       </div>
+      )}
     </>
   );
 }

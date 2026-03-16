@@ -6,6 +6,7 @@
 import React from "react";
 import { formatInCompanyTimezone } from "../utils/timezone";
 import { formatDate, formatTime } from "../utils/formatting.js";
+import { useAuth } from "../AuthContext";
 
 
 export default function LeadAppointmentSection({
@@ -13,6 +14,8 @@ export default function LeadAppointmentSection({
   setShowApptModal,
   setShowDateModal,
 }) {
+  const { user } = useAuth();
+  const isEstimatorOnly = user?.planType === 'estimator_only';
 
 
 
@@ -26,6 +29,24 @@ export default function LeadAppointmentSection({
     ? formatDate(form.installDate) +
       (form.installTentative ? " (Tentative)" : "")
     : "Not Set";
+
+  if (isEstimatorOnly) {
+    return (
+      <div className="w-full">
+        <div className="grid grid-cols-2 gap-3">
+          {["Appointment", "Install Date"].map((label) => (
+            <div
+              key={label}
+              className="bg-gray-100 rounded-xl border border-gray-200 px-3 py-3 flex flex-col opacity-60 cursor-not-allowed"
+            >
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</div>
+              <div className="mt-1 text-gray-400 text-xs font-medium">Upgrade to Pro for scheduling</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
