@@ -317,6 +317,47 @@ router.put("/me/password", async (req, res) => {
 });
 
 // ============================================================================
+// PUT /api/users/:id/set-password – Master/Admin force-set a user's password
+// ============================================================================
+
+router.put("/:id/set-password", async (req, res) => {
+  try {
+    if (req.user.role !== "master" && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    const userId = parseInt(req.params.id, 10);
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: "Password is required" });
+    }
+
+    const existing = await db.query(
+      "SELECT company_id FROM users WHERE id = $1 AND deleted_at IS NULL",
+      [userId]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Admins can only set passwords for users in their own company
+    if (req.user.role === "admin" && existing.rows[0].company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Cannot update users from other companies" });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    await db.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, userId]);
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    console.error("Set password error:", err);
+    res.status(500).json({ error: "Failed to set password" });
+  }
+});
+
+// ============================================================================
 // DELETE /api/users/:id - Soft delete user (Admin/Master only)
 // ============================================================================
 router.delete('/:id', requireRole('admin', 'master'), async (req, res) => {

@@ -115,12 +115,16 @@ const canManage = showAllUsers
           role: form.role,
           is_active: form.is_active,
           company_id: form.company_id,
-          ...(form.password ? { password: form.password } : {}),
         };
 
         console.log("Updating user with payload:", payload);
 
         const res = await UsersAPI.update(selectedUser.id, payload);
+
+        // Password is handled separately via set-password endpoint
+        if (form.password) {
+          await UsersAPI.setPassword(selectedUser.id, form.password);
+        }
         const updated = res.user || res;
 
         // If in scoped mode and user was moved to different company, remove from list
