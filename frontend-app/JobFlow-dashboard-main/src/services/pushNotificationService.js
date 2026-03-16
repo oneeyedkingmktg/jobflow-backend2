@@ -34,6 +34,21 @@ export const setupPushListeners = () => {
       };
       tryNavigate();
     }
+
+    if (data.leadId) {
+      const leadId = parseInt(data.leadId);
+      window.__pendingLeadId = leadId;
+
+      const tryNavigate = (attempts = 0) => {
+        if (typeof window.__setAppScreen === 'function') {
+          window.__setAppScreen('leads');
+          window.dispatchEvent(new CustomEvent('openLeadById', { detail: { leadId } }));
+        } else if (attempts < 20) {
+          setTimeout(() => tryNavigate(attempts + 1), 250);
+        }
+      };
+      tryNavigate();
+    }
   });
 };
 

@@ -9,6 +9,17 @@ const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { syncLeadToGhl } = require("../sync/dbToGhlSync");
 const { deleteGhlContact, applyStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
+const { sendPushToCompany } = require("../services/pushNotificationService");
+
+function formatProjectTypeForPush(type) {
+  if (!type) return 'Unknown';
+  if (type.startsWith('garage_')) return `${type.split('_')[1]} Car Garage`;
+  if (type === 'patio') return 'Patio';
+  if (type === 'basement') return 'Basement';
+  if (type === 'commercial') return 'Commercial';
+  if (type === 'custom') return 'Custom Project';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
 
 
 // Normalize phone to digits only for matching
@@ -529,6 +540,25 @@ const insertValues = [
       }
     } else if (shouldBypassSync) {
       console.log('🔓 GHL sync bypassed for testing (master admin bypass enabled)');
+    }
+
+    // Fire push notification for estimator_only companies
+    if (company.plan_type === 'estimator_only') {
+      try {
+        const name = newLead.first_name || newLead.full_name || 'Someone';
+        const project = formatProjectTypeForPush(newLead.project_type);
+        const title = company.est_push_title || 'New Estimator Lead';
+        const bodyTemplate = company.est_push_body || '{{name}} just submitted an estimator request for a {{project}} project. Click to open lead.';
+        const body = bodyTemplate.replace('{{name}}', name).replace('{{project}}', project);
+        sendPushToCompany(companyId, {
+          type: 'new_estimator_lead',
+          title,
+          body,
+          data: { type: 'new_estimator_lead', leadId: String(newLead.id) },
+        }).catch((e) => console.error('Push send error:', e.message));
+      } catch (pushErr) {
+        console.error('Push build error:', pushErr.message);
+      }
     }
 
     res.status(201).json({ lead: toCamel(newLead), ghlSynced });

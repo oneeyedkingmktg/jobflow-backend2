@@ -202,6 +202,21 @@ const loadLeads = async () => {
     }
   }, [leads]);
 
+  // Listen for tap on estimator-only push notification (matched by internal lead ID)
+  useEffect(() => {
+    const handleOpenLeadById = (e) => {
+      const { leadId } = e.detail;
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead) {
+        setSelectedLead(lead);
+        setIsNewLead(false);
+        window.__pendingLeadId = null;
+      }
+    };
+    window.addEventListener('openLeadById', handleOpenLeadById);
+    return () => window.removeEventListener('openLeadById', handleOpenLeadById);
+  }, [leads]);
+
   // Also listen for real-time event when leads are already loaded
   useEffect(() => {
     const handleOpenLead = (e) => {

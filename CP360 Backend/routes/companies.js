@@ -332,6 +332,8 @@ const {
       estimator_enabled,
       estimatorEnabled,
       plan_type,
+      est_push_title,
+      est_push_body,
 
       // estimator_configs fields (must NOT be written to companies)
       text_color,
@@ -469,6 +471,8 @@ google_conversion_event = COALESCE($27, google_conversion_event),
   service_area_zips = COALESCE($29, service_area_zips),
   sip_domain = COALESCE($30, sip_domain),
   plan_type = COALESCE($31, plan_type),
+  est_push_title = COALESCE($32, est_push_title),
+  est_push_body = COALESCE($33, est_push_body),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -505,6 +509,8 @@ sanitizedBody.google_base_tag || null,        // $25
 service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   sip_domain || null,                                          // $30
   plan_type || null,                                           // $31
+  est_push_title || null,                                      // $32
+  est_push_body || null,                                       // $33
 ]
 
 );

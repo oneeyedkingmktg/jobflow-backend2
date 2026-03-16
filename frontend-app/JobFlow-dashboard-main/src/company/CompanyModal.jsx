@@ -90,6 +90,8 @@ setForm({
   suspended: false,
   plan_type: "pro",
   service_area_zips: "",
+  est_push_title: "",
+  est_push_body: "",
 });
 
 setGhlForm({
@@ -138,6 +140,8 @@ zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
   plan_type: company.plan_type || "pro",
+  est_push_title: company.est_push_title || company.estPushTitle || "",
+  est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
   company.googleDriveBaseFolderId ??
   company.google_drive_base_folder_id ??
@@ -229,6 +233,8 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         zip: form.zip || null,
         suspended: form.suspended,
         plan_type: form.plan_type,
+        est_push_title: form.est_push_title || null,
+        est_push_body: form.est_push_body || null,
         timezone: form.timezone,
         google_drive_base_folder_id: form.googleDriveBaseFolderId || null,
         service_area_zips: zipsArray.length > 0 ? zipsArray : null,
@@ -625,6 +631,34 @@ const handleSaveTracking = async () => {
                 <option value="suspended">Suspended</option>
               </select>
             </div>
+
+            {form.plan_type === "estimator_only" && (
+              <div className="pt-2 space-y-3">
+                <div className="text-xs font-semibold text-blue-700 uppercase">New Lead Push Notification</div>
+                <p className="text-xs text-gray-500">
+                  Available merge fields: <code>{"{{name}}"}</code>, <code>{"{{project}}"}</code>
+                </p>
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">TITLE</label>
+                  <input
+                    className={editBox}
+                    value={form.est_push_title}
+                    onChange={(e) => handleChange("est_push_title", e.target.value)}
+                    placeholder="New Estimator Lead"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 font-semibold mb-1">BODY</label>
+                  <textarea
+                    className={`${editBox} text-sm`}
+                    rows={3}
+                    value={form.est_push_body}
+                    onChange={(e) => handleChange("est_push_body", e.target.value)}
+                    placeholder={"{{name}} just submitted an estimator request for a {{project}} project. Click to open lead."}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
