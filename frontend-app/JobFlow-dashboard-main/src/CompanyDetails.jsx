@@ -21,6 +21,7 @@ const [formData, setFormData] = useState({
     ghl_appt_description_template: "",
 ghl_install_description_template: "",
     suspended: false,
+    plan_type: "pro",
     google_base_tag: "",
     meta_base_tag: "",
     google_conversion_event: "",
@@ -51,6 +52,7 @@ setFormData({
       ghl_appt_description_template: company.ghl_appt_description_template || "",
 ghl_install_description_template: company.ghl_install_description_template || "",
       suspended: !!company.suspended,
+      plan_type: company.plan_type || "pro",
       google_base_tag: company.google_base_tag || "",
       meta_base_tag: company.meta_base_tag || "",
       google_conversion_event: company.google_conversion_event || "",
@@ -160,6 +162,19 @@ ghl_install_description_template: company.ghl_install_description_template || ""
               />
               Suspended
             </label>
+
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-semibold">Plan:</label>
+              <select
+                value={formData.plan_type}
+                onChange={(e) => handleChange("plan_type", e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              >
+                <option value="pro">Pro</option>
+                <option value="estimator_only">Estimator Only</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
           </div>
 
           {saving && <p className="text-xs text-gray-500">Saving…</p>}
