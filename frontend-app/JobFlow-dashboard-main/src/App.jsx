@@ -67,6 +67,26 @@ class ErrorBoundary extends React.Component {
 /* ===========================================================
    MAIN APP CONTENT
    =========================================================== */
+function LockedScreen({ children }) {
+  return (
+    <div className="relative min-h-screen">
+      <div className="pointer-events-none select-none opacity-30">{children}</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 z-10">
+        <div className="bg-white rounded-2xl shadow-xl p-8 mx-6 text-center max-w-sm">
+          <div className="text-4xl mb-3">🔒</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Pro Feature</h2>
+          <p className="text-gray-600 text-sm">
+            Upgrade to CoatingPro360 Pro to unlock the full CRM, messaging, calendar, and more.
+          </p>
+          <p className="text-gray-500 text-xs mt-3">
+            Contact us to upgrade your plan.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { currentCompany, companies, loading: companyLoading } = useCompany();
@@ -74,6 +94,8 @@ function AppContent() {
   // App-level screen control (default = leads)
   const [activeScreen, setActiveScreen] = useState("leads");
   const [totalUnread, setTotalUnread] = useState(0);
+
+  const isEstimatorOnly = user?.planType === 'estimator_only';
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
@@ -174,9 +196,17 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
       {activeScreen === "messages" ? (
-        <MessagesPage onUnreadCount={setTotalUnread} />
+        isEstimatorOnly ? (
+          <LockedScreen><MessagesPage onUnreadCount={setTotalUnread} /></LockedScreen>
+        ) : (
+          <MessagesPage onUnreadCount={setTotalUnread} />
+        )
       ) : (
-        <LeadsHome currentUser={user} />
+        isEstimatorOnly ? (
+          <LockedScreen><LeadsHome currentUser={user} /></LockedScreen>
+        ) : (
+          <LeadsHome currentUser={user} />
+        )
       )}
 
       {/* Bottom Navigation */}
