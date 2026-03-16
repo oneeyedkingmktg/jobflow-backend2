@@ -30,15 +30,6 @@ export default function LeadFooter({
           {saving ? "Saving..." : "Save & Exit"}
         </button>
 
-        {/* PAUSE */}
-        <button
-          type="button"
-          onClick={onPause}
-          className="flex-1 py-3 bg-yellow-400 text-gray-900 rounded-xl font-semibold text-sm hover:bg-yellow-500 transition"
-        >
-          ⏸ Pause
-        </button>
-
         {/* SAVE / EDIT */}
         {!isEditing ? (
           <button

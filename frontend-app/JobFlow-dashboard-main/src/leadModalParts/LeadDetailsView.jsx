@@ -5,6 +5,7 @@
 import React, { useState } from "react";
 import EstimateModal from "../EstimateModal.jsx";
 import ConversationModal from "./ConversationModal.jsx";
+import { useAuth } from "../AuthContext";
 
 export default function LeadDetailsView({
   form,
@@ -13,6 +14,8 @@ export default function LeadDetailsView({
   showConversations = false,
 }) {
 const hasEstimate = form?.hasEstimate === true;
+  const { user } = useAuth();
+  const isEstimatorOnly = user?.planType === 'estimator_only';
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
   const [showConversationModal, setShowConversationModal] = useState(false);
@@ -107,16 +110,22 @@ const hasEstimate = form?.hasEstimate === true;
 
 {/* CONVERSATIONS BUTTON */}
 {showConversations && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowConversationModal(true);
-          }}
-          className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
-        >
-          View Conversation History
-        </button>
+        isEstimatorOnly ? (
+          <div className="w-full mt-4 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
+            🔒 Messages — Upgrade to Pro
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowConversationModal(true);
+            }}
+            className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+          >
+            View Conversation History
+          </button>
+        )
       )}
 
       {/* ONLINE ESTIMATE BUTTON */}
@@ -134,16 +143,22 @@ const hasEstimate = form?.hasEstimate === true;
       )}
 
       {/* UPLOAD PHOTOS BUTTON */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onUploadPhotos?.();
-        }}
-        className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
-      >
-        Photos and Files
-      </button>
+      {isEstimatorOnly ? (
+        <div className="w-full mt-3 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
+          🔒 Upgrade to Pro to save jobsite photos for this job
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUploadPhotos?.();
+          }}
+          className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+        >
+          Photos and Files
+        </button>
+      )}
 {/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (
         <EstimateModal

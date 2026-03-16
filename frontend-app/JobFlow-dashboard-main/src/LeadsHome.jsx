@@ -142,7 +142,7 @@ export default function LeadsHome() {
   const isMasterAdmin = user?.role === "master";
 
   const [leads, setLeads] = useState([]);
-  const [activeTab, setActiveTab] = useState("Leads");
+  const [activeTab, setActiveTab] = useState("Pre-Leads");
   const [selectedLead, setSelectedLead] = useState(null);
   const [isNewLead, setIsNewLead] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");

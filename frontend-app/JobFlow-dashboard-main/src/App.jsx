@@ -75,12 +75,26 @@ function LockedScreen({ children }) {
         <div className="bg-white rounded-2xl shadow-xl p-8 mx-6 text-center max-w-sm">
           <div className="text-4xl mb-3">🔒</div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Pro Feature</h2>
-          <p className="text-gray-600 text-sm">
-            Upgrade to CoatingPro360 Pro to unlock the full CRM, messaging, calendar, and more.
+          <p className="text-gray-600 text-sm mb-3">
+            Upgrade to CoatingPro360 Pro to unlock messaging, the full CRM, calendar, and more.
           </p>
-          <p className="text-gray-500 text-xs mt-3">
-            Contact us to upgrade your plan.
+          <p className="text-gray-700 text-sm font-semibold">
+            Text us to learn more:
           </p>
+          <a
+            href="sms:+18152422441"
+            className="text-blue-600 font-bold text-lg block mt-1"
+          >
+            815-242-2441
+          </a>
+          <a
+            href="https://coatingpro360.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 text-xs underline mt-2 block"
+          >
+            coatingpro360.com
+          </a>
         </div>
       </div>
     </div>
