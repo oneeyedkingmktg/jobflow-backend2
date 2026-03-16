@@ -123,7 +123,11 @@ const canManage = showAllUsers
 
         // Password is handled separately via set-password endpoint
         if (form.password) {
-          await UsersAPI.setPassword(selectedUser.id, form.password);
+          try {
+            await UsersAPI.setPassword(selectedUser.id, form.password);
+          } catch (pwErr) {
+            throw new Error('Profile saved but password update failed: ' + (pwErr.message || 'Unknown error'));
+          }
         }
         const updated = res.user || res;
 
