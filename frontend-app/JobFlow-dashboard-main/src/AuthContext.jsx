@@ -31,6 +31,7 @@ const normalizeUser = (u) => {
     companyId: u.company_id ?? u.companyId ?? null,
     companyName: u.company_name ?? u.companyName ?? null,
     ghlLocationId: u.ghl_location_id ?? null,
+    planType: u.plan_type ?? u.planType ?? 'pro',
     
     // Meta fields
     created_at: u.created_at,
