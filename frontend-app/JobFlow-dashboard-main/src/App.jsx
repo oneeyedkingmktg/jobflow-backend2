@@ -202,11 +202,7 @@ function AppContent() {
           <MessagesPage onUnreadCount={setTotalUnread} />
         )
       ) : (
-        isEstimatorOnly ? (
-          <LockedScreen><LeadsHome currentUser={user} /></LockedScreen>
-        ) : (
-          <LeadsHome currentUser={user} />
-        )
+        <LeadsHome currentUser={user} />
       )}
 
       {/* Bottom Navigation */}
