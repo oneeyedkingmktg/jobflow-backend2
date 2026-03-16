@@ -88,6 +88,7 @@ setForm({
   zip: "",
   timezone: "America/New_York",
   suspended: false,
+  plan_type: "pro",
   service_area_zips: "",
 });
 
@@ -136,6 +137,7 @@ setForm({
 zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
+  plan_type: company.plan_type || "pro",
   googleDriveBaseFolderId:
   company.googleDriveBaseFolderId ??
   company.google_drive_base_folder_id ??
@@ -226,6 +228,7 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         state: form.state || null,
         zip: form.zip || null,
         suspended: form.suspended,
+        plan_type: form.plan_type,
         timezone: form.timezone,
         google_drive_base_folder_id: form.googleDriveBaseFolderId || null,
         service_area_zips: zipsArray.length > 0 ? zipsArray : null,
@@ -592,7 +595,7 @@ const handleSaveTracking = async () => {
         </div>
 
         {isMasterUser && sectionMode === "edit" && (
-          <div className="pt-4 border-t">
+          <div className="pt-4 border-t space-y-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -609,6 +612,19 @@ const handleSaveTracking = async () => {
                 </div>
               </div>
             </label>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-1">Plan</label>
+              <select
+                value={form.plan_type}
+                onChange={(e) => handleChange("plan_type", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="pro">Pro</option>
+                <option value="estimator_only">Estimator Only</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
