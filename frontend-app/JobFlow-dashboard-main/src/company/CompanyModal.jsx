@@ -139,7 +139,7 @@ setForm({
 zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
-  plan_type: company.plan_type || "pro",
+  plan_type: company.plan_type || company.planType || "pro",
   est_push_title: company.est_push_title || company.estPushTitle || "",
   est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
