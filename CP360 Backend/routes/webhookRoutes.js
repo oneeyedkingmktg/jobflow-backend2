@@ -4,10 +4,11 @@ const webhookController = require('../controllers/webhookController');
 const calendarWebhookController = require('../controllers/calendarWebhookController');
 const { pool } = require('../config/database');
 const { sendPushToCompany } = require('../services/pushNotificationService');
+const verifyGHLWebhook = require('../middleware/verifyGHLWebhook');
 
 // GHL Contact webhook - single endpoint for all companies
-router.post('/ghl/contact', webhookController.handleGHLContact);
-router.post('/ghl/calendar', calendarWebhookController.handleGHLCalendar);
+router.post('/ghl/contact', verifyGHLWebhook, webhookController.handleGHLContact);
+router.post('/ghl/calendar', verifyGHLWebhook, calendarWebhookController.handleGHLCalendar);
 
 // Push notification trigger — called by GHL automations
 router.post('/push', async (req, res) => {

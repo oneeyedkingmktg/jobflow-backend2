@@ -12,6 +12,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
+const verifyGHLWebhook = require("../middleware/verifyGHLWebhook");
 
 // Map GHL status tags to JF status
 function mapGHLStatusToJF(tags) {
@@ -147,7 +148,7 @@ async function updateLeadIfNeeded(existing, updates) {
 // ============================================================================
 // MAIN WEBHOOK ENDPOINT
 // ============================================================================
-router.post("/:companyId", express.json({ limit: "2mb" }), async (req, res) => {
+router.post("/:companyId", verifyGHLWebhook, async (req, res) => {
   try {
     const companyId = parseInt(req.params.companyId, 10);
     const body = req.body || {};
