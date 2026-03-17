@@ -30,7 +30,19 @@ PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
 RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
 
 cd "$PACKAGE_DIR"
-swift package resolve
+
+# Retry swift package resolve up to 3 times — binary target downloads can timeout transiently
+for i in 1 2 3; do
+  echo ">>> swift package resolve attempt $i..."
+  swift package resolve && break
+  if [ $i -lt 3 ]; then
+    echo ">>> Attempt $i failed, retrying in 20 seconds..."
+    sleep 20
+  else
+    echo ">>> All swift package resolve attempts failed."
+    exit 1
+  fi
+done
 
 mkdir -p "$RESOLVED_DEST"
 cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
