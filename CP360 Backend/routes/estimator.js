@@ -238,7 +238,8 @@ next_steps_button_text,
         cta1_button,
         cta1_link,
         cta2_button,
-        cta2_link
+        cta2_link,
+        combined_project_message
       )
 VALUES (
   $1,$2,
@@ -253,7 +254,7 @@ VALUES (
   $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
   $53,$54,$55,
 $56,$57,$58,$59,$60,$61,$62,$63,$64,
-  $65,$66,$67,$68,$69,$70,$71,$72,$73
+  $65,$66,$67,$68,$69,$70,$71,$72,$73,$74
   )
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
@@ -339,6 +340,7 @@ cta1_button = COALESCE(EXCLUDED.cta1_button, estimator_configs.cta1_button),
 cta1_link = COALESCE(EXCLUDED.cta1_link, estimator_configs.cta1_link),
 cta2_button = COALESCE(EXCLUDED.cta2_button, estimator_configs.cta2_button),
 cta2_link = COALESCE(EXCLUDED.cta2_link, estimator_configs.cta2_link),
+        combined_project_message = COALESCE(EXCLUDED.combined_project_message, estimator_configs.combined_project_message),
         updated_at = now()
     `;
 
@@ -415,7 +417,8 @@ b.next_steps_button_text,
       b.cta1_button,
       b.cta1_link,
       b.cta2_button,
-      b.cta2_link
+      b.cta2_link,
+      b.combined_project_message,
     ];
 
     console.log("SQL placeholders:", (sql.match(/\$/g) || []).length);

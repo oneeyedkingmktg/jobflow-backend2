@@ -135,6 +135,7 @@ setForm({
   pricingInfoBoxStripeColor: data.pricing_info_box_stripe_color ?? "",
 
 // Text content
+customProjectLabel: data.custom_project_label ?? "",
 disclaimerText: data.disclaimer_text ?? "",
 minJobInfoText: data.min_job_info_text ?? "",
 standardInfoText: data.standard_info_text ?? "",
