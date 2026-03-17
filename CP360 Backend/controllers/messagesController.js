@@ -102,6 +102,10 @@ async function getThreadMessages(req, res) {
     const ghlResponse = await getMessagesByConversationId(conversationId, company, limit);
     const messages = ghlResponse?.messages || [];
 
+    // Temporary: log message types to identify chat widget type string
+    const types = [...new Set(messages.map(m => m.messageType || m.type || "none"))];
+    console.log(`[MSG TYPES] convo=${conversationId} types=${JSON.stringify(types)}`);
+
     res.json({ messages });
   } catch (error) {
     console.error("Error fetching thread messages:", error);
