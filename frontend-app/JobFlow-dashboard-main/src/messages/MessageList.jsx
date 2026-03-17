@@ -22,10 +22,13 @@ const CHANNEL_LABELS = {
   FACEBOOK:       { label: "Facebook",  color: "bg-blue-100 text-blue-800" },
   TYPE_IG:        { label: "Instagram", color: "bg-pink-100 text-pink-700" },
   IG:             { label: "Instagram", color: "bg-pink-100 text-pink-700" },
-  TYPE_LIVE_CHAT: { label: "Web Chat",  color: "bg-teal-100 text-teal-700" },
-  TYPE_WEB_CHAT:  { label: "Web Chat",  color: "bg-teal-100 text-teal-700" },
-  TYPE_WHATSAPP:  { label: "WhatsApp",  color: "bg-green-100 text-green-800" },
-  TYPE_GMB:       { label: "Google",    color: "bg-red-100 text-red-700" },
+  TYPE_LIVE_CHAT:    { label: "Web Chat",    color: "bg-teal-100 text-teal-700" },
+  TYPE_WEB_CHAT:     { label: "Web Chat",    color: "bg-teal-100 text-teal-700" },
+  TYPE_WEBCHAT:      { label: "Chat Widget", color: "bg-purple-100 text-purple-700" },
+  TYPE_CHAT_WIDGET:  { label: "Chat Widget", color: "bg-purple-100 text-purple-700" },
+  CHAT_WIDGET:       { label: "Chat Widget", color: "bg-purple-100 text-purple-700" },
+  TYPE_WHATSAPP:     { label: "WhatsApp",    color: "bg-green-100 text-green-800" },
+  TYPE_GMB:          { label: "Google",      color: "bg-red-100 text-red-700" },
 };
 
 function ChannelPill({ messageType }) {

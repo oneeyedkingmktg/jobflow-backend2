@@ -100,13 +100,8 @@ async function getThreadMessages(req, res) {
 
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const ghlResponse = await getMessagesByConversationId(conversationId, company, limit);
-    const messages = ghlResponse?.messages || [];
-
-    // Temporary: log raw GHL response structure to identify chat widget message type
-    console.log(`[MSG DEBUG] convo=${conversationId} keys=${JSON.stringify(Object.keys(ghlResponse || {}))} messages_type=${Array.isArray(messages) ? "array" : typeof messages} messages_keys=${!Array.isArray(messages) && messages ? JSON.stringify(Object.keys(messages)) : "n/a"}`);
-    const msgArray = Array.isArray(messages) ? messages : (Array.isArray(messages?.messages) ? messages.messages : []);
-    const types = [...new Set(msgArray.map(m => m.messageType || m.type || "none"))];
-    console.log(`[MSG TYPES] convo=${conversationId} count=${msgArray.length} types=${JSON.stringify(types)}`);
+    const raw = ghlResponse?.messages || [];
+    const messages = Array.isArray(raw) ? raw : (Array.isArray(raw?.messages) ? raw.messages : []);
 
     res.json({ messages });
   } catch (error) {

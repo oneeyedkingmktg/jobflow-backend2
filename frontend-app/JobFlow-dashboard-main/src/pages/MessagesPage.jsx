@@ -88,8 +88,11 @@ function ChannelBadge({ type }) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     )},
-    TYPE_WHATSAPP:  { bg: "bg-green-600",   content: <span className="text-white font-black" style={{fontSize:"8px"}}>W</span> },
-    TYPE_GMB:       { bg: "bg-red-500",     content: <span className="text-white font-black" style={{fontSize:"8px"}}>G</span> },
+    TYPE_WEBCHAT:     { bg: "bg-purple-500",  content: <span className="text-white font-black" style={{fontSize:"8px"}}>C</span> },
+    TYPE_CHAT_WIDGET: { bg: "bg-purple-500",  content: <span className="text-white font-black" style={{fontSize:"8px"}}>C</span> },
+    CHAT_WIDGET:      { bg: "bg-purple-500",  content: <span className="text-white font-black" style={{fontSize:"8px"}}>C</span> },
+    TYPE_WHATSAPP:    { bg: "bg-green-600",   content: <span className="text-white font-black" style={{fontSize:"8px"}}>W</span> },
+    TYPE_GMB:         { bg: "bg-red-500",     content: <span className="text-white font-black" style={{fontSize:"8px"}}>G</span> },
   };
 
   const cfg = configs[t];
@@ -109,6 +112,9 @@ function MessageTypeLabel({ type }) {
     SMS: "SMS",
     FB: "Facebook",
     IG: "Instagram",
+    TYPE_WEBCHAT: "Chat Widget",
+    TYPE_CHAT_WIDGET: "Chat Widget",
+    CHAT_WIDGET: "Chat Widget",
   };
   const t = (type || "").toUpperCase();
   if (!labels[t]) return null;
