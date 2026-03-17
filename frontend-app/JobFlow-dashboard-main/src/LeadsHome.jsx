@@ -82,6 +82,7 @@ const convertLeadFromBackend = (lead) => ({
   pauseNotes: lead.pauseNotes || null,
 
   ghlContactId: lead.ghlContactId || lead.ghl_contact_id || null,
+  createdAt: lead.createdAt || lead.created_at || null,
 
   proceedWithAutomation:
     lead.proceedWithAutomation ?? lead.proceed_with_automation ?? true,

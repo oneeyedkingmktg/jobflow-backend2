@@ -106,6 +106,15 @@ const hasEstimate = form?.hasEstimate === true;
             {form.referralSource || "Not Set"}
           </span>
         </div>
+
+        <div>
+          <span className="text-gray-500 block">Date Added</span>
+          <span className="font-semibold break-words">
+            {form.createdAt
+              ? new Date(form.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+              : "Not Set"}
+          </span>
+        </div>
       </div>
 
 {/* CONVERSATIONS BUTTON */}
