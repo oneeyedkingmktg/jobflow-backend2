@@ -103,7 +103,8 @@ async function getThreadMessages(req, res) {
     const messages = ghlResponse?.messages || [];
 
     // Temporary: log message types to identify chat widget type string
-    const types = [...new Set(messages.map(m => m.messageType || m.type || "none"))];
+    const msgArray = Array.isArray(messages) ? messages : [];
+    const types = [...new Set(msgArray.map(m => m.messageType || m.type || "none"))];
     console.log(`[MSG TYPES] convo=${conversationId} types=${JSON.stringify(types)}`);
 
     res.json({ messages });
