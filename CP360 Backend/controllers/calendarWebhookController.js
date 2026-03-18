@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { clearContactCustomFields, convertFromUTC } = require('./ghlAPI');
+const { clearContactCustomFields } = require('./ghlAPI');
 
 const calendarWebhookController = {
   // Handle GHL calendar event webhook (appointments AND installs)
@@ -360,11 +360,12 @@ await client.query(
         console.log(`✅ Cleared ${eventType} from lead ${lead.id}`);
         
       } else if (startTime) {
-        // Event was created or updated — convert UTC timestamp to company local time (DST-aware)
-        const companyTimezone = company.timezone || 'America/New_York';
-        const { dateOnly, timeOnly } = convertFromUTC(new Date(startTime), companyTimezone);
+        // GHL sends startTime as local time (not UTC), so parse directly from the string.
+        // Do NOT use convertFromUTC — that would incorrectly subtract the timezone offset.
+        const [dateOnly, timePart] = startTime.split('T');
+        const timeOnly = (timePart || '00:00:00').substring(0, 8); // HH:MM:SS
 
-        console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly, `(${companyTimezone})`);
+        console.log(`📅 [CALENDAR] Updating ${eventType} to:`, dateOnly, timeOnly);
 
         if (eventType === 'appointment') {
 const appointmentTimestamp = new Date(startTime);
