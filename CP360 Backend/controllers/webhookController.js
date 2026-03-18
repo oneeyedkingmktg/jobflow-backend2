@@ -207,13 +207,13 @@ const now = new Date();
           sync_source: 'GHL',
           ghl_last_synced: now
         };
-        
-if (contactData.lead_source) {
-  fieldsToUpdate.lead_source = contactData.lead_source;
-  console.log('✍️ Updating lead_source from GHL:', contactData.lead_source);
-}
 
-        
+        // REACTIVATION: If lead was deleted, bring it back to pre-lead status
+        if (existingLead.status === 'deleted') {
+          fieldsToUpdate.status = 'status_pre_lead';
+          console.log(`🔄 [REACTIVATION] Reactivating deleted lead ${existingLead.id} to pre-lead status`);
+        }
+
         // WRITE-ONCE RULE: Only update lead_source if it's currently empty
         if (!existingLead.lead_source && contactData.lead_source) {
           fieldsToUpdate.lead_source = contactData.lead_source;
