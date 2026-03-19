@@ -203,7 +203,8 @@ const now = new Date();
           state: contactData.state,
           zip: contactData.zip,
           project_type: contactData.project_type,
-          notes: contactData.notes,
+          // Only update notes if GHL actually sent a value — never overwrite JF-authored notes with null
+          ...(contactData.notes ? { notes: contactData.notes } : {}),
           sync_source: 'GHL',
           ghl_last_synced: now
         };
