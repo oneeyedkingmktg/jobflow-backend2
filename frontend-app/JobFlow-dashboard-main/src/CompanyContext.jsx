@@ -6,6 +6,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { CompaniesAPI } from "./api";
 import { useAuth } from "./AuthContext";
+import { switchNotificationCompany } from "./services/pushNotificationService";
 
 const CompanyContext = createContext(null);
 
@@ -115,6 +116,7 @@ const loadCompanies = async () => {
     try {
       const res = await CompaniesAPI.get(companyId);
       setCurrentCompany(normalizeCompany(res.company));
+      if (user) switchNotificationCompany(user, companyId);
     } catch (err) {
       console.error("Failed to switch company:", err);
     }

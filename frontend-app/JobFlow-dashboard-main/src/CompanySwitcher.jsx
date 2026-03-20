@@ -1,11 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCompany } from './CompanyContext';
-import { useAuth } from './AuthContext';
-import { switchNotificationCompany } from './services/pushNotificationService';
 
 export default function CompanySwitcher() {
   const { currentCompany, companies, switchCompany } = useCompany();
-  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -24,7 +21,6 @@ export default function CompanySwitcher() {
   const handleSwitch = (companyId) => {
     switchCompany(companyId);
     setIsOpen(false);
-    if (user) switchNotificationCompany(user, companyId);
   };
 
   if (!currentCompany) {
