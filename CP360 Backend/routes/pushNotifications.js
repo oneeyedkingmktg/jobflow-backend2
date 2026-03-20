@@ -24,10 +24,10 @@ router.post('/register-device', async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      // Update last_used timestamp
+      // Update last_used and company assignment (master may switch companies)
       await db.query(
-        'UPDATE device_tokens SET last_used = NOW() WHERE device_token = $1',
-        [deviceToken]
+        'UPDATE device_tokens SET last_used = NOW(), company_id = $2, user_id = $3 WHERE device_token = $1',
+        [deviceToken, companyId, userId]
       );
       return res.json({ message: 'Device token updated', existing: true });
     }
