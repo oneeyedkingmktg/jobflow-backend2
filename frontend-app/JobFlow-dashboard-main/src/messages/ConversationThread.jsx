@@ -27,6 +27,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
   const companyId = currentCompany?.id;
 
   const softphone = useSoftphone();
+  const [pendingCall, setPendingCall] = useState(null);
 
   // Fetch messages on mount + mark as read
   useEffect(() => {
@@ -66,8 +67,8 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
       const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
       const IG_TYPES = ['IG','TYPE_IG'];
-      const hasFB = msgs.some(m => FB_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
-      const hasIG = msgs.some(m => IG_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      const hasFB = msgs.some(m => FB_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
+      const hasIG = msgs.some(m => IG_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
       setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : [])]);
     } catch (err) {
       console.error("Failed to fetch thread messages:", err);
@@ -137,6 +138,12 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
         onDecline={softphone.declineCall}
         onToggleMute={softphone.toggleMute}
         onToggleSpeaker={softphone.toggleSpeaker}
+        pendingCall={pendingCall}
+        onConfirmCall={() => {
+          softphone.makeCall(pendingCall.phone, pendingCall.name);
+          setPendingCall(null);
+        }}
+        onCancelCall={() => setPendingCall(null)}
       />
       {/* Header */}
       <div className="bg-[#225ce5] text-white shadow-md flex-shrink-0">
@@ -165,7 +172,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
           {/* Call button — native app only, requires phone number */}
           {isNativeApp() && conversation.phone && (
             <button
-              onClick={() => softphone.makeCall(conversation.phone, conversation.contactName)}
+              onClick={() => setPendingCall({ phone: conversation.phone, name: conversation.contactName })}
               disabled={softphone.isActive}
               className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 disabled:opacity-40 flex items-center justify-center transition"
               title={`Call ${formatPhoneNumber(conversation.phone)}`}

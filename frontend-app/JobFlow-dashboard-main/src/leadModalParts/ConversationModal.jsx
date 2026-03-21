@@ -30,6 +30,7 @@ export default function ConversationModal({ lead, onClose }) {
   const [availableTypes, setAvailableTypes] = useState(["SMS"]);
 
   const softphone = useSoftphone();
+  const [pendingCall, setPendingCall] = useState(null);
 
   const phone = lead.phone || lead.phone_number || lead.phoneNumber || "";
   const name = lead.name || lead.fullName || lead.full_name || "";
@@ -64,8 +65,8 @@ export default function ConversationModal({ lead, onClose }) {
 
       const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
       const IG_TYPES = ['IG','TYPE_IG'];
-      const hasFB = msgs.some(m => FB_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
-      const hasIG = msgs.some(m => IG_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      const hasFB = msgs.some(m => FB_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
+      const hasIG = msgs.some(m => IG_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
       setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : [])]);
     } catch (err) {
       setError(err.message);
@@ -119,6 +120,12 @@ export default function ConversationModal({ lead, onClose }) {
         onDecline={softphone.declineCall}
         onToggleMute={softphone.toggleMute}
         onToggleSpeaker={softphone.toggleSpeaker}
+        pendingCall={pendingCall}
+        onConfirmCall={() => {
+          softphone.makeCall(pendingCall.phone, pendingCall.name);
+          setPendingCall(null);
+        }}
+        onCancelCall={() => setPendingCall(null)}
       />
 
       {/* Header */}
@@ -146,7 +153,7 @@ export default function ConversationModal({ lead, onClose }) {
           {/* Call button — native app only */}
           {isNativeApp() && phone && (
             <button
-              onClick={() => softphone.makeCall(phone, name)}
+              onClick={() => setPendingCall({ phone, name })}
               disabled={softphone.isActive}
               className="flex-shrink-0 w-9 h-9 rounded-full bg-green-500 hover:bg-green-600 disabled:opacity-40 flex items-center justify-center transition"
               title={`Call ${formatPhoneNumber(phone)}`}
