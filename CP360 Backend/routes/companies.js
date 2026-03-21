@@ -499,7 +499,7 @@ google_conversion_event = COALESCE($27, google_conversion_event),
   ghl_install_title_template || null, // $19
   ghl_appt_description_template || null,// $20
   ghl_install_description_template || null,// $21
-  show_conversations || false,        // $22
+  show_conversations ?? null,         // $22
   billing_status,                     // $23
   companyId,                          // $24
 sanitizedBody.google_base_tag || null,        // $25
