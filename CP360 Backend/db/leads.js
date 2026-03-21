@@ -90,6 +90,7 @@ async function getAllLeads() {
       appointment_time,
       install_date,
       install_tentative,
+      install_duration_days,
 
       created_at,
       updated_at
