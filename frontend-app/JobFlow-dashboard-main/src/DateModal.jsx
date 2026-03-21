@@ -35,6 +35,7 @@ function formatTime12h(time) {
 export default function DateModal({
   initialDate,
   initialTentative = false,
+  initialDurationDays = 1,
   onConfirm,
   onClose,
   onRemove,
@@ -45,6 +46,7 @@ export default function DateModal({
   const today = new Date();
 
   const [tentative, setTentative] = useState(initialTentative || false);
+  const [durationDays, setDurationDays] = useState(initialDurationDays || 1);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(initialDate || null);
@@ -114,7 +116,7 @@ export default function DateModal({
   const handleSave = () => {
     if (!selectedDate) return;
     const finalDate = tentative ? getMondayOfWeek(selectedDate) : selectedDate;
-    onConfirm(finalDate, tentative);
+    onConfirm(finalDate, tentative, durationDays);
     onClose();
   };
 
@@ -155,6 +157,23 @@ export default function DateModal({
             {tentative && (
               <p className="text-xs text-blue-600 mt-1 ml-6">Date will be set to Monday of the selected week</p>
             )}
+          </div>
+        )}
+
+        {/* Duration input — install dates only */}
+        {allowTentative && (
+          <div className="mb-3 flex items-center gap-3">
+            <label className="text-sm text-gray-700 font-medium whitespace-nowrap">Number of days:</label>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={durationDays}
+              onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ fontSize: '16px' }}
+            />
+            <span className="text-xs text-gray-500">{durationDays === 1 ? 'single day' : `ends ${(() => { const d = new Date(selectedDate + 'T12:00:00'); d.setDate(d.getDate() + durationDays - 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })()}`}</span>
           </div>
         )}
 

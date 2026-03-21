@@ -27,17 +27,21 @@ export default function LeadModalsWrapper({
           initialTentative={
             showDateModal === "installDate" ? form.installTentative : false
           }
+          initialDurationDays={
+            showDateModal === "installDate" ? (form.installDurationDays || 1) : 1
+          }
           allowTentative={showDateModal === "installDate"}
           label={
             showDateModal === "installDate"
               ? "Set Install Date"
               : "Select Date"
           }
-          onConfirm={(date, tentative) => {
+          onConfirm={(date, tentative, durationDays) => {
             setForm((prev) => ({
               ...prev,
               [showDateModal]: date,
               installTentative: tentative || false,
+              ...(showDateModal === "installDate" ? { installDurationDays: durationDays || 1 } : {}),
             }));
             setShowDateModal(null);
           }}

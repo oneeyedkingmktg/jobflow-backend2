@@ -129,7 +129,7 @@ router.get("/calendar-dots", async (req, res) => {
     if (!company_id) return res.status(400).json({ error: "company_id required" });
 
     const result = await pool.query(
-      `SELECT id, name, install_date, install_tentative, appointment_date, appointment_time
+      `SELECT id, name, install_date, install_tentative, install_duration_days, appointment_date, appointment_time
        FROM leads
        WHERE company_id = $1
          AND deleted_at IS NULL

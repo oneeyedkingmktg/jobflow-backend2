@@ -43,6 +43,7 @@ function mapLead(row) {
     appointmentTime: row.appointment_time,
     installDate: row.install_date,
     installTentative: row.install_tentative,
+    installDurationDays: row.install_duration_days || 1,
 
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -127,7 +128,7 @@ async function createLead(data) {
       preferred_contact, notes,
       status, not_sold_reason, contract_price,
       appointment_date, appointment_time,
-      install_date, install_tentative,
+      install_date, install_tentative, install_duration_days,
       created_at, updated_at
     )
     VALUES (
@@ -138,7 +139,7 @@ async function createLead(data) {
       $16,$17,
       $18,$19,$20,
       $21,$22,
-      $23,$24,
+      $23,$24,$25,
       NOW(), NOW()
     )
     RETURNING *;
@@ -175,6 +176,7 @@ async function createLead(data) {
 
       data.install_date,
       data.install_tentative,
+      data.install_duration_days || 1,
     ]
   );
 
@@ -195,9 +197,9 @@ async function updateLead(id, data) {
       preferred_contact=$16, notes=$17,
       status=$18, not_sold_reason=$19, contract_price=$20,
       appointment_date=$21, appointment_time=$22,
-      install_date=$23, install_tentative=$24,
+      install_date=$23, install_tentative=$24, install_duration_days=$25,
       updated_at = NOW()
-    WHERE id = $25
+    WHERE id = $26
     RETURNING *;
   `,
     [
@@ -231,6 +233,7 @@ async function updateLead(id, data) {
       data.appointment_time,
       data.install_date,
       data.install_tentative,
+      data.install_duration_days || 1,
 
       id,
     ]
