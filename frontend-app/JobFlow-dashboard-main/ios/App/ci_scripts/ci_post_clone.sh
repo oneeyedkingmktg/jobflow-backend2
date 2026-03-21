@@ -31,6 +31,10 @@ RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swi
 
 cd "$PACKAGE_DIR"
 
+echo ">>> Clearing stale Package.resolved files..."
+rm -f "$PACKAGE_DIR/Package.resolved"
+rm -f "$RESOLVED_DEST/Package.resolved"
+
 # Retry swift package resolve up to 3 times — binary target downloads can timeout transiently
 for i in 1 2 3; do
   echo ">>> swift package resolve attempt $i..."
