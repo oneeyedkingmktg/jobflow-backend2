@@ -80,7 +80,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
           placeholder="Type a message..."
           rows={1}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          style={{ minHeight: "40px", maxHeight: "120px" }}
+          style={{ minHeight: "40px", maxHeight: "120px", fontSize: "16px" }}
         />
         <button
           onClick={handleSend}
