@@ -16,6 +16,7 @@ import { isNativeApp } from "../utils/platform.js";
 export default function ConversationThread({ conversation, onBack, onGoToLead, onRead }) {
   const { currentCompany } = useCompany();
   const [messages, setMessages] = useState([]);
+  const [availableTypes, setAvailableTypes] = useState(["SMS"]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
@@ -62,6 +63,12 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
       const reversed = [...msgs].reverse();
       setMessages(reversed);
       setHasMore(msgs.length >= limit);
+
+      const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
+      const IG_TYPES = ['IG','TYPE_IG'];
+      const hasFB = msgs.some(m => FB_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      const hasIG = msgs.some(m => IG_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : [])]);
     } catch (err) {
       console.error("Failed to fetch thread messages:", err);
       setError("Could not load messages. Please try again.");
@@ -216,6 +223,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
           conversationId={conversation.id}
           contactId={conversation.contactId}
           channelType={conversation.channelType}
+          availableTypes={availableTypes}
           onSent={() => fetchMessages()}
         />
       </div>

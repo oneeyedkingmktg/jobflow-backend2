@@ -27,6 +27,7 @@ export default function ConversationModal({ lead, onClose }) {
   const [shouldScroll, setShouldScroll] = useState(true);
   const [conversationId, setConversationId] = useState(null);
   const [contactId, setContactId] = useState(lead.ghl_contact_id || null);
+  const [availableTypes, setAvailableTypes] = useState(["SMS"]);
 
   const softphone = useSoftphone();
 
@@ -60,6 +61,12 @@ export default function ConversationModal({ lead, onClose }) {
       setHasMore(msgs.length >= limit);
       if (data.conversationId) setConversationId(data.conversationId);
       if (data.contactId) setContactId(data.contactId);
+
+      const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
+      const IG_TYPES = ['IG','TYPE_IG'];
+      const hasFB = msgs.some(m => FB_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      const hasIG = msgs.some(m => IG_TYPES.includes((m.type || m.messageType || '').toUpperCase()));
+      setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : [])]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -188,6 +195,7 @@ export default function ConversationModal({ lead, onClose }) {
           conversationId={conversationId}
           contactId={contactId}
           channelType="SMS"
+          availableTypes={availableTypes}
           onSent={() => fetchConversations()}
         />
       </div>

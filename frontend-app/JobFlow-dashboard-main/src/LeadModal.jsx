@@ -7,6 +7,9 @@ import React, { useState, useRef } from "react";
 import { useCompany } from "./CompanyContext";
 import { formatPhoneNumber } from "./utils/formatting";
 import { LeadsAPI } from "./api";
+import { useSoftphone } from "./hooks/useSoftphone.js";
+import { isNativeApp } from "./utils/platform";
+import ConversationModal from "./leadModalParts/ConversationModal.jsx";
 
 import LeadHeader from "./leadModalParts/LeadHeader.jsx";
 import LeadAddressBox from "./leadModalParts/LeadAddressBox.jsx";
@@ -29,6 +32,7 @@ export default function LeadModal({
   onClose,
 }) {
   const { currentCompany } = useCompany();
+  const softphone = useSoftphone();
 
   const initialFormRef = useRef(null);
 
@@ -55,6 +59,7 @@ export default function LeadModal({
   const [showNotSoldModal, setShowNotSoldModal] = useState(false);
 const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
+  const [showConversationModal, setShowConversationModal] = useState(false);
 
 
   const isDirty =
@@ -120,12 +125,20 @@ const cancelDiscardChanges = () => {
   // ------------------------------------------------------------------
   const handleCall = () => {
     if (!form.phone) return;
-    window.location.href = `tel:${form.phone.replace(/\D/g, "")}`;
+    if (isNativeApp()) {
+      softphone.makeCall(form.phone.replace(/\D/g, ""), form.name || form.full_name || "");
+    } else {
+      window.location.href = `tel:${form.phone.replace(/\D/g, "")}`;
+    }
   };
 
   const handleText = () => {
     if (!form.phone) return;
-    window.location.href = `sms:${form.phone.replace(/\D/g, "")}`;
+    if (isNativeApp()) {
+      setShowConversationModal(true);
+    } else {
+      window.location.href = `sms:${form.phone.replace(/\D/g, "")}`;
+    }
   };
 
   const handleOpenMaps = () => {
@@ -307,6 +320,13 @@ const handleUploadPhotos = async () => {
           form={form}
           onSave={handlePauseSave}
           onClose={() => setShowPauseModal(false)}
+        />
+      )}
+
+      {showConversationModal && (
+        <ConversationModal
+          lead={form}
+          onClose={() => setShowConversationModal(false)}
         />
       )}
 

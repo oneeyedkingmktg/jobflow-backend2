@@ -7,15 +7,17 @@ import { useState } from "react";
 import { apiRequest } from "../api";
 import { useCompany } from "../CompanyContext";
 
-const SEND_TYPES = [
+const ALL_SEND_TYPES = [
   { value: "SMS", label: "SMS" },
-  { value: "Email", label: "Email" },
   { value: "FB", label: "Facebook" },
   { value: "IG", label: "Instagram" },
 ];
 
-export default function ReplyBox({ conversationId, contactId, channelType, onSent }) {
+export default function ReplyBox({ conversationId, contactId, channelType, availableTypes, onSent }) {
   const { currentCompany } = useCompany();
+  const SEND_TYPES = availableTypes?.length
+    ? ALL_SEND_TYPES.filter((t) => availableTypes.includes(t.value))
+    : ALL_SEND_TYPES.filter((t) => t.value === "SMS");
   const [message, setMessage] = useState("");
   const [type, setType] = useState(
     SEND_TYPES.find((t) => t.value === channelType) ? channelType : "SMS"
