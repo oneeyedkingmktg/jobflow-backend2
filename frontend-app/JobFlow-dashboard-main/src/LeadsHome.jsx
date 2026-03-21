@@ -122,6 +122,7 @@ const convertLeadToBackend = (lead) => ({
   appointment_time: lead.appointmentTime || null,
   install_date: lead.installDate || null,
   install_tentative: lead.installTentative || false,
+  install_duration_days: lead.installDurationDays || 1,
 
   has_estimate: lead.hasEstimate || false,
 

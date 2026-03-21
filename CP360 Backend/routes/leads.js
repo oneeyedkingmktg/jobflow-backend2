@@ -638,18 +638,19 @@ const result = await pool.query(
     appointment_time = $22,
     install_date = $23,
     install_tentative = COALESCE($24, install_tentative),
-    pause_status = $25,
-    pause_until = $26,
-    resume_action = $27,
-    pause_notes = $28,
-    proceed_with_automation = COALESCE($29, proceed_with_automation),
+    install_duration_days = COALESCE($25, install_duration_days),
+    pause_status = $26,
+    pause_until = $27,
+    resume_action = $28,
+    pause_notes = $29,
+    proceed_with_automation = COALESCE($30, proceed_with_automation),
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $30
+  WHERE id = $31
   RETURNING *`,
 
       [
@@ -677,6 +678,7 @@ const result = await pool.query(
         clean(lead.appointment_time),
         clean(lead.install_date),
         lead.install_tentative,
+        lead.install_duration_days || null,
         clean(lead.pause_status),
         clean(lead.pause_until),
         clean(lead.resume_action),
