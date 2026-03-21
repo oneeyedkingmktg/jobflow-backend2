@@ -10,6 +10,7 @@ import { LeadsAPI } from "./api";
 import { useSoftphone } from "./hooks/useSoftphone.js";
 import { isNativeApp } from "./utils/platform";
 import ConversationModal from "./leadModalParts/ConversationModal.jsx";
+import SoftphoneWidget from "./components/SoftphoneWidget.jsx";
 
 import LeadHeader from "./leadModalParts/LeadHeader.jsx";
 import LeadAddressBox from "./leadModalParts/LeadAddressBox.jsx";
@@ -60,6 +61,7 @@ export default function LeadModal({
 const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showConversationModal, setShowConversationModal] = useState(false);
+  const [pendingCall, setPendingCall] = useState(null);
 
 
   const isDirty =
@@ -126,7 +128,7 @@ const cancelDiscardChanges = () => {
   const handleCall = () => {
     if (!form.phone) return;
     if (isNativeApp()) {
-      softphone.makeCall(form.phone.replace(/\D/g, ""), form.name || form.full_name || "");
+      setPendingCall({ phone: form.phone.replace(/\D/g, ""), name: form.name || form.full_name || "" });
     } else {
       window.location.href = `tel:${form.phone.replace(/\D/g, "")}`;
     }
@@ -329,6 +331,29 @@ const handleUploadPhotos = async () => {
           onClose={() => setShowConversationModal(false)}
         />
       )}
+
+      <SoftphoneWidget
+        callState={softphone.callState}
+        callerNumber={softphone.callerNumber}
+        callerName={softphone.callerName}
+        formattedTime={softphone.formattedTime}
+        isMuted={softphone.isMuted}
+        isSpeaker={softphone.isSpeaker}
+        isConnected={softphone.isConnected}
+        isDialing={softphone.isDialing}
+        isIncoming={softphone.isIncoming}
+        onHangup={softphone.hangup}
+        onAnswer={softphone.answerCall}
+        onDecline={softphone.declineCall}
+        onToggleMute={softphone.toggleMute}
+        onToggleSpeaker={softphone.toggleSpeaker}
+        pendingCall={pendingCall}
+        onConfirmCall={() => {
+          softphone.makeCall(pendingCall.phone, pendingCall.name);
+          setPendingCall(null);
+        }}
+        onCancelCall={() => setPendingCall(null)}
+      />
 
       {showEstimateModal && estimateData && (
         <EstimateModal

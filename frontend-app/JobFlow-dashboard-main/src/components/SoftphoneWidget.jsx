@@ -21,7 +21,44 @@ export default function SoftphoneWidget({
   onDecline,
   onToggleMute,
   onToggleSpeaker,
+  pendingCall,
+  onConfirmCall,
+  onCancelCall,
 }) {
+  // Pre-dial screen — show before the call is placed
+  if (pendingCall && (!callState || callState === 'idle' || callState === 'released')) {
+    const displayName = pendingCall.name || formatPhoneNumber(pendingCall.phone) || pendingCall.phone;
+    return (
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900 bg-opacity-95">
+        <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center mb-4 shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </div>
+        <p className="text-white text-2xl font-bold mb-1">{displayName}</p>
+        <p className="text-gray-400 text-sm mb-8">{formatPhoneNumber(pendingCall.phone)}</p>
+        <div className="flex gap-16 items-center">
+          <div className="flex flex-col items-center gap-2">
+            <button onClick={onCancelCall} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg active:bg-red-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <span className="text-gray-400 text-xs">Cancel</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <button onClick={onConfirmCall} className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg active:bg-green-600">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5z" />
+              </svg>
+            </button>
+            <span className="text-gray-400 text-xs">Call</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!callState || callState === 'idle' || callState === 'released') return null;
 
   const displayName = callerName || formatPhoneNumber(callerNumber) || callerNumber || 'Unknown';
