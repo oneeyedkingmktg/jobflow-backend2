@@ -86,6 +86,8 @@ const toCamel = (row) => ({
   appointmentTime: row.appointment_time,
   installDate: row.install_date,
   installTentative: row.install_tentative,
+  installDurationDays: row.install_duration_days || 1,
+  installEndDate: row.install_end_date || null,
 
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -129,7 +131,7 @@ router.get("/calendar-dots", async (req, res) => {
     if (!company_id) return res.status(400).json({ error: "company_id required" });
 
     const result = await pool.query(
-      `SELECT id, name, install_date, install_tentative, install_duration_days, appointment_date, appointment_time
+      `SELECT id, name, install_date, install_tentative, install_duration_days, install_end_date, appointment_date, appointment_time
        FROM leads
        WHERE company_id = $1
          AND deleted_at IS NULL
@@ -639,18 +641,19 @@ const result = await pool.query(
     install_date = $23,
     install_tentative = COALESCE($24, install_tentative),
     install_duration_days = COALESCE($25, install_duration_days),
-    pause_status = $26,
-    pause_until = $27,
-    resume_action = $28,
-    pause_notes = $29,
-    proceed_with_automation = COALESCE($30, proceed_with_automation),
+    install_end_date = $26,
+    pause_status = $27,
+    pause_until = $28,
+    resume_action = $29,
+    pause_notes = $30,
+    proceed_with_automation = COALESCE($31, proceed_with_automation),
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $31
+  WHERE id = $32
   RETURNING *`,
 
       [
@@ -679,6 +682,7 @@ const result = await pool.query(
         clean(lead.install_date),
         lead.install_tentative,
         lead.install_duration_days || null,
+        lead.install_end_date || null,
         clean(lead.pause_status),
         clean(lead.pause_until),
         clean(lead.resume_action),
