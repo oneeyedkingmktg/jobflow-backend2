@@ -20,6 +20,7 @@ function formatDateKey(date) {
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "";
   const date = new Date(dateStr + "T00:00:00");
+  if (isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -30,6 +31,22 @@ function formatTime12h(time) {
   const ampm = hour >= 12 ? "PM" : "AM";
   hour = hour % 12 || 12;
   return `${hour}:${m} ${ampm}`;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+
+function daysBetween(startStr, endStr) {
+  const start = new Date(startStr + "T12:00:00");
+  const end = new Date(endStr + "T12:00:00");
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+function isValidDateStr(d) {
+  return d && !isNaN(new Date(d + "T00:00:00").getTime());
 }
 
 export default function DateModal({
@@ -46,19 +63,26 @@ export default function DateModal({
   const today = new Date();
 
   const [tentative, setTentative] = useState(initialTentative || false);
-  const [durationDays, setDurationDays] = useState(initialDurationDays || 1);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [selectedDate, setSelectedDate] = useState(initialDate || null);
+
+  // Start date (always used)
+  const [startDate, setStartDate] = useState(isValidDateStr(initialDate) ? initialDate : null);
+
+  // End date — only for install dates (allowTentative). Computed from initialDate + initialDurationDays.
+  const computedInitialEnd = isValidDateStr(initialDate) && initialDurationDays > 1
+    ? addDays(initialDate, initialDurationDays - 1)
+    : null;
+  const [endDate, setEndDate] = useState(computedInitialEnd);
+
   const [dayViewDate, setDayViewDate] = useState(null);
   const [dots, setDots] = useState([]);
 
   useEffect(() => {
-    if (initialDate) setSelectedDate(initialDate);
+    if (isValidDateStr(initialDate)) setStartDate(initialDate);
     if (initialTentative !== undefined) setTentative(initialTentative);
   }, [initialDate, initialTentative]);
 
-  // Fetch fresh calendar data
   useEffect(() => {
     if (!company?.id) return;
     LeadsAPI.getCalendarDots(company.id)
@@ -109,14 +133,41 @@ export default function DateModal({
   };
 
   const handleDayClick = (key) => {
-    setSelectedDate(key);
-    setDayViewDate(key);
+    if (!allowTentative) {
+      // Non-install dates: single date selection
+      setStartDate(key);
+      setDayViewDate(key);
+      return;
+    }
+
+    // Install dates: range selection
+    if (!startDate || (startDate && endDate)) {
+      // No start yet, or both already set — start fresh
+      setStartDate(key);
+      setEndDate(null);
+      setDayViewDate(key);
+    } else {
+      // Start set, no end — pick end date
+      if (key < startDate) {
+        // Clicked before start — reset with new start
+        setStartDate(key);
+        setEndDate(null);
+      } else if (key === startDate) {
+        // Same day = single day install
+        setEndDate(key);
+        setDayViewDate(key);
+      } else {
+        setEndDate(key);
+        setDayViewDate(key);
+      }
+    }
   };
 
   const handleSave = () => {
-    if (!selectedDate) return;
-    const finalDate = tentative ? getMondayOfWeek(selectedDate) : selectedDate;
-    onConfirm(finalDate, tentative, durationDays);
+    if (!startDate) return;
+    const finalStart = tentative ? getMondayOfWeek(startDate) : startDate;
+    const duration = allowTentative && endDate ? daysBetween(finalStart, endDate) : 1;
+    onConfirm(finalStart, tentative, Math.max(1, duration));
     onClose();
   };
 
@@ -125,12 +176,24 @@ export default function DateModal({
     onClose();
   };
 
-  const isValidDate = (d) => d && !isNaN(new Date(d + "T00:00:00").getTime());
-  const displaySelected = isValidDate(selectedDate)
-    ? tentative
-      ? `Week of ${formatDisplayDate(getMondayOfWeek(selectedDate))}`
-      : formatDisplayDate(selectedDate)
-    : "No date selected";
+  // Display text
+  const displayText = (() => {
+    if (!startDate) return allowTentative ? "Tap start date" : "No date selected";
+    if (allowTentative) {
+      if (!endDate || endDate === startDate) {
+        return endDate
+          ? `${formatDisplayDate(startDate)} (1 day)`
+          : `Start: ${formatDisplayDate(startDate)} — tap end date`;
+      }
+      const days = daysBetween(startDate, endDate);
+      return `${formatDisplayDate(startDate)} – ${formatDisplayDate(endDate)} (${days} days)`;
+    }
+    return tentative
+      ? `Week of ${formatDisplayDate(getMondayOfWeek(startDate))}`
+      : formatDisplayDate(startDate);
+  })();
+
+  const canSave = startDate && (!allowTentative || endDate);
 
   return (
     <div
@@ -161,26 +224,9 @@ export default function DateModal({
           </div>
         )}
 
-        {/* Duration input — install dates only */}
-        {allowTentative && (
-          <div className="mb-3 flex items-center gap-3">
-            <label className="text-sm text-gray-700 font-medium whitespace-nowrap">Number of days:</label>
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={durationDays}
-              onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{ fontSize: '16px' }}
-            />
-            <span className="text-xs text-gray-500">{durationDays === 1 ? 'single day' : selectedDate ? `ends ${(() => { const d = new Date(selectedDate + 'T12:00:00'); d.setDate(d.getDate() + durationDays - 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })()}` : 'pick a date first'}</span>
-          </div>
-        )}
-
-        {/* Selected date display */}
+        {/* Date range display */}
         <div className="text-center text-sm font-semibold text-blue-700 mb-2 min-h-[20px]">
-          {displaySelected}
+          {displayText}
         </div>
 
         {/* Month navigation */}
@@ -214,28 +260,34 @@ export default function DateModal({
             const key = formatDateKey(day);
             const data = groupedByDate[key] || { appt: [], install: [] };
             const isToday = key === formatDateKey(today);
-            const isSelected = key === selectedDate;
+            const isStart = key === startDate;
+            const isEnd = allowTentative && key === endDate;
+            const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
+
+            let cellClass = "rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors ";
+            if (isStart) cellClass += "bg-blue-600 text-white";
+            else if (isEnd) cellClass += "bg-green-600 text-white";
+            else if (inRange) cellClass += "bg-green-100 text-green-900";
+            else if (isToday) cellClass += "bg-blue-100 text-blue-800";
+            else cellClass += "hover:bg-gray-100 text-gray-800";
+
+            const dotWhite = isStart || isEnd;
 
             return (
-              <div
-                key={key}
-                onClick={() => handleDayClick(key)}
-                className={`rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors
-                  ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
-              >
+              <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
                 <span className="font-medium leading-none">{day.getDate()}</span>
                 <div className="flex gap-px mt-0.5 flex-wrap justify-center">
                   {data.appt.map((_, i) => (
-                    <div key={`a-${i}`} className="w-2 h-2 bg-blue-400 rounded-full" style={isSelected ? { backgroundColor: "white" } : {}} />
+                    <div key={`a-${i}`} className="w-2 h-2 bg-blue-400 rounded-full" style={dotWhite ? { backgroundColor: "white" } : {}} />
                   ))}
                   {data.install.map((lead, i) => (
                     <div
                       key={`i-${i}`}
                       className="w-2 h-2 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: isSelected ? "white" : (lead.installTentative ? "#16a34a" : "#22c55e") }}
+                      style={{ backgroundColor: dotWhite ? "white" : (lead.installTentative ? "#16a34a" : "#22c55e") }}
                     >
                       {lead.installTentative && (
-                        <span style={{ fontSize: "6px", color: isSelected ? "#1d4ed8" : "white", fontWeight: "bold", lineHeight: 1 }}>T</span>
+                        <span style={{ fontSize: "6px", color: dotWhite ? "#1d4ed8" : "white", fontWeight: "bold", lineHeight: 1 }}>T</span>
                       )}
                     </div>
                   ))}
@@ -275,15 +327,12 @@ export default function DateModal({
             Remove
           </button>
           <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
-            >
+            <button onClick={onClose} className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={!selectedDate}
+              disabled={!canSave}
               className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save
