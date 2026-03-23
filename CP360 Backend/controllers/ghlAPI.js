@@ -1054,7 +1054,12 @@ else if (calendarType === 'install') {
 
     const localDateTime = `${dateOnly}T${slotHours.toString().padStart(2, '0')}:${slotMinutes.toString().padStart(2, '0')}:00`;
     startDateTime = convertToUTC(localDateTime, companyTimezone);
-    endDateTime = new Date(startDateTime.getTime() + 15 * 60000);
+
+    // End at 5:00 PM on the last install day (install_end_date or same day)
+    const endDateOnly = lead.install_end_date
+      ? new Date(lead.install_end_date).toISOString().split("T")[0]
+      : dateOnly;
+    endDateTime = convertToUTC(`${endDateOnly}T17:00:00`, companyTimezone);
 }
 
 else {

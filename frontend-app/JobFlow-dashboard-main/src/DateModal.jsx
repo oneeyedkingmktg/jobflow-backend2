@@ -109,9 +109,18 @@ export default function DateModal({
     const map = {};
     dots.forEach((lead) => {
       if (lead.installDate) {
-        const key = lead.installDate.split("T")[0];
-        if (!map[key]) map[key] = { appt: [], install: [] };
-        map[key].install.push(lead);
+        const startStr = lead.installDate.split("T")[0];
+        const endStr = lead.installEndDate ? lead.installEndDate.split("T")[0] : startStr;
+        const start = new Date(startStr + "T12:00:00");
+        const end = new Date(endStr + "T12:00:00");
+        const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
+        for (let d = 0; d < days; d++) {
+          const date = new Date(startStr + "T12:00:00");
+          date.setDate(date.getDate() + d);
+          const key = date.toISOString().split("T")[0];
+          if (!map[key]) map[key] = { appt: [], install: [] };
+          map[key].install.push(lead);
+        }
       }
       if (lead.appointmentDate) {
         const key = lead.appointmentDate.split("T")[0];
@@ -269,8 +278,8 @@ export default function DateModal({
             const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
 
             let cellClass = "rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors ";
-            if (isStart) cellClass += "bg-blue-600 text-white";
-            else if (isEnd) cellClass += "bg-green-600 text-white";
+            if (isStart) cellClass += "bg-green-700 text-white";
+            else if (isEnd) cellClass += "bg-green-700 text-white";
             else if (inRange) cellClass += "bg-green-100 text-green-900";
             else if (isToday) cellClass += "bg-blue-100 text-blue-800";
             else cellClass += "hover:bg-gray-100 text-gray-800";

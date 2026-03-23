@@ -44,13 +44,15 @@ if (lead.status === "appointment_set") {
 
 
 if (lead.status === "install_scheduled") {
-  // ✅ Only format if we have a valid date (not null, undefined, or empty string)
   if (lead.installDate && lead.installDate !== "") {
-    const installDisplay = formatDate(lead.installDate);
-    const tentative = lead.installTentative ? " (tentative)" : "";
-
-    if (installDisplay) {
-      statusText = `Install — ${installDisplay}${tentative}`;
+    const tentative = lead.installTentative ? " (Tentative)" : "";
+    if (lead.installEndDate && lead.installEndDate !== lead.installDate) {
+      const start = new Date(lead.installDate + "T12:00:00");
+      const end = new Date(lead.installEndDate + "T12:00:00");
+      const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
+      statusText = `Install — ${formatDate(lead.installDate)} – ${formatDate(lead.installEndDate)} (${days}d)${tentative}`;
+    } else {
+      statusText = `Install — ${formatDate(lead.installDate)}${tentative}`;
     }
   }
 }
