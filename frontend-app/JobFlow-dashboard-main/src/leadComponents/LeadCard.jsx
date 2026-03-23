@@ -10,6 +10,13 @@ import { formatDate, formatTime } from "../utils/formatting.js";
 
 
 
+function formatShortDate(str) {
+  if (!str) return "";
+  const d = new Date(str + "T00:00:00");
+  if (isNaN(d.getTime())) return str;
+  return `${d.getMonth() + 1}-${d.getDate()}-${String(d.getFullYear()).slice(-2)}`;
+}
+
 function formatProjectType(type) {
   if (!type) return null;
   if (type.startsWith("garage_")) {
@@ -47,12 +54,9 @@ if (lead.status === "install_scheduled") {
   if (lead.installDate && lead.installDate !== "") {
     const tentative = lead.installTentative ? " (Tentative)" : "";
     if (lead.installEndDate && lead.installEndDate !== lead.installDate) {
-      const start = new Date(lead.installDate + "T12:00:00");
-      const end = new Date(lead.installEndDate + "T12:00:00");
-      const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
-      statusText = `Install — ${formatDate(lead.installDate)} – ${formatDate(lead.installEndDate)} (${days}d)${tentative}`;
+      statusText = `INSTALL ${formatShortDate(lead.installDate)} - ${formatShortDate(lead.installEndDate)}${tentative}`;
     } else {
-      statusText = `Install — ${formatDate(lead.installDate)}${tentative}`;
+      statusText = `INSTALL ${formatShortDate(lead.installDate)}${tentative}`;
     }
   }
 }

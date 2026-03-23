@@ -49,6 +49,19 @@ function isValidDateStr(d) {
   return d && !isNaN(new Date(d + "T00:00:00").getTime());
 }
 
+const MODAL_GAP_PX = 8;
+const MODAL_COLS = 7;
+const MODAL_TOTAL_GAP_PX = (MODAL_COLS - 1) * MODAL_GAP_PX;
+
+function modalBarLeftCalc(colStart) {
+  if (colStart === 0) return "0px";
+  return `calc(${colStart} * ((100% - ${MODAL_TOTAL_GAP_PX}px) / ${MODAL_COLS} + ${MODAL_GAP_PX}px))`;
+}
+
+function modalBarWidthCalc(colSpan) {
+  return `calc(${colSpan} * (100% - ${MODAL_TOTAL_GAP_PX}px) / ${MODAL_COLS} + ${Math.max(colSpan - 1, 0)} * ${MODAL_GAP_PX}px)`;
+}
+
 export default function DateModal({
   initialDate,
   initialEndDate = null,
@@ -118,18 +131,63 @@ export default function DateModal({
           const date = new Date(startStr + "T12:00:00");
           date.setDate(date.getDate() + d);
           const key = date.toISOString().split("T")[0];
-          if (!map[key]) map[key] = { appt: [], install: [] };
-          map[key].install.push(lead);
+          if (!map[key]) map[key] = { install: [] };
+          map[key].install.push({ ...lead, _barStart: d === 0, _barEnd: d === days - 1 });
         }
-      }
-      if (lead.appointmentDate) {
-        const key = lead.appointmentDate.split("T")[0];
-        if (!map[key]) map[key] = { appt: [], install: [] };
-        map[key].appt.push(lead);
       }
     });
     return map;
   }, [dots]);
+
+  const weeks = useMemo(() => {
+    const result = [];
+    let week = Array(monthDays[0].getDay()).fill(null);
+    monthDays.forEach((day) => {
+      week.push(day);
+      if (week.length === 7) { result.push([...week]); week = []; }
+    });
+    if (week.length > 0) {
+      while (week.length < 7) week.push(null);
+      result.push(week);
+    }
+    return result;
+  }, [monthDays]);
+
+  const getWeekBars = (week) => {
+    const installsByLead = {};
+    week.forEach((day, colIdx) => {
+      if (!day) return;
+      const key = formatDateKey(day);
+      (groupedByDate[key]?.install || []).forEach((leadEntry) => {
+        const id = leadEntry.id;
+        if (!installsByLead[id]) installsByLead[id] = { leadEntry, cols: [] };
+        installsByLead[id].cols.push(colIdx);
+      });
+    });
+    const bars = Object.values(installsByLead).map(({ leadEntry, cols }) => {
+      const colStart = Math.min(...cols);
+      const colEnd = Math.max(...cols);
+      const startEntry = groupedByDate[formatDateKey(week[colStart])]?.install.find(l => l.id === leadEntry.id);
+      const endEntry = groupedByDate[formatDateKey(week[colEnd])]?.install.find(l => l.id === leadEntry.id);
+      return {
+        id: leadEntry.id,
+        lead: leadEntry,
+        colStart, colEnd,
+        colSpan: colEnd - colStart + 1,
+        roundLeft: startEntry?._barStart || false,
+        roundRight: endEntry?._barEnd || false,
+      };
+    });
+    bars.sort((a, b) => a.colStart - b.colStart);
+    const rowEndCols = [];
+    bars.forEach((bar) => {
+      let rowIdx = rowEndCols.findIndex(e => e < bar.colStart);
+      if (rowIdx === -1) rowIdx = rowEndCols.length;
+      rowEndCols[rowIdx] = bar.colEnd;
+      bar.rowIdx = rowIdx;
+    });
+    return bars;
+  };
 
   const getMonthName = () =>
     new Date(currentYear, currentMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -264,69 +322,68 @@ export default function DateModal({
           ))}
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-px text-center text-xs">
-          {Array(monthDays[0].getDay()).fill(null).map((_, i) => (
-            <div key={`e-${i}`} />
-          ))}
-          {monthDays.map((day) => {
-            const key = formatDateKey(day);
-            const data = groupedByDate[key] || { appt: [], install: [] };
-            const isToday = key === formatDateKey(today);
-            const isStart = key === startDate;
-            const isEnd = allowTentative && key === endDate;
-            const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
-
-            let cellClass = "rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors ";
-            if (isStart) cellClass += "bg-green-700 text-white";
-            else if (isEnd) cellClass += "bg-green-700 text-white";
-            else if (inRange) cellClass += "bg-green-100 text-green-900";
-            else if (isToday) cellClass += "bg-blue-100 text-blue-800";
-            else cellClass += "hover:bg-gray-100 text-gray-800";
-
-            const dotWhite = isStart || isEnd;
-
+        {/* Calendar grid — week-by-week with install pill bars */}
+        <div className="text-xs">
+          {weeks.map((week, wIdx) => {
+            const weekBars = getWeekBars(week);
+            const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map(b => b.rowIdx)) + 1 : 0;
+            const barAreaHeight = barRowCount * 14;
             return (
-              <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
-                <span className="font-medium leading-none">{day.getDate()}</span>
-                <div className="flex gap-px mt-0.5 flex-wrap justify-center">
-                  {data.appt.map((_, i) => (
-                    <div key={`a-${i}`} className="w-2 h-2 bg-blue-400 rounded-full" style={dotWhite ? { backgroundColor: "white" } : {}} />
-                  ))}
-                  {data.install.map((lead, i) => (
-                    <div
-                      key={`i-${i}`}
-                      className="w-2 h-2 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: dotWhite ? "white" : (lead.installTentative ? "#16a34a" : "#22c55e") }}
-                    >
-                      {lead.installTentative && (
-                        <span style={{ fontSize: "6px", color: dotWhite ? "#1d4ed8" : "white", fontWeight: "bold", lineHeight: 1 }}>T</span>
-                      )}
-                    </div>
-                  ))}
+              <div key={wIdx} className="mb-0.5">
+                <div className="grid grid-cols-7 gap-x-2 text-center">
+                  {week.map((day, dIdx) => {
+                    if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[32px]" />;
+                    const key = formatDateKey(day);
+                    const isToday = key === formatDateKey(today);
+                    const isStart = key === startDate;
+                    const isEnd = allowTentative && key === endDate;
+                    const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
+                    let cellClass = "rounded cursor-pointer py-1 flex items-center justify-center min-h-[32px] font-medium transition-colors ";
+                    if (isStart || isEnd) cellClass += "bg-green-700 text-white";
+                    else if (inRange) cellClass += "bg-green-100 text-green-900";
+                    else if (isToday) cellClass += "bg-blue-100 text-blue-800";
+                    else cellClass += "hover:bg-gray-100 text-gray-800";
+                    return (
+                      <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
+                        {day.getDate()}
+                      </div>
+                    );
+                  })}
                 </div>
+                {barAreaHeight > 0 && (
+                  <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
+                    {weekBars.map((bar) => {
+                      const roundClass = bar.roundLeft && bar.roundRight ? "rounded-full" : bar.roundLeft ? "rounded-l-full" : bar.roundRight ? "rounded-r-full" : "";
+                      const bg = bar.lead.installTentative ? "#15803d" : "#22c55e";
+                      return (
+                        <div
+                          key={bar.id}
+                          onClick={() => setDayViewDate(formatDateKey(week[bar.colStart]))}
+                          className={`absolute h-2.5 cursor-pointer hover:opacity-80 ${roundClass}`}
+                          style={{ backgroundColor: bg, left: modalBarLeftCalc(bar.colStart), width: modalBarWidthCalc(bar.colSpan), top: `${bar.rowIdx * 14}px` }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Day detail list */}
-        {dayViewDate && groupedByDate[dayViewDate] && (
+        {/* Day detail list — installs only */}
+        {dayViewDate && groupedByDate[dayViewDate]?.install?.length > 0 && (
           <div className="mt-3 border-t pt-2">
             <div className="text-xs font-semibold text-gray-600 mb-1">{formatDisplayDate(dayViewDate)}</div>
             <div className="space-y-1 max-h-28 overflow-y-auto">
-              {groupedByDate[dayViewDate].install.map((lead, i) => (
-                <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                  <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
-                </div>
-              ))}
-              {groupedByDate[dayViewDate].appt.map((lead, i) => (
-                <div key={`da-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span>Appt{lead.appointmentTime ? ` at ${formatTime12h(lead.appointmentTime)}` : ""} — {lead.name}</span>
-                </div>
-              ))}
+              {groupedByDate[dayViewDate].install
+                .filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i)
+                .map((lead, i) => (
+                  <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
+                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                    <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}
