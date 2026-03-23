@@ -1038,28 +1038,26 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // Count all installs on this date (15-min staggered slots starting at 8:00 AM)
-    const slotResult = await db.query(
-      `SELECT COUNT(*) as count
-       FROM leads
-       WHERE company_id = $1
-         AND install_date = $2
-         AND id != $3
-         AND deleted_at IS NULL`,
-      [lead.company_id, dateOnly, lead.id]
-    );
-    const slotOffset = parseInt(slotResult.rows[0].count) || 0;
-    const slotHours = 8 + Math.floor((slotOffset * 15) / 60);
-    const slotMinutes = (slotOffset * 15) % 60;
+    // All installs start at noon on the first day
+    startDateTime = convertToUTC(`${dateOnly}T12:00:00`, companyTimezone);
 
-    const localDateTime = `${dateOnly}T${slotHours.toString().padStart(2, '0')}:${slotMinutes.toString().padStart(2, '0')}:00`;
-    startDateTime = convertToUTC(localDateTime, companyTimezone);
-
-    // End at 5:00 PM on the last install day (install_end_date or same day)
+    // End at 8:15 AM on the last install day.
+    // For single-day installs (no end date), end at 8:15 AM the next morning
+    // so the event doesn't end before it starts.
     const endDateOnly = lead.install_end_date
       ? new Date(lead.install_end_date).toISOString().split("T")[0]
       : dateOnly;
-    endDateTime = convertToUTC(`${endDateOnly}T17:00:00`, companyTimezone);
+
+    if (endDateOnly === dateOnly) {
+      // Single-day: end 8:15 AM next morning
+      const nextDay = new Date(dateOnly + "T12:00:00");
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split("T")[0];
+      endDateTime = convertToUTC(`${nextDayStr}T08:15:00`, companyTimezone);
+    } else {
+      // Multi-day: end 8:15 AM on the last install day
+      endDateTime = convertToUTC(`${endDateOnly}T08:15:00`, companyTimezone);
+    }
 }
 
 else {
