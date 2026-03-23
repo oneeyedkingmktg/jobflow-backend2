@@ -80,7 +80,10 @@ export default function CalendarView({ leads, onSelectLead }) {
         map[lead.appointmentDate].appt.push(lead);
       }
       if (lead.installDate) {
-        const duration = lead.installDurationDays || 1;
+        const endDateStr = lead.installEndDate || lead.installDate;
+        const start = new Date(lead.installDate + "T12:00:00");
+        const end = new Date(endDateStr + "T12:00:00");
+        const duration = Math.max(1, Math.round((end - start) / 86400000) + 1);
         for (let d = 0; d < duration; d++) {
           const date = new Date(lead.installDate + "T12:00:00");
           date.setDate(date.getDate() + d);
@@ -329,11 +332,8 @@ export default function CalendarView({ leads, onSelectLead }) {
             const labelType = isInstall ? "Install" : "Appointment";
 
             let labelDate = formatDisplayDate(lead.displayDate);
-            if (isInstall && (lead.installDurationDays || 1) > 1) {
-              const endDate = new Date(lead.installDate + "T12:00:00");
-              endDate.setDate(endDate.getDate() + (lead.installDurationDays - 1));
-              const endKey = endDate.toISOString().split("T")[0];
-              labelDate = `${formatDisplayDate(lead.installDate)} – ${formatDisplayDate(endKey)}`;
+            if (isInstall && lead.installEndDate && lead.installEndDate !== lead.installDate) {
+              labelDate = `${formatDisplayDate(lead.installDate)} – ${formatDisplayDate(lead.installEndDate)}`;
             }
 
             return (

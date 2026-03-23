@@ -27,6 +27,9 @@ export default function LeadModalsWrapper({
           initialTentative={
             showDateModal === "installDate" ? form.installTentative : false
           }
+          initialEndDate={
+            showDateModal === "installDate" ? (form.installEndDate || null) : null
+          }
           initialDurationDays={
             showDateModal === "installDate" ? (form.installDurationDays || 1) : 1
           }
@@ -36,12 +39,15 @@ export default function LeadModalsWrapper({
               ? "Set Install Date"
               : "Select Date"
           }
-          onConfirm={(date, tentative, durationDays) => {
+          onConfirm={(date, tentative, durationDays, endDate) => {
             setForm((prev) => ({
               ...prev,
               [showDateModal]: date,
               installTentative: tentative || false,
-              ...(showDateModal === "installDate" ? { installDurationDays: durationDays || 1 } : {}),
+              ...(showDateModal === "installDate" ? {
+                installDurationDays: durationDays || 1,
+                installEndDate: endDate || null,
+              } : {}),
             }));
             setShowDateModal(null);
           }}
@@ -50,6 +56,7 @@ export default function LeadModalsWrapper({
               ...prev,
               [showDateModal]: "",
               installTentative: false,
+              ...(showDateModal === "installDate" ? { installEndDate: null, installDurationDays: 1 } : {}),
             }));
             setShowDateModal(null);
           }}

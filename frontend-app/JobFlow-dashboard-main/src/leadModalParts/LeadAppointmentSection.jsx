@@ -26,7 +26,9 @@ export default function LeadAppointmentSection({
   const apptTimeDisplay = form.appointmentTime ? formatTime(form.appointmentTime) : "";
 
   const installDateDisplay = form.installDate
-    ? formatDate(form.installDate) +
+    ? (form.installEndDate && form.installEndDate !== form.installDate
+        ? `${formatDate(form.installDate)} – ${formatDate(form.installEndDate)}`
+        : formatDate(form.installDate)) +
       (form.installTentative ? " (Tentative)" : "")
     : "Not Set";
 

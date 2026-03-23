@@ -51,6 +51,7 @@ function isValidDateStr(d) {
 
 export default function DateModal({
   initialDate,
+  initialEndDate = null,
   initialTentative = false,
   initialDurationDays = 1,
   onConfirm,
@@ -69,11 +70,13 @@ export default function DateModal({
   // Start date (always used)
   const [startDate, setStartDate] = useState(isValidDateStr(initialDate) ? initialDate : null);
 
-  // End date — only for install dates (allowTentative). Computed from initialDate + initialDurationDays.
+  // End date — only for install dates (allowTentative). Prefer initialEndDate; fall back to computing from initialDurationDays.
   const computedInitialEnd = isValidDateStr(initialDate) && initialDurationDays > 1
     ? addDays(initialDate, initialDurationDays - 1)
     : null;
-  const [endDate, setEndDate] = useState(computedInitialEnd);
+  const [endDate, setEndDate] = useState(
+    isValidDateStr(initialEndDate) ? initialEndDate : computedInitialEnd
+  );
 
   const [dayViewDate, setDayViewDate] = useState(null);
   const [dots, setDots] = useState([]);
@@ -166,8 +169,9 @@ export default function DateModal({
   const handleSave = () => {
     if (!startDate) return;
     const finalStart = tentative ? getMondayOfWeek(startDate) : startDate;
-    const duration = allowTentative && endDate ? daysBetween(finalStart, endDate) : 1;
-    onConfirm(finalStart, tentative, Math.max(1, duration));
+    const finalEnd = allowTentative ? (endDate || startDate) : null;
+    const duration = allowTentative && finalEnd ? daysBetween(finalStart, finalEnd) : 1;
+    onConfirm(finalStart, tentative, Math.max(1, duration), finalEnd);
     onClose();
   };
 

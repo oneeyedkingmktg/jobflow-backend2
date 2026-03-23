@@ -72,6 +72,8 @@ const convertLeadFromBackend = (lead) => ({
   appointmentTime: lead.appointmentTime || "",
   installDate: normalizeDate(lead.installDate),
   installTentative: lead.installTentative,
+  installDurationDays: lead.installDurationDays || 1,
+  installEndDate: normalizeDate(lead.installEndDate),
 
   hasEstimate: lead.hasEstimate === true,
   deletedAt: lead.deletedAt || lead.deleted_at,
@@ -123,6 +125,7 @@ const convertLeadToBackend = (lead) => ({
   install_date: lead.installDate || null,
   install_tentative: lead.installTentative || false,
   install_duration_days: lead.installDurationDays || 1,
+  install_end_date: lead.installEndDate || null,
 
   has_estimate: lead.hasEstimate || false,
 
