@@ -239,7 +239,9 @@ next_steps_button_text,
         cta1_link,
         cta2_button,
         cta2_link,
-        combined_project_message
+        combined_project_message,
+        large_project_sf_threshold,
+        large_project_note
       )
 VALUES (
   $1,$2,
@@ -254,7 +256,8 @@ VALUES (
   $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
   $53,$54,$55,
 $56,$57,$58,$59,$60,$61,$62,$63,$64,
-  $65,$66,$67,$68,$69,$70,$71,$72,$73,$74
+  $65,$66,$67,$68,$69,$70,$71,$72,$73,$74,
+  $75,$76
   )
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
@@ -341,6 +344,8 @@ cta1_link = COALESCE(EXCLUDED.cta1_link, estimator_configs.cta1_link),
 cta2_button = COALESCE(EXCLUDED.cta2_button, estimator_configs.cta2_button),
 cta2_link = COALESCE(EXCLUDED.cta2_link, estimator_configs.cta2_link),
         combined_project_message = COALESCE(EXCLUDED.combined_project_message, estimator_configs.combined_project_message),
+        large_project_sf_threshold = COALESCE(EXCLUDED.large_project_sf_threshold, estimator_configs.large_project_sf_threshold),
+        large_project_note = COALESCE(EXCLUDED.large_project_note, estimator_configs.large_project_note),
         updated_at = now()
     `;
 
@@ -419,6 +424,8 @@ b.next_steps_button_text,
       b.cta2_button,
       b.cta2_link,
       b.combined_project_message,
+      b.large_project_sf_threshold || null,
+      b.large_project_note || null,
     ];
 
     console.log("SQL placeholders:", (sql.match(/\$/g) || []).length);

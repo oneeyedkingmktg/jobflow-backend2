@@ -355,6 +355,8 @@ const {
       standard_info_text,
       ty_url_redirect,
       combined_project_message,
+      large_project_sf_threshold,
+      large_project_note,
 
 billing_status,
       service_area_zips,
@@ -550,6 +552,8 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
           standard_info_text = COALESCE($17, standard_info_text),
           ty_url_redirect = COALESCE($18, ty_url_redirect),
           combined_project_message = COALESCE($20, combined_project_message),
+          large_project_sf_threshold = CASE WHEN $21 IS NOT NULL THEN $21::int ELSE large_project_sf_threshold END,
+          large_project_note = COALESCE($22, large_project_note),
           updated_at = CURRENT_TIMESTAMP
          WHERE company_id = $19
          RETURNING id`,
@@ -573,7 +577,9 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
           standard_info_text,
           ty_url_redirect,
           companyId,
-          combined_project_message
+          combined_project_message,
+          large_project_sf_threshold || null,
+          large_project_note || null
         ]
       );
 
@@ -600,9 +606,11 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
             min_job_info_text,
             standard_info_text,
             ty_url_redirect,
-            combined_project_message
+            combined_project_message,
+            large_project_sf_threshold,
+            large_project_note
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
           [
             companyId,
             text_color || null,
@@ -623,7 +631,9 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
             min_job_info_text || null,
             standard_info_text || null,
             ty_url_redirect || null,
-            combined_project_message || null
+            combined_project_message || null,
+            large_project_sf_threshold || null,
+            large_project_note || null
           ]
         );
       }

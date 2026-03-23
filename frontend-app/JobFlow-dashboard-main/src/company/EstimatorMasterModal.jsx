@@ -54,6 +54,8 @@ customProjectLabel: "",
 disclaimerText: "",
 minJobInfoText: "",
 standardInfoText: "",
+largeProjectSfThreshold: "",
+largeProjectNote: "",
 combinedProjectMessage: "",
 
 // Finish-specific descriptions (Results page)
@@ -139,6 +141,8 @@ customProjectLabel: data.custom_project_label ?? "",
 disclaimerText: data.disclaimer_text ?? "",
 minJobInfoText: data.min_job_info_text ?? "",
 standardInfoText: data.standard_info_text ?? "",
+largeProjectSfThreshold: data.large_project_sf_threshold ?? "",
+largeProjectNote: data.large_project_note ?? "",
 combinedProjectMessage: data.combined_project_message ?? "",
 // Finish-specific descriptions
 solidFinishDescription: data.solid_finish_description ?? "",
@@ -326,6 +330,8 @@ custom_project_label: form.customProjectLabel || null,
 disclaimer_text: form.disclaimerText || null,
 min_job_info_text: form.minJobInfoText || null,
 standard_info_text: form.standardInfoText || null,
+large_project_sf_threshold: form.largeProjectSfThreshold ? Number(form.largeProjectSfThreshold) : null,
+large_project_note: form.largeProjectNote || null,
 combined_project_message: form.combinedProjectMessage || null,
 
 // Finish-specific descriptions (Results page)
@@ -582,6 +588,8 @@ navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n 
     {textInput("Custom Floor Display Name", "customProjectLabel", "e.g. Dance Floors")}
     {textArea("Minimum Job Info Text", "minJobInfoText")}
     {textArea("Standard Info Text", "standardInfoText")}
+    {textInput("Large Project SF Threshold", "largeProjectSfThreshold", "e.g. 3000 — show special note for jobs at or above this size")}
+    {textArea("Large Project Note", "largeProjectNote", "Shown instead of Standard Info Text when job is at or above threshold")}
     {textArea("Combined Project Message", "combinedProjectMessage", "Message shown between two estimates on the dual-estimate results page")}
 
     <hr className="my-4" />

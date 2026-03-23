@@ -80,6 +80,8 @@ export default function EstimatorResults({
   const conditionMajorLabel = config?.condition_major_label || "A Lot of Cracks";
   const minJobInfoText = config?.min_job_info_text || "Minimum job pricing applied.";
   const standardInfoText = config?.standard_info_text || "This is an estimate based on the information provided.";
+  const largeProjectSfThreshold = config?.large_project_sf_threshold ? Number(config.large_project_sf_threshold) : null;
+  const largeProjectNote = config?.large_project_note || null;
   const cta1Button = config?.cta1_button || "";
 const cta1Link = config?.cta1_link || "";
 const cta2Button = config?.cta2_button || "";
@@ -164,7 +166,8 @@ const cta2Link = config?.cta2_link || "";
     currentFinishMinimumApplied &&
     estimate.allPriceRanges[activeFinish]?.min === estimate.allPriceRanges[activeFinish]?.max;
 
-  const infoText = showMinJobText ? minJobInfoText : standardInfoText;
+  const isLargeProject = largeProjectSfThreshold && estimate?.calculatedSf >= largeProjectSfThreshold;
+  const infoText = showMinJobText ? minJobInfoText : (isLargeProject && largeProjectNote ? largeProjectNote : standardInfoText);
 
   // Finish-specific description (based on active tab)
   let finishDescriptionText = "";
