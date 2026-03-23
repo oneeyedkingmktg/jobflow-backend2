@@ -64,8 +64,8 @@ export const getStatusBarText = (lead) => {
           ? ` - ${formatShortDate(lead.installEndDate)}`
           : "";
         return lead.installTentative
-          ? `Install ${startDs}${endDs} (Tentative)`
-          : `Install ${startDs}${endDs}`;
+          ? `Install  •  ${startDs}${endDs} (Tentative)`
+          : `Install  •  ${startDs}${endDs}`;
       }
       return "Sold";
 

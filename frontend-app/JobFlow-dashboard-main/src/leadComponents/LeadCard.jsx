@@ -47,9 +47,9 @@ if (lead.status === "install_scheduled") {
   if (lead.installDate && lead.installDate !== "") {
     const tentative = lead.installTentative ? " (Tentative)" : "";
     if (lead.installEndDate && lead.installEndDate !== lead.installDate) {
-      statusText = `INSTALL ${formatShortDate(lead.installDate)} - ${formatShortDate(lead.installEndDate)}${tentative}`;
+      statusText = `INSTALL  •  ${formatShortDate(lead.installDate)} - ${formatShortDate(lead.installEndDate)}${tentative}`;
     } else {
-      statusText = `INSTALL ${formatShortDate(lead.installDate)}${tentative}`;
+      statusText = `INSTALL  •  ${formatShortDate(lead.installDate)}${tentative}`;
     }
   }
 }
