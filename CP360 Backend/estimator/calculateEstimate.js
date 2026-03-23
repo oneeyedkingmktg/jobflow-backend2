@@ -106,7 +106,13 @@ function calculateEstimate(config, input, pricingByFinish = {}) {
     }
   }
 
-  if (!priceRanges[selectedQuality]) {
+  // If the requested finish isn't available, fall back to solid then first available
+  let resolvedQuality = selectedQuality;
+  if (!priceRanges[resolvedQuality]) {
+    resolvedQuality = priceRanges['solid'] ? 'solid'
+      : Object.keys(priceRanges)[0] || null;
+  }
+  if (!resolvedQuality) {
     throw new Error("INVALID_QUALITY_SELECTION");
   }
 
@@ -145,19 +151,19 @@ function calculateEstimate(config, input, pricingByFinish = {}) {
     };
 
     // Track if selected finish has minimum applied
-    if (finish === selectedQuality && minimumApplied) {
+    if (finish === resolvedQuality && minimumApplied) {
       selectedMinimumApplied = true;
     }
   }
 
-  const selectedRange = adjustedPriceRanges[selectedQuality];
+  const selectedRange = adjustedPriceRanges[resolvedQuality];
 
   // ---------------------------------------------------------------------------
   // FINAL RESPONSE
   // ---------------------------------------------------------------------------
   return {
     calculatedSf: squareFeet,
-    selectedQuality,
+    selectedQuality: resolvedQuality,
     displayPriceMin: selectedRange.min,
     displayPriceMax: selectedRange.max,
     minimumJobApplied: selectedMinimumApplied,

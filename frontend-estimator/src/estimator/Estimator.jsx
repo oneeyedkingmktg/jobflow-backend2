@@ -590,6 +590,11 @@ const previewRes = await fetch(`${API_BASE}/estimator/preview`, {
 
       console.log("📊 Estimate calculated:", previewData.estimate);
 
+      // Sync active tab to whichever finish the backend resolved (handles no-flake configs)
+      if (previewData.estimate?.selectedQuality) {
+        setActiveFinish(previewData.estimate.selectedQuality);
+      }
+
       // 🔍 DEBUG: Log what we're about to send
 const leadData = {
   company_id: companyId,
@@ -741,6 +746,10 @@ try {
       });
       const previewData = await previewRes.json();
       if (!previewRes.ok) throw new Error(previewData.error || "Unable to generate estimate");
+
+      if (previewData.estimate?.selectedQuality) {
+        setActiveFinish2(previewData.estimate.selectedQuality);
+      }
 
       const token = localStorage.getItem("authToken");
       const saveRes = await fetch(`${API_BASE}/leads/${leadId}/second-estimate`, {
