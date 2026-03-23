@@ -504,14 +504,26 @@ const config = configResult.rows[0];
       spaceType = 'garage';
     }
     
-    const pricingResult = await query(
+    let pricingResult = await query(
       `SELECT space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled
        FROM estimator_pricing_configs
        WHERE company_id = $1 AND space_type = $2 AND enabled = true
        ORDER BY finish_type`,
       [companyId, spaceType]
     );
-    
+
+    // If no pricing found for this space type, fall back to garage pricing
+    if (pricingResult.rows.length === 0 && spaceType !== 'garage') {
+      console.log(`No pricing found for space_type=${spaceType}, falling back to garage pricing`);
+      pricingResult = await query(
+        `SELECT space_type, finish_type, min_price_per_sf, max_price_per_sf, enabled
+         FROM estimator_pricing_configs
+         WHERE company_id = $1 AND space_type = 'garage' AND enabled = true
+         ORDER BY finish_type`,
+        [companyId]
+      );
+    }
+
     // Build pricing map by finish type
     const pricingByFinish = {};
     pricingResult.rows.forEach(row => {
