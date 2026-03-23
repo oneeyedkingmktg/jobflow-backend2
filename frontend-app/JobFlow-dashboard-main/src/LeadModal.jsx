@@ -9,6 +9,7 @@ import { formatPhoneNumber } from "./utils/formatting";
 import { LeadsAPI } from "./api";
 import { useSoftphone } from "./hooks/useSoftphone.js";
 import { isNativeApp } from "./utils/platform";
+import { Browser } from "@capacitor/browser";
 import ConversationModal from "./leadModalParts/ConversationModal.jsx";
 import SoftphoneWidget from "./components/SoftphoneWidget.jsx";
 
@@ -208,7 +209,11 @@ const handleUploadPhotos = async () => {
       throw new Error("No Drive URL returned");
     }
 
-    window.open(data.url, "_blank");
+    if (isNativeApp()) {
+      await Browser.open({ url: data.url });
+    } else {
+      window.open(data.url, "_blank");
+    }
   } catch (err) {
     console.error("Upload error:", err);
     alert("Failed to open Google Drive.");
