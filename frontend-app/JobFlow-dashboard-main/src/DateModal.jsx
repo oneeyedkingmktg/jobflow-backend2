@@ -125,7 +125,8 @@ export default function DateModal({
     onClose();
   };
 
-  const displaySelected = selectedDate
+  const isValidDate = (d) => d && !isNaN(new Date(d + "T00:00:00").getTime());
+  const displaySelected = isValidDate(selectedDate)
     ? tentative
       ? `Week of ${formatDisplayDate(getMondayOfWeek(selectedDate))}`
       : formatDisplayDate(selectedDate)
@@ -173,7 +174,7 @@ export default function DateModal({
               className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
               style={{ fontSize: '16px' }}
             />
-            <span className="text-xs text-gray-500">{durationDays === 1 ? 'single day' : `ends ${(() => { const d = new Date(selectedDate + 'T12:00:00'); d.setDate(d.getDate() + durationDays - 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })()}`}</span>
+            <span className="text-xs text-gray-500">{durationDays === 1 ? 'single day' : selectedDate ? `ends ${(() => { const d = new Date(selectedDate + 'T12:00:00'); d.setDate(d.getDate() + durationDays - 1); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })()}` : 'pick a date first'}</span>
           </div>
         )}
 
