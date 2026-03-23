@@ -3,19 +3,12 @@
 
 import React from "react";
 import { STATUS_COLORS } from "../leadModalParts/statusConfig.js";
-import { getStatusBarText } from "./leadHelpers.js";
+import { getStatusBarText, formatShortDate } from "./leadHelpers.js";
 import { formatDate, formatTime } from "../utils/formatting.js";
 
 
 
 
-
-function formatShortDate(str) {
-  if (!str) return "";
-  const d = new Date(str + "T00:00:00");
-  if (isNaN(d.getTime())) return str;
-  return `${d.getMonth() + 1}-${d.getDate()}-${String(d.getFullYear()).slice(-2)}`;
-}
 
 function formatProjectType(type) {
   if (!type) return null;

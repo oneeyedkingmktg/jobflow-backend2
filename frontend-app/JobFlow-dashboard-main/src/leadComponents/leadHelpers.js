@@ -30,6 +30,14 @@ export const formatDisplayDate = (d) => {
   return `${m}/${day}/${y}`;
 };
 
+// Convert YYYY-MM-DD → M-D-YY (no leading zeros, 2-digit year)
+export const formatShortDate = (d) => {
+  if (!d) return "";
+  const iso = normalizeDate(d);
+  const [y, m, day] = iso.split("-");
+  return `${parseInt(m)}-${parseInt(day)}-${y.slice(-2)}`;
+};
+
 // Convert "HH:mm" → h:mm AM/PM
 export const formatDisplayTime = (t) => {
   if (!t) return "";
@@ -51,10 +59,13 @@ export const getStatusBarText = (lead) => {
 
     case "sold":
       if (lead.installDate) {
-        const ds = formatDisplayDate(lead.installDate);
+        const startDs = formatShortDate(lead.installDate);
+        const endDs = lead.installEndDate && lead.installEndDate !== lead.installDate
+          ? ` - ${formatShortDate(lead.installEndDate)}`
+          : "";
         return lead.installTentative
-          ? `Install ${ds} (Tentative)`
-          : `Install ${ds}`;
+          ? `Install ${startDs}${endDs} (Tentative)`
+          : `Install ${startDs}${endDs}`;
       }
       return "Sold";
 
