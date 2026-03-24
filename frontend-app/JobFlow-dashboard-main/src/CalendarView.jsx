@@ -163,15 +163,16 @@ export default function CalendarView({ leads, onSelectLead }) {
   };
 
   const futureLeads = useMemo(() => {
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const allLeads = [];
     leads.forEach((l) => {
-      if (l.appointmentDate && new Date(l.appointmentDate) >= now) {
+      if (l.appointmentDate && new Date(l.appointmentDate) >= today) {
         allLeads.push({ ...l, displayDate: l.appointmentDate, displayType: "appointment" });
       }
     });
     leads.forEach((l) => {
-      if (l.installDate && new Date(l.installDate) >= now) {
+      if (l.installDate && new Date(l.installDate) >= today) {
         allLeads.push({ ...l, displayDate: l.installDate, displayType: "install" });
       }
     });
