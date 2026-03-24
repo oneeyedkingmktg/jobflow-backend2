@@ -1,6 +1,6 @@
 // ============================================================================
 // File: routes/googleDrive.js
-// Purpose: API routes for Google Drive folder + file management
+// Purpose: API routes for Google Drive — OAuth setup, folder, file management
 // ============================================================================
 
 console.log("🔥 googleDrive routes file loaded");
@@ -8,20 +8,29 @@ console.log("🔥 googleDrive routes file loaded");
 const express = require("express");
 const multer = require("multer");
 const db = require("../config/database");
-const { getOrCreateFolder, listFilesInFolder, uploadFileToFolder } = require("../controllers/googleDrive");
+const {
+  getOAuthClient,
+  getOrCreateFolder,
+  listFilesInFolder,
+  uploadFileToFolder,
+} = require("../controllers/googleDrive");
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per file
+});
 
 // ------------------------------------------------------------------
-// Helper: resolve lead folder ID (get or create)
+// Helper: resolve lead folder (get or create) for a given leadId
 // ------------------------------------------------------------------
 async function resolveLeadFolder(leadId) {
   const leadResult = await db.query(
     `SELECT id, name, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
     [leadId]
   );
-  if (!leadResult.rows.length) throw Object.assign(new Error("Lead not found"), { status: 404 });
+  if (!leadResult.rows.length)
+    throw Object.assign(new Error("Lead not found"), { status: 404 });
 
   const lead = leadResult.rows[0];
 
@@ -29,16 +38,117 @@ async function resolveLeadFolder(leadId) {
     `SELECT id, google_drive_base_folder_id FROM companies WHERE id = $1 AND deleted_at IS NULL`,
     [lead.company_id]
   );
-  if (!companyResult.rows.length) throw Object.assign(new Error("Company not found"), { status: 404 });
+  if (!companyResult.rows.length)
+    throw Object.assign(new Error("Company not found"), { status: 404 });
 
   const company = companyResult.rows[0];
   if (!company.google_drive_base_folder_id) {
-    throw Object.assign(new Error("Google Drive base folder not configured for this company"), { status: 400 });
+    throw Object.assign(
+      new Error("Google Drive base folder not configured for this company"),
+      { status: 400 }
+    );
   }
 
-  const folder = await getOrCreateFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+  const folder = await getOrCreateFolder(
+    lead.name || "Lead",
+    company.google_drive_base_folder_id
+  );
   return folder;
 }
+
+// ============================================================================
+// OAUTH SETUP ROUTES (one-time, Becky runs these once)
+// ============================================================================
+
+// ------------------------------------------------------------------
+// GET /google-drive/auth?secret=GOOGLE_OAUTH_SETUP_SECRET
+// Redirects to Google consent screen
+// ------------------------------------------------------------------
+router.get("/auth", (req, res) => {
+  const secret = req.query.secret;
+  if (!secret || secret !== process.env.GOOGLE_OAUTH_SETUP_SECRET) {
+    return res.status(403).send("Forbidden");
+  }
+
+  const oauth2Client = getOAuthClient();
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent", // forces refresh_token to be returned every time
+    scope: ["https://www.googleapis.com/auth/drive"],
+  });
+
+  return res.redirect(url);
+});
+
+// ------------------------------------------------------------------
+// GET /google-drive/auth/callback
+// Google redirects here after consent — stores refresh token in DB
+// ------------------------------------------------------------------
+router.get("/auth/callback", async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    console.error("❌ OAuth error:", error);
+    return res.status(400).send(`Google OAuth error: ${error}`);
+  }
+
+  if (!code) {
+    return res.status(400).send("Missing authorization code");
+  }
+
+  try {
+    const oauth2Client = getOAuthClient();
+    const { tokens } = await oauth2Client.getToken(code);
+
+    if (!tokens.refresh_token) {
+      return res.status(400).send(
+        "No refresh token returned. If you have authorized this app before, " +
+        "go to <a href='https://myaccount.google.com/permissions'>Google Account Permissions</a>, " +
+        "revoke access for this app, then try again."
+      );
+    }
+
+    // Store refresh token in platform_settings
+    await db.query(
+      `INSERT INTO platform_settings (key, value, updated_at)
+       VALUES ('google_oauth_refresh_token', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+      [tokens.refresh_token]
+    );
+
+    console.log("✅ Google OAuth refresh token stored successfully");
+    return res.send(
+      "<h2 style='font-family:sans-serif;color:green'>✅ Google Drive connected successfully!</h2>" +
+      "<p style='font-family:sans-serif'>You can close this tab. File uploads will now use your Google account.</p>"
+    );
+  } catch (err) {
+    console.error("❌ OAuth callback error:", err);
+    return res.status(500).send(`OAuth setup failed: ${err.message}`);
+  }
+});
+
+// ------------------------------------------------------------------
+// GET /google-drive/auth/status
+// Check whether OAuth is connected (master use only in app)
+// ------------------------------------------------------------------
+router.get("/auth/status", async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT updated_at FROM platform_settings WHERE key = 'google_oauth_refresh_token' LIMIT 1`
+    );
+    const connected = result.rows.length > 0;
+    return res.json({
+      connected,
+      connectedAt: connected ? result.rows[0].updated_at : null,
+    });
+  } catch (err) {
+    return res.json({ connected: false });
+  }
+});
+
+// ============================================================================
+// DRIVE OPERATION ROUTES
+// ============================================================================
 
 // ------------------------------------------------------------------
 // POST /google-drive/lead-folder
