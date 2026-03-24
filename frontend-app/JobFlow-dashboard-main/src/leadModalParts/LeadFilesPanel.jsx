@@ -99,13 +99,13 @@ export default function LeadFilesPanel({ leadId, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end" onClick={onClose}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Sheet */}
       <div
-        className="relative bg-white rounded-t-2xl shadow-xl flex flex-col max-h-[80vh]"
+        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] md:mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
