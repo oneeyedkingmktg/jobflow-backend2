@@ -13,6 +13,16 @@ function getToken() {
   return localStorage.getItem("authToken");
 }
 
+function fileBgColor(mimeType) {
+  if (!mimeType) return "bg-gray-100";
+  if (mimeType.startsWith("image/")) return "bg-gray-200";
+  if (mimeType === "application/pdf") return "bg-red-50";
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "bg-green-50";
+  if (mimeType.includes("document") || mimeType.includes("word")) return "bg-blue-50";
+  if (mimeType.startsWith("video/")) return "bg-purple-50";
+  return "bg-gray-100";
+}
+
 function fileIcon(mimeType) {
   if (!mimeType) return "📄";
   if (mimeType.startsWith("image/")) return "🖼️";
@@ -28,6 +38,48 @@ function formatSize(bytes) {
   const kb = Number(bytes) / 1024;
   if (kb < 1024) return `${Math.round(kb)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+function FileTile({ file, onOpen }) {
+  const isImage = file.mimeType?.startsWith("image/");
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(file.webViewLink)}
+      className="flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md active:opacity-80 transition bg-white"
+    >
+      {/* Thumbnail or icon */}
+      <div className={`w-full aspect-square flex items-center justify-center ${fileBgColor(file.mimeType)}`}>
+        {isImage && file.thumbnailLink && !imgError ? (
+          <img
+            src={file.thumbnailLink}
+            alt={file.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <span className="text-4xl">{fileIcon(file.mimeType)}</span>
+        )}
+      </div>
+
+      {/* File name + meta */}
+      <div className="px-2 py-2 text-left">
+        <p className="text-xs font-semibold text-gray-800 truncate">{file.name}</p>
+        <p className="text-xs text-gray-400 truncate mt-0.5">
+          {file.createdTime
+            ? new Date(file.createdTime).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : ""}
+          {file.size ? ` · ${formatSize(file.size)}` : ""}
+        </p>
+      </div>
+    </button>
+  );
 }
 
 export default function LeadFilesPanel({ leadId, onClose }) {
@@ -99,11 +151,14 @@ export default function LeadFilesPanel({ leadId, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end"
+      onClick={onClose}
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" />
 
-      {/* Sheet */}
+      {/* Modal */}
       <div
         className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] md:mx-4"
         onClick={(e) => e.stopPropagation()}
@@ -138,50 +193,33 @@ export default function LeadFilesPanel({ leadId, onClose }) {
           />
         </div>
 
-        {/* File list */}
-        <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-4">
           {loading && (
-            <div className="px-5 py-8 text-sm text-gray-400 text-center">Loading…</div>
+            <div className="py-10 text-sm text-gray-400 text-center">Loading…</div>
           )}
 
           {!loading && error && (
-            <div className="px-5 py-8 text-sm text-red-500 text-center">{error}</div>
+            <div className="py-10 text-sm text-red-500 text-center">{error}</div>
           )}
 
           {!loading && !error && files.length === 0 && (
-            <div className="px-5 py-10 text-sm text-gray-400 text-center">
+            <div className="py-10 text-sm text-gray-400 text-center">
               No files yet — tap Upload to add photos or documents.
             </div>
           )}
 
-          {!loading && files.map((file) => (
-            <button
-              key={file.id}
-              type="button"
-              onClick={() => openFile(file.webViewLink)}
-              className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 active:bg-gray-100 transition"
-            >
-              <span className="text-2xl leading-none">{fileIcon(file.mimeType)}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">{file.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {file.createdTime
-                    ? new Date(file.createdTime).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : ""}
-                  {file.size ? ` · ${formatSize(file.size)}` : ""}
-                </p>
-              </div>
-              <span className="text-gray-300 text-lg">›</span>
-            </button>
-          ))}
+          {!loading && files.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              {files.map((file) => (
+                <FileTile key={file.id} file={file} onOpen={openFile} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Safe area spacer for iOS home indicator */}
-        <div className="h-6" />
+        <div className="h-4" />
       </div>
     </div>
   );
