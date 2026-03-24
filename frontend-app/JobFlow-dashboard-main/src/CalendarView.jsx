@@ -336,6 +336,9 @@ export default function CalendarView({ leads, onSelectLead }) {
             if (isInstall && lead.installEndDate && lead.installEndDate !== lead.installDate) {
               labelDate = `${formatDisplayDate(lead.installDate)} – ${formatDisplayDate(lead.installEndDate)}`;
             }
+            if (isAppt && lead.appointmentTime) {
+              labelDate = `${labelDate} @ ${formatTime12h(lead.appointmentTime)}`;
+            }
 
             return (
               <div
@@ -358,11 +361,6 @@ export default function CalendarView({ leads, onSelectLead }) {
                     </div>
                     <span className="text-gray-600">{lead.city}, {lead.state}</span>
                   </div>
-                  {isAppt && lead.apptTime && (
-                    <div className="text-xs text-gray-700 mt-1">
-                      <strong>Time:</strong> {formatTime12h(lead.apptTime)}
-                    </div>
-                  )}
                 </div>
               </div>
             );
