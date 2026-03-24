@@ -9,7 +9,6 @@ import { formatPhoneNumber } from "./utils/formatting";
 import { LeadsAPI } from "./api";
 import { useSoftphone } from "./hooks/useSoftphone.js";
 import { isNativeApp } from "./utils/platform";
-import { Browser } from "@capacitor/browser";
 import ConversationModal from "./leadModalParts/ConversationModal.jsx";
 import SoftphoneWidget from "./components/SoftphoneWidget.jsx";
 
@@ -174,51 +173,6 @@ const handlePauseSave = (pauseFields) => {
     }
   };
 
-  // ------------------------------------------------------------------
-// Upload photos (placeholder – Drive logic comes later)
-// ------------------------------------------------------------------
-const handleUploadPhotos = async () => {
-  try {
-    if (!form?.id) {
-      alert("Lead must be saved before uploading photos.");
-      return;
-    }
-
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/google-drive/lead-folder`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          leadId: form.id,
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || "Upload failed");
-    }
-
-    const data = await res.json();
-
-    if (!data?.url) {
-      throw new Error("No Drive URL returned");
-    }
-
-    if (isNativeApp()) {
-      await Browser.open({ url: data.url });
-    } else {
-      window.open(data.url, "_blank");
-    }
-  } catch (err) {
-    console.error("Upload error:", err);
-    alert("Failed to open Google Drive.");
-  }
-};
 
 
 
@@ -300,7 +254,6 @@ const handleUploadPhotos = async () => {
 <LeadDetailsView
   form={form}
   onEdit={() => setIsEditing(true)}
-  onUploadPhotos={handleUploadPhotos}
   showConversations={currentCompany?.showConversations || false}
 />
 

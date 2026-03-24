@@ -1,21 +1,20 @@
 // ============================================================================
 // File: controllers/googleDrive.js
-// Purpose: Google Drive folder creation + reuse for lead uploads
+// Purpose: Google Drive folder creation + file listing + file upload
 // ============================================================================
 
 const { google } = require("googleapis");
+const { Readable } = require("stream");
 
 // Load credentials from environment variable or local file
 let auth;
 if (process.env.GOOGLE_DRIVE_CREDENTIALS) {
-  // Production: Use environment variable
   const credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
   auth = new google.auth.GoogleAuth({
     credentials: credentials,
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 } else {
-  // Local development: Use keyfile path
   auth = new google.auth.GoogleAuth({
     keyFile: "./keys/google-drive.json",
     scopes: ["https://www.googleapis.com/auth/drive"],
@@ -31,7 +30,6 @@ const drive = google.drive({
 // Get or create a folder by name under a parent folder
 // ------------------------------------------------------------------
 async function getOrCreateFolder(folderName, parentFolderId) {
-  // Look for existing folder
   const searchRes = await drive.files.list({
     q: `
       mimeType = 'application/vnd.google-apps.folder'
@@ -46,7 +44,6 @@ async function getOrCreateFolder(folderName, parentFolderId) {
     return searchRes.data.files[0];
   }
 
-  // Create folder if not found
   const createRes = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -59,6 +56,42 @@ async function getOrCreateFolder(folderName, parentFolderId) {
   return createRes.data;
 }
 
+// ------------------------------------------------------------------
+// List files in a folder
+// ------------------------------------------------------------------
+async function listFilesInFolder(folderId) {
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and trashed = false`,
+    fields: "files(id, name, mimeType, webViewLink, thumbnailLink, createdTime, size)",
+    orderBy: "createdTime desc",
+  });
+
+  return res.data.files || [];
+}
+
+// ------------------------------------------------------------------
+// Upload a file buffer to a folder
+// ------------------------------------------------------------------
+async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
+  const stream = Readable.from(buffer);
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      parents: [folderId],
+    },
+    media: {
+      mimeType,
+      body: stream,
+    },
+    fields: "id, name, webViewLink, mimeType",
+  });
+
+  return res.data;
+}
+
 module.exports = {
   getOrCreateFolder,
+  listFilesInFolder,
+  uploadFileToFolder,
 };

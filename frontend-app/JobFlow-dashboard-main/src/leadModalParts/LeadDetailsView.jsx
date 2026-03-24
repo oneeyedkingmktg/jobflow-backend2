@@ -5,12 +5,12 @@
 import React, { useState } from "react";
 import EstimateModal from "../EstimateModal.jsx";
 import ConversationModal from "./ConversationModal.jsx";
+import LeadFilesPanel from "./LeadFilesPanel.jsx";
 import { useAuth } from "../AuthContext";
 
 export default function LeadDetailsView({
   form,
   onEdit,
-  onUploadPhotos,
   showConversations = false,
 }) {
 const hasEstimate = form?.hasEstimate === true;
@@ -151,22 +151,13 @@ const hasEstimate = form?.hasEstimate === true;
         </button>
       )}
 
-      {/* UPLOAD PHOTOS BUTTON */}
+      {/* PHOTOS & FILES PANEL */}
       {isEstimatorOnly ? (
         <div className="w-full mt-3 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
           🔒 Upgrade to Pro to save jobsite photos for this job
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUploadPhotos?.();
-          }}
-          className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
-        >
-          Photos and Files
-        </button>
+        <LeadFilesPanel leadId={form?.id} />
       )}
 {/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (
