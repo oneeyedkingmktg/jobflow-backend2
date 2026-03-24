@@ -19,6 +19,7 @@ const hasEstimate = form?.hasEstimate === true;
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
   const [showConversationModal, setShowConversationModal] = useState(false);
+  const [showFilesModal, setShowFilesModal] = useState(false);
 
   const loadEstimate = async () => {
     try {
@@ -151,13 +152,24 @@ const hasEstimate = form?.hasEstimate === true;
         </button>
       )}
 
-      {/* PHOTOS & FILES PANEL */}
+      {/* PHOTOS & FILES BUTTON */}
       {isEstimatorOnly ? (
         <div className="w-full mt-3 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
           🔒 Upgrade to Pro to save jobsite photos for this job
         </div>
       ) : (
-        <LeadFilesPanel leadId={form?.id} />
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
+          className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+        >
+          Photos &amp; Files
+        </button>
+      )}
+
+      {/* FILES MODAL */}
+      {showFilesModal && (
+        <LeadFilesPanel leadId={form?.id} onClose={() => setShowFilesModal(false)} />
       )}
 {/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (

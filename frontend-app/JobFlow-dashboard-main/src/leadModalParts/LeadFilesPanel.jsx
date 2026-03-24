@@ -1,6 +1,6 @@
 // ============================================================================
 // File: src/leadModalParts/LeadFilesPanel.jsx
-// Purpose: Inline panel for viewing and uploading files to Google Drive
+// Purpose: Modal for viewing and uploading files to Google Drive
 // ============================================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -19,7 +19,7 @@ function fileIcon(mimeType) {
   if (mimeType === "application/pdf") return "📄";
   if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "📊";
   if (mimeType.includes("document") || mimeType.includes("word")) return "📝";
-  if (mimeType.includes("video/")) return "🎥";
+  if (mimeType.startsWith("video/")) return "🎥";
   return "📁";
 }
 
@@ -30,7 +30,7 @@ function formatSize(bytes) {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
-export default function LeadFilesPanel({ leadId }) {
+export default function LeadFilesPanel({ leadId, onClose }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -99,62 +99,89 @@ export default function LeadFilesPanel({ leadId }) {
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-        <span className="font-semibold text-sm text-gray-800">Photos &amp; Files</span>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg shadow hover:bg-blue-700 transition disabled:opacity-50"
-        >
-          {uploading ? "Uploading…" : "+ Upload"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.mp4,.mov"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </div>
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" />
 
-      {/* File list */}
-      <div className="divide-y divide-gray-100">
-        {loading && (
-          <div className="px-4 py-4 text-sm text-gray-400 text-center">Loading…</div>
-        )}
+      {/* Sheet */}
+      <div
+        className="relative bg-white rounded-t-2xl shadow-xl flex flex-col max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h2 className="text-base font-bold text-gray-900">Photos &amp; Files</h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {uploading ? "Uploading…" : "+ Upload"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            >
+              ×
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
 
-        {!loading && error && (
-          <div className="px-4 py-4 text-sm text-red-500 text-center">{error}</div>
-        )}
+        {/* File list */}
+        <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+          {loading && (
+            <div className="px-5 py-8 text-sm text-gray-400 text-center">Loading…</div>
+          )}
 
-        {!loading && !error && files.length === 0 && (
-          <div className="px-4 py-6 text-sm text-gray-400 text-center">No files yet</div>
-        )}
+          {!loading && error && (
+            <div className="px-5 py-8 text-sm text-red-500 text-center">{error}</div>
+          )}
 
-        {!loading && files.map((file) => (
-          <button
-            key={file.id}
-            type="button"
-            onClick={() => openFile(file.webViewLink)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition"
-          >
-            <span className="text-xl leading-none">{fileIcon(file.mimeType)}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-              <p className="text-xs text-gray-400">
-                {file.createdTime
-                  ? new Date(file.createdTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : ""}
-                {file.size ? ` · ${formatSize(file.size)}` : ""}
-              </p>
+          {!loading && !error && files.length === 0 && (
+            <div className="px-5 py-10 text-sm text-gray-400 text-center">
+              No files yet — tap Upload to add photos or documents.
             </div>
-            <span className="text-gray-400 text-xs">›</span>
-          </button>
-        ))}
+          )}
+
+          {!loading && files.map((file) => (
+            <button
+              key={file.id}
+              type="button"
+              onClick={() => openFile(file.webViewLink)}
+              className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 active:bg-gray-100 transition"
+            >
+              <span className="text-2xl leading-none">{fileIcon(file.mimeType)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{file.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {file.createdTime
+                    ? new Date(file.createdTime).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : ""}
+                  {file.size ? ` · ${formatSize(file.size)}` : ""}
+                </p>
+              </div>
+              <span className="text-gray-300 text-lg">›</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Safe area spacer for iOS home indicator */}
+        <div className="h-6" />
       </div>
     </div>
   );
