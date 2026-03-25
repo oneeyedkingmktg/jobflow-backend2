@@ -197,11 +197,40 @@ function CallCard({ msg, idx, companyId }) {
 const FAILED_STATUSES = new Set(["failed", "undelivered", "error"]);
 
 
+function EmailBodyModal({ subject, body, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[600] flex flex-col items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[85vh] mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h2 className="text-sm font-bold text-gray-900 truncate pr-4">{subject || "Email"}</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none flex-shrink-0">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-5 py-4">
+          {body ? (
+            <div
+              className="text-sm text-gray-800 prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: body }}
+            />
+          ) : (
+            <p className="text-sm text-gray-400 italic">No email body available.</p>
+          )}
+        </div>
+        <div className="h-4" />
+      </div>
+    </div>
+  );
+}
+
 function MessageBubble({ msg, idx, contactName, companyId }) {
   const isEmail = msg.messageType === "TYPE_EMAIL";
   const isSMS = msg.messageType === "TYPE_SMS";
   const isCall = msg.messageType === "TYPE_CALL";
   const isWorkflow = msg.source === "workflow";
+  const [showEmailBody, setShowEmailBody] = useState(false);
 
   const direction = resolveDirection(msg);
   const displayText = resolveDisplayText(msg);
@@ -231,31 +260,46 @@ function MessageBubble({ msg, idx, contactName, companyId }) {
     : <span className="text-xs font-bold">{getInitials(contactName)}</span>;
 
   return (
-    <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
-      <div className="flex items-start gap-2 max-w-[75%]">
-        {!isOutbound && (
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
-            {avatarContent}
+    <>
+      {showEmailBody && (
+        <EmailBodyModal
+          subject={msg.meta?.email?.subject || displayText}
+          body={msg.body}
+          onClose={() => setShowEmailBody(false)}
+        />
+      )}
+      <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
+        <div className="flex items-start gap-2 max-w-[75%]">
+          {!isOutbound && (
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
+              {avatarContent}
+            </div>
+          )}
+          <div>
+            <div
+              className={`p-3 rounded-xl ${isFailed ? "bg-red-50 border border-red-200" : bubbleColor} ${isEmail ? "cursor-pointer hover:opacity-80 active:opacity-60 transition" : ""}`}
+              onClick={isEmail ? () => setShowEmailBody(true) : undefined}
+            >
+              <p className="text-sm">{displayText}</p>
+              {isEmail && (
+                <p className="text-xs text-gray-500 mt-1">Tap to view full email →</p>
+              )}
+            </div>
+            <div className="text-xs text-gray-400 mt-1 px-1 flex items-center flex-wrap gap-x-1">
+              {new Date(msg.dateAdded).toLocaleString()}
+              <ChannelPill messageType={msg.messageType} />
+              {isWorkflow && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700">workflow</span>}
+              {isFailed && <span className="text-red-500 font-semibold">Failed</span>}
+            </div>
           </div>
-        )}
-        <div>
-          <div className={`p-3 rounded-xl ${isFailed ? "bg-red-50 border border-red-200" : bubbleColor}`}>
-            <p className="text-sm">{displayText}</p>
-          </div>
-          <div className="text-xs text-gray-400 mt-1 px-1 flex items-center flex-wrap gap-x-1">
-            {new Date(msg.dateAdded).toLocaleString()}
-            <ChannelPill messageType={msg.messageType} />
-            {isWorkflow && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700">workflow</span>}
-            {isFailed && <span className="text-red-500 font-semibold">Failed</span>}
-          </div>
+          {isOutbound && (
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
+              {avatarContent}
+            </div>
+          )}
         </div>
-        {isOutbound && (
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
-            {avatarContent}
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 }
 
