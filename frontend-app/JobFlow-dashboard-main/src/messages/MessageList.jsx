@@ -212,8 +212,10 @@ function EmailBodyModal({ subject, body, onClose }) {
         <div className="overflow-y-auto flex-1 px-5 py-4">
           {body ? (
             <div
-              className="text-sm text-gray-800 prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: body }}
+              className="text-sm text-gray-800 leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: body.includes("<") ? body : body.replace(/\n/g, "<br/>")
+              }}
             />
           ) : (
             <p className="text-sm text-gray-400 italic">No email body available.</p>
