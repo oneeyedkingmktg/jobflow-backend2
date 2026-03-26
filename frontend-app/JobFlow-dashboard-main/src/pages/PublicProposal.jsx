@@ -12,7 +12,8 @@ function fmt(n) {
 
 function fmtDate(d) {
   if (!d) return '';
-  return new Date(d + (d.length === 10 ? 'T12:00:00' : '')).toLocaleDateString('en-US', {
+  const dateOnly = String(d).substring(0, 10);
+  return new Date(dateOnly + 'T12:00:00').toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
   });
 }
