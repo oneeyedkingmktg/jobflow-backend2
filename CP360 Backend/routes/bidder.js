@@ -913,6 +913,10 @@ router.get('/public/:id', async (req, res) => {
   try {
     const proposalResult = await pool.query(
       `SELECT bp.*, c.name as company_name_db,
+              c.phone as company_phone_db, c.email as company_email_db,
+              c.address as company_address_db, c.city as company_city_db,
+              c.state as company_state_db, c.zip as company_zip_db,
+              c.website as company_website_db,
               c.ghl_company_name, c.ghl_company_from_name, c.ghl_company_from_email,
               c.ghl_company_phone, c.ghl_company_website,
               c.ghl_company_street_address, c.ghl_company_city,

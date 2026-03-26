@@ -91,13 +91,15 @@ export default function PublicProposal({ proposalId }) {
 
   const { proposal, lead, items = [], customItems = [], discounts = [], paymentSchedules = [] } = data;
 
-  // Company info
-  const companyName  = proposal.ghl_company_from_name || proposal.company_name_db || '';
-  const companyPhone = proposal.ghl_company_phone || '';
-  const companyEmail = proposal.ghl_company_from_email || '';
-  const companyStreet= proposal.ghl_company_street_address || '';
-  const companyCity  = proposal.ghl_company_city || '';
-  const companyWeb   = proposal.ghl_company_website || '';
+  // Company info — GHL fields take priority, fall back to DB fields
+  const companyName   = proposal.ghl_company_from_name  || proposal.company_name_db     || '';
+  const companyPhone  = proposal.ghl_company_phone       || proposal.company_phone_db    || '';
+  const companyEmail  = proposal.ghl_company_from_email  || proposal.company_email_db    || '';
+  const companyStreet = proposal.ghl_company_street_address || proposal.company_address_db || '';
+  const companyCity   = proposal.ghl_company_city        || proposal.company_city_db     || '';
+  const companyState  = proposal.ghl_company_state       || proposal.company_state_db    || '';
+  const companyZip    = proposal.ghl_company_zip         || proposal.company_zip_db      || '';
+  const companyWeb    = proposal.ghl_company_website     || proposal.company_website_db  || '';
 
   // Calculations
   const libItems = items.filter(i => !i.is_freeform);
@@ -124,7 +126,14 @@ export default function PublicProposal({ proposalId }) {
       {/* ── Company Header ─────────────────────────────────────────────── */}
       <div className="bg-blue-700 text-white px-6 py-6">
         <h1 className="text-2xl font-bold">{companyName}</h1>
-        {companyStreet && <p className="text-blue-200 text-sm mt-0.5">{companyStreet}{companyCity ? ', ' + companyCity : ''}</p>}
+        {companyStreet && (
+          <p className="text-blue-200 text-sm mt-0.5">
+            {companyStreet}
+            {companyCity ? ', ' + companyCity : ''}
+            {companyState ? ', ' + companyState : ''}
+            {companyZip ? ' ' + companyZip : ''}
+          </p>
+        )}
         <div className="flex flex-wrap gap-x-4 mt-1 text-blue-200 text-sm">
           {companyPhone && <a href={`tel:${companyPhone}`} className="hover:text-white">{companyPhone}</a>}
           {companyEmail && <a href={`mailto:${companyEmail}`} className="hover:text-white">{companyEmail}</a>}
@@ -365,8 +374,12 @@ export default function PublicProposal({ proposalId }) {
           </a>
         )}
 
-        <div className="pb-8 text-center text-xs text-gray-400">
-          {companyName}{companyPhone ? ` · ${companyPhone}` : ''}
+        <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
+          <p>{companyName}</p>
+          {(companyStreet || companyCity) && (
+            <p>{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</p>
+          )}
+          <p>{[companyPhone, companyEmail].filter(Boolean).join(' · ')}</p>
         </div>
 
       </div>
