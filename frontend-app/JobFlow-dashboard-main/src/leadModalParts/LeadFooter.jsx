@@ -15,6 +15,8 @@ export default function LeadFooter({
   deleteConfirm,
   setDeleteConfirm,
   onDelete,
+  onJunk,
+  isJunk,
   onReinstate,
   saving = false,
 }) {
@@ -66,7 +68,7 @@ export default function LeadFooter({
         )}
       </div>
 
-{/* DELETE OR REINSTATE */}
+{/* JUNK / DELETE / REINSTATE */}
       <div className="mt-4 flex justify-center">
         {onReinstate ? (
           <button
@@ -77,16 +79,7 @@ export default function LeadFooter({
           >
             Reinstate Contact
           </button>
-        ) : !deleteConfirm ? (
-          <button
-            type="button"
-            onClick={() => setDeleteConfirm(true)}
-            disabled={saving}
-            className="text-sm text-red-600 hover:text-red-800 underline disabled:opacity-50"
-          >
-            Delete Contact
-          </button>
-        ) : (
+        ) : deleteConfirm ? (
           <div className="flex flex-col items-center gap-2">
             <div className="text-sm text-gray-700 text-center">
               Deleting this contact will permanently remove them from JobFlow
@@ -108,6 +101,27 @@ export default function LeadFooter({
                 Delete
               </button>
             </div>
+          </div>
+        ) : (
+          <div className="flex gap-6">
+            {!isJunk && onJunk && (
+              <button
+                type="button"
+                onClick={onJunk}
+                disabled={saving}
+                className="text-sm text-orange-500 hover:text-orange-700 underline disabled:opacity-50"
+              >
+                Mark as Junk
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm(true)}
+              disabled={saving}
+              className="text-sm text-red-600 hover:text-red-800 underline disabled:opacity-50"
+            >
+              Delete Contact
+            </button>
           </div>
         )}
       </div>

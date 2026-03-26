@@ -151,6 +151,7 @@ export default function LeadsHome() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [isNewLead, setIsNewLead] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [includeJunk, setIncludeJunk] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showPhoneLookup, setShowPhoneLookup] = useState(false);
 
@@ -164,7 +165,7 @@ const loadLeads = async () => {
     try {
       const includeDeleted = isMasterAdmin ? '&include_deleted=true' : '';
       const res = await apiRequest(
-        `/leads?company_id=${currentCompany.id}${includeDeleted}`
+        `/leads?company_id=${currentCompany.id}${includeDeleted}&include_junk=true`
       );
 
       const rawLeads = Array.isArray(res)
@@ -265,8 +266,8 @@ const filteredLeads = useMemo(() => {
     const digits = normalizePhone(searchTerm);
 
     return leads.filter((lead) => {
-      // Always exclude junk leads
-      if (lead.status === "status_junk") return false;
+      // Exclude junk leads unless "Include Junk" checkbox is checked
+      if (lead.status === "status_junk" && !includeJunk) return false;
       
       // Handle deleted leads visibility
       if (activeTab === "Deleted") {
@@ -302,7 +303,7 @@ const matchesSearch =
 
       return matchesTab && matchesSearch;
     });
-  }, [leads, activeTab, searchTerm, isMasterAdmin]);
+  }, [leads, activeTab, searchTerm, isMasterAdmin, includeJunk]);
 
   // --------------------------------------------------
   // Render
@@ -333,6 +334,8 @@ onAddLead={() => {
   searchTerm={searchTerm}
   setSearchTerm={setSearchTerm}
   setActiveTab={setActiveTab}
+  includeJunk={includeJunk}
+  setIncludeJunk={setIncludeJunk}
 />
 
 
@@ -456,6 +459,19 @@ onSaveAndExit={async (data) => {
   } catch (error) {
     console.error("Delete error:", error);
     alert("Failed to delete lead");
+  }
+}}
+          onJunk={async (lead) => {
+  if (!lead?.id) return;
+  try {
+    const backendData = convertLeadToBackend({ ...lead, status: 'status_junk' });
+    await LeadsAPI.update(lead.id, backendData);
+    await loadLeads();
+    setSelectedLead(null);
+    setIsNewLead(false);
+  } catch (error) {
+    console.error("Junk error:", error);
+    alert("Failed to mark as junk");
   }
 }}
         />

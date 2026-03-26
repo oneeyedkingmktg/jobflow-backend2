@@ -8,7 +8,7 @@ const router = express.Router();
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { syncLeadToGhl } = require("../sync/dbToGhlSync");
-const { deleteGhlContact, applyStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
+const { deleteGhlContact, applyStatusTags, removeStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
 const { sendPushToCompany } = require("../services/pushNotificationService");
 
 function formatProjectTypeForPush(type) {
@@ -199,6 +199,8 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "company_id required" });
     }
 const deletedFilter = includeDeleted ? '' : 'AND l.deleted_at IS NULL';
+const includeJunk = req.query.include_junk === 'true';
+const junkFilter = includeJunk ? '' : "AND l.status != 'status_junk'";
 const result = await pool.query(
   `
   SELECT
@@ -208,7 +210,7 @@ const result = await pool.query(
   JOIN companies c ON c.id = l.company_id
   WHERE l.company_id = $1
     ${deletedFilter}
-    AND l.status != 'status_junk'
+    ${junkFilter}
   ORDER BY l.created_at DESC
   `,
   [companyId]
@@ -722,6 +724,15 @@ await syncLeadToGhl({
         ghlSynced = true;
       } catch (syncError) {
         console.log('GHL sync failed for updated lead:', syncError.message);
+      }
+
+      // If unjunking: remove the junk tag from GHL
+      if (previousLead.status === 'status_junk' && updatedLead.status !== 'status_junk' && updatedLead.ghl_contact_id) {
+        try {
+          await removeStatusTags(updatedLead.ghl_contact_id, 'status - junk', company);
+        } catch (err) {
+          console.error('Failed to remove GHL junk tag:', err.message);
+        }
       }
     }
 

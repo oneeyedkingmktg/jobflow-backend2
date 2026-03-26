@@ -29,6 +29,7 @@ export default function LeadModal({
   onSave,
   onSaveAndExit,
   onDelete,
+  onJunk,
   onReinstate,
   onClose,
 }) {
@@ -265,6 +266,8 @@ const handlePauseSave = (pauseFields) => {
               onExit={handleSaveAndExit}
               onEdit={() => setIsEditing(true)}
               onDelete={() => onDelete(form)}
+              onJunk={onJunk ? () => onJunk(form) : null}
+              isJunk={form?.status === 'status_junk'}
               onReinstate={onReinstate ? () => onReinstate(form) : null}
               onPause={() => setShowPauseModal(true)}
               deleteConfirm={deleteConfirm}
