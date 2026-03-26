@@ -912,7 +912,7 @@ router.delete('/payment/:id', async (req, res) => {
 router.get('/public/:id', async (req, res) => {
   try {
     const proposalResult = await pool.query(
-      `SELECT bp.*, c.name as company_name_db,
+      `SELECT bp.*, c.company_name as company_name_db,
               c.phone as company_phone_db, c.email as company_email_db,
               c.address as company_address_db, c.city as company_city_db,
               c.state as company_state_db, c.zip as company_zip_db,
@@ -1023,7 +1023,7 @@ router.post('/public/:id/accept', async (req, res) => {
 
     // Check proposal exists and isn't already signed
     const existing = await pool.query(
-      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.name as company_db_name FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id WHERE bp.id = $1',
+      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.id = $1',
       [req.params.id]
     );
     if (!existing.rows.length) return res.status(404).json({ error: 'Proposal not found' });
@@ -1061,6 +1061,8 @@ router.post('/public/:id/accept', async (req, res) => {
       contractorEmail,
       companyName,
       proposalUrl,
+      fromName: proposal.email_from_name || null,
+      fromEmail: proposal.email_from_email || null,
     }).catch(err => console.error('Proposal accept email error:', err));
 
     res.json({ success: true, signed_at: signedAt });

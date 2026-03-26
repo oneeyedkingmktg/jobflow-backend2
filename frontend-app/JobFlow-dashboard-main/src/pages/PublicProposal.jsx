@@ -125,20 +125,22 @@ export default function PublicProposal({ proposalId }) {
     <div className="min-h-screen bg-gray-100">
 
       {/* ── Company Header ─────────────────────────────────────────────── */}
-      <div className="bg-blue-700 text-white px-6 py-6">
-        <h1 className="text-2xl font-bold">{companyName}</h1>
-        {companyStreet && (
-          <p className="text-blue-200 text-sm mt-0.5">
-            {companyStreet}
-            {companyCity ? ', ' + companyCity : ''}
-            {companyState ? ', ' + companyState : ''}
-            {companyZip ? ' ' + companyZip : ''}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-x-4 mt-1 text-blue-200 text-sm">
-          {companyPhone && <a href={`tel:${companyPhone}`} className="hover:text-white">{companyPhone}</a>}
-          {companyEmail && <a href={`mailto:${companyEmail}`} className="hover:text-white">{companyEmail}</a>}
-          {companyWeb   && <a href={companyWeb.startsWith('http') ? companyWeb : `https://${companyWeb}`} className="hover:text-white">{companyWeb}</a>}
+      <div className="bg-blue-700 text-white">
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          <h1 className="text-2xl font-bold">{companyName}</h1>
+          {companyStreet && (
+            <p className="text-blue-200 text-sm mt-0.5">
+              {companyStreet}
+              {companyCity ? ', ' + companyCity : ''}
+              {companyState ? ', ' + companyState : ''}
+              {companyZip ? ' ' + companyZip : ''}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-x-4 mt-1 text-blue-200 text-sm">
+            {companyPhone && <a href={`tel:${companyPhone}`} className="hover:text-white">{companyPhone}</a>}
+            {companyEmail && <a href={`mailto:${companyEmail}`} className="hover:text-white">{companyEmail}</a>}
+            {companyWeb   && <a href={companyWeb.startsWith('http') ? companyWeb : `https://${companyWeb}`} className="hover:text-white">{companyWeb}</a>}
+          </div>
         </div>
       </div>
 

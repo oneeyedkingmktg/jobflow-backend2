@@ -37,13 +37,16 @@ async function sendPasswordResetEmail(email, resetToken) {
   await transporter.sendMail(mailOptions);
 }
 
-async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, signedAt, customerEmail, customerName, contractorEmail, companyName, proposalUrl }) {
+async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, signedAt, customerEmail, customerName, contractorEmail, companyName, proposalUrl, fromName, fromEmail }) {
   const dateStr = new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const displayName = fromName || companyName || 'CoatingPro360';
+  const senderAddr = fromEmail || process.env.SMTP_USER;
+  const fromHeader = `"${displayName}" <${senderAddr}>`;
 
   // Email to contractor
   if (contractorEmail) {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: fromHeader,
       to: contractorEmail,
       subject: `Proposal Accepted — ${bidName}`,
       html: `
@@ -69,7 +72,7 @@ async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, 
   // Confirmation email to customer
   if (customerEmail) {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: fromHeader,
       to: customerEmail,
       subject: `Your Proposal Has Been Accepted — ${companyName || 'CoatingPro360'}`,
       html: `
