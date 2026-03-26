@@ -312,7 +312,8 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
   const docNum = `INV-${String(proposal.id).padStart(4, '0')}-${payIdx + 1}`;
   const docDate = `Date: ${fmtDate(null)}`;
 
-  const payUrl = (proposal.payment_url || '').trim();
+  const rawPayUrl = (proposal.payment_url || '').trim();
+  const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
 
   const body = `
     ${clientBlock(lead, 'Bill To')}
@@ -356,7 +357,8 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
 export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '' }) {
   const docNum  = `INV-${String(proposal.id).padStart(4, '0')}-F`;
   const docDate = `Date: ${fmtDate(null)}`;
-  const payUrl  = (proposal.payment_url || '').trim();
+  const rawPayUrlF = (proposal.payment_url || '').trim();
+  const payUrl  = rawPayUrlF && !rawPayUrlF.startsWith('http') ? `https://${rawPayUrlF}` : rawPayUrlF;
 
   const prevPayRows = paySchedule.map((ps, i) => {
     const amt   = calcAmt(ps, bidTotal);

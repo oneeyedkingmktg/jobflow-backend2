@@ -114,7 +114,8 @@ export default function PublicProposal({ proposalId }) {
   const payTotal  = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
   const balanceDue= bidTotal - payTotal;
 
-  const payUrl = (proposal.payment_url || proposal.company_payment_url || '').trim();
+  const rawPayUrl = (proposal.payment_url || proposal.company_payment_url || '').trim();
+  const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
   const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && payUrl;
 
   const termsText = proposal.terms_and_conditions || '';
