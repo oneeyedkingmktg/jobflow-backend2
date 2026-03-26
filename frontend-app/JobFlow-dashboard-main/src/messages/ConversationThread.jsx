@@ -28,6 +28,22 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
   const softphone = useSoftphone();
   const [pendingCall, setPendingCall] = useState(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handler = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(offset);
+    };
+    vv.addEventListener('resize', handler);
+    vv.addEventListener('scroll', handler);
+    return () => {
+      vv.removeEventListener('resize', handler);
+      vv.removeEventListener('scroll', handler);
+    };
+  }, []);
 
   // Fetch messages on mount + mark as read
   useEffect(() => {
@@ -121,7 +137,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
   }
 
   return (
-    <div className="fixed inset-0 bg-white z-[100] flex flex-col">
+    <div className="fixed inset-0 bg-white z-[100] flex flex-col" style={{ bottom: keyboardOffset }}>
       {/* Softphone overlay — shown during active/incoming calls */}
       <SoftphoneWidget
         callState={softphone.callState}
