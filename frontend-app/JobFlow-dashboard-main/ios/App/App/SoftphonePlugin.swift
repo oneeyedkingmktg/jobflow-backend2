@@ -1,12 +1,12 @@
 // ============================================================================
 // SoftphonePlugin.swift
-// iOS native Capacitor plugin for SIP calling via Linphone SDK.
-// Mirrors the Android SoftphonePlugin.java / SoftphoneManager.java exactly.
+// iOS Capacitor plugin stub — registers the "Softphone" plugin name so the
+// JS bridge doesn't throw. All methods are no-ops; iOS calling uses the
+// tel: fallback in useSoftphone.js until native SIP is implemented.
 // ============================================================================
 
 import Foundation
 import Capacitor
-import linphonesw
 
 @objc(SoftphonePlugin)
 public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
@@ -25,262 +25,16 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "destroy",      returnType: CAPPluginReturnPromise),
     ]
 
-    private var mCore: Core?
-    private var mDelegate: CoreDelegate?
-    private var mTimer: Timer?
-    private var isInitialized = false
+    @objc func initialize(_ call: CAPPluginCall)  { call.resolve() }
+    @objc func makeCall(_ call: CAPPluginCall)     { call.resolve() }
+    @objc func answerCall(_ call: CAPPluginCall)   { call.resolve() }
+    @objc func declineCall(_ call: CAPPluginCall)  { call.resolve() }
+    @objc func hangup(_ call: CAPPluginCall)       { call.resolve() }
+    @objc func setMuted(_ call: CAPPluginCall)     { call.resolve() }
+    @objc func setSpeaker(_ call: CAPPluginCall)   { call.resolve() }
+    @objc func destroy(_ call: CAPPluginCall)      { call.resolve() }
 
-    // =========================================================================
-    // INITIALIZE — sets up Linphone Core and registers with SIP server
-    // =========================================================================
-    @objc func initialize(_ call: CAPPluginCall) {
-        guard let sipDomain   = call.getString("sipDomain"),
-              let sipUser     = call.getString("sipUser"),
-              let sipPassword = call.getString("sipPassword") else {
-            call.reject("Missing SIP credentials")
-            return
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            do {
-                if self.mCore != nil {
-                    // Already initialized — just re-register
-                    self.register(domain: sipDomain, user: sipUser, password: sipPassword)
-                    call.resolve()
-                    return
-                }
-
-                let core = try Factory.Instance.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
-                core.mediaEncryption = .None
-                self.mCore = core
-
-                // Attach delegate for state events
-                self.attachDelegate()
-
-                // Register account
-                self.register(domain: sipDomain, user: sipUser, password: sipPassword)
-
-                // Start the core
-                try core.start()
-
-                // Linphone needs a 20 ms iterate loop on the main thread
-                self.mTimer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
-                    self?.mCore?.iterate()
-                }
-
-                self.isInitialized = true
-                NSLog("[SoftphonePlugin] Initialized: \(sipUser)@\(sipDomain)")
-                call.resolve()
-            } catch {
-                NSLog("[SoftphonePlugin] Init failed: \(error)")
-                call.reject("Init failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    // =========================================================================
-    // REGISTER — configures a SIP account on the core
-    // =========================================================================
-    private func register(domain: String, user: String, password: String) {
-        guard let core = mCore else { return }
-        do {
-            // Clear existing accounts and auth
-            for account in core.accountList {
-                core.removeAccount(account: account)
-            }
-            core.clearAllAuthInfo()
-
-            // Auth info
-            let authInfo = try Factory.Instance.createAuthInfo(
-                username: user, userid: user,
-                passwd: password, ha1: nil, realm: nil, domain: domain
-            )
-            core.addAuthInfo(info: authInfo)
-
-            // Account params
-            let params = try core.createAccountParams()
-
-            if let identity = try? Factory.Instance.createAddress(addr: "sip:\(user)@\(domain)") {
-                try? params.setIdentityaddress(newValue: identity)
-            }
-
-            if let serverAddr = try? Factory.Instance.createAddress(addr: "sip:\(domain)") {
-                serverAddr.transport = .Udp
-                try? params.setServeraddress(newValue: serverAddr)
-            }
-
-            params.registerEnabled = true
-
-            let account = try core.createAccount(params: params)
-            core.addAccount(account: account)
-            core.defaultAccount = account
-
-        } catch {
-            NSLog("[SoftphonePlugin] Register failed: \(error)")
-        }
-    }
-
-    // =========================================================================
-    // DELEGATE — fires events back to JavaScript
-    // =========================================================================
-    private func attachDelegate() {
-        let delegate = CoreDelegateStub(
-            onRegistrationStateChanged: { [weak self] (_, _, state, message) in
-                guard let self = self else { return }
-                let stateStr: String
-                switch state {
-                case .None:     stateStr = "none"
-                case .Progress: stateStr = "progress"
-                case .Ok:       stateStr = "ok"
-                case .Cleared:  stateStr = "cleared"
-                case .Failed:   stateStr = "failed"
-                default:        stateStr = "none"
-                }
-                NSLog("[SoftphonePlugin] Registration: \(stateStr) – \(message)")
-                self.notifyListeners("registrationState", data: ["state": stateStr, "message": message])
-            },
-            onCallStateChanged: { [weak self] (_, call, state, message) in
-                guard let self = self else { return }
-                let callerNumber = call.remoteAddress?.asStringUriOnly() ?? ""
-                let stateStr: String
-                switch state {
-                case .Idle:               stateStr = "idle"
-                case .IncomingReceived:   stateStr = "incomingreceived"
-                case .OutgoingInit:       stateStr = "outgoinginit"
-                case .OutgoingProgress:   stateStr = "outgoingprogress"
-                case .OutgoingRinging:    stateStr = "outgoingearlymedia"
-                case .OutgoingEarlyMedia: stateStr = "outgoingearlymedia"
-                case .Connected:          stateStr = "connected"
-                case .StreamsRunning:     stateStr = "streamsrunning"
-                case .End:                stateStr = "end"
-                case .Released:           stateStr = "released"
-                case .Error:              stateStr = "error"
-                default:                  stateStr = "idle"
-                }
-                NSLog("[SoftphonePlugin] Call: \(stateStr) – \(callerNumber)")
-                self.notifyListeners("callState", data: [
-                    "state": stateStr,
-                    "callerNumber": callerNumber,
-                    "message": message
-                ])
-            }
-        )
-        mDelegate = delegate
-        mCore?.addDelegate(delegate: delegate)
-    }
-
-    // =========================================================================
-    // MAKE OUTGOING CALL
-    // =========================================================================
-    @objc func makeCall(_ call: CAPPluginCall) {
-        guard let phoneNumber = call.getString("phoneNumber") else {
-            call.reject("phoneNumber required")
-            return
-        }
-        DispatchQueue.main.async { [weak self] in
-            guard let core = self?.mCore else {
-                call.reject("SIP not initialized")
-                return
-            }
-            do {
-                if let remoteAddr = try? core.interpretUrl(url: phoneNumber, applyInternationalPrefix: true) {
-                    try core.inviteAddress(addr: remoteAddr)
-                    NSLog("[SoftphonePlugin] Calling: \(phoneNumber)")
-                    call.resolve()
-                } else {
-                    call.reject("Invalid phone number: \(phoneNumber)")
-                }
-            } catch {
-                call.reject("makeCall failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    // =========================================================================
-    // ANSWER INCOMING CALL
-    // =========================================================================
-    @objc func answerCall(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            if let currentCall = self?.mCore?.currentCall,
-               currentCall.state == .IncomingReceived {
-                try? currentCall.accept()
-            }
-            call.resolve()
-        }
-    }
-
-    // =========================================================================
-    // DECLINE INCOMING CALL
-    // =========================================================================
-    @objc func declineCall(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            try? self?.mCore?.currentCall?.decline(reason: .Declined)
-            call.resolve()
-        }
-    }
-
-    // =========================================================================
-    // HANGUP
-    // =========================================================================
-    @objc func hangup(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            try? self?.mCore?.currentCall?.terminate()
-            call.resolve()
-        }
-    }
-
-    // =========================================================================
-    // MUTE
-    // =========================================================================
-    @objc func setMuted(_ call: CAPPluginCall) {
-        let muted = call.getBool("muted") ?? false
-        DispatchQueue.main.async { [weak self] in
-            self?.mCore?.currentCall?.microphoneMuted = muted
-            call.resolve()
-        }
-    }
-
-    // =========================================================================
-    // SPEAKER / EARPIECE
-    // =========================================================================
-    @objc func setSpeaker(_ call: CAPPluginCall) {
-        let speaker = call.getBool("speaker") ?? false
-        DispatchQueue.main.async { [weak self] in
-            guard let core = self?.mCore else { call.resolve(); return }
-            let targetType: AudioDeviceType = speaker ? .Speaker : .Earpiece
-            for device in core.audioDevices {
-                if device.type == targetType && device.hasCapability(capability: .CapabilityPlay) {
-                    core.outputAudioDevice = device
-                    break
-                }
-            }
-            call.resolve()
-        }
-    }
-
-    // =========================================================================
-    // STATUS
-    // =========================================================================
     @objc func getStatus(_ call: CAPPluginCall) {
-        call.resolve([
-            "callState": "idle",
-            "initialized": isInitialized,
-            "muted": mCore?.currentCall?.microphoneMuted ?? false
-        ])
-    }
-
-    // =========================================================================
-    // DESTROY
-    // =========================================================================
-    @objc func destroy(_ call: CAPPluginCall) {
-        DispatchQueue.main.async { [weak self] in
-            self?.mTimer?.invalidate()
-            self?.mTimer = nil
-            self?.mCore?.stop()
-            self?.mCore = nil
-            self?.isInitialized = false
-            call.resolve()
-        }
+        call.resolve(["callState": "idle", "initialized": false, "muted": false])
     }
 }
