@@ -4,7 +4,6 @@
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
-import { apiRequest } from '../api';
 
 function fmt(n) {
   const v = parseFloat(n) || 0;
@@ -36,7 +35,9 @@ export default function PublicProposal({ proposalId }) {
   const [submitErr, setSubmitErr] = useState('');
 
   useEffect(() => {
-    apiRequest(`/api/bidder/public/${proposalId}`)
+    const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
+    fetch(`${apiBase}/api/bidder/public/${proposalId}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setData(d);
         if (d.proposal?.signed_at) {
