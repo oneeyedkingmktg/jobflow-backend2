@@ -203,3 +203,64 @@ export const LeadsAPI = {
     return apiRequest(`/leads/appt-slot-check?${params.toString()}`);
   },
 };
+
+/* ============================================================================
+   BIDDER
+============================================================================ */
+
+export const BidderAPI = {
+  // Proposals
+  getProposals: (leadId) => apiRequest(`/api/bidder/proposals/${leadId}`),
+  getProposal: (id) => apiRequest(`/api/bidder/proposal/${id}`),
+  createProposal: (data) => apiRequest('/api/bidder/proposal', { method: 'POST', body: JSON.stringify(data) }),
+  updateProposal: (id, data) => apiRequest(`/api/bidder/proposal/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProposal: (id) => apiRequest(`/api/bidder/proposal/${id}`, { method: 'DELETE' }),
+
+  // Items
+  createItem: (data) => apiRequest('/api/bidder/item', { method: 'POST', body: JSON.stringify(data) }),
+  updateItem: (id, data) => apiRequest(`/api/bidder/item/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteItem: (id) => apiRequest(`/api/bidder/item/${id}`, { method: 'DELETE' }),
+
+  // Custom items
+  createCustomItem: (data) => apiRequest('/api/bidder/custom-item', { method: 'POST', body: JSON.stringify(data) }),
+  updateCustomItem: (id, data) => apiRequest(`/api/bidder/custom-item/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCustomItem: (id) => apiRequest(`/api/bidder/custom-item/${id}`, { method: 'DELETE' }),
+
+  // Discounts
+  createDiscount: (data) => apiRequest('/api/bidder/discount', { method: 'POST', body: JSON.stringify(data) }),
+  updateDiscount: (id, data) => apiRequest(`/api/bidder/discount/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteDiscount: (id) => apiRequest(`/api/bidder/discount/${id}`, { method: 'DELETE' }),
+
+  // Library — companyId required when caller is master viewing a specific company
+  getLibrary: (companyId) => apiRequest(`/api/bidder/library${companyId ? `?company_id=${companyId}` : ''}`),
+  createCategory: (data, companyId) => apiRequest(`/api/bidder/library/category${companyId ? `?company_id=${companyId}` : ''}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateCategory: (id, data, companyId) => apiRequest(`/api/bidder/library/category/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCategory: (id, companyId) => apiRequest(`/api/bidder/library/category/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
+  createLibraryItem: (data, companyId) => apiRequest(`/api/bidder/library/item${companyId ? `?company_id=${companyId}` : ''}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateLibraryItem: (id, data, companyId) => apiRequest(`/api/bidder/library/item/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteLibraryItem: (id, companyId) => apiRequest(`/api/bidder/library/item/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
+
+  // Company settings
+  getCompanySettings: (companyId) => apiRequest(`/api/bidder/company-settings${companyId ? `?company_id=${companyId}` : ''}`),
+  updateCompanySettings: (data, companyId) => apiRequest(`/api/bidder/company-settings${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Proposal designs (master only for write, all for read)
+  getProposalDesigns: () => apiRequest('/api/bidder/proposal-designs'),
+  createProposalDesign: (data) => apiRequest('/api/bidder/proposal-designs', { method: 'POST', body: JSON.stringify(data) }),
+  updateProposalDesign: (id, data) => apiRequest(`/api/bidder/proposal-designs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProposalDesign: (id) => apiRequest(`/api/bidder/proposal-designs/${id}`, { method: 'DELETE' }),
+
+  // Payment schedules
+  createPayment: (data) => apiRequest('/api/bidder/payment', { method: 'POST', body: JSON.stringify(data) }),
+  updatePayment: (id, data) => apiRequest(`/api/bidder/payment/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePayment: (id) => apiRequest(`/api/bidder/payment/${id}`, { method: 'DELETE' }),
+
+  // Public proposal page
+  getPublicProposal: (id) => apiRequest(`/api/bidder/public/${id}`),
+
+  // Send proposal link email to customer
+  sendProposalEmail: (id, email, type) => apiRequest(`/api/bidder/proposal/${id}/send-email`, {
+    method: 'POST',
+    body: JSON.stringify({ ...(email ? { email } : {}), ...(type ? { type } : {}) }),
+  }),
+};

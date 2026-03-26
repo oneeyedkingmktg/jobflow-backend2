@@ -54,6 +54,7 @@ const companiesRoutes = require("./routes/companies");
 const ghlRoutes = require("./routes/ghl");
 const messagesRoutes = require("./routes/messages");
 const sipRoutes = require("./routes/sip");
+const bidderRoutes = require("./routes/bidder");
 
 
 
@@ -98,6 +99,7 @@ app.use("/api/drive", authenticateToken, googleDriveRoutes);
 app.use("/api/messages", messagesRoutes);
 app.use("/api/sip", sipRoutes);
 app.use("/google-drive", googleDriveRoutes);
+app.use("/api/bidder", bidderRoutes);
 
 
 

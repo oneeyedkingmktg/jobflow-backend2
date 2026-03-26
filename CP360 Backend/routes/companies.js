@@ -334,6 +334,8 @@ const {
       plan_type,
       est_push_title,
       est_push_body,
+      bidder_enabled,
+      bidderEnabled,
 
       // estimator_configs fields (must NOT be written to companies)
       text_color,
@@ -399,6 +401,12 @@ billing_status,
         ? estimator_enabled
         : estimatorEnabled !== undefined
         ? estimatorEnabled
+        : null;
+    const bidderValue =
+      bidder_enabled !== undefined
+        ? bidder_enabled
+        : bidderEnabled !== undefined
+        ? bidderEnabled
         : null;
 
     const ghlLocationValue = ghl_location_id || ghlLocationId || null;
@@ -475,6 +483,7 @@ google_conversion_event = COALESCE($27, google_conversion_event),
   plan_type = COALESCE($31, plan_type),
   est_push_title = COALESCE($32, est_push_title),
   est_push_body = COALESCE($33, est_push_body),
+  bidder_enabled = COALESCE($34, bidder_enabled),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -513,6 +522,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   plan_type || null,                                           // $31
   est_push_title || null,                                      // $32
   est_push_body || null,                                       // $33
+  bidderValue,                                                 // $34
 ]
 
 );

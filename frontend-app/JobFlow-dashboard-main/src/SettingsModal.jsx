@@ -12,6 +12,7 @@ import CompanyModal from "./company/CompanyModal";
 import UsersHome from "./users/UsersHome";
 import UserProfileModal from "./UserProfileModal";
 import NotificationSettings from "./components/NotificationSettings";
+import BidderMasterAdmin from "./components/BidderMasterAdmin";
 
 export default function SettingsModal({ onClose }) {
   const { logout, isMaster, user } = useAuth();
@@ -35,6 +36,7 @@ export default function SettingsModal({ onClose }) {
   const openCompanySettings = () => setScreen("company_settings");
   const openNotifications = () => setScreen("notifications");
   const openSuperAdmin = () => setScreen("superadmin");
+  const openBidderAdmin = () => setScreen("bidder_admin");
 
   const handleBack = () => {
     if (screen === "company_details") return setScreen("manage_companies");
@@ -120,6 +122,15 @@ const renderHome = () => (
             className="w-full px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
           >
             Super Admin Details
+          </button>
+        )}
+
+        {isMaster() && (
+          <button
+            onClick={openBidderAdmin}
+            className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+          >
+            Bidder Admin
           </button>
         )}
 
@@ -229,6 +240,10 @@ const renderHome = () => (
           </button>
         </div>
       );
+      break;
+
+    case "bidder_admin":
+      content = <BidderMasterAdmin onBack={handleBack} />;
       break;
 
     default:

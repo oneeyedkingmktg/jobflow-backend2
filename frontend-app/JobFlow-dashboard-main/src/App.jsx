@@ -10,6 +10,7 @@ import ResetPassword from "./ResetPassword";
 import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
+import PublicProposal from "./pages/PublicProposal.jsx";
 import "./index.css";
 import { initializePushNotifications, setupPushListeners } from "./services/pushNotificationService";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -284,6 +285,12 @@ function AppContent() {
    APP PROVIDERS + ERROR BOUNDARY
    =========================================================== */
 export default function App() {
+  // Public proposal page — no auth required
+  const proposalMatch = window.location.pathname.match(/^\/proposal\/(\d+)$/);
+  if (proposalMatch) {
+    return <ErrorBoundary><PublicProposal proposalId={proposalMatch[1]} /></ErrorBoundary>;
+  }
+
   return (
     <ErrorBoundary>
       <AuthProvider>

@@ -10,6 +10,7 @@ import { useAuth } from "../AuthContext";
 import UsersHome from "../users/UsersHome";
 import EstimatorPricingModal from "./EstimatorPricingModal";
 import EstimatorMasterModal from "./EstimatorMasterModal";
+import BidderAdminSettings from "./BidderAdminSettings";
 
 // Phone formatter utility
 const formatPhoneNumber = (value) => {
@@ -956,6 +957,18 @@ setTrackingForm({
                 Users
               </button>
             )}
+
+            {(isMasterUser || isAdminUser) && !isCreate && (
+              <button
+                className={sectionBtn(activeSection === "bidder")}
+                onClick={() => {
+                  setActiveSection("bidder");
+                  setSectionMode("view");
+                }}
+              >
+                Bidder
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -967,6 +980,10 @@ setTrackingForm({
     scopedCompany={company}
     allowAdminAccess={true}
   />
+)}
+
+{activeSection === "bidder" && (
+  <BidderAdminSettings companyId={company?.id} />
 )}
 
 

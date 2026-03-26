@@ -2,11 +2,14 @@
 // File: src/leadModalParts/LeadDetailsView.jsx
 // Version: v1.6 – Added Conversations button and modal
 // ============================================================================
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import EstimateModal from "../EstimateModal.jsx";
 import ConversationModal from "./ConversationModal.jsx";
 import LeadFilesPanel from "./LeadFilesPanel.jsx";
+import BidderPanel from "./BidderPanel.jsx";
 import { useAuth } from "../AuthContext";
+import { useCompany } from "../CompanyContext";
+import { BidderAPI } from "../api";
 
 export default function LeadDetailsView({
   form,
@@ -15,11 +18,23 @@ export default function LeadDetailsView({
 }) {
 const hasEstimate = form?.hasEstimate === true;
   const { user } = useAuth();
+  const { currentCompany } = useCompany();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
   const [showConversationModal, setShowConversationModal] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
+  const [showBidderPanel, setShowBidderPanel] = useState(false);
+  const [bidCount, setBidCount] = useState(null);
+
+  useEffect(() => {
+    if (form?.id && !isEstimatorOnly && bidderEnabled) {
+      BidderAPI.getProposals(form.id)
+        .then(bids => setBidCount(bids.length))
+        .catch(() => {});
+    }
+  }, [form?.id]);
 
   const loadEstimate = async () => {
     try {
@@ -118,58 +133,76 @@ const hasEstimate = form?.hasEstimate === true;
         </div>
       </div>
 
-{/* CONVERSATIONS BUTTON */}
-{showConversations && (
-        isEstimatorOnly ? (
-          <div className="w-full mt-4 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
-            🔒 Messages — Upgrade to Pro
+{/* ACTION BUTTONS GRID */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+
+        {/* Conversations */}
+        {showConversations && (
+          isEstimatorOnly ? (
+            <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
+              🔒 Messages<br/>Upgrade to Pro
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowConversationModal(true); }}
+              className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+            >
+              View Conversation History
+            </button>
+          )
+        )}
+
+        {/* Online Estimate */}
+        {hasEstimate && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); loadEstimate(); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            View Online Estimate
+          </button>
+        )}
+
+        {/* Photos & Files */}
+        {isEstimatorOnly ? (
+          <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
+            🔒 Upgrade to Pro for jobsite photos
           </div>
         ) : (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowConversationModal(true);
-            }}
-            className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+            onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
           >
-            View Conversation History
+            Photos &amp; Files
           </button>
-        )
-      )}
+        )}
 
-      {/* ONLINE ESTIMATE BUTTON */}
-      {hasEstimate && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            loadEstimate();
-          }}
-          className="w-full mt-4 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
-        >
-          View Online Estimate
-        </button>
-      )}
+        {/* Bids */}
+        {!isEstimatorOnly && bidderEnabled && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowBidderPanel(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            {bidCount === null ? 'Bids' : bidCount === 0 ? '+ New Bid' : `View Bids (${bidCount})`}
+          </button>
+        )}
 
-      {/* PHOTOS & FILES BUTTON */}
-      {isEstimatorOnly ? (
-        <div className="w-full mt-3 px-5 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed">
-          🔒 Upgrade to Pro to save jobsite photos for this job
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
-          className="w-full mt-3 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
-        >
-          Photos &amp; Files
-        </button>
-      )}
+      </div>
 
       {/* FILES MODAL */}
       {showFilesModal && (
         <LeadFilesPanel leadId={form?.id} onClose={() => setShowFilesModal(false)} />
+      )}
+
+      {/* BIDDER PANEL */}
+      {showBidderPanel && (
+        <BidderPanel
+          lead={form}
+          onClose={() => { setShowBidderPanel(false); BidderAPI.getProposals(form.id).then(b => setBidCount(b.length)).catch(() => {}); }}
+        />
       )}
 {/* ESTIMATE MODAL */}
       {showEstimateModal && estimateData && (
