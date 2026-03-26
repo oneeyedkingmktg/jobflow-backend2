@@ -374,12 +374,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		AA11BB22CC33DD44EE55FF01 /* XCRemoteSwiftPackageReference "linphone-sdk-ios" */ = {
+		AA11BB22CC33DD44EE55FF01 /* XCRemoteSwiftPackageReference "linphone-sdk-swift-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/BelledonneCommunications/linphone-sdk-ios";
+			repositoryURL = "https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.2.0;
+				branch = stable;
+				kind = branch;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
