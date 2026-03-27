@@ -150,9 +150,8 @@ export function useSoftphone() {
     if (!initialized) {
       await initialize();
     }
-    await waitForRegistration(10000);
     await Softphone.makeCall({ phoneNumber });
-  }, [initialized, initialize, waitForRegistration]);
+  }, [initialized, initialize]);
 
   const hangup = useCallback(async () => {
     await Softphone.hangup();
