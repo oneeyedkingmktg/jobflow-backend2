@@ -124,17 +124,8 @@ export function useSoftphone() {
   const makeCall = useCallback(async (phoneNumber, displayName = '') => {
     if (!isNativeApp()) return;
 
-    // iOS: fall back to device dialer until native SIP plugin is built in Xcode
-    if (window.Capacitor?.getPlatform() === 'ios') {
-      // Strip everything except digits and leading + to avoid "Call Failed" from bad format
-      const cleaned = phoneNumber.replace(/[^\d+]/g, '');
-      window.open(`tel:${cleaned}`, '_system');
-      return;
-    }
-
     setCallerName(displayName);
     setCallerNumber(phoneNumber);
-    // Initialize SIP on first call if not already done
     if (!initialized) {
       await initialize();
     }
