@@ -53,8 +53,8 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
                 let core = try Factory.Instance.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
                 self.mCore = core
                 self.attachDelegate()
-                self.register(domain: sipDomain, user: sipUser, password: sipPassword)
                 try core.start()
+                self.register(domain: sipDomain, user: sipUser, password: sipPassword)
 
                 self.mTimer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
                     self?.mCore?.iterate()

@@ -138,8 +138,11 @@ export default function ConversationModal({ lead, onClose }) {
         onToggleSpeaker={softphone.toggleSpeaker}
         pendingCall={pendingCall}
         onConfirmCall={() => {
-          softphone.makeCall(pendingCall.phone, pendingCall.name);
           setPendingCall(null);
+          softphone.makeCall(pendingCall.phone, pendingCall.name).catch((err) => {
+            console.error('[makeCall failed]', err);
+            alert('Call failed: ' + (err?.message || 'Unknown error'));
+          });
         }}
         onCancelCall={() => setPendingCall(null)}
       />
