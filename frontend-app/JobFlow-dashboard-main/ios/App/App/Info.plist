@@ -49,6 +49,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>CoatingPro360 uses the camera for video calling features.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>CoatingPro360 needs microphone access for VOIP calls.</string>
 	<key>UIBackgroundModes</key>
