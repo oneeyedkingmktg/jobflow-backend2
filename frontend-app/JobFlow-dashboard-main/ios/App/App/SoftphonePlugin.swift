@@ -95,7 +95,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
             params.registerEnabled = true
 
             let account = try core.createAccount(params: params)
-            core.addAccount(account: account)
+            try core.addAccount(account: account)
             core.defaultAccount = account
         } catch {
             NSLog("[SoftphonePlugin] Register failed: \(error)")
