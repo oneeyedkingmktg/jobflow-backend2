@@ -53,12 +53,31 @@ cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
 cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
 echo ">>> Package.resolved updated at $RESOLVED_DEST"
 
-echo ">>> Resolving Xcode project remote packages (linphone etc.)..."
-cd "$SCRIPT_DIR/.."
-xcodebuild -resolvePackageDependencies \
-  -workspace App.xcworkspace \
-  -scheme App \
-  2>&1 | tail -5 || true
-echo ">>> Xcode package resolution complete."
+echo ">>> Injecting Linphone pin into workspace Package.resolved..."
+LINPHONE_REVISION=$(git ls-remote https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git refs/heads/stable 2>/dev/null | awk '{print $1}')
+if [ -z "$LINPHONE_REVISION" ]; then
+  echo ">>> ERROR: Could not fetch Linphone stable branch HEAD — aborting."
+  exit 1
+fi
+echo ">>> Linphone stable HEAD: $LINPHONE_REVISION"
+python3 - "$RESOLVED_DEST/Package.resolved" "$LINPHONE_REVISION" <<'PYEOF'
+import json, sys
+path, revision = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    data = json.load(f)
+pin = {
+    "identity": "linphone-sdk-swift-ios",
+    "kind": "remoteSourceControl",
+    "location": "https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git",
+    "state": {"branch": "stable", "revision": revision}
+}
+data["pins"] = [p for p in data["pins"] if p.get("identity") != "linphone-sdk-swift-ios"]
+data["pins"].append(pin)
+data["pins"].sort(key=lambda p: p["identity"])
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+print(">>> Linphone pin injected successfully")
+PYEOF
 
 echo ">>> Post-clone steps complete."
