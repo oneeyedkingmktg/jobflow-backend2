@@ -53,4 +53,12 @@ cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
 cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
 echo ">>> Package.resolved updated at $RESOLVED_DEST"
 
+echo ">>> Resolving Xcode project remote packages (linphone etc.)..."
+cd "$SCRIPT_DIR/.."
+xcodebuild -resolvePackageDependencies \
+  -workspace App.xcworkspace \
+  -scheme App \
+  2>&1 | tail -5 || true
+echo ">>> Xcode package resolution complete."
+
 echo ">>> Post-clone steps complete."
