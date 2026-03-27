@@ -126,7 +126,9 @@ export function useSoftphone() {
 
     // iOS: fall back to device dialer until native SIP plugin is built in Xcode
     if (window.Capacitor?.getPlatform() === 'ios') {
-      window.open(`tel:${phoneNumber}`, '_system');
+      // Strip everything except digits and leading + to avoid "Call Failed" from bad format
+      const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+      window.open(`tel:${cleaned}`, '_system');
       return;
     }
 
