@@ -26,6 +26,7 @@ export function useSoftphone() {
 
   const timerRef = useRef(null);
   const listenersRef = useRef([]);
+  const registrationStateRef = useRef('none');
 
   const isActive = !IDLE_STATES.includes(callState);
   const isIncoming = callState === 'incomingreceived';
@@ -83,6 +84,7 @@ export function useSoftphone() {
     const regListener = Softphone.addListener('registrationState', (data) => {
       console.log('[Softphone] Registration:', data.state, data.message);
       setRegistrationState(data.state);
+      registrationStateRef.current = data.state;
     });
 
     const callListener = Softphone.addListener('callState', (data) => {
@@ -119,6 +121,25 @@ export function useSoftphone() {
   }, [initialize, startTimer, stopTimer]);
 
   // =========================================================================
+  // WAIT FOR REGISTRATION
+  // =========================================================================
+  const waitForRegistration = useCallback((timeoutMs = 10000) => {
+    return new Promise((resolve, reject) => {
+      if (registrationStateRef.current === 'ok') { resolve(); return; }
+      const start = Date.now();
+      const interval = setInterval(() => {
+        if (registrationStateRef.current === 'ok') {
+          clearInterval(interval);
+          resolve();
+        } else if (registrationStateRef.current === 'failed' || Date.now() - start > timeoutMs) {
+          clearInterval(interval);
+          reject(new Error('SIP registration failed or timed out'));
+        }
+      }, 100);
+    });
+  }, []);
+
+  // =========================================================================
   // ACTIONS
   // =========================================================================
   const makeCall = useCallback(async (phoneNumber, displayName = '') => {
@@ -129,8 +150,9 @@ export function useSoftphone() {
     if (!initialized) {
       await initialize();
     }
+    await waitForRegistration(10000);
     await Softphone.makeCall({ phoneNumber });
-  }, [initialized, initialize]);
+  }, [initialized, initialize, waitForRegistration]);
 
   const hangup = useCallback(async () => {
     await Softphone.hangup();
