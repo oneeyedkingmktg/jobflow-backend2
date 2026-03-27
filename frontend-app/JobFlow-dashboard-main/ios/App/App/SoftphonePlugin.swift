@@ -154,15 +154,11 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         DispatchQueue.main.async { [weak self] in
             guard let core = self?.mCore else { call.reject("SIP not initialized"); return }
-            do {
-                if let addr = try? core.interpretUrl(url: phoneNumber, applyInternationalPrefix: true) {
-                    try core.inviteAddress(addr: addr)
-                    call.resolve()
-                } else {
-                    call.reject("Invalid phone number")
-                }
-            } catch {
-                call.reject("makeCall failed: \(error.localizedDescription)")
+            if let addr = core.interpretUrl(url: phoneNumber, applyInternationalPrefix: true) {
+                _ = core.inviteAddress(addr: addr)
+                call.resolve()
+            } else {
+                call.reject("Invalid phone number")
             }
         }
     }
