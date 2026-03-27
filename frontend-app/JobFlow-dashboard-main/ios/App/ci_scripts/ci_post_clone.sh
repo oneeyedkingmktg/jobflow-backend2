@@ -25,42 +25,17 @@ npm run build
 echo ">>> Syncing Capacitor..."
 npx cap sync ios
 
-echo ">>> Regenerating Package.resolved after cap sync..."
-PACKAGE_DIR="$SCRIPT_DIR/../CapApp-SPM"
-RESOLVED_DEST="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+echo ">>> Injecting Linphone pin into Package.resolved..."
+RESOLVED_PATH="$SCRIPT_DIR/../App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 
-cd "$PACKAGE_DIR"
-
-echo ">>> Clearing stale Package.resolved files..."
-rm -f "$PACKAGE_DIR/Package.resolved"
-rm -f "$RESOLVED_DEST/Package.resolved"
-
-# Retry swift package resolve up to 3 times — binary target downloads can timeout transiently
-for i in 1 2 3; do
-  echo ">>> swift package resolve attempt $i..."
-  swift package resolve && break
-  if [ $i -lt 3 ]; then
-    echo ">>> Attempt $i failed, retrying in 20 seconds..."
-    sleep 20
-  else
-    echo ">>> All swift package resolve attempts failed."
-    exit 1
-  fi
-done
-
-mkdir -p "$RESOLVED_DEST"
-cp "$PACKAGE_DIR/.build/workspace-state.json" /dev/null 2>/dev/null || true
-cp "$PACKAGE_DIR/Package.resolved" "$RESOLVED_DEST/Package.resolved"
-echo ">>> Package.resolved updated at $RESOLVED_DEST"
-
-echo ">>> Injecting Linphone pin into workspace Package.resolved..."
 LINPHONE_REVISION=$(git ls-remote https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git refs/heads/stable 2>/dev/null | awk '{print $1}')
 if [ -z "$LINPHONE_REVISION" ]; then
   echo ">>> ERROR: Could not fetch Linphone stable branch HEAD — aborting."
   exit 1
 fi
 echo ">>> Linphone stable HEAD: $LINPHONE_REVISION"
-python3 - "$RESOLVED_DEST/Package.resolved" "$LINPHONE_REVISION" <<'PYEOF'
+
+python3 - "$RESOLVED_PATH" "$LINPHONE_REVISION" <<'PYEOF'
 import json, sys
 path, revision = sys.argv[1], sys.argv[2]
 with open(path) as f:
