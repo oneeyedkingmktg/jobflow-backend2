@@ -51,7 +51,6 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 let core = try Factory.Instance.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
-                core.mediaEncryption = .None
                 self.mCore = core
                 self.attachDelegate()
                 self.register(domain: sipDomain, user: sipUser, password: sipPassword)
@@ -90,8 +89,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
             if let identity = try? Factory.Instance.createAddress(addr: "sip:\(user)@\(domain)") {
                 try? params.setIdentityaddress(newValue: identity)
             }
-            if let serverAddr = try? Factory.Instance.createAddress(addr: "sip:\(domain)") {
-                serverAddr.transport = .Udp
+            if let serverAddr = try? Factory.Instance.createAddress(addr: "sip:\(domain);transport=udp") {
                 try? params.setServeraddress(newValue: serverAddr)
             }
             params.registerEnabled = true
@@ -202,9 +200,8 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         let speaker = call.getBool("speaker") ?? false
         DispatchQueue.main.async { [weak self] in
             guard let core = self?.mCore else { call.resolve(); return }
-            let target: AudioDeviceType = speaker ? .Speaker : .Earpiece
             for device in core.audioDevices {
-                if device.type == target && device.hasCapability(capability: .CapabilityPlay) {
+                if device.type == (speaker ? .Speaker : .Earpiece) && device.hasCapability(capability: .CapabilityPlay) {
                     core.outputAudioDevice = device; break
                 }
             }
