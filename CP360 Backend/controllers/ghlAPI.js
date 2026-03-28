@@ -1051,26 +1051,15 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // All installs start at noon on the first day
-    startDateTime = convertToUTC(`${dateOnly}T12:00:00`, companyTimezone);
+    // All installs start at 8:00 AM on the first day
+    startDateTime = convertToUTC(`${dateOnly}T08:00:00`, companyTimezone);
 
-    // End at 8:15 AM on the last install day.
-    // For single-day installs (no end date), end at 8:15 AM the next morning
-    // so the event doesn't end before it starts.
+    // End at 11:59 PM on the last install day so GHL blocks every install day.
     const endDateOnly = lead.install_end_date
       ? new Date(lead.install_end_date).toISOString().split("T")[0]
       : dateOnly;
 
-    if (endDateOnly === dateOnly) {
-      // Single-day: end 8:15 AM next morning
-      const nextDay = new Date(dateOnly + "T12:00:00");
-      nextDay.setDate(nextDay.getDate() + 1);
-      const nextDayStr = nextDay.toISOString().split("T")[0];
-      endDateTime = convertToUTC(`${nextDayStr}T08:15:00`, companyTimezone);
-    } else {
-      // Multi-day: end 8:15 AM on the last install day
-      endDateTime = convertToUTC(`${endDateOnly}T08:15:00`, companyTimezone);
-    }
+    endDateTime = convertToUTC(`${endDateOnly}T23:59:00`, companyTimezone);
 }
 
 else {
