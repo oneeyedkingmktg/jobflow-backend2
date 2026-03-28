@@ -86,19 +86,19 @@ public class SoftphoneManager {
             // Add Core listener
             core.addListener(coreListener);
 
-            // Register with SIP server
-            register(sipDomain, sipUser, sipPassword);
-
             // Start background thread for iterate loop (keeps off UI thread)
             iterateThread = new HandlerThread("LinphoneIterate");
             iterateThread.start();
             iterateHandler = new Handler(iterateThread.getLooper());
 
-            // Start Core
+            // Start Core before registering accounts
             core.start();
 
             // Start the iterate loop
             iterateHandler.post(iterateRunnable);
+
+            // Register with SIP server (must be after core.start())
+            register(sipDomain, sipUser, sipPassword);
 
             initialized = true;
             Log.d(TAG, "SoftphoneManager initialized for " + sipUser + "@" + sipDomain);
