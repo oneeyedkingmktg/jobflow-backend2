@@ -584,6 +584,8 @@ router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const lead = req.body;
 
+    console.log(`[PUT /leads/${id}] appointment_date received:`, lead.appointment_date, '| appointment_time:', lead.appointment_time);
+
     const prevResult = await pool.query(
       `SELECT * FROM leads WHERE id = $1 AND deleted_at IS NULL`,
       [id]
