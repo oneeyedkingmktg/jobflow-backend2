@@ -9,21 +9,7 @@ import Capacitor
 import linphonesw
 
 @objc(SoftphonePlugin)
-public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
-
-    public let identifier = "SoftphonePlugin"
-    public let jsName = "Softphone"
-    public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "initialize",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "makeCall",     returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "answerCall",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "declineCall",  returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "hangup",       returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setMuted",     returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setSpeaker",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getStatus",    returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "destroy",      returnType: CAPPluginReturnPromise),
-    ]
+public class SoftphonePlugin: CAPPlugin {
 
     private var mCore: Core?
     private var mDelegate: CoreDelegate?

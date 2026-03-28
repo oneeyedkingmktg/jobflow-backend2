@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		CF1A2B3C4D5E6F7A8B9C0D1E /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = CF1A2B3C4D5E6F7A8B9C0D1F /* GoogleService-Info.plist */; };
 		AA11BB22CC33DD44EE55FF05 /* SoftphonePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* SoftphonePlugin.swift */; };
+		AA11BB22CC33DD44EE55FF07 /* SoftphonePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* SoftphonePlugin.m */; };
 		AA11BB22CC33DD44EE55FF03 /* linphonesw in Frameworks */ = {isa = PBXBuildFile; productRef = AA11BB22CC33DD44EE55FF02 /* linphonesw */; };
 /* End PBXBuildFile section */
 
@@ -34,6 +35,7 @@
 		CF1A2B3C4D5E6F7A8B9C0D1F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		CF2A3B4C5D6E7F8A9B0C1D2E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE55FF04 /* SoftphonePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftphonePlugin.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF06 /* SoftphonePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SoftphonePlugin.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				AA11BB22CC33DD44EE55FF04 /* SoftphonePlugin.swift */,
+				AA11BB22CC33DD44EE55FF06 /* SoftphonePlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -170,6 +173,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AA11BB22CC33DD44EE55FF05 /* SoftphonePlugin.swift in Sources */,
+				AA11BB22CC33DD44EE55FF07 /* SoftphonePlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
