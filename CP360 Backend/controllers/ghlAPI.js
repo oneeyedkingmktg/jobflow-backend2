@@ -1090,6 +1090,9 @@ const createPayload = {
 
   // ✅ THIS is the field GHL actually displays
   description: description,
+
+  // Bypass GHL's slot availability validator — we manage scheduling in CP360
+  ignoreDateRanges: true,
 };
 
 
