@@ -1375,6 +1375,13 @@ module.exports = {
       // ==========================================
       // 4️⃣ APPOINTMENT CALENDAR SYNC
       // ==========================================
+console.log("[APPT SYNC DEBUG]", {
+  appointment_date: lead.appointment_date,
+  appointment_time: lead.appointment_time,
+  appointment_calendar_event_id: lead.appointment_calendar_event_id,
+  last_synced_appointment_date: lead.last_synced_appointment_date,
+  ghl_appt_calendar: company.ghl_appt_calendar,
+});
 if (
   lead.appointment_date &&
   lead.appointment_time &&
