@@ -309,9 +309,8 @@ function detectAppointmentChange(currentLead, lastSyncedDate, lastSyncedTime) {
   return 'unchanged'; // No changes
 }
 
-function detectInstallChange(currentLead, lastSyncedDate) {
+function detectInstallChange(currentLead, lastSyncedDate, lastSyncedEndDate) {
   const hasInstall = !!currentLead.install_date;
-  const hadInstall = lastSyncedDate;
   const hasEventId = currentLead.install_calendar_event_id;
 
   if (!hasInstall && hasEventId) {
@@ -326,12 +325,24 @@ function detectInstallChange(currentLead, lastSyncedDate) {
     return 'new'; // First time scheduling
   }
 
-  // Compare dates
+  // Compare start dates
   const currentDate = new Date(currentLead.install_date).toISOString().split('T')[0];
   const lastDate = lastSyncedDate ? new Date(lastSyncedDate).toISOString().split('T')[0] : null;
 
   if (currentDate !== lastDate) {
-    return 'changed'; // Date changed
+    return 'changed'; // Start date changed
+  }
+
+  // Compare end dates
+  const currentEndDate = currentLead.install_end_date
+    ? new Date(currentLead.install_end_date).toISOString().split('T')[0]
+    : null;
+  const lastEndDate = lastSyncedEndDate
+    ? new Date(lastSyncedEndDate).toISOString().split('T')[0]
+    : null;
+
+  if (currentEndDate !== lastEndDate) {
+    return 'changed'; // End date changed
   }
 
   return 'unchanged'; // No changes
@@ -1514,7 +1525,8 @@ if (
         try {
           const changeType = detectInstallChange(
             lead,
-            lead.last_synced_install_date
+            lead.last_synced_install_date,
+            lead.last_synced_install_end_date
           );
 
           if (changeType !== "none" && changeType !== "unchanged") {
@@ -1564,9 +1576,10 @@ if (
 
               await db.query(
                 `UPDATE leads
-                 SET last_synced_install_date = $1
-                 WHERE id = $2`,
-                [lead.install_date, lead.id]
+                 SET last_synced_install_date = $1,
+                     last_synced_install_end_date = $2
+                 WHERE id = $3`,
+                [lead.install_date, lead.install_end_date || null, lead.id]
               );
             }
           }
