@@ -1121,7 +1121,8 @@ const updatePayload = {
   title,
   startTime: startDateTime.toISOString(),
   endTime: endDateTime.toISOString(),
-  description: description, 
+  description: description,
+  ignoreDateRanges: true,
 };
 
 
