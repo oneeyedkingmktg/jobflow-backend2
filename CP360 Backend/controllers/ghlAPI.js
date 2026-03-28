@@ -586,14 +586,11 @@ async function deleteCalendarEvent(company, eventId) {
 
   console.log("🗑️ [CALENDAR] Deleting event:", eventId);
 
-  // Try the standard events endpoint first; fall back to the appointments sub-path
   try {
-    await ghlRequest(company, `/calendars/events/${eventId}`, { method: "DELETE" });
+    await ghlRequest(company, `/calendars/events/appointments/${eventId}`, { method: "DELETE" });
     console.log("✅ [CALENDAR] Event deleted successfully");
     return true;
   } catch (err) {
-    // If GHL rejects the delete (IAM not supported, etc.) log and return false
-    // Callers should clear the local event ID so the next sync creates a fresh event
     console.warn("⚠️ [CALENDAR DELETE] GHL rejected delete, clearing local event ID:", err.message);
     return false;
   }
@@ -1154,13 +1151,19 @@ const created = await ghlRequest(
   }
 );
 
-console.log("[CALENDAR CREATE SUCCESS] Event ID:", created?.id);
+// GHL may wrap the event under different keys depending on API version
+const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+console.log("[CALENDAR CREATE SUCCESS] Full response:", JSON.stringify(created));
+console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
 
+if (!eventId) {
+  console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
+}
 
   return {
     type,
     action: 'created',
-    calendarEventId: created?.id || null,
+    calendarEventId: eventId,
   };
 }
 
@@ -1440,10 +1443,32 @@ if (
             }
           );
         }
-      } else if (lead.appointment_calendar_event_id) {
-        // If appointment was removed in JF, remove event + clean DB
+      } else if (lead.appointment_calendar_event_id || lead.last_synced_appointment_date) {
+        // Appointment was removed in JF — delete the GHL event
+        let eventIdToDelete = lead.appointment_calendar_event_id;
+
+        // Fallback: no stored event ID but appointment was previously synced — look it up via GHL
+        if (!eventIdToDelete && lead.last_synced_appointment_date && contactId) {
+          try {
+            console.log("[APPT DELETE FALLBACK] No stored event ID — searching GHL appointments for contact", contactId);
+            const apptResponse = await ghlRequest(company, `/contacts/${contactId}/appointments`, { method: "GET" });
+            const appointments = apptResponse?.appointments || apptResponse?.events || [];
+            if (appointments.length > 0) {
+              // Use the first appointment found (most recent)
+              eventIdToDelete = appointments[0]?.id;
+              console.log("[APPT DELETE FALLBACK] Found GHL appointment ID:", eventIdToDelete);
+            } else {
+              console.log("[APPT DELETE FALLBACK] No GHL appointments found for contact");
+            }
+          } catch (lookupErr) {
+            console.warn("[APPT DELETE FALLBACK] Could not look up GHL appointments:", lookupErr.message);
+          }
+        }
+
         try {
-          await deleteCalendarEvent(company, lead.appointment_calendar_event_id);
+          if (eventIdToDelete) {
+            await deleteCalendarEvent(company, eventIdToDelete);
+          }
 
           await applyStatusTags(contactId, "removed appt event", company);
 
