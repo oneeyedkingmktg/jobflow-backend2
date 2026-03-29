@@ -375,15 +375,25 @@ async function handleJFEventRemoval({ lead, company, contactId, type }) {
   if (!lead?.id || !company || !contactId) return;
 
   const isAppt = type === "appointment";
+  const eventId = isAppt ? lead.appointment_calendar_event_id : lead.install_calendar_event_id;
 
-  // Tag in GHL (exact spelling, no underscores)
+  // Delete the GHL event
+  if (eventId) {
+    if (isAppt) {
+      await deleteCalendarEvent(company, eventId);
+    } else {
+      await deleteBlockSlot(company, eventId);
+    }
+  }
+
+  // Tag in GHL
   await applyStatusTags(
     contactId,
     isAppt ? "removed appt event" : "removed install event",
     company
   );
 
-  // DB clear (date/time are treated as removed together)
+  // DB clear
   if (isAppt) {
     await db.query(
       `UPDATE leads
@@ -399,8 +409,10 @@ async function handleJFEventRemoval({ lead, company, contactId, type }) {
     await db.query(
       `UPDATE leads
        SET install_date = NULL,
+           install_end_date = NULL,
            install_calendar_event_id = NULL,
-           last_synced_install_date = NULL
+           last_synced_install_date = NULL,
+           last_synced_install_end_date = NULL
        WHERE id = $1`,
       [lead.id]
     );
@@ -590,7 +602,7 @@ async function updateCalendarEvent(company, eventId, payload) {
 }
 
 // ----------------------------------------------------------------------------
-// DELETE CALENDAR EVENT
+// DELETE CALENDAR EVENT (appointments)
 // GHL's IAM service does not support DELETE for calendar events.
 // We cancel by setting appointmentStatus = "cancelled" via PUT instead.
 // ----------------------------------------------------------------------------
@@ -608,6 +620,38 @@ async function deleteCalendarEvent(company, eventId) {
     return true;
   } catch (err) {
     console.warn("⚠️ [CALENDAR CANCEL] GHL rejected cancel:", err.message);
+    return false;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// CREATE BLOCK SLOT (installs) — no slot validation, supports multi-day
+// ----------------------------------------------------------------------------
+async function createBlockSlot(company, payload) {
+  console.log("📅 [BLOCK SLOT] Creating block slot");
+  const result = await ghlRequest(company, `/calendars/events/block-slots`, {
+    method: "POST",
+    body: payload,
+  });
+  const eventId = result?.id || result?.event?.id || null;
+  console.log("✅ [BLOCK SLOT] Created, ID:", eventId);
+  return eventId;
+}
+
+// ----------------------------------------------------------------------------
+// DELETE BLOCK SLOT (installs)
+// ----------------------------------------------------------------------------
+async function deleteBlockSlot(company, eventId) {
+  if (!eventId) throw new Error("EVENT_ID_REQUIRED");
+  console.log("🗑️ [BLOCK SLOT] Deleting block slot:", eventId);
+  try {
+    await ghlRequest(company, `/calendars/events/block-slots/${eventId}`, {
+      method: "DELETE",
+    });
+    console.log("✅ [BLOCK SLOT] Deleted successfully");
+    return true;
+  } catch (err) {
+    console.warn("⚠️ [BLOCK SLOT DELETE] Failed:", err.message);
     return false;
   }
 }
@@ -1132,14 +1176,31 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   if (changeType === 'cancelled') {
     // DELETE
     if (existingEventId) {
-      await deleteCalendarEvent(company, existingEventId);
+      if (type === 'install') {
+        await deleteBlockSlot(company, existingEventId);
+      } else {
+        await deleteCalendarEvent(company, existingEventId);
+      }
       return { type, action: 'deleted', calendarEventId: null };
     }
     return null;
   }
 
-if (changeType === 'changed' && existingEventId) {
-    // UPDATE
+  if (changeType === 'changed' && existingEventId) {
+    // For installs: delete old block slot + create new one (block-slots has no PUT)
+    // For appointments: standard PUT update
+    if (type === 'install') {
+      await deleteBlockSlot(company, existingEventId);
+      const newEventId = await createBlockSlot(company, {
+        locationId: company.ghl_location_id,
+        calendarId: calendarId,
+        title,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        ...(assignedUserId ? { assignedUserId } : {}),
+      });
+      return { type, action: 'updated', calendarEventId: newEventId };
+    }
     await updateCalendarEvent(company, existingEventId, updatePayload);
     return { type, action: 'updated', calendarEventId: existingEventId };
   }
@@ -1151,23 +1212,34 @@ if (changeType === 'changed' && existingEventId) {
   }
 
   // CREATE NEW
-const created = await ghlRequest(
-  company,
-  "/calendars/events/appointments",
-  {
-    method: "POST",
-    body: createPayload,
+  let eventId;
+  if (type === 'install') {
+    // Installs use block-slots — no duration limit, no slot validation
+    eventId = await createBlockSlot(company, {
+      locationId: company.ghl_location_id,
+      calendarId: calendarId,
+      title,
+      startTime: startDateTime.toISOString(),
+      endTime: endDateTime.toISOString(),
+      ...(assignedUserId ? { assignedUserId } : {}),
+    });
+  } else {
+    // Appointments use the standard appointments endpoint
+    const created = await ghlRequest(
+      company,
+      "/calendars/events/appointments",
+      {
+        method: "POST",
+        body: createPayload,
+      }
+    );
+    eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+    console.log("[CALENDAR CREATE SUCCESS] Full response:", JSON.stringify(created));
+    console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
+    if (!eventId) {
+      console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
+    }
   }
-);
-
-// GHL may wrap the event under different keys depending on API version
-const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-console.log("[CALENDAR CREATE SUCCESS] Full response:", JSON.stringify(created));
-console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
-
-if (!eventId) {
-  console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
-}
 
   return {
     type,
