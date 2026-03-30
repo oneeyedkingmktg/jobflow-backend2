@@ -1161,6 +1161,7 @@ const updatePayload = {
   endTime: endDateTime.toISOString(),
   description: description,
   ignoreDateRanges: true,
+  contactId: lead.ghl_contact_id,
 };
 
 
