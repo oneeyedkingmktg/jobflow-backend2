@@ -380,7 +380,7 @@ async function handleJFEventRemoval({ lead, company, contactId, type }) {
   // Delete the GHL event
   if (eventId) {
     if (isAppt) {
-      await deleteCalendarEvent(company, eventId);
+      await deleteCalendarEvent(company, eventId, contactId);
     } else {
       await deleteBlockSlot(company, eventId);
     }
@@ -606,15 +606,18 @@ async function updateCalendarEvent(company, eventId, payload) {
 // GHL IAM does not support DELETE — mark as cancelled via PUT instead.
 // Cancelled appointments show as crossed-off in the GHL calendar.
 // ----------------------------------------------------------------------------
-async function deleteCalendarEvent(company, eventId) {
+async function deleteCalendarEvent(company, eventId, contactId) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
 
   console.log("🗑️ [CALENDAR] Cancelling event:", eventId);
 
+  const body = { appointmentStatus: "cancelled" };
+  if (contactId) body.contactId = contactId;
+
   try {
     await ghlRequest(company, `/calendars/events/appointments/${eventId}`, {
       method: "PUT",
-      body: { appointmentStatus: "cancelled" },
+      body,
     });
     console.log("✅ [CALENDAR] Event cancelled successfully");
     return true;
@@ -1150,7 +1153,8 @@ if (address) {
   createPayload.address = address;
 }
 
-if (assignedUserId) {
+// Only add assignedUserId for appointments — install calendar manages its own team
+if (assignedUserId && type !== 'install') {
   createPayload.assignedUserId = assignedUserId;
 }
 
@@ -1182,7 +1186,7 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   if (changeType === 'cancelled') {
     // DELETE — both appointments and installs use the same cancel endpoint
     if (existingEventId) {
-      await deleteCalendarEvent(company, existingEventId);
+      await deleteCalendarEvent(company, existingEventId, lead.ghl_contact_id);
       return { type, action: 'deleted', calendarEventId: null };
     }
     return null;
@@ -1192,7 +1196,7 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     if (type === 'install') {
       // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
       // then create a fresh appointment so the new event ID is stored
-      await deleteCalendarEvent(company, existingEventId);
+      await deleteCalendarEvent(company, existingEventId, lead.ghl_contact_id);
       const created = await ghlRequest(company, "/calendars/events/appointments", {
         method: "POST",
         body: createPayload,
@@ -1545,7 +1549,7 @@ if (
 
         try {
           if (eventIdToDelete) {
-            await deleteCalendarEvent(company, eventIdToDelete);
+            await deleteCalendarEvent(company, eventIdToDelete, contactId);
           }
 
           await applyStatusTags(contactId, "removed appt event", company);
