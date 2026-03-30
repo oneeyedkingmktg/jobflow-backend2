@@ -1098,20 +1098,14 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // Installs start at 1:00 PM on the first day
+    // Installs: 1pm start on first day, 1pm end on last day (or same day for single-day)
     startDateTime = convertToUTC(`${dateOnly}T13:00:00`, companyTimezone);
 
-    // Multi-day: end at 12:00 PM noon on last day (allows morning job before new 1pm start)
-    // Single-day: end at 5:00 PM same day
     const endDateOnly = lead.install_end_date
       ? new Date(lead.install_end_date).toISOString().split("T")[0]
-      : null;
+      : dateOnly;
 
-    if (endDateOnly && endDateOnly !== dateOnly) {
-      endDateTime = convertToUTC(`${endDateOnly}T12:00:00`, companyTimezone);
-    } else {
-      endDateTime = convertToUTC(`${dateOnly}T17:00:00`, companyTimezone);
-    }
+    endDateTime = convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone);
 }
 
 else {
