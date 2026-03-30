@@ -585,8 +585,8 @@ async function removeStatusTags(contactId, tag, company) {
 // ----------------------------------------------------------------------------
 async function updateCalendarEvent(company, eventId, payload) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
-  
-  console.log("🔄 [CALENDAR] Updating event:", eventId);
+
+  console.log("🔄 [CALENDAR] Updating event:", eventId, "| payload contactId:", payload.contactId);
   
   const updated = await ghlRequest(
     company,
