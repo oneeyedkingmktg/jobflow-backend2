@@ -983,7 +983,7 @@ if (est.all_price_ranges?.custom) {
 // ----------------------------------------------------------------------------
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
-async function syncLeadCalendarEvent(lead, company, changeType, calendarType) {
+async function syncLeadCalendarEvent(lead, company, changeType, calendarType, contactId) {
   const SYNC_COOLDOWN = 2 * 60 * 1000;
   
   // Compare actual dates instead of timestamps
@@ -1098,14 +1098,19 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // Installs: 1pm start on first day, 1pm end on last day (or same day for single-day)
+    // Installs: 1pm start on first day, 1pm end on last day
+    // Single-day (no end date or same date): end at 2pm to satisfy GHL's minimum duration
     startDateTime = convertToUTC(`${dateOnly}T13:00:00`, companyTimezone);
 
     const endDateOnly = lead.install_end_date
       ? new Date(lead.install_end_date).toISOString().split("T")[0]
-      : dateOnly;
+      : null;
 
-    endDateTime = convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone);
+    if (endDateOnly && endDateOnly !== dateOnly) {
+      endDateTime = convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone);
+    } else {
+      endDateTime = convertToUTC(`${dateOnly}T14:00:00`, companyTimezone);
+    }
 }
 
 else {
@@ -1177,10 +1182,12 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   // -------------------------------
   // HANDLE BASED ON CHANGE TYPE
   // -------------------------------
+  const ghlContactId = contactId || lead.ghl_contact_id;
+
   if (changeType === 'cancelled') {
     // DELETE — both appointments and installs use the same cancel endpoint
     if (existingEventId) {
-      await deleteCalendarEvent(company, existingEventId, lead.ghl_contact_id);
+      await deleteCalendarEvent(company, existingEventId, ghlContactId);
       return { type, action: 'deleted', calendarEventId: null };
     }
     return null;
@@ -1190,7 +1197,7 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     if (type === 'install') {
       // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
       // then create a fresh appointment so the new event ID is stored
-      await deleteCalendarEvent(company, existingEventId, lead.ghl_contact_id);
+      await deleteCalendarEvent(company, existingEventId, ghlContactId);
       const created = await ghlRequest(company, "/calendars/events/appointments", {
         method: "POST",
         body: createPayload,
@@ -1465,7 +1472,7 @@ if (
           );
 
           if (changeType !== "none" && changeType !== "unchanged") {
-            const result = await syncLeadCalendarEvent(lead, company, changeType, "appointment");
+            const result = await syncLeadCalendarEvent(lead, company, changeType, "appointment", contactId);
 
             if (result) {
               markCalendarSynced(lead, "appointment");
@@ -1580,7 +1587,7 @@ if (
           );
 
           if (changeType !== "none" && changeType !== "unchanged") {
-            const result = await syncLeadCalendarEvent(lead, company, changeType, "install");
+            const result = await syncLeadCalendarEvent(lead, company, changeType, "install", contactId);
 
             if (result) {
               markCalendarSynced(lead, "install");
