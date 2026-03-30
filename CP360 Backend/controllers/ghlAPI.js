@@ -628,7 +628,7 @@ async function deleteCalendarEvent(company, eventId) {
 // CREATE BLOCK SLOT (installs) — no slot validation, supports multi-day
 // ----------------------------------------------------------------------------
 async function createBlockSlot(company, payload) {
-  console.log("📅 [BLOCK SLOT] Creating block slot");
+  console.log("📅 [BLOCK SLOT] Creating block slot, payload:", JSON.stringify(payload));
   const result = await ghlRequest(company, `/calendars/events/block-slots`, {
     method: "POST",
     body: payload,
