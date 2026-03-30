@@ -115,6 +115,9 @@ const canManage = showAllUsers
           role: form.role,
           is_active: form.is_active,
           company_id: form.company_id,
+          sip_username: form.sip_username,
+          sip_password: form.sip_password,
+          sip_incoming_enabled: form.sip_incoming_enabled,
         };
 
         console.log("Updating user with payload:", payload);
