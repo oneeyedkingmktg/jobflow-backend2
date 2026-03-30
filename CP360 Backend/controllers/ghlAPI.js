@@ -1189,7 +1189,19 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   }
 
   if (changeType === 'changed' && existingEventId) {
-    // Both appointments and installs use PUT update
+    if (type === 'install') {
+      // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
+      // then create a fresh appointment so the new event ID is stored
+      await deleteCalendarEvent(company, existingEventId);
+      const created = await ghlRequest(company, "/calendars/events/appointments", {
+        method: "POST",
+        body: createPayload,
+      });
+      const newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+      console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
+      return { type, action: 'updated', calendarEventId: newEventId };
+    }
+    // Appointments use standard PUT update
     await updateCalendarEvent(company, existingEventId, updatePayload);
     return { type, action: 'updated', calendarEventId: existingEventId };
   }
