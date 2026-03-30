@@ -1191,9 +1191,9 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     // For appointments: standard PUT update
     if (type === 'install') {
       await deleteBlockSlot(company, existingEventId);
-      const blockPayload = assignedUserId
-        ? { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
-        : { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
+      const blockPayload = calendarId
+        ? { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
+        : { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
       const newEventId = await createBlockSlot(company, blockPayload);
       return { type, action: 'updated', calendarEventId: newEventId };
     }
@@ -1211,10 +1211,10 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   let eventId;
   if (type === 'install') {
     // Installs use block-slots — no duration limit, no slot validation
-    // block-slots requires EITHER calendarId OR assignedUserId, not both
-    const blockPayload = assignedUserId
-      ? { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
-      : { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
+    // block-slots requires EITHER calendarId OR assignedUserId, not both — prefer calendarId
+    const blockPayload = calendarId
+      ? { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
+      : { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
     eventId = await createBlockSlot(company, blockPayload);
   } else {
     // Appointments use the standard appointments endpoint
