@@ -1095,15 +1095,20 @@ else if (calendarType === 'install') {
     // ✅ FIX: Convert company timezone to UTC
     const companyTimezone = company.timezone || 'America/New_York';
 
-    // All installs start at 8:00 AM on the first day
-    startDateTime = convertToUTC(`${dateOnly}T08:00:00`, companyTimezone);
+    // Installs start at 1:00 PM on the first day
+    startDateTime = convertToUTC(`${dateOnly}T13:00:00`, companyTimezone);
 
-    // End at 11:59 PM on the last install day so GHL blocks every install day.
+    // Multi-day: end at 12:00 PM noon on last day (allows morning job before new 1pm start)
+    // Single-day: end at 5:00 PM same day
     const endDateOnly = lead.install_end_date
       ? new Date(lead.install_end_date).toISOString().split("T")[0]
-      : dateOnly;
+      : null;
 
-    endDateTime = convertToUTC(`${endDateOnly}T23:59:00`, companyTimezone);
+    if (endDateOnly && endDateOnly !== dateOnly) {
+      endDateTime = convertToUTC(`${endDateOnly}T12:00:00`, companyTimezone);
+    } else {
+      endDateTime = convertToUTC(`${dateOnly}T17:00:00`, companyTimezone);
+    }
 }
 
 else {
@@ -1174,29 +1179,16 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   // HANDLE BASED ON CHANGE TYPE
   // -------------------------------
   if (changeType === 'cancelled') {
-    // DELETE
+    // DELETE — both appointments and installs use the same cancel endpoint
     if (existingEventId) {
-      if (type === 'install') {
-        await deleteBlockSlot(company, existingEventId);
-      } else {
-        await deleteCalendarEvent(company, existingEventId);
-      }
+      await deleteCalendarEvent(company, existingEventId);
       return { type, action: 'deleted', calendarEventId: null };
     }
     return null;
   }
 
   if (changeType === 'changed' && existingEventId) {
-    // For installs: delete old block slot + create new one (block-slots has no PUT)
-    // For appointments: standard PUT update
-    if (type === 'install') {
-      await deleteBlockSlot(company, existingEventId);
-      const blockPayload = calendarId
-        ? { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
-        : { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
-      const newEventId = await createBlockSlot(company, blockPayload);
-      return { type, action: 'updated', calendarEventId: newEventId };
-    }
+    // Both appointments and installs use PUT update
     await updateCalendarEvent(company, existingEventId, updatePayload);
     return { type, action: 'updated', calendarEventId: existingEventId };
   }
@@ -1207,17 +1199,9 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     return { type, action: 'skipped', calendarEventId: existingEventId };
   }
 
-  // CREATE NEW
+  // CREATE NEW — both appointments and installs use the appointments endpoint
   let eventId;
-  if (type === 'install') {
-    // Installs use block-slots — no duration limit, no slot validation
-    // block-slots requires EITHER calendarId OR assignedUserId, not both — prefer calendarId
-    const blockPayload = calendarId
-      ? { locationId: company.ghl_location_id, calendarId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() }
-      : { locationId: company.ghl_location_id, assignedUserId, title, startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
-    eventId = await createBlockSlot(company, blockPayload);
-  } else {
-    // Appointments use the standard appointments endpoint
+  {
     const created = await ghlRequest(
       company,
       "/calendars/events/appointments",
