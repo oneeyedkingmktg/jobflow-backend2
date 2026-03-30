@@ -260,12 +260,13 @@ router.put("/:id", async (req, res) => {
       `
       UPDATE users SET ${updates.join(", ")}, updated_at = NOW()
       WHERE id = $${i}
-      RETURNING id, company_id, email, name, phone, role, is_active
+      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled
       `,
       values
     );
 
-    res.json({ user: result.rows[0] });
+    const updatedUser = result.rows[0];
+    res.json({ user: { ...updatedUser, sip_password: updatedUser.sip_password ? '***hidden***' : null } });
   } catch (err) {
     console.error("Update user error:", err);
     res.status(500).json({ error: "Failed to update user" });

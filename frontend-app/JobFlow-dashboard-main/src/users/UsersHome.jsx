@@ -115,8 +115,8 @@ const canManage = showAllUsers
           role: form.role,
           is_active: form.is_active,
           company_id: form.company_id,
-          sip_username: form.sip_username,
-          sip_password: form.sip_password,
+          ...(form.sip_username !== undefined && { sip_username: form.sip_username || null }),
+          ...(form.sip_password ? { sip_password: form.sip_password } : {}),
           sip_incoming_enabled: form.sip_incoming_enabled,
         };
 
