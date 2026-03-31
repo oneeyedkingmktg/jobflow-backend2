@@ -93,7 +93,7 @@ router.get("/config", async (req, res) => {
 console.log("Created default config:", created.rows[0]);
 
 const trackingResult2 = await query(
-        `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, service_area_zips, plan_type
+        `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, microsoft_base_tag, microsoft_conversion_event, service_area_zips, plan_type
          FROM companies WHERE id = $1 LIMIT 1`,
         [companyId]
       );
@@ -105,7 +105,7 @@ console.log("Config found for company:", companyId);
 
     // Fetch tracking fields from companies table
 const trackingResult = await query(
-      `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, service_area_zips, plan_type
+      `SELECT google_base_tag, meta_base_tag, google_conversion_event, meta_conversion_event, microsoft_base_tag, microsoft_conversion_event, service_area_zips, plan_type
        FROM companies WHERE id = $1 LIMIT 1`,
       [companyId]
     );

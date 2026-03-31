@@ -26,6 +26,8 @@ ghl_install_description_template: "",
     meta_base_tag: "",
     google_conversion_event: "",
     meta_conversion_event: "",
+    microsoft_base_tag: "",
+    microsoft_conversion_event: "",
   });
 
   const [error, setError] = useState("");
@@ -57,6 +59,8 @@ ghl_install_description_template: company.ghl_install_description_template || ""
       meta_base_tag: company.meta_base_tag || "",
       google_conversion_event: company.google_conversion_event || "",
       meta_conversion_event: company.meta_conversion_event || "",
+      microsoft_base_tag: company.microsoft_base_tag || "",
+      microsoft_conversion_event: company.microsoft_conversion_event || "",
     });
     setError("");
     setSuccess("");
@@ -483,6 +487,50 @@ ghl_install_description_template: company.ghl_install_description_template || ""
               className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
               rows="2"
               placeholder={"fbq('track', 'Lead');"}
+            />
+          </div>
+
+          {/* Microsoft Base Tag */}
+          <div className="space-y-2">
+            <label className="font-semibold">Microsoft (Bing) Base Tag</label>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Microsoft Advertising</strong> (ads.microsoft.com) → Tools → UET Tags</li>
+                <li>Click your UET tag name (or create one if you don't have one yet)</li>
+                <li>Click <strong>View tag</strong> → copy the full <code>&lt;script&gt;</code> block shown</li>
+                <li>Paste the entire script block here</li>
+              </ol>
+              <p className="text-blue-700 mt-1">This loads the Microsoft UET tag on the estimator. It tracks page visits and is required before any conversion event will fire.</p>
+            </div>
+            <textarea
+              value={formData.microsoft_base_tag}
+              onChange={(e) => handleChange("microsoft_base_tag", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="4"
+              placeholder={'<script>(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[];f=function(){var o={ti:"XXXXXXXXX"};o.q=w[u];w[u]=new UET(o);w[u].push("pageLoad")};n=d.createElement(t);n.src=r;n.async=1;n.onload=n.onreadystatechange=function(){var s=this.readyState;s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)};i=d.getElementsByTagName(t)[0];i.parentNode.insertBefore(n,i)})(window,document,"script","//bat.bing.com/bat.js","uetq");</script>'}
+            />
+          </div>
+
+          {/* Microsoft Conversion Event */}
+          <div className="space-y-2">
+            <label className="font-semibold">Microsoft Conversion Event Code</label>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Microsoft Advertising</strong> → Tools → Conversion Goals → click your goal (or create one)</li>
+                <li>Set goal type to <strong>Event</strong></li>
+                <li>The event code will look like: <code>window.uetq = window.uetq || []; window.uetq.push('event', 'submit_lead', {'{'}'{'}'});</code></li>
+                <li>Copy just that line — no <code>&lt;script&gt;</code> tags — and paste here</li>
+              </ol>
+              <p className="text-blue-700 mt-1">This fires when a visitor submits the estimator form. It shows up in Microsoft Ads under your conversion goal and lets Bing optimize campaigns for leads.</p>
+            </div>
+            <textarea
+              value={formData.microsoft_conversion_event}
+              onChange={(e) => handleChange("microsoft_conversion_event", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="2"
+              placeholder={"window.uetq = window.uetq || []; window.uetq.push('event', 'submit_lead', {});"}
             />
           </div>
 

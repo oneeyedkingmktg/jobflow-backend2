@@ -673,6 +673,15 @@ try {
       }
 
       try {
+        if (config.microsoft_conversion_event) {
+          // eslint-disable-next-line no-new-func
+          new Function(config.microsoft_conversion_event)();
+        }
+      } catch (e) {
+        console.warn("Microsoft conversion event error:", e);
+      }
+
+      try {
         if (typeof gtag === 'function') {
           gtag('event', 'estimate_submitted');
         }

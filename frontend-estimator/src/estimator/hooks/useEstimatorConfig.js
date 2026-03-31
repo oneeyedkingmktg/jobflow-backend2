@@ -99,9 +99,10 @@ useEffect(() => {
       console.log("✅ estimator config response", data);
       setConfig(data);
 
-      // Inject company tracking base tags into <head> so gtag/fbq are defined before conversion fires
+      // Inject company tracking base tags into <head> so gtag/fbq/uetq are defined before conversion fires
       injectTrackingTag(data.google_base_tag);
       injectTrackingTag(data.meta_base_tag);
+      injectTrackingTag(data.microsoft_base_tag);
 
       // Generate and set custom styles
       const styles = generateCustomStyles(data);

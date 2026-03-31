@@ -484,6 +484,8 @@ google_conversion_event = COALESCE($27, google_conversion_event),
   est_push_title = COALESCE($32, est_push_title),
   est_push_body = COALESCE($33, est_push_body),
   bidder_enabled = COALESCE($34, bidder_enabled),
+  microsoft_base_tag = COALESCE($35, microsoft_base_tag),
+  microsoft_conversion_event = COALESCE($36, microsoft_conversion_event),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -523,6 +525,8 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   est_push_title || null,                                      // $32
   est_push_body || null,                                       // $33
   bidderValue,                                                 // $34
+  sanitizedBody.microsoft_base_tag || null,                    // $35
+  sanitizedBody.microsoft_conversion_event || null,            // $36
 ]
 
 );
