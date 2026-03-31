@@ -59,6 +59,8 @@ export default function CompanyModal({
     meta_base_tag: "",
     google_conversion_event: "",
     meta_conversion_event: "",
+    microsoft_base_tag: "",
+    microsoft_conversion_event: "",
   });
 
   // Track checkbox interaction
@@ -181,6 +183,8 @@ setTrackingForm({
       meta_base_tag: company.metaBaseTag || company.meta_base_tag || "",
       google_conversion_event: company.googleConversionEvent || company.google_conversion_event || "",
       meta_conversion_event: company.metaConversionEvent || company.meta_conversion_event || "",
+      microsoft_base_tag: company.microsoftBaseTag || company.microsoft_base_tag || "",
+      microsoft_conversion_event: company.microsoftConversionEvent || company.microsoft_conversion_event || "",
     });
 
     setSuspendedTouched(false);
@@ -328,6 +332,8 @@ const handleSaveTracking = async () => {
         meta_base_tag: trackingForm.meta_base_tag || null,
         google_conversion_event: trackingForm.google_conversion_event || null,
         meta_conversion_event: trackingForm.meta_conversion_event || null,
+        microsoft_base_tag: trackingForm.microsoft_base_tag || null,
+        microsoft_conversion_event: trackingForm.microsoft_conversion_event || null,
       };
       await onSave(payload);
       setError("");
@@ -354,7 +360,14 @@ const handleSaveTracking = async () => {
 
       <div>
         <div className={viewLabel}>GOOGLE / GA4 BASE TAG</div>
-        <p className="text-xs text-gray-500 mb-1">Full &lt;script&gt; block from Google Tag Manager or gtag.js setup.</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Google Ads</strong> → Tools &amp; Settings → Audience Manager → Your Data Sources → Google tag</li>
+            <li>Click <strong>Tag setup</strong> → Install the tag yourself</li>
+            <li>Copy both <code>&lt;script&gt;</code> blocks shown and paste them here</li>
+          </ol>
+        </div>
         <textarea
           className={`${editBox} font-mono text-xs`}
           rows="4"
@@ -365,8 +378,36 @@ const handleSaveTracking = async () => {
       </div>
 
       <div>
-        <div className={viewLabel}>META BASE TAG</div>
-        <p className="text-xs text-gray-500 mb-1">Full Facebook Pixel base &lt;script&gt; block.</p>
+        <div className={viewLabel}>GOOGLE CONVERSION EVENT CODE</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Google Ads</strong> → Goals → Conversions → click your conversion action</li>
+            <li>Click <strong>Tag setup</strong> → Use Google tag → Install manually</li>
+            <li>Copy only the <strong>event snippet</strong> line — looks like: <code>gtag('event', 'conversion', {'{'}'send_to': 'AW-...'{'}'});</code></li>
+            <li>Paste just that one line here — no <code>&lt;script&gt;</code> tags</li>
+          </ol>
+        </div>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="2"
+          value={trackingForm.google_conversion_event}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, google_conversion_event: e.target.value }))}
+          placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX' });"}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>META (FACEBOOK) BASE TAG</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Meta Business Suite</strong> → Events Manager → your Pixel → Add Events → From a new website</li>
+            <li>Choose <strong>Install code manually</strong></li>
+            <li>Copy the full base code block (the <code>!function(f,b,e,v...)</code> script including <code>fbq('init', ...)</code> and <code>fbq('track', 'PageView')</code>)</li>
+            <li>Paste the entire <code>&lt;script&gt;</code> block here</li>
+          </ol>
+        </div>
         <textarea
           className={`${editBox} font-mono text-xs`}
           rows="4"
@@ -377,26 +418,62 @@ const handleSaveTracking = async () => {
       </div>
 
       <div>
-        <div className={viewLabel}>GOOGLE CONVERSION EVENT CODE</div>
-        <p className="text-xs text-gray-500 mb-1">Fires on form submit success. No &lt;script&gt; tags — event call only.</p>
-        <textarea
-          className={`${editBox} font-mono text-xs`}
-          rows="2"
-          value={trackingForm.google_conversion_event}
-          onChange={(e) => setTrackingForm((p) => ({ ...p, google_conversion_event: e.target.value }))}
-          placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX', value: 875, currency: 'USD' });"}
-        />
-      </div>
-
-      <div>
         <div className={viewLabel}>META CONVERSION EVENT CODE</div>
-        <p className="text-xs text-gray-500 mb-1">Fires on form submit success. No &lt;script&gt; tags — event call only.</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Meta Business Suite</strong> → Events Manager → your Pixel → Add Events → Install code manually</li>
+            <li>Select <strong>Lead</strong> as the event type and copy the event line</li>
+            <li>Paste just that one line here — no <code>&lt;script&gt;</code> tags</li>
+          </ol>
+          <p className="text-blue-700 mt-1"><strong>'Lead'</strong> is Meta's standard event for form submissions — shows in Events Manager and lets Meta optimize your ads.</p>
+        </div>
         <textarea
           className={`${editBox} font-mono text-xs`}
           rows="2"
           value={trackingForm.meta_conversion_event}
           onChange={(e) => setTrackingForm((p) => ({ ...p, meta_conversion_event: e.target.value }))}
           placeholder={"fbq('track', 'Lead');"}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>MICROSOFT (BING) BASE TAG</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Microsoft Advertising</strong> (ads.microsoft.com) → Tools → UET Tags</li>
+            <li>Click your UET tag name → click <strong>View tag</strong></li>
+            <li>Copy the full <code>&lt;script&gt;</code> block shown and paste it here</li>
+          </ol>
+          <p className="text-blue-700 mt-1">Required before the conversion event will fire. Loads the UET tag on the estimator.</p>
+        </div>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="4"
+          value={trackingForm.microsoft_base_tag}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, microsoft_base_tag: e.target.value }))}
+          placeholder={'<script>(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[];...ti:"XXXXXXXXX"...})(window,document,"script","//bat.bing.com/bat.js","uetq");</script>'}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>MICROSOFT CONVERSION EVENT CODE</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find this code:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>Microsoft Advertising</strong> → Tools → Conversion Goals → click your goal (or create one with type <strong>Event</strong>)</li>
+            <li>The event code looks like: <code>window.uetq = window.uetq || []; window.uetq.push('event', 'submit_lead', {'{'}{'}'}); </code></li>
+            <li>Paste just that one line here — no <code>&lt;script&gt;</code> tags</li>
+          </ol>
+          <p className="text-blue-700 mt-1">Fires on estimator form submit. Shows in Microsoft Ads under your conversion goal.</p>
+        </div>
+        <textarea
+          className={`${editBox} font-mono text-xs`}
+          rows="2"
+          value={trackingForm.microsoft_conversion_event}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, microsoft_conversion_event: e.target.value }))}
+          placeholder={"window.uetq = window.uetq || []; window.uetq.push('event', 'submit_lead', {});"}
         />
       </div>
     </div>
