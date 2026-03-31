@@ -680,6 +680,13 @@ try {
         console.warn("GA4 event error:", e);
       }
 
+      // Notify parent window so GTM tags on contractor sites can fire (e.g. Microsoft/Bing UET)
+      try {
+        window.parent.postMessage({ event: 'estimator_conversion', type: 'estimate_submitted' }, '*');
+      } catch (e) {
+        console.warn("postMessage error:", e);
+      }
+
       // 4️⃣ Handle response
       if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
       setCompanyPhone(previewData.companyPhone || "");

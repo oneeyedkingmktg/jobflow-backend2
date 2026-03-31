@@ -396,12 +396,21 @@ ghl_install_description_template: company.ghl_install_description_template || ""
         </div>
 
 {/* CONVERSION TRACKING */}
-        <div className="space-y-4 border-t pt-4">
+        <div className="space-y-6 border-t pt-4">
           <h3 className="text-lg font-bold text-gray-800">Conversion Tracking</h3>
 
-          <div>
+          {/* Google Base Tag */}
+          <div className="space-y-2">
             <label className="font-semibold">Google / GA4 Base Tag</label>
-            <p className="text-xs text-gray-500 mb-1">Paste the full &lt;script&gt; block from Google Tag Manager or gtag.js setup. Injected into the estimator &lt;head&gt;.</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Google Ads</strong> → Tools &amp; Settings → Audience Manager → Your Data Sources → Google tag</li>
+                <li>Click <strong>Tag setup</strong> → Install the tag yourself</li>
+                <li>Copy the two <code>&lt;script&gt;</code> blocks shown — paste both here</li>
+              </ol>
+              <p className="text-blue-700 mt-1">Also works with a Google Tag Manager container snippet if you use GTM instead.</p>
+            </div>
             <textarea
               value={formData.google_base_tag}
               onChange={(e) => handleChange("google_base_tag", e.target.value)}
@@ -411,33 +420,63 @@ ghl_install_description_template: company.ghl_install_description_template || ""
             />
           </div>
 
-          <div>
-            <label className="font-semibold">Meta Base Tag</label>
-            <p className="text-xs text-gray-500 mb-1">Paste the full Facebook Pixel base &lt;script&gt; block. Injected into the estimator &lt;head&gt;.</p>
-            <textarea
-              value={formData.meta_base_tag}
-              onChange={(e) => handleChange("meta_base_tag", e.target.value)}
-              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
-              rows="4"
-              placeholder={'<script>!function(f,b,e,v,n,t,s){...}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","XXXXXXXXXXXXXXX");fbq("track","PageView");</script>'}
-            />
-          </div>
-
-          <div>
+          {/* Google Conversion Event */}
+          <div className="space-y-2">
             <label className="font-semibold">Google Conversion Event Code</label>
-            <p className="text-xs text-gray-500 mb-1">Fires on form submit success. Paste the gtag conversion or GA4 event line only — no &lt;script&gt; tags.</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Google Ads</strong> → Goals → Conversions → click your conversion action</li>
+                <li>Click <strong>Tag setup</strong> → Use Google tag → Install manually</li>
+                <li>Copy only the <strong>event snippet</strong> line — it looks like:<br /><code>gtag('event', 'conversion', {'{'}'send_to': 'AW-XXXXXXXXX/XXXXXXXXX'{'}'});</code></li>
+                <li>Paste just that one line here — no <code>&lt;script&gt;</code> tags</li>
+              </ol>
+              <p className="text-blue-700 mt-1">This fires automatically when a visitor submits the estimator form. It shows up in Google Ads under your conversion action.</p>
+            </div>
             <textarea
               value={formData.google_conversion_event}
               onChange={(e) => handleChange("google_conversion_event", e.target.value)}
               className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
               rows="2"
-              placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX', value: 875, currency: 'USD' });"}
+              placeholder={"gtag('event', 'conversion', { send_to: 'AW-XXXXXXXXX/XXXXXXXXX' });"}
             />
           </div>
 
-          <div>
+          {/* Meta Base Tag */}
+          <div className="space-y-2">
+            <label className="font-semibold">Meta (Facebook) Base Tag</label>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Meta Business Suite</strong> → Events Manager → your Pixel → click <strong>Add Events</strong> → From a new website</li>
+                <li>Choose <strong>Install code manually</strong></li>
+                <li>Copy the full <strong>base code</strong> block (the <code>!function(f,b,e,v...)</code> script including the <code>fbq('init', ...)</code> and <code>fbq('track', 'PageView')</code> lines)</li>
+                <li>Paste the entire <code>&lt;script&gt;</code> block here</li>
+              </ol>
+              <p className="text-blue-700 mt-1">This loads the Facebook Pixel and tracks page views on the estimator. Your Pixel ID is the number inside <code>fbq('init', 'XXXXXXXXXXXXXXX')</code>.</p>
+            </div>
+            <textarea
+              value={formData.meta_base_tag}
+              onChange={(e) => handleChange("meta_base_tag", e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg font-mono text-xs"
+              rows="5"
+              placeholder={'<script>\n!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){...};\nfbq(\'init\', \'XXXXXXXXXXXXXXX\');\nfbq(\'track\', \'PageView\');\n</script>'}
+            />
+          </div>
+
+          {/* Meta Conversion Event */}
+          <div className="space-y-2">
             <label className="font-semibold">Meta Conversion Event Code</label>
-            <p className="text-xs text-gray-500 mb-1">Fires on form submit success. Paste the fbq Lead event line only — no &lt;script&gt; tags.</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+              <p className="font-semibold">Where to find this code:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Go to <strong>Meta Business Suite</strong> → Events Manager → your Pixel → <strong>Add Events</strong> → From a new website → Install code manually</li>
+                <li>Scroll to the <strong>event code</strong> section and select <strong>Lead</strong> as the event type</li>
+                <li>Copy only the event line: <code>fbq('track', 'Lead');</code></li>
+                <li>Paste just that one line here — no <code>&lt;script&gt;</code> tags</li>
+              </ol>
+              <p className="text-blue-700 mt-1"><strong>'Lead'</strong> is Meta's standard event name for form submissions. It shows up in Events Manager as "Lead" and lets Meta optimize your ads to find people likely to fill out the estimator.</p>
+            </div>
             <textarea
               value={formData.meta_conversion_event}
               onChange={(e) => handleChange("meta_conversion_event", e.target.value)}
@@ -446,6 +485,7 @@ ghl_install_description_template: company.ghl_install_description_template || ""
               placeholder={"fbq('track', 'Lead');"}
             />
           </div>
+
         </div>
 
         {/* ACTIONS */}

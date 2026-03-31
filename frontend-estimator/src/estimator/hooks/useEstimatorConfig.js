@@ -71,6 +71,18 @@ function generateCustomStyles(cfg) {
   `;
 }
 
+function injectTrackingTag(html) {
+  if (!html || !html.trim()) return;
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  container.querySelectorAll('script').forEach(oldScript => {
+    const newScript = document.createElement('script');
+    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+    newScript.textContent = oldScript.textContent;
+    document.head.appendChild(newScript);
+  });
+}
+
 export default function useEstimatorConfig() {
   const [config, setConfig] = useState(null);
   const [customStyles, setCustomStyles] = useState("");
@@ -78,15 +90,19 @@ export default function useEstimatorConfig() {
 useEffect(() => {
   const params = new URLSearchParams(window.location.search);
   const companyId = params.get("company") || "1";
-  
+
   console.log("🔥 estimator config useEffect fired, company:", companyId);
-  
+
   fetch(`${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`)
     .then(res => res.json())
     .then(data => {
       console.log("✅ estimator config response", data);
       setConfig(data);
-      
+
+      // Inject company tracking base tags into <head> so gtag/fbq are defined before conversion fires
+      injectTrackingTag(data.google_base_tag);
+      injectTrackingTag(data.meta_base_tag);
+
       // Generate and set custom styles
       const styles = generateCustomStyles(data);
       setCustomStyles(styles);
