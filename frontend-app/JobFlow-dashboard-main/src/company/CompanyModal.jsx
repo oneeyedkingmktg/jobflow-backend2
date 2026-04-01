@@ -117,19 +117,15 @@ setGhlForm({
   }
 
   if (company) {
-    console.log("🔍 Company exists, setting form data");
-    console.log("🔍 company.ghl_appt_calendar:", company.ghl_appt_calendar);
-    console.log("🔍 company.ghl_install_calendar:", company.ghl_install_calendar);
-    console.log("🔍 company.ghl_appt_assigned_user:", company.ghl_appt_assigned_user);
-    console.log("🔍 company.ghl_install_assigned_user:", company.ghl_install_assigned_user);
-      console.log("🔍 Company exists, setting form data");
-  console.log("🔍 company.ghlApptTitleTemplate:", company.ghlApptTitleTemplate);
-  console.log("🔍 company.ghlInstallTitleTemplate:", company.ghlInstallTitleTemplate);
-  console.log("🔍 company.ghlApptDescriptionTemplate:", company.ghlApptDescriptionTemplate?.substring(0, 50));
-  console.log("🔍 FULL COMPANY OBJECT:", company);
+    const isNewCompany = prevCompanyId !== company.id;
 
-    setActiveSection("info");
-    setSectionMode("view");
+    // Only reset the active section when switching to a different company.
+    // When the same company is updated (e.g. after saving tracking codes),
+    // stay on the current section so the user sees the saved data in place.
+    if (isNewCompany) {
+      setActiveSection("info");
+      setSectionMode("view");
+    }
 
 setForm({
   name: company.name || "",
