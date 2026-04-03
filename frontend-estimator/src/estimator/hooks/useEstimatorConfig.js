@@ -83,36 +83,53 @@ function injectTrackingTag(html) {
   });
 }
 
+const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+function applyConfig(data, setConfig, setCustomStyles) {
+  setConfig(data);
+  injectTrackingTag(data.google_base_tag);
+  injectTrackingTag(data.meta_base_tag);
+  injectTrackingTag(data.microsoft_base_tag);
+  setCustomStyles(generateCustomStyles(data));
+}
+
 export default function useEstimatorConfig() {
   const [config, setConfig] = useState(null);
   const [customStyles, setCustomStyles] = useState("");
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const companyId = params.get("company") || "1";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const companyId = params.get("company") || "1";
+    const cacheKey = `estimator-config-${companyId}`;
 
-  console.log("🔥 estimator config useEffect fired, company:", companyId);
+    // Try cache first
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL_MS) {
+          applyConfig(data, setConfig, setCustomStyles);
+          return; // skip fetch
+        }
+      }
+    } catch (e) {
+      // ignore corrupt cache
+    }
 
-  fetch(`${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`)
-    .then(res => res.json())
-    .then(data => {
-      console.log("✅ estimator config response", data);
-      setConfig(data);
-
-      // Inject company tracking base tags into <head> so gtag/fbq/uetq are defined before conversion fires
-      injectTrackingTag(data.google_base_tag);
-      injectTrackingTag(data.meta_base_tag);
-      injectTrackingTag(data.microsoft_base_tag);
-
-      // Generate and set custom styles
-      const styles = generateCustomStyles(data);
-      setCustomStyles(styles);
-      console.log("🎨 Custom styles generated");
-    })
-    .catch(err => {
-      console.error("❌ estimator config error", err);
-    });
-}, []);
+    fetch(`${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`)
+      .then(res => res.json())
+      .then(data => {
+        applyConfig(data, setConfig, setCustomStyles);
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() }));
+        } catch (e) {
+          // ignore storage errors (private browsing, quota)
+        }
+      })
+      .catch(err => {
+        console.error("❌ estimator config error", err);
+      });
+  }, []);
 
 
   const useCustomStyles = config?.use_embedded_styles === true;
