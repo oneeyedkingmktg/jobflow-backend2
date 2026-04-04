@@ -235,7 +235,7 @@ export default function CalendarView({ leads, onSelectLead }) {
       {weeks.map((week, wIdx) => {
         const weekBars = getWeekBars(week);
         const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map((b) => b.rowIdx)) + 1 : 0;
-        const barAreaHeight = barRowCount * 24; // 20px bar + 4px gap per row
+        const barAreaHeight = barRowCount * 28; // 24px bar + 4px gap per row
 
         return (
           <div key={wIdx} className="mb-1">
@@ -260,8 +260,8 @@ export default function CalendarView({ leads, onSelectLead }) {
                     {data.appt.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-1">
                         {data.appt.map((apptLead, i) => (
-                          <div key={`a-${i}`} className="w-full h-5 bg-blue-500 rounded-sm overflow-hidden flex items-center px-1">
-                            <span className="text-white text-[10px] font-semibold truncate leading-none">{apptLead.name}</span>
+                          <div key={`a-${i}`} className="w-full h-6 bg-blue-500 rounded-sm overflow-hidden flex items-center px-1">
+                            <span className="text-white text-xs font-semibold truncate leading-none">{apptLead.name}</span>
                           </div>
                         ))}
                       </div>
@@ -285,14 +285,14 @@ export default function CalendarView({ leads, onSelectLead }) {
                     <div
                       key={bar.id}
                       onClick={() => handleDayClick(formatDateKey(week[bar.colStart]))}
-                      className={`absolute h-5 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
+                      className={`absolute h-6 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
                       style={{
                         left: barLeftCalc(bar.colStart),
                         width: barWidthCalc(bar.colSpan),
-                        top: `${bar.rowIdx * 24}px`,
+                        top: `${bar.rowIdx * 28}px`,
                       }}
                     >
-                      <span className="text-white text-[10px] font-semibold truncate leading-none">{bar.lead.name}</span>
+                      <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
                     </div>
                   );
                 })}
