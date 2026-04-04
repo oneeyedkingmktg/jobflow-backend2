@@ -689,9 +689,13 @@ try {
         console.warn("GA4 event error:", e);
       }
 
-      // Notify parent window so GTM tags on contractor sites can fire (e.g. Microsoft/Bing UET)
+      // Notify parent window so UET tags on contractor sites can fire
       try {
-        window.parent.postMessage({ event: 'estimator_conversion', type: 'estimate_submitted' }, '*');
+        window.parent.postMessage({
+          event: 'estimator_conversion',
+          type: 'estimate_submitted',
+          microsoftEventCode: config.microsoft_conversion_event || null
+        }, '*');
       } catch (e) {
         console.warn("postMessage error:", e);
       }
