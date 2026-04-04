@@ -696,7 +696,7 @@ const result = await pool.query(
       ]
     );
 
-const updatedLead = result.rows[0];
+let updatedLead = result.rows[0];
 
 if (updatedLead.project_type) {
   await pool.query(
