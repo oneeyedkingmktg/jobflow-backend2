@@ -46,6 +46,15 @@
       }
     },
     {
+      "identity" : "grpc-binary",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/grpc-binary.git",
+      "state" : {
+        "revision" : "75b31c842f664a0f46a2e590a570e370249fd8f6",
+        "version" : "1.69.1"
+      }
+    },
+    {
       "identity" : "gtm-session-fetcher",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/gtm-session-fetcher.git",
@@ -61,15 +70,6 @@
       "state" : {
         "revision" : "040d087ac2267d2ddd4cca36c757d1c6a05fdbfe",
         "version" : "101.0.0"
-      }
-    },
-    {
-      "identity" : "linphone-sdk-swift-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git",
-      "state" : {
-        "branch" : "stable",
-        "revision" : "721245a5c583251709f7cdd13be15b3be33f2761"
       }
     },
     {
