@@ -8,6 +8,15 @@
         "revision" : "0e862e6ff13852a710c8a484180ca4d6a2cc9761",
         "version" : "8.2.0"
       }
+    },
+    {
+      "identity" : "linphone-sdk-swift-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git",
+      "state" : {
+        "branch" : "stable",
+        "revision" : "721245a5c583251709f7cdd13be15b3be33f2761"
+      }
     }
   ],
   "version" : 2
