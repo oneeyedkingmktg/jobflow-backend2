@@ -235,7 +235,7 @@ export default function CalendarView({ leads, onSelectLead }) {
       {weeks.map((week, wIdx) => {
         const weekBars = getWeekBars(week);
         const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map((b) => b.rowIdx)) + 1 : 0;
-        const barAreaHeight = barRowCount * 16; // 12px bar + 4px gap per row
+        const barAreaHeight = barRowCount * 20; // 16px bar + 4px gap per row
 
         return (
           <div key={wIdx} className="mb-1">
@@ -257,10 +257,12 @@ export default function CalendarView({ leads, onSelectLead }) {
                     }`}
                   >
                     <div className="font-semibold text-xs sm:text-sm">{day.getDate()}</div>
-                    {apptCount > 0 && (
-                      <div className="flex gap-0.5 flex-wrap justify-center mt-1">
-                        {Array(apptCount).fill(0).map((_, i) => (
-                          <div key={`a-${i}`} className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                    {data.appt.length > 0 && (
+                      <div className="flex flex-col gap-0.5 w-full mt-1">
+                        {data.appt.map((apptLead, i) => (
+                          <div key={`a-${i}`} className="w-full h-4 bg-blue-500 rounded-sm overflow-hidden flex items-center px-1">
+                            <span className="text-white text-[9px] font-medium truncate leading-none">{apptLead.name}</span>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -283,13 +285,15 @@ export default function CalendarView({ leads, onSelectLead }) {
                     <div
                       key={bar.id}
                       onClick={() => handleDayClick(formatDateKey(week[bar.colStart]))}
-                      className={`absolute h-3 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80`}
+                      className={`absolute h-4 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
                       style={{
                         left: barLeftCalc(bar.colStart),
                         width: barWidthCalc(bar.colSpan),
-                        top: `${bar.rowIdx * 16}px`,
+                        top: `${bar.rowIdx * 20}px`,
                       }}
-                    />
+                    >
+                      <span className="text-white text-[9px] font-medium truncate leading-none">{bar.lead.name}</span>
+                    </div>
                   );
                 })}
               </div>
