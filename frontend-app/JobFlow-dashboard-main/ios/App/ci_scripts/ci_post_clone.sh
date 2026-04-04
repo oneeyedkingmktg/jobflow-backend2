@@ -45,12 +45,14 @@ echo ">>> Package.resolved copied to xcworkspace location"
 # Linphone is a direct Xcode project dependency (not in CapApp-SPM/Package.swift)
 # so swift package resolve above won't include it — inject it manually.
 echo ">>> Fetching Linphone stable HEAD..."
+LINPHONE_FALLBACK="721245a5c583251709f7cdd13be15b3be33f2761"
 LINPHONE_REVISION=$(git ls-remote https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git refs/heads/stable 2>/dev/null | awk '{print $1}')
 if [ -z "$LINPHONE_REVISION" ]; then
-  echo ">>> ERROR: Could not fetch Linphone stable HEAD — aborting."
-  exit 1
+  echo ">>> git ls-remote unavailable — using fallback revision: $LINPHONE_FALLBACK"
+  LINPHONE_REVISION="$LINPHONE_FALLBACK"
+else
+  echo ">>> Linphone stable HEAD: $LINPHONE_REVISION"
 fi
-echo ">>> Linphone stable HEAD: $LINPHONE_REVISION"
 
 python3 - "$RESOLVED_PATH" "$LINPHONE_REVISION" <<'PYEOF'
 import json, sys
