@@ -191,10 +191,11 @@ if (!isUpdate) {
     const existingEventId = targetLead.appointment_calendar_event_id;
     
     if (existingEventId) {
-      console.error(`❌ [CREATE REJECTED] Appointment slot already occupied with event ${existingEventId}`);
-      return res.status(400).json({
-        error: 'Slot occupied',
-        message: 'Lead already has an appointment event ID - cannot create new appointment'
+      console.log(`⚠️ [CREATE SKIPPED] Appointment slot already occupied with event ${existingEventId} — returning 200 to suppress GHL alerts`);
+      return res.status(200).json({
+        received: true,
+        skipped: true,
+        message: 'Lead already has an appointment event ID - no change made'
       });
     }
     
@@ -212,10 +213,11 @@ if (!isUpdate) {
     const existingEventId = targetLead.install_calendar_event_id;
     
     if (existingEventId) {
-      console.error(`❌ [CREATE REJECTED] Install slot already occupied with event ${existingEventId}`);
-      return res.status(400).json({
-        error: 'Slot occupied',
-        message: 'Lead already has an install event ID - cannot create new install'
+      console.log(`⚠️ [CREATE SKIPPED] Install slot already occupied with event ${existingEventId} — returning 200 to suppress GHL alerts`);
+      return res.status(200).json({
+        received: true,
+        skipped: true,
+        message: 'Lead already has an install event ID - no change made'
       });
     }
     
