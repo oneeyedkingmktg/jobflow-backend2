@@ -715,6 +715,7 @@ if (updatedLead.project_type) {
     ).rows[0];
 
 let ghlSynced = false;
+    let calendarConflict = null;
     if (company.ghl_api_key) {
       try {
 await syncLeadToGhl({
@@ -726,6 +727,17 @@ await syncLeadToGhl({
         ghlSynced = true;
       } catch (syncError) {
         console.log('GHL sync failed for updated lead:', syncError.message);
+        if (syncError.calendarConflict) {
+          calendarConflict = {
+            type: syncError.calendarType,
+            message: syncError.calendarType === 'install'
+              ? 'GHL calendar is full for that install date — the date has been removed. Please choose a different date.'
+              : 'GHL calendar is full for that appointment date — the date has been removed. Please choose a different date.',
+          };
+          // Re-fetch lead so response reflects the cleared date
+          const freshResult = await pool.query('SELECT * FROM leads WHERE id = $1', [updatedLead.id]);
+          if (freshResult.rows.length > 0) updatedLead = freshResult.rows[0];
+        }
       }
 
       // If unjunking: remove the junk tag from GHL
@@ -738,7 +750,7 @@ await syncLeadToGhl({
       }
     }
 
-    res.json({ lead: toCamel(updatedLead), ghlSynced });
+    res.json({ lead: toCamel(updatedLead), ghlSynced, calendarConflict });
   } catch (error) {
     console.error("Error updating lead:", error);
     res.status(500).json({ error: "Failed to update lead." });

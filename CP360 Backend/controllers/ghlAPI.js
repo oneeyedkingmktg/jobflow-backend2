@@ -276,6 +276,20 @@ async function fetchLeadWithEstimator(leadId) {
 }
 
 // ----------------------------------------------------------------------------
+// CALENDAR CONFLICT DETECTION
+// Returns true if GHL rejected the event because the slot/calendar is full
+// ----------------------------------------------------------------------------
+function isCalendarConflict(err) {
+  if (!err) return false;
+  const status = err.status || 0;
+  const msg = (err.message || '').toLowerCase();
+  const respMsg = ((err.response && err.response.message) || '').toLowerCase();
+  if (status === 422 || status === 409) return true;
+  const terms = ['slot', 'unavailable', 'not available', 'limit', 'conflict', 'already booked', 'capacity', 'full'];
+  return terms.some((t) => msg.includes(t) || respMsg.includes(t));
+}
+
+// ----------------------------------------------------------------------------
 // CHANGE DETECTION
 // ----------------------------------------------------------------------------
 function detectAppointmentChange(currentLead, lastSyncedDate, lastSyncedTime) {
@@ -1525,6 +1539,22 @@ if (
               appointment_time: lead.appointment_time,
             }
           );
+          if (isCalendarConflict(calendarErr)) {
+            console.warn(`⚠️ [APPT CONFLICT] GHL slot full — clearing appointment_date from lead ${lead.id}`);
+            await db.query(
+              `UPDATE leads
+               SET appointment_date = NULL,
+                   appointment_time = NULL,
+                   appointment_calendar_event_id = NULL,
+                   last_synced_appointment_date = NULL,
+                   last_synced_appointment_time = NULL
+               WHERE id = $1`,
+              [lead.id]
+            );
+            calendarErr.calendarConflict = true;
+            calendarErr.calendarType = 'appointment';
+            throw calendarErr;
+          }
         }
       } else if (lead.appointment_calendar_event_id || lead.last_synced_appointment_date) {
         // Appointment was removed in JF — delete the GHL event
@@ -1653,6 +1683,21 @@ if (
               install_tentative: lead.install_tentative,
             }
           );
+          if (isCalendarConflict(calendarErr)) {
+            console.warn(`⚠️ [INSTALL CONFLICT] GHL slot full — clearing install_date from lead ${lead.id}`);
+            await db.query(
+              `UPDATE leads
+               SET install_date = NULL,
+                   install_calendar_event_id = NULL,
+                   last_synced_install_date = NULL,
+                   last_synced_install_end_date = NULL
+               WHERE id = $1`,
+              [lead.id]
+            );
+            calendarErr.calendarConflict = true;
+            calendarErr.calendarType = 'install';
+            throw calendarErr;
+          }
         }
       } else if (lead.install_calendar_event_id) {
         try {

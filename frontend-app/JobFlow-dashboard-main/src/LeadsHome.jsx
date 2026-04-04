@@ -408,11 +408,13 @@ onSave={async (data) => {
   const res = data.id
     ? await LeadsAPI.update(data.id, backendData)
     : await LeadsAPI.create(backendData);
-  
-  if (res.ghlSynced === false) {
+
+  if (res.calendarConflict) {
+    alert(`⚠️ ${res.calendarConflict.message}`);
+  } else if (res.ghlSynced === false) {
     alert("⚠️ Lead saved but not synced with GHL (no API key configured)");
   }
-  
+
   await loadLeads();
   return res.lead;
 }}
@@ -431,8 +433,10 @@ onSaveAndExit={async (data) => {
       : await LeadsAPI.create(backendData);
 
     console.log("✅ API response:", res);
-    
-    if (res.ghlSynced === false) {
+
+    if (res.calendarConflict) {
+      alert(`⚠️ ${res.calendarConflict.message}`);
+    } else if (res.ghlSynced === false) {
       alert("⚠️ Lead saved but not synced with GHL (no API key configured)");
     }
     
