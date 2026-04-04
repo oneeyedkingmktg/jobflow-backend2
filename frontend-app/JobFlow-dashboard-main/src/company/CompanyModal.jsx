@@ -1009,6 +1009,8 @@ setTrackingForm({
                     meta_base_tag: company.metaBaseTag || company.meta_base_tag || "",
                     google_conversion_event: company.googleConversionEvent || company.google_conversion_event || "",
                     meta_conversion_event: company.metaConversionEvent || company.meta_conversion_event || "",
+                    microsoft_base_tag: company.microsoftBaseTag || company.microsoft_base_tag || "",
+                    microsoft_conversion_event: company.microsoftConversionEvent || company.microsoft_conversion_event || "",
                   });
                 }}
               >
