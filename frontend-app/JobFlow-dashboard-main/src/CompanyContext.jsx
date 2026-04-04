@@ -72,9 +72,10 @@ const loadCompanies = async () => {
 
       setCompanies(normalized);
       setCurrentCompany((prev) => {
-        // Preserve explicitly selected company if it still exists
-        if (prev && normalized.some((c) => c.id === prev.id)) {
-          return prev;
+        // Return the fresh object from DB (not stale prev) so new fields always appear
+        if (prev) {
+          const fresh = normalized.find((c) => c.id === prev.id);
+          if (fresh) return fresh;
         }
 
         // ✅ Always default to Company ID 1 if it exists
