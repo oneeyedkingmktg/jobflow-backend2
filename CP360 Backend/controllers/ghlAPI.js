@@ -1539,22 +1539,20 @@ if (
               appointment_time: lead.appointment_time,
             }
           );
-          if (isCalendarConflict(calendarErr)) {
-            console.warn(`⚠️ [APPT CONFLICT] GHL slot full — clearing appointment_date from lead ${lead.id}`);
-            await db.query(
-              `UPDATE leads
-               SET appointment_date = NULL,
-                   appointment_time = NULL,
-                   appointment_calendar_event_id = NULL,
-                   last_synced_appointment_date = NULL,
-                   last_synced_appointment_time = NULL
-               WHERE id = $1`,
-              [lead.id]
-            );
-            calendarErr.calendarConflict = true;
-            calendarErr.calendarType = 'appointment';
-            throw calendarErr;
-          }
+          console.warn(`⚠️ [APPT SYNC FAIL] Clearing appointment_date from lead ${lead.id} (GHL error: ${calendarErr.message})`);
+          await db.query(
+            `UPDATE leads
+             SET appointment_date = NULL,
+                 appointment_time = NULL,
+                 appointment_calendar_event_id = NULL,
+                 last_synced_appointment_date = NULL,
+                 last_synced_appointment_time = NULL
+             WHERE id = $1`,
+            [lead.id]
+          );
+          calendarErr.calendarConflict = true;
+          calendarErr.calendarType = 'appointment';
+          throw calendarErr;
         }
       } else if (lead.appointment_calendar_event_id || lead.last_synced_appointment_date) {
         // Appointment was removed in JF — delete the GHL event
@@ -1683,21 +1681,19 @@ if (
               install_tentative: lead.install_tentative,
             }
           );
-          if (isCalendarConflict(calendarErr)) {
-            console.warn(`⚠️ [INSTALL CONFLICT] GHL slot full — clearing install_date from lead ${lead.id}`);
-            await db.query(
-              `UPDATE leads
-               SET install_date = NULL,
-                   install_calendar_event_id = NULL,
-                   last_synced_install_date = NULL,
-                   last_synced_install_end_date = NULL
-               WHERE id = $1`,
-              [lead.id]
-            );
-            calendarErr.calendarConflict = true;
-            calendarErr.calendarType = 'install';
-            throw calendarErr;
-          }
+          console.warn(`⚠️ [INSTALL SYNC FAIL] Clearing install_date from lead ${lead.id} (GHL error: ${calendarErr.message})`);
+          await db.query(
+            `UPDATE leads
+             SET install_date = NULL,
+                 install_calendar_event_id = NULL,
+                 last_synced_install_date = NULL,
+                 last_synced_install_end_date = NULL
+             WHERE id = $1`,
+            [lead.id]
+          );
+          calendarErr.calendarConflict = true;
+          calendarErr.calendarType = 'install';
+          throw calendarErr;
         }
       } else if (lead.install_calendar_event_id) {
         try {
