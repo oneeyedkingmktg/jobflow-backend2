@@ -108,17 +108,44 @@ const BASE_STYLES = `
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function openPrintWindow(html) {
-  // In Capacitor iOS/Android, window.open is blocked — use hidden iframe + window.print()
+  // In Capacitor iOS/Android, inject a full-screen overlay then call window.print()
   if (window.Capacitor?.isNative) {
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-    document.body.appendChild(iframe);
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    setTimeout(() => {
-      iframe.contentWindow.print();
-      setTimeout(() => iframe.remove(), 1000);
-    }, 500);
+    const existing = document.getElementById('__print_overlay__');
+    if (existing) existing.remove();
+    document.getElementById('__print_overlay_style__')?.remove();
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const docStyle = doc.querySelector('style')?.textContent || '';
+
+    const styleEl = document.createElement('style');
+    styleEl.id = '__print_overlay_style__';
+    styleEl.textContent = docStyle + `
+      @media print {
+        body > *:not(#__print_overlay__) { display: none !important; }
+        #__print_overlay__ { position: static !important; overflow: visible !important; }
+      }
+    `;
+    document.head.appendChild(styleEl);
+
+    const overlay = document.createElement('div');
+    overlay.id = '__print_overlay__';
+    overlay.style.cssText = 'position:fixed;inset:0;background:white;z-index:99999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;';
+    overlay.innerHTML = doc.body.innerHTML;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕ Close';
+    closeBtn.style.cssText = 'position:sticky;top:0;float:right;background:#333;color:white;border:none;padding:8px 14px;border-radius:6px;font-size:16px;z-index:1;cursor:pointer;';
+    closeBtn.onclick = () => { overlay.remove(); styleEl.remove(); };
+    overlay.prepend(closeBtn);
+
+    const printBtn = document.createElement('button');
+    printBtn.textContent = '🖨 Print';
+    printBtn.style.cssText = 'position:sticky;top:0;float:right;margin-right:8px;background:#1d4ed8;color:white;border:none;padding:8px 14px;border-radius:6px;font-size:16px;z-index:1;cursor:pointer;';
+    printBtn.onclick = () => window.print();
+    overlay.prepend(printBtn);
+
+    document.body.appendChild(overlay);
     return;
   }
   const w = window.open('', '_blank');

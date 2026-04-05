@@ -3,6 +3,11 @@
   "appName": "CoatingPro360",
   "webDir": "dist",
   "plugins": {
+    "Keyboard": {
+      "resize": "body",
+      "scrollAssist": false,
+      "resizeOnFullScreen": true
+    },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
     },

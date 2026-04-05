@@ -393,11 +393,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         </button>
       </div>
 
-      {/* BUILD TEST - REMOVE AFTER CONFIRMING BUILD PATH WORKS */}
-      <div style={{background:'red',color:'white',textAlign:'center',padding:'8px',fontWeight:'bold',fontSize:'16px'}}>
-        BUILD TEST v1 — Apr 5
-      </div>
-
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
 
