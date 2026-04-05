@@ -108,12 +108,11 @@ const BASE_STYLES = `
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function openPrintWindow(html) {
-  // In Capacitor iOS/Android, window.open is blocked — use Browser plugin instead
+  // In Capacitor iOS/Android, window.open is blocked — use Browser plugin with data URL
   if (window.Capacitor?.isNative) {
     import('@capacitor/browser').then(({ Browser }) => {
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      Browser.open({ url, presentationStyle: 'popover' });
+      const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+      Browser.open({ url: dataUrl, presentationStyle: 'popover' });
     });
     return;
   }
