@@ -108,12 +108,17 @@ const BASE_STYLES = `
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function openPrintWindow(html) {
-  // In Capacitor iOS/Android, window.open is blocked — use Browser plugin with data URL
+  // In Capacitor iOS/Android, window.open is blocked — use hidden iframe + window.print()
   if (window.Capacitor?.isNative) {
-    import('@capacitor/browser').then(({ Browser }) => {
-      const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
-      Browser.open({ url: dataUrl, presentationStyle: 'popover' });
-    });
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => iframe.remove(), 1000);
+    }, 500);
     return;
   }
   const w = window.open('', '_blank');
