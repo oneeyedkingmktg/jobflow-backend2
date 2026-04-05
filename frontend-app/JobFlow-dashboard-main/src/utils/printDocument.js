@@ -19,6 +19,8 @@ function calcAmt(ps, bidTotal) {
   return type === 'dollar' ? val : bidTotal * (val / 100);
 }
 
+import { Capacitor } from '@capacitor/core';
+
 // ── Shared CSS ──────────────────────────────────────────────────────────────
 const BASE_STYLES = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -109,7 +111,7 @@ const BASE_STYLES = `
 
 function openPrintWindow(html) {
   // In Capacitor iOS/Android, inject a full-screen overlay then call window.print()
-  if (window.Capacitor?.isNative) {
+  if (Capacitor.isNativePlatform()) {
     const existing = document.getElementById('__print_overlay__');
     if (existing) existing.remove();
     document.getElementById('__print_overlay_style__')?.remove();

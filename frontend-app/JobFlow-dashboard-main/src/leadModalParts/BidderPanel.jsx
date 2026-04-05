@@ -79,7 +79,7 @@ export default function BidderPanel({ lead, onClose }) {
   if (activeBidId !== null) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1000] px-2 pt-2 pb-20">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-96px)] flex flex-col">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-96px)] flex flex-col overflow-x-hidden">
           <BidderForm
             proposalId={activeBidId}
             lead={lead}

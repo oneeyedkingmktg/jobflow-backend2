@@ -394,7 +394,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-5 space-y-6">
 
         {/* ── BID INFO ─────────────────────────────────────────────────── */}
         <section>
