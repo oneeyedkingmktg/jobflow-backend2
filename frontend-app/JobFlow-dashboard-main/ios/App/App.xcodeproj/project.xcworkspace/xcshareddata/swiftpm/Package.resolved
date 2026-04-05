@@ -1,7 +1,7 @@
 {
   "pins" : [
     {
-      "identity" : "linphone-sdk-swift-ios",
+      "identity" : "linphone-sdk-swift-ios-mirror",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/oneeyedkingmktg/linphone-sdk-swift-ios-mirror.git",
       "state" : {

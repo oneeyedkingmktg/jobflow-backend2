@@ -37,7 +37,7 @@ path, revision = sys.argv[1], sys.argv[2]
 with open(path) as f:
     data = json.load(f)
 for pin in data["pins"]:
-    if pin.get("identity") == "linphone-sdk-swift-ios":
+    if pin.get("identity") == "linphone-sdk-swift-ios-mirror":
         pin["state"]["revision"] = revision
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
