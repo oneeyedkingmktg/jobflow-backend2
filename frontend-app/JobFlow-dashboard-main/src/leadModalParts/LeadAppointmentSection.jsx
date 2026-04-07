@@ -51,7 +51,9 @@ export default function LeadAppointmentSection({
   }
 
   // Show warning when appointment is set but hasn't synced to GHL calendar
-  const apptNotSynced = form.appointmentDate && !form.appointmentCalendarEventId;
+  const apptNotSynced = form.appointmentDate &&
+    !form.appointmentCalendarEventId &&
+    form.appointmentDate !== form.lastSyncedAppointmentDate;
 
   return (
     <div className="w-full">

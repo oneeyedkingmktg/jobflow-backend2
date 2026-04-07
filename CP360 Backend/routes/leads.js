@@ -85,6 +85,7 @@ const toCamel = (row) => ({
   appointmentDate: row.appointment_date,
   appointmentTime: row.appointment_time,
   appointmentCalendarEventId: row.appointment_calendar_event_id || null,
+  lastSyncedAppointmentDate: row.last_synced_appointment_date || null,
   installDate: row.install_date,
   installTentative: row.install_tentative,
   installDurationDays: row.install_duration_days || 1,
