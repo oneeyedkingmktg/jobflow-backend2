@@ -11,7 +11,7 @@ import { useAuth } from "../AuthContext";
 
 export default function LeadAppointmentSection({
   form,
-  isEditing,
+  savedAppointmentDate,
   setShowApptModal,
   setShowDateModal,
 }) {
@@ -52,8 +52,11 @@ export default function LeadAppointmentSection({
   }
 
   // Show warning when appointment is set but hasn't synced to GHL calendar
-  const apptNotSynced = !isEditing &&
-    form.appointmentDate &&
+  // Only warn if the date was already saved to the backend (matches the prop
+  // passed from the lead record) AND it isn't reflected in GHL.
+  // Suppress while the user has an unsaved date change in the picker.
+  const appointmentSaved = form.appointmentDate && form.appointmentDate === savedAppointmentDate;
+  const apptNotSynced = appointmentSaved &&
     !form.appointmentCalendarEventId &&
     form.appointmentDate !== form.lastSyncedAppointmentDate;
 
