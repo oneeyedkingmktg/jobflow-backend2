@@ -203,10 +203,10 @@ async function markAsRead(req, res) {
 // POST /api/messages/send
 async function sendMessage(req, res) {
   try {
-    const { conversationId, contactId, message, type } = req.body;
+    let { conversationId, contactId, message, type } = req.body;
     const companyId = req.body.company_id || req.user?.company_id;
 
-    if (!conversationId || !contactId || !message || !companyId) {
+    if (!contactId || !message || !companyId) {
       return res.status(400).json({ error: "conversationId, contactId, message, and company_id required" });
     }
 
@@ -224,6 +224,16 @@ async function sendMessage(req, res) {
     const company = companyResult.rows[0];
     if (!company.ghl_api_key || !company.ghl_location_id) {
       return res.status(400).json({ error: "Company not configured for messaging" });
+    }
+
+    // If no conversationId was supplied, look it up from GHL by contactId
+    if (!conversationId) {
+      const convSearch = await searchConversations(company, { contactId, limit: 1 });
+      conversationId = convSearch?.conversations?.[0]?.id || null;
+    }
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "No conversation found for this contact. Send a message from GHL first to create one." });
     }
 
     const ghlResponse = await sendMessageGHL(company, {
