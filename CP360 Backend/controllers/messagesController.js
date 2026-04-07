@@ -4,7 +4,7 @@
 // ============================================================================
 
 const pool = require("../config/database");
-const { searchConversations, getMessagesByConversationId, markConversationRead, sendMessage: sendMessageGHL, proxyCallRecording, getCallTranscription } = require("./ghlAPI");
+const { searchConversations, getConversationById, getMessagesByConversationId, markConversationRead, sendMessage: sendMessageGHL, proxyCallRecording, getCallTranscription } = require("./ghlAPI");
 
 // GET /api/messages/conversations
 async function getConversations(req, res) {
@@ -206,8 +206,11 @@ async function sendMessage(req, res) {
     let { conversationId, contactId, message, type } = req.body;
     const companyId = req.body.company_id || req.user?.company_id;
 
-    if (!contactId || !message || !companyId) {
-      return res.status(400).json({ error: "conversationId, contactId, message, and company_id required" });
+    if (!message || !companyId) {
+      return res.status(400).json({ error: "message and company_id required" });
+    }
+    if (!contactId && !conversationId) {
+      return res.status(400).json({ error: "contactId or conversationId required" });
     }
 
     if (req.user.role !== "master" && parseInt(req.user.company_id) !== parseInt(companyId)) {
@@ -226,14 +229,23 @@ async function sendMessage(req, res) {
       return res.status(400).json({ error: "Company not configured for messaging" });
     }
 
-    // If no conversationId was supplied, look it up from GHL by contactId
-    if (!conversationId) {
+    // If contactId missing but conversationId is known, fetch contactId from GHL
+    if (!contactId && conversationId) {
+      const conv = await getConversationById(conversationId, company);
+      contactId = conv?.contactId || null;
+    }
+
+    // If no conversationId, look it up from GHL by contactId
+    if (!conversationId && contactId) {
       const convSearch = await searchConversations(company, { contactId, limit: 1 });
       conversationId = convSearch?.conversations?.[0]?.id || null;
     }
 
     if (!conversationId) {
       return res.status(400).json({ error: "No conversation found for this contact. Send a message from GHL first to create one." });
+    }
+    if (!contactId) {
+      return res.status(400).json({ error: "Could not resolve contactId for this conversation." });
     }
 
     const ghlResponse = await sendMessageGHL(company, {

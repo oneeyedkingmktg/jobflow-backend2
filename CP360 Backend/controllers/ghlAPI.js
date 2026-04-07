@@ -1834,6 +1834,13 @@ restoreGhlContact: async function (contactId, company) {
     });
   },
 
+  // Get a single conversation by ID (returns contactId + metadata)
+  getConversationById: async function (conversationId, company) {
+    return await ghlRequest(company, `/conversations/${conversationId}`, {
+      method: "GET",
+    });
+  },
+
   // Mark a conversation as read (unreadCount = 0)
   markConversationRead: async function (conversationId, company) {
     return await ghlRequest(company, `/conversations/${conversationId}`, {
