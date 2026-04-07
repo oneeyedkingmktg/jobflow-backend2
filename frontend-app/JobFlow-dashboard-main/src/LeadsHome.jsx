@@ -411,7 +411,7 @@ onSave={async (data) => {
 
   if (res.calendarConflict) {
     alert(`⚠️ ${res.calendarConflict.message}`);
-  } else if (res.ghlSynced === false) {
+  } else if (res.ghlSynced === false && !res.lead?.appointmentCalendarEventId && res.lead?.appointmentDate) {
     alert("⚠️ Lead saved but not synced with GHL (no API key configured)");
   }
 

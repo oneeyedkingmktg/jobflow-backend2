@@ -731,14 +731,16 @@ await syncLeadToGhl({
           calendarConflict = {
             type: syncError.calendarType,
             message: syncError.calendarType === 'install'
-              ? 'GHL calendar is full for that install date — the date has been removed. Please choose a different date.'
-              : 'GHL calendar is full for that appointment date — the date has been removed. Please choose a different date.',
+              ? 'Install date saved in CP but could not sync to GHL calendar. Check GHL calendar availability.'
+              : 'Appointment saved in CP but could not sync to GHL calendar. Check GHL calendar availability.',
           };
-          // Re-fetch lead so response reflects the cleared date
-          const freshResult = await pool.query('SELECT * FROM leads WHERE id = $1', [updatedLead.id]);
-          if (freshResult.rows.length > 0) updatedLead = freshResult.rows[0];
         }
       }
+
+      // Always re-fetch so response reflects current appointment_calendar_event_id
+      // (GHL sync updates it in a separate DB query after the main UPDATE)
+      const freshResult = await pool.query('SELECT * FROM leads WHERE id = $1', [updatedLead.id]);
+      if (freshResult.rows.length > 0) updatedLead = freshResult.rows[0];
 
       // If unjunking: remove the junk tag from GHL
       if (previousLead.status === 'status_junk' && updatedLead.status !== 'status_junk' && updatedLead.ghl_contact_id) {
