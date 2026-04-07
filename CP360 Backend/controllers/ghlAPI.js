@@ -1539,17 +1539,11 @@ if (
               appointment_time: lead.appointment_time,
             }
           );
-          console.warn(`⚠️ [APPT SYNC FAIL] Clearing appointment_date from lead ${lead.id} (GHL error: ${calendarErr.message})`);
-          await db.query(
-            `UPDATE leads
-             SET appointment_date = NULL,
-                 appointment_time = NULL,
-                 appointment_calendar_event_id = NULL,
-                 last_synced_appointment_date = NULL,
-                 last_synced_appointment_time = NULL
-             WHERE id = $1`,
-            [lead.id]
-          );
+          // DO NOT clear appointment data from CP — CP is source of truth.
+          // GHL "slot not available" often means the event was already created
+          // on a prior attempt but the event ID was never saved back. Preserve
+          // the date/time so the user can see and manage it.
+          console.warn(`⚠️ [APPT SYNC FAIL] GHL rejected appointment for lead ${lead.id} — keeping CP data intact (GHL error: ${calendarErr.message})`);
           calendarErr.calendarConflict = true;
           calendarErr.calendarType = 'appointment';
           throw calendarErr;
