@@ -30,6 +30,9 @@ npx cap sync ios
 # swift package resolve records dependency graph + checksums without downloading
 # binary XCFrameworks (those download during the build phase). This generates a
 # complete Package.resolved including all Firebase transitive deps.
+echo ">>> Fixing any Windows-style backslash paths in Package.swift..."
+sed -i '' 's|\\\\|/|g' "$PACKAGE_DIR/Package.swift" 2>/dev/null || true
+
 echo ">>> Running swift package resolve in CapApp-SPM..."
 cd "$PACKAGE_DIR"
 rm -f Package.resolved
