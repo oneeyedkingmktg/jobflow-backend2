@@ -29,10 +29,15 @@ npx cap sync ios
 echo ">>> Fixing path separators in Package.swift (safety net)..."
 sed -i '' 's|\\|/|g' "$PACKAGE_DIR/Package.swift" 2>/dev/null || true
 
-# ── Update Linphone pin in the committed Package.resolved ─────────────────────
-# We skip swift package resolve entirely — the committed Package.resolved already
-# has all packages pinned. We only need to refresh the Linphone branch revision
-# in case the stable branch HEAD moved since the last commit.
+# ── Regenerate Package.resolved from current Package.swift ───────────────────
+# cap sync may change package version requirements; run xcodebuild to resolve
+# them into a fresh Package.resolved before the main build validates it.
+echo ">>> Resolving Swift Package dependencies..."
+xcodebuild -resolvePackageDependencies \
+  -project "$SCRIPT_DIR/../App.xcodeproj" \
+  2>&1 | tail -40 || true
+
+# ── Update Linphone pin in the freshly-resolved Package.resolved ──────────────
 echo ">>> Fetching Linphone stable HEAD from GitHub mirror..."
 LINPHONE_REVISION=$(git ls-remote https://github.com/oneeyedkingmktg/linphone-sdk-swift-ios-mirror.git refs/heads/stable 2>/dev/null | awk '{print $1}')
 
