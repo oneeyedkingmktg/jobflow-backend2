@@ -217,13 +217,19 @@ export default function ConversationModal({ lead, onClose }) {
 
       {/* Reply box */}
       <div className="flex-shrink-0">
-        <ReplyBox
-          conversationId={conversationId}
-          contactId={contactId}
-          channelType="SMS"
-          availableTypes={availableTypes}
-          onSent={() => fetchConversations()}
-        />
+        {contactId ? (
+          <ReplyBox
+            conversationId={conversationId}
+            contactId={contactId}
+            channelType="SMS"
+            availableTypes={availableTypes}
+            onSent={() => fetchConversations()}
+          />
+        ) : (
+          <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs text-gray-400">
+            This contact is not synced to GHL — messaging unavailable.
+          </div>
+        )}
       </div>
     </div>,
     document.body
