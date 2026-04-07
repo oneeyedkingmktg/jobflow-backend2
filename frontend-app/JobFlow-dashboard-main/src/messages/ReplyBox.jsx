@@ -45,7 +45,8 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
       if (typeof onSent === "function") onSent();
     } catch (err) {
       console.error("Failed to send message:", err);
-      setError("Failed to send. Please try again.");
+      const detail = err?.detail || err?.message || "";
+      setError(detail ? `Failed to send: ${detail}` : "Failed to send. Please try again.");
     } finally {
       setSending(false);
     }

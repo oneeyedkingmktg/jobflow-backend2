@@ -50,13 +50,17 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   if (!response.ok) {
     let message = "API request failed";
+    let detail = null;
     try {
       const clone = response.clone();
       const json = await clone.json().catch(() => null);
       if (json?.message) message = json.message;
       if (json?.error) message = json.error;
+      if (json?.detail) detail = json.detail;
     } catch (_) {}
-    throw new Error(message);
+    const err = new Error(message);
+    err.detail = detail;
+    throw err;
   }
 
   try {

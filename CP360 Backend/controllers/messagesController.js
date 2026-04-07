@@ -231,12 +231,14 @@ async function sendMessage(req, res) {
       conversationId,
       contactId,
       message,
+      locationId: company.ghl_location_id,
     });
 
     res.json({ success: true, messageId: ghlResponse?.messageId || null });
   } catch (error) {
     console.error("Error sending message:", error);
-    res.status(500).json({ error: "Failed to send message" });
+    const ghlError = error?.response ? JSON.stringify(error.response) : error.message;
+    res.status(500).json({ error: "Failed to send message", detail: ghlError });
   }
 }
 
