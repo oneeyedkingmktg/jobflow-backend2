@@ -1,5 +1,4 @@
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { App } from '@capacitor/app';
 import { isNativeApp, getPlatform } from '../utils/platform';
 import { apiRequest } from '../api';
 
@@ -79,17 +78,7 @@ export const initializePushNotifications = async (user) => {
       await registerDeviceToken(user, event.token);
     });
 
-    // When app goes to background, reset token back to master's own company
-    // so offline notifications always come from company 1, not a test company
-    const ownCompanyId = user.companyId || user.company_id;
-    App.addListener('appStateChange', async ({ isActive }) => {
-      if (!isActive) {
-        await switchNotificationCompany(user, ownCompanyId);
-        console.log(`📵 App backgrounded — notifications reset to company ${ownCompanyId}`);
-      }
-    });
-
-    return { success: true };
+return { success: true };
 
   } catch (error) {
     console.error('Error initializing push notifications:', error);

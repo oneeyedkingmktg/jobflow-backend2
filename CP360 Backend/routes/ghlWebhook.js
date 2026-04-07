@@ -13,6 +13,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 const verifyGHLWebhook = require("../middleware/verifyGHLWebhook");
+const { syncCompanyValues } = require("../services/ghlCompanySync");
 
 // Map GHL status tags to JF status
 function mapGHLStatusToJF(tags) {
@@ -295,6 +296,9 @@ email ? "Email" : "Phone",
       );
       saved = insert.rows[0];
     }
+
+    // Fire-and-forget: sync GHL location custom values to company record
+    syncCompanyValues(companyId);
 
     return res.status(200).json({ received: true, lead_id: saved.id });
   } catch (err) {

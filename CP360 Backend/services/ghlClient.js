@@ -94,12 +94,21 @@ async function createContact(payload) {
     return res.data?.event || null;
   }
 
+  // ---------------------------------------------------------------------------
+  // LOCATION CUSTOM VALUES
+  // ---------------------------------------------------------------------------
+  async function getCustomValues() {
+    const res = await client.get(`/locations/${ghl_location_id}/customValues`);
+    return res.data?.customValues || [];
+  }
+
   return {
     createContact,
     updateContact,
     addTag,
     createCalendarEvent,
     updateCalendarEvent,
+    getCustomValues,
   };
 }
 

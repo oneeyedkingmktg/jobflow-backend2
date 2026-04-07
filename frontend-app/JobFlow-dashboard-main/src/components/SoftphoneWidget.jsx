@@ -1,9 +1,10 @@
 // ============================================================================
 // src/components/SoftphoneWidget.jsx
 // Active call overlay — shown during outgoing, incoming, and connected calls.
+// Supports minimize to a floating pill so the user can browse the app mid-call.
 // ============================================================================
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatPhoneNumber } from '../utils/formatting';
 
 export default function SoftphoneWidget({
@@ -25,7 +26,20 @@ export default function SoftphoneWidget({
   onConfirmCall,
   onCancelCall,
 }) {
-  // Pre-dial screen — show before the call is placed
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // Auto-reset minimize when call ends
+  useEffect(() => {
+    if (!callState || callState === 'idle' || callState === 'released') {
+      setIsMinimized(false);
+    }
+    // Incoming calls must always show full screen
+    if (callState === 'incomingreceived') {
+      setIsMinimized(false);
+    }
+  }, [callState]);
+
+  // ── Pre-dial screen ──────────────────────────────────────────────────────
   if (pendingCall && (!callState || callState === 'idle' || callState === 'released')) {
     const displayName = pendingCall.name || formatPhoneNumber(pendingCall.phone) || pendingCall.phone;
     return (
@@ -71,8 +85,64 @@ export default function SoftphoneWidget({
     ? formattedTime
     : callState;
 
+  // ── Minimized pill ───────────────────────────────────────────────────────
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-6 left-4 right-4 z-[200] flex items-center justify-between bg-gray-900 rounded-2xl px-4 py-3 shadow-2xl border border-gray-700">
+        {/* Left: phone icon + name + timer */}
+        <button
+          className="flex items-center gap-3 flex-1 min-w-0"
+          onClick={() => setIsMinimized(false)}
+        >
+          <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-white text-sm font-semibold truncate leading-tight">{displayName}</p>
+            <p className="text-green-400 text-xs leading-tight">{statusLabel}</p>
+          </div>
+        </button>
+
+        {/* Right: expand + hangup */}
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center active:bg-gray-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+            </svg>
+          </button>
+          <button
+            onClick={onHangup}
+            className="w-9 h-9 rounded-full bg-red-500 flex items-center justify-center active:bg-red-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M1.5 4.5a3 3 0 013-3h1.372c.86 0 1.61.586 1.819 1.42l1.105 4.423a1.875 1.875 0 01-.694 1.955l-1.293.97c-.135.101-.164.249-.126.352a11.285 11.285 0 006.697 6.697c.103.038.25.009.352-.126l.97-1.293a1.875 1.875 0 011.955-.694l4.423 1.105c.834.209 1.42.959 1.42 1.82V19.5a3 3 0 01-3 3h-2.25C8.552 22.5 1.5 15.448 1.5 6.75V4.5z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Full-screen overlay ──────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-gray-900 bg-opacity-95">
+
+      {/* Minimize button — only during active/dialing (not incoming) */}
+      {!isIncoming && (
+        <button
+          onClick={() => setIsMinimized(true)}
+          className="absolute top-12 right-5 w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center active:bg-gray-600"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
 
       {/* Contact avatar */}
       <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center mb-4 shadow-lg">
@@ -88,7 +158,6 @@ export default function SoftphoneWidget({
       {/* INCOMING — Accept / Decline */}
       {isIncoming && (
         <div className="flex gap-16 items-center">
-          {/* Decline */}
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={onDecline}
@@ -101,7 +170,6 @@ export default function SoftphoneWidget({
             <span className="text-gray-400 text-xs">Decline</span>
           </div>
 
-          {/* Accept */}
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={onAnswer}
