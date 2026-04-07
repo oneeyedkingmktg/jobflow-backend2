@@ -11,6 +11,7 @@ import { useAuth } from "../AuthContext";
 
 export default function LeadAppointmentSection({
   form,
+  isEditing,
   setShowApptModal,
   setShowDateModal,
 }) {
@@ -51,7 +52,8 @@ export default function LeadAppointmentSection({
   }
 
   // Show warning when appointment is set but hasn't synced to GHL calendar
-  const apptNotSynced = form.appointmentDate &&
+  const apptNotSynced = !isEditing &&
+    form.appointmentDate &&
     !form.appointmentCalendarEventId &&
     form.appointmentDate !== form.lastSyncedAppointmentDate;
 

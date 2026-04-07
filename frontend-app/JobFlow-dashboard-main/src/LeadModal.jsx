@@ -234,6 +234,7 @@ const handlePauseSave = (pauseFields) => {
 
             <LeadAppointmentSection
               form={form}
+              isEditing={isEditing}
               setShowApptModal={setShowApptModal}
               setShowDateModal={setShowDateModal}
             />
