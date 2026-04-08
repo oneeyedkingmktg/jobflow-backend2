@@ -80,10 +80,8 @@ export default function DateModal({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 
-  // Start date (always used)
   const [startDate, setStartDate] = useState(isValidDateStr(initialDate) ? initialDate : null);
 
-  // End date — only for install dates (allowTentative). Prefer initialEndDate; fall back to computing from initialDurationDays.
   const computedInitialEnd = isValidDateStr(initialDate) && initialDurationDays > 1
     ? addDays(initialDate, initialDurationDays - 1)
     : null;
@@ -93,6 +91,21 @@ export default function DateModal({
 
   const [dayViewDate, setDayViewDate] = useState(null);
   const [dots, setDots] = useState([]);
+
+  // Landscape detection
+  const [isLandscape, setIsLandscape] = useState(
+    () => typeof window !== "undefined" && window.innerWidth > window.innerHeight
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     if (isValidDateStr(initialDate)) setStartDate(initialDate);
@@ -204,26 +217,19 @@ export default function DateModal({
 
   const handleDayClick = (key) => {
     if (!allowTentative) {
-      // Non-install dates: single date selection
       setStartDate(key);
       setDayViewDate(key);
       return;
     }
-
-    // Install dates: range selection
     if (!startDate || (startDate && endDate)) {
-      // No start yet, or both already set — start fresh
       setStartDate(key);
       setEndDate(null);
       setDayViewDate(key);
     } else {
-      // Start set, no end — pick end date
       if (key < startDate) {
-        // Clicked before start — reset with new start
         setStartDate(key);
         setEndDate(null);
       } else if (key === startDate) {
-        // Same day = single day install
         setEndDate(key);
         setDayViewDate(key);
       } else {
@@ -247,7 +253,6 @@ export default function DateModal({
     onClose();
   };
 
-  // Display text
   const displayText = (() => {
     if (!startDate) return allowTentative ? "Tap start date" : "No date selected";
     if (allowTentative) {
@@ -266,151 +271,199 @@ export default function DateModal({
 
   const canSave = startDate && (!allowTentative || endDate);
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold mb-3 text-gray-800 text-center">{label}</h2>
+  // ── Shared JSX pieces ────────────────────────────────────────────────────
 
-        {/* Tentative checkbox */}
-        {allowTentative && (
-          <div className="mb-3">
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={tentative}
-                onChange={(e) => setTentative(e.target.checked)}
-                className="mr-2 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 font-medium">Week of (tentative)</span>
-            </label>
-            {tentative && (
-              <p className="text-xs text-blue-600 mt-1 ml-6">Date will be set to Monday of the selected week</p>
-            )}
-          </div>
-        )}
+  const headerBlock = (
+    <>
+      <h2 className="text-lg font-semibold mb-3 text-gray-800 text-center pr-6">{label}</h2>
 
-        {/* Date range display */}
-        <div className="text-center text-sm font-semibold text-blue-700 mb-2 min-h-[20px]">
-          {displayText}
+      {allowTentative && (
+        <div className="mb-3">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tentative}
+              onChange={(e) => setTentative(e.target.checked)}
+              className="mr-2 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 font-medium">Week of (tentative)</span>
+          </label>
+          {tentative && (
+            <p className="text-xs text-blue-600 mt-1 ml-6">Date will be set to Monday of the selected week</p>
+          )}
         </div>
+      )}
 
-        {/* Month navigation */}
-        <div className="flex items-center justify-between mb-2 bg-gray-50 rounded border border-gray-200 px-2 py-1">
-          <button onClick={goToPrevMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Previous month">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span className="text-xs font-medium text-gray-700">{getMonthName()}</span>
-          <button onClick={goToNextMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Next month">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+      <div className="text-center text-sm font-semibold text-blue-700 mb-2 min-h-[20px]">
+        {displayText}
+      </div>
+    </>
+  );
 
-        {/* Day headers */}
-        <div className="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 mb-1">
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
+  const calendarBlock = (
+    <>
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-2 bg-gray-50 rounded border border-gray-200 px-2 py-1">
+        <button onClick={goToPrevMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Previous month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-xs font-medium text-gray-700">{getMonthName()}</span>
+        <button onClick={goToNextMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Next month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
 
-        {/* Calendar grid — week-by-week with install pill bars */}
-        <div className="text-xs">
-          {weeks.map((week, wIdx) => {
-            const weekBars = getWeekBars(week);
-            const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map(b => b.rowIdx)) + 1 : 0;
-            const barAreaHeight = barRowCount * 28;
-            return (
-              <div key={wIdx} className="mb-0.5">
-                <div className="grid grid-cols-7 gap-x-2 text-center">
-                  {week.map((day, dIdx) => {
-                    if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[32px]" />;
-                    const key = formatDateKey(day);
-                    const isToday = key === formatDateKey(today);
-                    const isStart = key === startDate;
-                    const isEnd = allowTentative && key === endDate;
-                    const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
-                    let cellClass = "rounded cursor-pointer py-1 flex items-center justify-center min-h-[32px] font-medium transition-colors ";
-                    if (isStart || isEnd) cellClass += "bg-green-700 text-white";
-                    else if (inRange) cellClass += "bg-green-100 text-green-900";
-                    else if (isToday) cellClass += "bg-blue-100 text-blue-800";
-                    else cellClass += "hover:bg-gray-100 text-gray-800";
+      {/* Day headers */}
+      <div className="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 mb-1">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div key={d}>{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="text-xs">
+        {weeks.map((week, wIdx) => {
+          const weekBars = getWeekBars(week);
+          const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map(b => b.rowIdx)) + 1 : 0;
+          const barAreaHeight = barRowCount * 28;
+          return (
+            <div key={wIdx} className="mb-0.5">
+              <div className="grid grid-cols-7 gap-x-2 text-center">
+                {week.map((day, dIdx) => {
+                  if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[32px]" />;
+                  const key = formatDateKey(day);
+                  const isToday = key === formatDateKey(today);
+                  const isStart = key === startDate;
+                  const isEnd = allowTentative && key === endDate;
+                  const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
+                  let cellClass = "rounded cursor-pointer py-1 flex items-center justify-center min-h-[32px] font-medium transition-colors ";
+                  if (isStart || isEnd) cellClass += "bg-green-700 text-white";
+                  else if (inRange) cellClass += "bg-green-100 text-green-900";
+                  else if (isToday) cellClass += "bg-blue-100 text-blue-800";
+                  else cellClass += "hover:bg-gray-100 text-gray-800";
+                  return (
+                    <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
+                      {day.getDate()}
+                    </div>
+                  );
+                })}
+              </div>
+              {barAreaHeight > 0 && (
+                <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
+                  {weekBars.map((bar) => {
+                    const roundClass = bar.roundLeft && bar.roundRight ? "rounded" : bar.roundLeft ? "rounded-l" : bar.roundRight ? "rounded-r" : "";
+                    const bgColor = bar.lead.installTentative ? "bg-green-700" : "bg-green-500";
                     return (
-                      <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
-                        {day.getDate()}
+                      <div
+                        key={bar.id}
+                        onClick={() => setDayViewDate(formatDateKey(week[bar.colStart]))}
+                        className={`absolute h-6 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
+                        style={{ left: modalBarLeftCalc(bar.colStart), width: modalBarWidthCalc(bar.colSpan), top: `${bar.rowIdx * 28}px` }}
+                      >
+                        <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
                       </div>
                     );
                   })}
                 </div>
-                {barAreaHeight > 0 && (
-                  <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
-                    {weekBars.map((bar) => {
-                      const roundClass = bar.roundLeft && bar.roundRight ? "rounded" : bar.roundLeft ? "rounded-l" : bar.roundRight ? "rounded-r" : "";
-                      const bgColor = bar.lead.installTentative ? "bg-green-700" : "bg-green-500";
-                      return (
-                        <div
-                          key={bar.id}
-                          onClick={() => setDayViewDate(formatDateKey(week[bar.colStart]))}
-                          className={`absolute h-6 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
-                          style={{ left: modalBarLeftCalc(bar.colStart), width: modalBarWidthCalc(bar.colSpan), top: `${bar.rowIdx * 28}px` }}
-                        >
-                          <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Day detail list — installs only */}
-        {dayViewDate && groupedByDate[dayViewDate]?.install?.length > 0 && (
-          <div className="mt-3 border-t pt-2">
-            <div className="text-xs font-semibold text-gray-600 mb-1">{formatDisplayDate(dayViewDate)}</div>
-            <div className="space-y-1 max-h-28 overflow-y-auto">
-              {groupedByDate[dayViewDate].install
-                .filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i)
-                .map((lead, i) => (
-                  <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
-                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                    <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
-                  </div>
-                ))}
+              )}
             </div>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  const dayDetailBlock = dayViewDate && groupedByDate[dayViewDate]?.install?.length > 0 && (
+    <div className="mt-3 border-t pt-2">
+      <div className="text-xs font-semibold text-gray-600 mb-1">{formatDisplayDate(dayViewDate)}</div>
+      <div className="space-y-1 max-h-28 overflow-y-auto">
+        {groupedByDate[dayViewDate].install
+          .filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i)
+          .map((lead, i) => (
+            <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
+              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+
+  const buttonBlock = (
+    <div className="flex justify-between mt-4 gap-2">
+      <button
+        onClick={handleRemove}
+        className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
+      >
+        Clear Date
+      </button>
+      <div className="flex gap-2">
+        <button onClick={onClose} className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">
+          Exit
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={!canSave}
+          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div
+      className={`fixed inset-0 bg-black/40 flex justify-center items-center z-50 ${isLandscape ? "p-2" : "p-4"}`}
+      onClick={onClose}
+    >
+      <div
+        className={`bg-white rounded-lg shadow-xl w-full relative ${
+          isLandscape
+            ? "max-w-5xl max-h-screen overflow-y-auto flex flex-row"
+            : "max-w-3xl max-h-screen overflow-y-auto"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* X close button */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 z-10 text-gray-500 hover:text-gray-800 text-2xl font-bold leading-none"
+        >
+          ×
+        </button>
+
+        {isLandscape ? (
+          <>
+            {/* LEFT column: calendar */}
+            <div className="flex-1 min-w-0 p-4 border-r border-gray-200">
+              {calendarBlock}
+            </div>
+            {/* RIGHT column: header + date info + day detail + buttons */}
+            <div className="w-64 flex-shrink-0 p-4 flex flex-col justify-between">
+              <div>
+                {headerBlock}
+                {dayDetailBlock}
+              </div>
+              {buttonBlock}
+            </div>
+          </>
+        ) : (
+          /* Portrait: title → tentative → date display → calendar → day detail → buttons */
+          <div className="p-5">
+            {headerBlock}
+            {calendarBlock}
+            {dayDetailBlock}
+            {buttonBlock}
           </div>
         )}
-
-        {/* Buttons */}
-        <div className="flex justify-between mt-4 gap-2">
-          <button
-            onClick={handleRemove}
-            className="px-3 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
-          >
-            Remove
-          </button>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!canSave}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Save
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
