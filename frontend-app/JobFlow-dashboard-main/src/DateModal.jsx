@@ -420,15 +420,15 @@ export default function DateModal({
 
   return (
     <div
-      className={`fixed inset-0 bg-black/40 flex justify-center items-center z-50 ${isLandscape ? "p-2" : "p-4"}`}
+      className="fixed inset-0 bg-black/40 z-50 overflow-y-auto"
       onClick={onClose}
     >
+      <div className={`flex min-h-full items-center justify-center ${isLandscape ? "p-2" : "p-4"}`}>
       <div
         className={`bg-white rounded-lg shadow-xl w-full relative ${
-          isLandscape
-            ? "max-w-5xl max-h-screen overflow-y-auto flex flex-row"
-            : "max-w-3xl max-h-screen overflow-y-auto"
+          isLandscape ? "max-w-5xl flex flex-row" : "max-w-3xl"
         }`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* X close button */}
@@ -464,6 +464,7 @@ export default function DateModal({
             {buttonBlock}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
