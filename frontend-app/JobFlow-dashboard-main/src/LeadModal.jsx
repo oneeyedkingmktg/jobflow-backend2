@@ -71,11 +71,13 @@ const [showDiscardModal, setShowDiscardModal] = useState(false);
   // ------------------------------------------------------------------
   // Exit without saving
   // ------------------------------------------------------------------
+// X button always shows the save-or-discard choice modal
 const handleExitWithoutSave = () => {
-  if (isEditing && isDirty) {
-    setShowDiscardModal(true);
-    return;
-  }
+  setShowDiscardModal(true);
+};
+
+// Footer "Exit" button — close immediately without saving
+const handleExitNoSave = () => {
   onClose?.();
 };
 
@@ -264,6 +266,7 @@ const handlePauseSave = (pauseFields) => {
               isEditing={isEditing}
               onSave={handleSave}
               onExit={handleSaveAndExit}
+              onExitWithoutSaving={handleExitNoSave}
               onEdit={() => setIsEditing(true)}
               onDelete={() => onDelete(form)}
               onJunk={onJunk ? () => onJunk(form) : null}
@@ -341,35 +344,37 @@ const handlePauseSave = (pauseFields) => {
       />
       {showDiscardModal && (
   <div className="fixed inset-0 z-[60] flex items-center justify-center">
-    {/* Backdrop */}
-    <div
-      className="absolute inset-0 bg-black/40"
-      onClick={cancelDiscardChanges}
-    />
-
-    {/* Modal */}
-    <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Discard changes?
+    <div className="absolute inset-0 bg-black/50" onClick={cancelDiscardChanges} />
+    <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-1 text-center">
+        Exit this record?
       </h3>
-
-      <p className="text-sm text-gray-600 mb-6">
-        You have unsaved changes. If you exit now, they will be lost.
+      <p className="text-sm text-gray-500 mb-6 text-center">
+        Choose how you'd like to leave.
       </p>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col gap-3">
         <button
-          onClick={cancelDiscardChanges}
-          className="px-4 py-2 rounded-xl bg-gray-100 text-gray-800 hover:bg-gray-200"
+          onClick={async () => {
+            setShowDiscardModal(false);
+            await handleSaveAndExit();
+          }}
+          disabled={saving}
+          className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition disabled:opacity-50"
         >
-          Cancel
+          {saving ? "Saving..." : "Save & Exit"}
         </button>
-
         <button
           onClick={confirmDiscardChanges}
-          className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700"
+          className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold text-sm hover:bg-gray-200 transition"
         >
-          Discard
+          Exit Without Saving
+        </button>
+        <button
+          onClick={cancelDiscardChanges}
+          className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition"
+        >
+          Cancel — keep editing
         </button>
       </div>
     </div>

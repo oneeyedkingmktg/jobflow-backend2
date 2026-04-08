@@ -1,6 +1,5 @@
 // ============================================================================
 // File: src/leadModalParts/LeadFooter.jsx
-// Version: v1.1 – Delete warning clarifies multi-system removal
 // ============================================================================
 
 import React from "react";
@@ -11,6 +10,7 @@ export default function LeadFooter({
   onSave,
   onEdit,
   onExit,
+  onExitWithoutSaving,
   onPause,
   deleteConfirm,
   setDeleteConfirm,
@@ -25,7 +25,10 @@ export default function LeadFooter({
 
   return (
     <div className="pt-6 border-t border-gray-200">
+
+      {/* TOP ROW: Save & Exit | Exit Without Saving | Edit/Save */}
       <div className="flex items-center justify-between w-full gap-3">
+
         {/* SAVE & EXIT */}
         <button
           type="button"
@@ -36,18 +39,17 @@ export default function LeadFooter({
           {saving ? "Saving..." : "Save & Exit"}
         </button>
 
-        {/* PAUSE */}
-        {!isEstimatorOnly && (
-          <button
-            type="button"
-            onClick={onPause}
-            className="flex-1 py-3 bg-yellow-400 text-gray-900 rounded-xl font-semibold text-sm hover:bg-yellow-500 transition"
-          >
-            ⏸ Pause
-          </button>
-        )}
+        {/* EXIT WITHOUT SAVING */}
+        <button
+          type="button"
+          onClick={onExitWithoutSaving}
+          disabled={saving}
+          className="flex-1 py-3 bg-orange-100 text-orange-800 rounded-xl font-semibold text-sm hover:bg-orange-200 transition disabled:opacity-50"
+        >
+          Exit
+        </button>
 
-        {/* SAVE / EDIT */}
+        {/* EDIT / SAVE */}
         {!isEditing ? (
           <button
             type="button"
@@ -68,7 +70,7 @@ export default function LeadFooter({
         )}
       </div>
 
-{/* JUNK / DELETE / REINSTATE */}
+      {/* BOTTOM ROW: Pause | Junk | Delete (or Reinstate) */}
       <div className="mt-4 flex justify-center">
         {onReinstate ? (
           <button
@@ -103,7 +105,17 @@ export default function LeadFooter({
             </div>
           </div>
         ) : (
-          <div className="flex gap-6">
+          <div className="flex gap-6 flex-wrap justify-center">
+            {!isEstimatorOnly && onPause && (
+              <button
+                type="button"
+                onClick={onPause}
+                disabled={saving}
+                className="text-sm text-yellow-600 hover:text-yellow-800 underline disabled:opacity-50"
+              >
+                ⏸ Pause
+              </button>
+            )}
             {!isJunk && onJunk && (
               <button
                 type="button"
