@@ -361,7 +361,6 @@ export default function ApptDateTimeModal({
           className={`bg-white rounded-lg shadow-xl w-full relative ${
             isLandscape ? "max-w-5xl flex flex-row" : "max-w-3xl"
           }`}
-          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* X close button */}
