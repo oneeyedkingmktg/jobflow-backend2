@@ -209,7 +209,7 @@ function AppContent() {
      6. Main App (default)
      --------------------------------------- */
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-screen bg-gray-50" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}>
       {activeScreen === "messages" ? (
         isEstimatorOnly ? (
           <LockedScreen><MessagesPage onUnreadCount={setTotalUnread} /></LockedScreen>
@@ -221,7 +221,7 @@ function AppContent() {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <button
           onClick={() => setActiveScreen("leads")}
           className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors ${
