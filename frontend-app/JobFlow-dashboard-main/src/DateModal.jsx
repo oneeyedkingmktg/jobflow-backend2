@@ -272,7 +272,7 @@ export default function DateModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5"
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-3 text-gray-800 text-center">{label}</h2>
@@ -327,7 +327,7 @@ export default function DateModal({
           {weeks.map((week, wIdx) => {
             const weekBars = getWeekBars(week);
             const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map(b => b.rowIdx)) + 1 : 0;
-            const barAreaHeight = barRowCount * 14;
+            const barAreaHeight = barRowCount * 28;
             return (
               <div key={wIdx} className="mb-0.5">
                 <div className="grid grid-cols-7 gap-x-2 text-center">
@@ -353,15 +353,17 @@ export default function DateModal({
                 {barAreaHeight > 0 && (
                   <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
                     {weekBars.map((bar) => {
-                      const roundClass = bar.roundLeft && bar.roundRight ? "rounded-full" : bar.roundLeft ? "rounded-l-full" : bar.roundRight ? "rounded-r-full" : "";
-                      const bg = bar.lead.installTentative ? "#15803d" : "#22c55e";
+                      const roundClass = bar.roundLeft && bar.roundRight ? "rounded" : bar.roundLeft ? "rounded-l" : bar.roundRight ? "rounded-r" : "";
+                      const bgColor = bar.lead.installTentative ? "bg-green-700" : "bg-green-500";
                       return (
                         <div
                           key={bar.id}
                           onClick={() => setDayViewDate(formatDateKey(week[bar.colStart]))}
-                          className={`absolute h-2.5 cursor-pointer hover:opacity-80 ${roundClass}`}
-                          style={{ backgroundColor: bg, left: modalBarLeftCalc(bar.colStart), width: modalBarWidthCalc(bar.colSpan), top: `${bar.rowIdx * 14}px` }}
-                        />
+                          className={`absolute h-6 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
+                          style={{ left: modalBarLeftCalc(bar.colStart), width: modalBarWidthCalc(bar.colSpan), top: `${bar.rowIdx * 28}px` }}
+                        >
+                          <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
+                        </div>
                       );
                     })}
                   </div>
