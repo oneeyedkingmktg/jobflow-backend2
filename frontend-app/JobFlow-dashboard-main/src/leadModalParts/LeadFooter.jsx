@@ -44,7 +44,7 @@ export default function LeadFooter({
           type="button"
           onClick={onExitWithoutSaving}
           disabled={saving}
-          className="flex-1 py-3 bg-orange-100 text-orange-800 rounded-xl font-semibold text-sm hover:bg-orange-200 transition disabled:opacity-50"
+          className="flex-1 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition disabled:opacity-50"
         >
           Exit
         </button>
@@ -54,7 +54,7 @@ export default function LeadFooter({
           <button
             type="button"
             onClick={onEdit}
-            className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition"
+            className="flex-1 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition"
           >
             Edit
           </button>
