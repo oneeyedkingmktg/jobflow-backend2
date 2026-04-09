@@ -157,9 +157,9 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   // ── LIST VIEW ─────────────────────────────────────────────────────────────
   if (view === "list") {
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-        <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-xl p-5 max-h-[85vh] flex flex-col">
+        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 max-h-[85vh] flex flex-col mx-4">
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">Service Calls</h2>
@@ -213,9 +213,9 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   return (
     <>
       {/* Edit form — renders first so DateModal (below) stacks on top */}
-      <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={handleExitEdit} />
-        <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-xl p-5 max-h-[90vh] flex flex-col">
+        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 max-h-[90vh] flex flex-col mx-4">
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">
