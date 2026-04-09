@@ -21,16 +21,36 @@ function formatTimeDisplay(timeStr) {
   return `${hour}:${m} ${ampm}`;
 }
 
+// Parse "HH:MM" or "HH:MM:SS" → { hour, minute, ampm }
+function parseTime(t) {
+  if (!t) return { hour: "8", minute: "00", ampm: "AM" };
+  const [h, m] = t.split(":").map((v) => parseInt(v, 10));
+  const ampm = h >= 12 ? "PM" : "AM";
+  let hour12 = h % 12;
+  if (hour12 === 0) hour12 = 12;
+  return { hour: String(hour12), minute: (m || 0).toString().padStart(2, "0"), ampm };
+}
+
+// Convert hour/minute/ampm → "HH:MM"
+function to24Hour(hour, minute, ampm) {
+  let h = parseInt(hour, 10);
+  if (ampm === "PM" && h < 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return `${h.toString().padStart(2, "0")}:${minute}`;
+}
+
 export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   const [serviceCalls, setServiceCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "edit"
-  const [editing, setEditing] = useState(null); // null = new, object = existing
+  const [editing, setEditing] = useState(null);
 
   // Edit form state
-  const [date, setDate] = useState(null);
-  const [time, setTime] = useState("");
   const [title, setTitle] = useState("");
+  const [date, setDate] = useState(null);
+  const [hour, setHour] = useState("8");
+  const [minute, setMinute] = useState("00");
+  const [ampm, setAmpm] = useState("AM");
   const [notes, setNotes] = useState("");
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -59,9 +79,9 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
 
   const openNew = () => {
     setEditing(null);
-    setDate(null);
-    setTime("");
     setTitle("");
+    setDate(null);
+    setHour("8"); setMinute("00"); setAmpm("AM");
     setNotes("");
     setDirty(false);
     setView("edit");
@@ -69,9 +89,10 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
 
   const openEdit = (sc) => {
     setEditing(sc);
-    setDate(sc.scheduled_date ? sc.scheduled_date.split("T")[0] : null);
-    setTime(sc.scheduled_time ? sc.scheduled_time.substring(0, 5) : "");
     setTitle(sc.title || "");
+    setDate(sc.scheduled_date ? sc.scheduled_date.split("T")[0] : null);
+    const parsed = parseTime(sc.scheduled_time);
+    setHour(parsed.hour); setMinute(parsed.minute); setAmpm(parsed.ampm);
     setNotes(sc.notes || "");
     setDirty(false);
     setView("edit");
@@ -80,9 +101,10 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const timeStr = to24Hour(hour, minute, ampm);
       const payload = {
         scheduled_date: date || null,
-        scheduled_time: time || null,
+        scheduled_time: timeStr,
         title: title || null,
         notes: notes || null,
       };
@@ -139,7 +161,6 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-xl p-5 max-h-[85vh] flex flex-col">
 
-          {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">Service Calls</h2>
             <button
@@ -150,7 +171,6 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
             </button>
           </div>
 
-          {/* List */}
           <div className="flex-1 overflow-y-auto space-y-3">
             {loading ? (
               <div className="text-sm text-gray-500 py-6 text-center">Loading...</div>
@@ -178,7 +198,6 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
             )}
           </div>
 
-          {/* Add button */}
           <button
             onClick={openNew}
             className="mt-4 w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition"
@@ -193,52 +212,11 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   // ── EDIT VIEW ─────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Date picker overlay */}
-      {showDatePicker && (
-        <DateModal
-          initialDate={date}
-          label="Service Call Date"
-          allowTentative={false}
-          onConfirm={(selectedDate) => {
-            setDate(selectedDate);
-            setDirty(true);
-            setShowDatePicker(false);
-          }}
-          onClose={() => setShowDatePicker(false)}
-        />
-      )}
-
-      {/* Exit-without-saving confirmation */}
-      {confirmExit && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative bg-white rounded-2xl p-6 mx-4 w-full max-w-sm shadow-xl text-center">
-            <p className="text-gray-800 font-semibold mb-1">Exit without saving?</p>
-            <p className="text-gray-500 text-sm mb-5">Your changes will be lost.</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setConfirmExit(false); setView("list"); }}
-                className="flex-1 bg-red-100 text-red-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-red-200 transition"
-              >
-                Exit Without Saving
-              </button>
-              <button
-                onClick={() => setConfirmExit(false)}
-                className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
-              >
-                Stay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit form */}
+      {/* Edit form — renders first so DateModal (below) stacks on top */}
       <div className="fixed inset-0 z-50 flex items-end justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={handleExitEdit} />
         <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-xl p-5 max-h-[90vh] flex flex-col">
 
-          {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">
               {editing ? "Edit Service Call" : "New Service Call"}
@@ -251,33 +229,9 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
             </button>
           </div>
 
-          {/* Form fields */}
           <div className="flex-1 overflow-y-auto space-y-4">
 
-            {/* Date */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Date</label>
-              <button
-                type="button"
-                onClick={() => setShowDatePicker(true)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 transition"
-              >
-                {date ? formatDateDisplay(date) : <span className="text-gray-400 font-normal">Tap to set date</span>}
-              </button>
-            </div>
-
-            {/* Time */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Time</label>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => { setTime(e.target.value); setDirty(true); }}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
-              />
-            </div>
-
-            {/* Title */}
+            {/* Title — first */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block font-medium">Title</label>
               <input
@@ -289,7 +243,54 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
               />
             </div>
 
-            {/* Notes */}
+            {/* Date — second */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-medium">Date</label>
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(true)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 transition"
+              >
+                {date
+                  ? formatDateDisplay(date)
+                  : <span className="text-gray-400 font-normal">Tap to set date</span>}
+              </button>
+            </div>
+
+            {/* Time — third: hour / minute / AM-PM selects */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-medium">Time</label>
+              <div className="grid grid-cols-3 gap-2">
+                <select
+                  value={hour}
+                  onChange={(e) => { setHour(e.target.value); setDirty(true); }}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                >
+                  {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <select
+                  value={minute}
+                  onChange={(e) => { setMinute(e.target.value); setDirty(true); }}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                >
+                  {["00", "15", "30", "45"].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  value={ampm}
+                  onChange={(e) => { setAmpm(e.target.value); setDirty(true); }}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Notes — fourth */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block font-medium">Notes</label>
               <textarea
@@ -302,7 +303,6 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
             </div>
           </div>
 
-          {/* Action buttons */}
           <div className="mt-4 space-y-2">
             <button
               onClick={handleSave}
@@ -329,6 +329,46 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
           </div>
         </div>
       </div>
+
+      {/* Date picker — renders AFTER edit form so it stacks on top (z-50 same level, later in DOM wins) */}
+      {showDatePicker && (
+        <DateModal
+          initialDate={date}
+          label="Service Call Date"
+          allowTentative={false}
+          onConfirm={(selectedDate) => {
+            setDate(selectedDate);
+            setDirty(true);
+            setShowDatePicker(false);
+          }}
+          onClose={() => setShowDatePicker(false)}
+        />
+      )}
+
+      {/* Exit-without-saving confirmation — also after edit form */}
+      {confirmExit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl p-6 mx-4 w-full max-w-sm shadow-xl text-center">
+            <p className="text-gray-800 font-semibold mb-1">Exit without saving?</p>
+            <p className="text-gray-500 text-sm mb-5">Your changes will be lost.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setConfirmExit(false); setView("list"); }}
+                className="flex-1 bg-red-100 text-red-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-red-200 transition"
+              >
+                Exit Without Saving
+              </button>
+              <button
+                onClick={() => setConfirmExit(false)}
+                className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
+              >
+                Stay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
