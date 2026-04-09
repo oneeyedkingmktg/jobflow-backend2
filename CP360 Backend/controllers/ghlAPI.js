@@ -1327,6 +1327,84 @@ async function clearContactCustomFields(contactId, fieldKeys, company) {
 }
 
 // ----------------------------------------------------------------------------
+// SERVICE CALL → GHL INSTALL CALENDAR SYNC
+// ----------------------------------------------------------------------------
+
+// Create or replace a GHL calendar event for a service call.
+// Call after INSERT or UPDATE on service_calls.
+// Returns the new GHL event ID, or null if skipped.
+async function syncServiceCallToGhl({ serviceCall, lead, company }) {
+  if (!company.ghl_install_calendar) {
+    console.log("[SC GHL] Skipping — no install calendar configured");
+    return null;
+  }
+  if (!lead.ghl_contact_id) {
+    console.log("[SC GHL] Skipping — lead has no GHL contact ID");
+    return null;
+  }
+  if (!serviceCall.scheduled_date) {
+    console.log("[SC GHL] Skipping — service call has no date");
+    return null;
+  }
+
+  const companyTimezone = company.timezone || 'America/New_York';
+  const dateOnly = serviceCall.scheduled_date.toString().split('T')[0];
+
+  // Use scheduled_time if set, otherwise default to 9:00 AM
+  let timeStr = '09:00:00';
+  if (serviceCall.scheduled_time) {
+    const t = serviceCall.scheduled_time.toString();
+    timeStr = t.length === 5 ? `${t}:00` : t; // ensure HH:MM:SS
+  }
+
+  const startDt = convertToUTC(`${dateOnly}T${timeStr.substring(0, 5)}:00`, companyTimezone);
+  const endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // +1 hour
+
+  const title = `${lead.name || 'Unknown'} SC`;
+
+  const createPayload = {
+    locationId: company.ghl_location_id,
+    calendarId: company.ghl_install_calendar,
+    contactId: lead.ghl_contact_id,
+    title,
+    startTime: startDt.toISOString(),
+    endTime: endDt.toISOString(),
+    ignoreDateRanges: true,
+  };
+
+  // If there's an existing event, delete it first
+  if (serviceCall.ghl_event_id) {
+    try {
+      await deleteCalendarEvent(company, serviceCall.ghl_event_id, lead.ghl_contact_id);
+      console.log("[SC GHL] Deleted old event:", serviceCall.ghl_event_id);
+    } catch (err) {
+      console.warn("[SC GHL] Could not delete old event:", err.message);
+    }
+  }
+
+  console.log("[SC GHL] Creating event:", JSON.stringify(createPayload));
+  const created = await ghlRequest(company, '/calendars/events/appointments', {
+    method: 'POST',
+    body: createPayload,
+  });
+
+  const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+  console.log("[SC GHL] Created event ID:", eventId);
+  return eventId;
+}
+
+// Delete the GHL event for a service call (call before DELETE on service_calls).
+async function deleteServiceCallGhlEvent({ company, eventId, contactId }) {
+  if (!eventId) return;
+  try {
+    await deleteCalendarEvent(company, eventId, contactId);
+    console.log("[SC GHL] Deleted event:", eventId);
+  } catch (err) {
+    console.warn("[SC GHL] Could not delete event:", err.message);
+  }
+}
+
+// ----------------------------------------------------------------------------
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
 module.exports = {
@@ -1337,6 +1415,8 @@ module.exports = {
   updateContactCustomFields,
   clearContactCustomFields,
   convertFromUTC,
+  syncServiceCallToGhl,
+  deleteServiceCallGhlEvent,
   syncLeadToGHL: async function (lead, company, previousInstallTentative = null) {
     const companyId = company?.id;
 
