@@ -3,9 +3,11 @@
 // Version: v1.0 – Fixed field names (appointmentDate/appointmentTime)
 // ============================================================================
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { formatDate, formatTime } from "../utils/formatting.js";
 import { useAuth } from "../AuthContext";
+import { apiRequest } from "../api";
+import ServiceCallsModal from "../ServiceCallsModal";
 
 
 export default function LeadAppointmentSection({
@@ -15,6 +17,17 @@ export default function LeadAppointmentSection({
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const serviceCallsEnabled = user?.serviceCallsEnabled === true;
+
+  const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
+  const [serviceCallCount, setServiceCallCount] = useState(0);
+
+  useEffect(() => {
+    if (!serviceCallsEnabled || !form?.id) return;
+    apiRequest(`/leads/${form.id}/service-calls`)
+      .then((data) => setServiceCallCount((data.serviceCalls || []).length))
+      .catch(() => {});
+  }, [serviceCallsEnabled, form?.id]);
 
   const apptDateDisplay = formatDate(form.appointmentDate);
   const apptTimeDisplay = form.appointmentTime ? formatTime(form.appointmentTime) : "";
@@ -82,6 +95,30 @@ export default function LeadAppointmentSection({
           </div>
         </button>
       </div>
+
+      {/* SERVICE CALLS BUTTON */}
+      {serviceCallsEnabled && (
+        <button
+          type="button"
+          onClick={() => setShowServiceCallsModal(true)}
+          className="mt-3 w-full bg-[#f5f6f7] rounded-xl border border-gray-200 px-3 py-3 text-left shadow-sm"
+        >
+          <span className="text-sm font-semibold text-blue-600">
+            {serviceCallCount === 0
+              ? "+ Service Call"
+              : `Show Service Calls (${serviceCallCount})`}
+          </span>
+        </button>
+      )}
+
+      {/* SERVICE CALLS MODAL */}
+      {showServiceCallsModal && (
+        <ServiceCallsModal
+          leadId={form.id}
+          onClose={() => setShowServiceCallsModal(false)}
+          onCountChange={(count) => setServiceCallCount(count)}
+        />
+      )}
     </div>
   );
 }
