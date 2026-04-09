@@ -1348,16 +1348,15 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   }
 
   const companyTimezone = company.timezone || 'America/New_York';
-  const dateOnly = serviceCall.scheduled_date.toString().split('T')[0];
+  // pg returns DATE as a JS Date object — use toISOString to get "YYYY-MM-DD"
+  const dateOnly = new Date(serviceCall.scheduled_date).toISOString().split('T')[0];
 
   // Use scheduled_time if set, otherwise default to 9:00 AM
-  let timeStr = '09:00:00';
-  if (serviceCall.scheduled_time) {
-    const t = serviceCall.scheduled_time.toString();
-    timeStr = t.length === 5 ? `${t}:00` : t; // ensure HH:MM:SS
-  }
+  const timeStr = serviceCall.scheduled_time
+    ? serviceCall.scheduled_time.toString().substring(0, 5) // "HH:MM"
+    : '09:00';
 
-  const startDt = convertToUTC(`${dateOnly}T${timeStr.substring(0, 5)}:00`, companyTimezone);
+  const startDt = convertToUTC(`${dateOnly}T${timeStr}:00`, companyTimezone);
   const endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // +1 hour
 
   const title = `${lead.name || 'Unknown'} SC`;
