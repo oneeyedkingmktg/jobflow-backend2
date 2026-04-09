@@ -151,6 +151,33 @@ router.get("/calendar-dots", async (req, res) => {
 });
 
 // ============================================================================
+// GET SERVICE CALLS CALENDAR DATA
+// ============================================================================
+router.get("/service-calls-calendar", async (req, res) => {
+  try {
+    const { company_id } = req.query;
+    if (!company_id) return res.status(400).json({ error: "company_id required" });
+
+    const result = await pool.query(
+      `SELECT sc.id, sc.lead_id, sc.scheduled_date::text, sc.scheduled_time::text,
+              sc.title, l.name AS lead_name
+       FROM service_calls sc
+       JOIN leads l ON l.id = sc.lead_id
+       WHERE sc.company_id = $1
+         AND sc.scheduled_date IS NOT NULL
+         AND l.deleted_at IS NULL
+       ORDER BY sc.scheduled_date ASC`,
+      [company_id]
+    );
+
+    res.json({ serviceCalls: result.rows });
+  } catch (err) {
+    console.error("Error fetching service calls calendar:", err);
+    res.status(500).json({ error: "Failed to fetch service calls calendar." });
+  }
+});
+
+// ============================================================================
 // CHECK APPOINTMENT SLOT (hard block collision check) - MOVED TO TOP
 // ============================================================================
 router.get("/appt-slot-check", async (req, res) => {

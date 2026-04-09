@@ -206,6 +206,9 @@ export const LeadsAPI = {
     if (excludeLeadId) params.append("exclude_lead_id", excludeLeadId);
     return apiRequest(`/leads/appt-slot-check?${params.toString()}`);
   },
+
+  getServiceCallsCalendar: (companyId) =>
+    apiRequest(`/leads/service-calls-calendar?company_id=${companyId}`),
 };
 
 /* ============================================================================

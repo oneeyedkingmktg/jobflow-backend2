@@ -21,7 +21,7 @@ function barWidthCalc(colSpan) {
   return `calc(${colSpan} * (100% - ${TOTAL_GAP_PX}px) / ${COLS} + ${Math.max(colSpan - 1, 0)} * ${GAP_PX}px)`;
 }
 
-export default function CalendarView({ leads, onSelectLead }) {
+export default function CalendarView({ leads, serviceCalls = [], onSelectLead }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -76,7 +76,7 @@ export default function CalendarView({ leads, onSelectLead }) {
     const map = {};
     leads.forEach((lead) => {
       if (lead.appointmentDate) {
-        if (!map[lead.appointmentDate]) map[lead.appointmentDate] = { appt: [], install: [] };
+        if (!map[lead.appointmentDate]) map[lead.appointmentDate] = { appt: [], install: [], sc: [] };
         map[lead.appointmentDate].appt.push(lead);
       }
       if (lead.installDate) {
@@ -88,7 +88,7 @@ export default function CalendarView({ leads, onSelectLead }) {
           const date = new Date(lead.installDate + "T12:00:00");
           date.setDate(date.getDate() + d);
           const key = date.toISOString().split("T")[0];
-          if (!map[key]) map[key] = { appt: [], install: [] };
+          if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
           map[key].install.push({
             ...lead,
             _barStart: d === 0,
@@ -97,8 +97,14 @@ export default function CalendarView({ leads, onSelectLead }) {
         }
       }
     });
+    serviceCalls.forEach((sc) => {
+      if (!sc.scheduled_date) return;
+      const key = sc.scheduled_date.split("T")[0];
+      if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
+      map[key].sc.push(sc);
+    });
     return map;
-  }, [leads]);
+  }, [leads, serviceCalls]);
 
   // Group monthDays into weeks (arrays of 7, nulls for padding)
   const weeks = useMemo(() => {
@@ -176,8 +182,13 @@ export default function CalendarView({ leads, onSelectLead }) {
         allLeads.push({ ...l, displayDate: l.installDate, displayType: "install" });
       }
     });
+    serviceCalls.forEach((sc) => {
+      if (sc.scheduled_date && sc.scheduled_date.slice(0, 10) >= todayStr) {
+        allLeads.push({ ...sc, displayDate: sc.scheduled_date, displayType: "serviceCall", name: sc.lead_name });
+      }
+    });
     return allLeads.sort((a, b) => new Date(a.displayDate) - new Date(b.displayDate));
-  }, [leads]);
+  }, [leads, serviceCalls]);
 
   const handleDayClick = (date) => {
     setSelectedDate(date);
@@ -244,8 +255,7 @@ export default function CalendarView({ leads, onSelectLead }) {
               {week.map((day, dIdx) => {
                 if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[60px]" />;
                 const key = formatDateKey(day);
-                const data = groupedByDate[key] || { appt: [], install: [] };
-                const apptCount = data.appt.length;
+                const data = groupedByDate[key] || { appt: [], install: [], sc: [] };
                 const isToday = key === formatDateKey(today);
 
                 return (
@@ -262,6 +272,15 @@ export default function CalendarView({ leads, onSelectLead }) {
                         {data.appt.map((apptLead, i) => (
                           <div key={`a-${i}`} className="w-full h-6 bg-blue-500 rounded-sm overflow-hidden flex items-center px-1">
                             <span className="text-white text-xs font-semibold truncate leading-none">{apptLead.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {data.sc.length > 0 && (
+                      <div className="flex flex-col gap-0.5 w-full mt-0.5">
+                        {data.sc.map((sc, i) => (
+                          <div key={`sc-${i}`} className="w-full h-6 bg-orange-400 rounded-sm overflow-hidden flex items-center px-1">
+                            <span className="text-white text-xs font-semibold truncate leading-none">{sc.lead_name}</span>
                           </div>
                         ))}
                       </div>
@@ -333,8 +352,9 @@ export default function CalendarView({ leads, onSelectLead }) {
           {futureLeads.map((lead, idx) => {
             const isInstall = lead.displayType === "install";
             const isAppt = lead.displayType === "appointment";
-            const barColor = isInstall ? "bg-green-500" : "bg-blue-500";
-            const labelType = isInstall ? "Install" : "Appointment";
+            const isSC = lead.displayType === "serviceCall";
+            const barColor = isInstall ? "bg-green-500" : isSC ? "bg-orange-400" : "bg-blue-500";
+            const labelType = isInstall ? "Install" : isSC ? "Service Call" : "Appointment";
 
             let labelDate = formatDisplayDate(lead.displayDate);
             if (isInstall && lead.installEndDate && lead.installEndDate !== lead.installDate) {
@@ -343,12 +363,14 @@ export default function CalendarView({ leads, onSelectLead }) {
             if (isAppt && lead.appointmentTime) {
               labelDate = `${labelDate} @ ${formatTime12h(lead.appointmentTime)}`;
             }
+            if (isSC && lead.scheduled_time) {
+              labelDate = `${labelDate} @ ${formatTime12h(lead.scheduled_time)}`;
+            }
 
             return (
               <div
                 key={idx}
-                onClick={() => handleLeadClick(lead, "list")}
-                className="border rounded-md hover:bg-gray-50 cursor-pointer overflow-hidden"
+                className="border rounded-md overflow-hidden"
               >
                 <div className={`${barColor} text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md`}>
                   {`${labelType} — ${labelDate}`}
@@ -357,13 +379,16 @@ export default function CalendarView({ leads, onSelectLead }) {
                   <div className="flex justify-between flex-wrap">
                     <div className="flex-1">
                       <span className="font-semibold">
-                        {lead.name}{lead.projectType ? ` — ${lead.projectType}` : ""}
+                        {lead.name}{!isSC && lead.projectType ? ` — ${lead.projectType}` : ""}
                       </span>
-                      {lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
+                      {isSC && lead.title && (
+                        <div className="text-xs text-gray-600 mt-0.5">{lead.title}</div>
+                      )}
+                      {!isSC && lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
                         <div className="text-xs text-gray-700 font-semibold mt-0.5">{lead.companyName}</div>
                       )}
                     </div>
-                    <span className="text-gray-600">{lead.city}, {lead.state}</span>
+                    {!isSC && <span className="text-gray-600">{lead.city}, {lead.state}</span>}
                   </div>
                 </div>
               </div>
@@ -376,8 +401,8 @@ export default function CalendarView({ leads, onSelectLead }) {
 
   // ========= Day View =========
   const DayView = () => {
-    const data = groupedByDate[selectedDate] || { appt: [], install: [] };
-    const hasAny = data.appt.length + data.install.length > 0;
+    const data = groupedByDate[selectedDate] || { appt: [], install: [], sc: [] };
+    const hasAny = data.appt.length + data.install.length + data.sc.length > 0;
 
     // Deduplicate installs (same lead may appear multiple times if multi-day)
     const uniqueInstalls = [];
@@ -447,6 +472,18 @@ export default function CalendarView({ leads, onSelectLead }) {
               </div>
             );
           })}
+          {data.sc.map((sc, i) => (
+            <div key={`sc-${i}`} className="border rounded-md overflow-hidden">
+              <div className="bg-orange-400 text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md">
+                Service Call{sc.scheduled_time ? ` @ ${formatTime12h(sc.scheduled_time)}` : ""}
+              </div>
+              <div className="px-3 pb-3 pt-2 text-sm">
+                <span className="font-semibold">{sc.lead_name}</span>
+                {sc.title && <div className="text-xs text-gray-600 mt-0.5">{sc.title}</div>}
+                {sc.notes && <div className="text-xs text-gray-500 mt-0.5">{sc.notes}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

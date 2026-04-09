@@ -154,6 +154,7 @@ export default function LeadsHome() {
   const [includeJunk, setIncludeJunk] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showPhoneLookup, setShowPhoneLookup] = useState(false);
+  const [serviceCalls, setServiceCalls] = useState([]);
 
   // --------------------------------------------------
   // Load leads
@@ -184,6 +185,9 @@ const loadLeads = async () => {
   useEffect(() => {
     if (!currentCompany?.id) return;
     loadLeads();
+    LeadsAPI.getServiceCallsCalendar(currentCompany.id)
+      .then((data) => setServiceCalls(data.serviceCalls || []))
+      .catch(() => {});
   }, [currentCompany?.id]);
 
   // Open a specific lead when navigating from Messages → Go to Lead
@@ -343,6 +347,7 @@ onAddLead={() => {
   {activeTab === "Calendar" ? (
     <CalendarView
       leads={leads}
+      serviceCalls={serviceCalls}
       onSelectLead={(lead) => {
         setSelectedLead(lead);
         setIsNewLead(false);
