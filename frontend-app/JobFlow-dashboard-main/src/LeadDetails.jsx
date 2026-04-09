@@ -1,5 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
+import { useAuth } from "./AuthContext";
+import { apiRequest } from "./api";
+import ServiceCallsModal from "./ServiceCallsModal";
 
 
 export default function LeadDetails({
@@ -13,6 +16,19 @@ export default function LeadDetails({
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState("");
   const [estimate, setEstimate] = useState(null);
+
+  const { user } = useAuth();
+  const serviceCallsEnabled = user?.serviceCallsEnabled === true;
+
+  const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
+  const [serviceCallCount, setServiceCallCount] = useState(0);
+
+  useEffect(() => {
+    if (!serviceCallsEnabled || !form?.id) return;
+    apiRequest(`/leads/${form.id}/service-calls`)
+      .then((data) => setServiceCallCount((data.serviceCalls || []).length))
+      .catch(() => {});
+  }, [serviceCallsEnabled, form?.id]);
 
   const hasEstimate = form?.hasEstimate === true;
 
@@ -332,6 +348,29 @@ export default function LeadDetails({
           )}
         </div>
       </div>
+
+      {/* SERVICE CALLS BUTTON */}
+      {serviceCallsEnabled && (
+        <button
+          onClick={() => setShowServiceCallsModal(true)}
+          className="w-full bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm hover:border-blue-400 cursor-pointer transition text-left"
+        >
+          <span className="text-sm font-semibold text-blue-600">
+            {serviceCallCount === 0
+              ? "+ Service Call"
+              : `Show Service Calls (${serviceCallCount})`}
+          </span>
+        </button>
+      )}
+
+      {/* SERVICE CALLS MODAL */}
+      {showServiceCallsModal && (
+        <ServiceCallsModal
+          leadId={form.id}
+          onClose={() => setShowServiceCallsModal(false)}
+          onCountChange={(count) => setServiceCallCount(count)}
+        />
+      )}
 
       {/* NOTES */}
       {form.notes ? (

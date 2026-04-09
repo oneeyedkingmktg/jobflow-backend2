@@ -34,6 +34,7 @@ export default function UserManagement({ onBack }) {
       phone: user.phone || "",
       role: user.role,
       is_active: user.is_active,
+      service_calls_enabled: user.service_calls_enabled ?? false,
       newPassword: "",
     });
   };
@@ -45,6 +46,7 @@ export default function UserManagement({ onBack }) {
       phone: editForm.phone,
       role: editForm.role,
       is_active: editForm.is_active,
+      service_calls_enabled: editForm.service_calls_enabled,
     });
 
     if (editForm.newPassword) {
@@ -213,6 +215,37 @@ export default function UserManagement({ onBack }) {
             </select>
           ) : (
             <div>{selectedUser.is_active ? "Active" : "Inactive"}</div>
+          )}
+        </div>
+
+        {/* Service Calls Feature Toggle */}
+        <div>
+          <label className="form-label">Service Calls</label>
+          {isEditing ? (
+            <label className="flex items-center gap-3 cursor-pointer mt-1">
+              <div
+                onClick={() =>
+                  setEditForm({
+                    ...editForm,
+                    service_calls_enabled: !editForm.service_calls_enabled,
+                  })
+                }
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  editForm.service_calls_enabled ? "bg-blue-600" : "bg-gray-300"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    editForm.service_calls_enabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </div>
+              <span className="text-sm text-gray-700">
+                {editForm.service_calls_enabled ? "Enabled" : "Disabled"}
+              </span>
+            </label>
+          ) : (
+            <div>{selectedUser.service_calls_enabled ? "Enabled" : "Disabled"}</div>
           )}
         </div>
 

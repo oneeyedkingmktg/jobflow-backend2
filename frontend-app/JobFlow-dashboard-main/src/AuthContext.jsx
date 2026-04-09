@@ -33,6 +33,9 @@ const normalizeUser = (u) => {
     ghlLocationId: u.ghl_location_id ?? null,
     planType: u.plan_type ?? u.planType ?? 'pro',
     
+    // Feature flags
+    serviceCallsEnabled: u.service_calls_enabled ?? u.serviceCallsEnabled ?? false,
+
     // Meta fields
     created_at: u.created_at,
     updated_at: u.updated_at,

@@ -41,7 +41,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       if (req.query.company_id) {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
-                 sip_username, sip_password, sip_incoming_enabled
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -50,7 +50,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       } else {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
-                 sip_username, sip_password, sip_incoming_enabled
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -58,7 +58,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       }
     } else {
       query = `
-        SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login
+        SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+               service_calls_enabled
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -141,7 +142,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id, 10);
-    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled } = req.body;
+    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled } = req.body;
 
     // 🔴 BLOCK PASSWORD ATTEMPTS HERE
     if (password !== undefined && password !== "") {
@@ -234,6 +235,17 @@ router.put("/:id", async (req, res) => {
       values.push(company_id);
     }
 
+    // service_calls_enabled (admin or master can toggle for any user in their company)
+    if (service_calls_enabled !== undefined) {
+      const canToggle =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canToggle) {
+        updates.push(`service_calls_enabled = $${i++}`);
+        values.push(service_calls_enabled);
+      }
+    }
+
     // SIP fields (only master)
     if (req.user.role === "master") {
       if (sip_username !== undefined) {
@@ -260,7 +272,7 @@ router.put("/:id", async (req, res) => {
       `
       UPDATE users SET ${updates.join(", ")}, updated_at = NOW()
       WHERE id = $${i}
-      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled
+      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled
       `,
       values
     );
