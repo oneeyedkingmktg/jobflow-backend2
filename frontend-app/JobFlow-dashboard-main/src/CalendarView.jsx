@@ -281,7 +281,7 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                         {data.sc.map((sc, i) => (
                           <div key={`sc-${i}`} className="w-full h-6 bg-orange-400 rounded-sm overflow-hidden flex items-center px-1">
                             <span className="text-white text-xs font-semibold truncate leading-none">
-                              {sc.lead_name}{sc.title ? ` - ((${sc.title}))` : ""}
+                              {sc.lead_name}{sc.title ? ` - ${sc.title}` : ""}
                             </span>
                           </div>
                         ))}
@@ -376,7 +376,7 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
               >
                 <div className={`${barColor} text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md`}>
                   {isSC
-                    ? `${lead.name}${lead.title ? ` - ((${lead.title}))` : ""} — ${labelDate}`
+                    ? `${lead.name}${lead.title ? ` - ${lead.title}` : ""} — ${labelDate}`
                     : `${labelType} — ${labelDate}`}
                 </div>
                 <div className="px-3 pb-3 pt-2 text-sm">
@@ -481,11 +481,15 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
             return (
               <div
                 key={`sc-${i}`}
-                onClick={() => scLead && handleLeadClick(scLead, "day", selectedDate)}
+                onClick={() => {
+                  if (!scLead) return;
+                  window.__pendingOpenServiceCalls = sc.lead_id;
+                  handleLeadClick(scLead, "day", selectedDate);
+                }}
                 className={`border rounded-md overflow-hidden ${scLead ? "cursor-pointer hover:bg-gray-50" : ""}`}
               >
                 <div className="bg-orange-400 text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md">
-                  {sc.lead_name}{sc.title ? ` - ((${sc.title}))` : ""}{sc.scheduled_time ? ` @ ${formatTime12h(sc.scheduled_time)}` : ""}
+                  {sc.lead_name}{sc.title ? ` - ${sc.title}` : ""}{sc.scheduled_time ? ` @ ${formatTime12h(sc.scheduled_time)}` : ""}
                 </div>
                 <div className="px-3 pb-3 pt-2 text-sm">
                   <span className="font-semibold">{sc.lead_name}</span>

@@ -27,6 +27,10 @@ export default function LeadAppointmentSection({
     apiRequest(`/leads/${form.id}/service-calls`)
       .then((data) => setServiceCallCount((data.serviceCalls || []).length))
       .catch(() => {});
+    if (window.__pendingOpenServiceCalls === form.id) {
+      window.__pendingOpenServiceCalls = null;
+      setShowServiceCallsModal(true);
+    }
   }, [serviceCallsEnabled, form?.id]);
 
   const apptDateDisplay = formatDate(form.appointmentDate);
