@@ -181,13 +181,18 @@ const loadLeads = async () => {
     }
   };
 
+  const refreshServiceCalls = () => {
+    if (!currentCompany?.id) return;
+    LeadsAPI.getServiceCallsCalendar(currentCompany.id)
+      .then((data) => setServiceCalls(data.serviceCalls || []))
+      .catch(() => {});
+  };
+
   // 🔴 FIX: reload when company changes
   useEffect(() => {
     if (!currentCompany?.id) return;
     loadLeads();
-    LeadsAPI.getServiceCallsCalendar(currentCompany.id)
-      .then((data) => setServiceCalls(data.serviceCalls || []))
-      .catch(() => {});
+    refreshServiceCalls();
   }, [currentCompany?.id]);
 
   // Open a specific lead when navigating from Messages → Go to Lead
@@ -391,6 +396,7 @@ onAddLead={() => {
 {(selectedLead || isNewLead) && !showPhoneLookup && (
   <LeadModal
           lead={selectedLead}
+          onServiceCallsChange={refreshServiceCalls}
           onReinstate={isMasterAdmin && selectedLead?.deletedAt ? async (lead) => {
             if (!confirm(`Reinstate ${lead.name}? This will restore the contact in both JobFlow and GoHighLevel.`)) {
               return;

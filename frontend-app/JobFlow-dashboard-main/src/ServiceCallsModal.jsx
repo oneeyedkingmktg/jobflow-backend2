@@ -39,7 +39,7 @@ function to24Hour(hour, minute, ampm) {
   return `${h.toString().padStart(2, "0")}:${minute}`;
 }
 
-export default function ServiceCallsModal({ leadId, initialScId, onClose, onCountChange }) {
+export default function ServiceCallsModal({ leadId, initialScId, onClose, onCountChange, onServiceCallsChange }) {
   const [serviceCalls, setServiceCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "edit"
@@ -125,6 +125,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       }
       await loadServiceCalls(null);
       setView("list");
+      onServiceCallsChange?.();
     } catch (err) {
       console.error("Failed to save service call:", err);
       alert("Failed to save. Please try again.");
@@ -142,6 +143,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       });
       await loadServiceCalls(null);
       setView("list");
+      onServiceCallsChange?.();
     } catch (err) {
       console.error("Failed to delete service call:", err);
       alert("Failed to delete. Please try again.");

@@ -32,6 +32,7 @@ export default function LeadModal({
   onJunk,
   onReinstate,
   onClose,
+  onServiceCallsChange,
 }) {
   const { currentCompany } = useCompany();
   const softphone = useSoftphone();
@@ -238,6 +239,7 @@ const handlePauseSave = (pauseFields) => {
               form={form}
               setShowApptModal={setShowApptModal}
               setShowDateModal={setShowDateModal}
+              onServiceCallsChange={onServiceCallsChange}
             />
 
             {isEditing ? (

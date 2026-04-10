@@ -14,6 +14,7 @@ export default function LeadAppointmentSection({
   form,
   setShowApptModal,
   setShowDateModal,
+  onServiceCallsChange,
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
@@ -126,6 +127,7 @@ export default function LeadAppointmentSection({
           initialScId={pendingScId}
           onClose={() => { setShowServiceCallsModal(false); setPendingScId(null); }}
           onCountChange={(count) => setServiceCallCount(count)}
+          onServiceCallsChange={onServiceCallsChange}
         />
       )}
     </div>
