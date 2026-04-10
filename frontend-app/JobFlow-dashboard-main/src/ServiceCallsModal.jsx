@@ -218,19 +218,13 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     <>
       {/* Edit form — renders first so DateModal (below) stacks on top */}
       <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/40" onClick={handleExitEdit} />
+        <div className="absolute inset-0 bg-black/40" />
         <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 max-h-[90vh] flex flex-col mx-4">
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center mb-4">
             <h2 className="text-lg font-bold text-gray-900">
               {editing ? "Edit Service Call" : "New Service Call"}
             </h2>
-            <button
-              onClick={handleExitEdit}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center"
-            >
-              ×
-            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-4">
