@@ -1359,7 +1359,10 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   const startDt = convertToUTC(`${dateOnly}T${timeStr}:00`, companyTimezone);
   const endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // +1 hour
 
-  const title = `${lead.name || 'Unknown'} SC`;
+  // Title: "Full Name - Service Call Title"  e.g. "Mr Crabs - Spot Repair"
+  const displayName = lead.name || 'Unknown';
+  const scTitle = serviceCall.title || 'Service Call';
+  const title = `${displayName} - ${scTitle}`;
 
   const createPayload = {
     locationId: company.ghl_location_id,
@@ -1369,6 +1372,8 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     startTime: startDt.toISOString(),
     endTime: endDt.toISOString(),
     ignoreDateRanges: true,
+    // Flag this event as a service call so it can be distinguished from regular installs
+    isRunningLateAsGuest: true,
   };
 
   // If there's an existing event, delete it first
