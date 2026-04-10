@@ -363,7 +363,7 @@ export default function DateModal({
                         <div className="flex flex-col gap-px mt-0.5 w-full px-px">
                           {scItems.map((sc, i) => (
                             <div key={i} className="w-full h-5 bg-orange-400 rounded-sm flex items-center px-0.5 overflow-hidden">
-                              <span className="text-white text-[9px] font-semibold truncate leading-none">
+                              <span className="text-white text-xs font-semibold truncate leading-none">
                                 {sc.lead_name}{sc.title ? ` - ${sc.title}` : ""}
                               </span>
                             </div>
