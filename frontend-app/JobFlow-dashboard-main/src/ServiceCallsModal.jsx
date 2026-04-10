@@ -126,6 +126,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       await loadServiceCalls(null);
       setView("list");
       onServiceCallsChange?.();
+      window.dispatchEvent(new CustomEvent('serviceCallsChanged'));
     } catch (err) {
       console.error("Failed to save service call:", err);
       alert("Failed to save. Please try again.");
@@ -144,6 +145,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       await loadServiceCalls(null);
       setView("list");
       onServiceCallsChange?.();
+      window.dispatchEvent(new CustomEvent('serviceCallsChanged'));
     } catch (err) {
       console.error("Failed to delete service call:", err);
       alert("Failed to delete. Please try again.");

@@ -3,7 +3,7 @@
 // Version: v1.6 – Fixed save & exit + new lead creation
 // ============================================================================
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { apiRequest, LeadsAPI } from "./api";
 
 import LeadModal from "./LeadModal.jsx";
@@ -187,6 +187,17 @@ const loadLeads = async () => {
       .then((data) => setServiceCalls(data.serviceCalls || []))
       .catch(() => {});
   };
+
+  // Keep a ref so the event listener always calls the latest version
+  const refreshServiceCallsRef = useRef(refreshServiceCalls);
+  refreshServiceCallsRef.current = refreshServiceCalls;
+
+  // Listen for any SC create/update/delete from anywhere in the app
+  useEffect(() => {
+    const handler = () => refreshServiceCallsRef.current();
+    window.addEventListener('serviceCallsChanged', handler);
+    return () => window.removeEventListener('serviceCallsChanged', handler);
+  }, []);
 
   // 🔴 FIX: reload when company changes
   useEffect(() => {
