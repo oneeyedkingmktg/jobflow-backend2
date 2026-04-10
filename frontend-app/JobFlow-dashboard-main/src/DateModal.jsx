@@ -116,7 +116,7 @@ export default function DateModal({
   useEffect(() => {
     if (!company?.id) return;
     LeadsAPI.getCalendarDots(company.id)
-      .then((res) => setDots(res.leads || []))
+      .then((res) => setDots(res.dots || []))
       .catch(() => {});
     LeadsAPI.getServiceCallsCalendar(company.id)
       .then((res) => setScDots(res.serviceCalls || []))
@@ -138,9 +138,9 @@ export default function DateModal({
   const groupedByDate = useMemo(() => {
     const map = {};
     dots.forEach((lead) => {
-      if (lead.installDate) {
-        const startStr = lead.installDate.split("T")[0];
-        const endStr = lead.installEndDate ? lead.installEndDate.split("T")[0] : startStr;
+      if (lead.install_date) {
+        const startStr = lead.install_date.split("T")[0];
+        const endStr = lead.install_end_date ? lead.install_end_date.split("T")[0] : startStr;
         const start = new Date(startStr + "T12:00:00");
         const end = new Date(endStr + "T12:00:00");
         const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
@@ -370,7 +370,7 @@ export default function DateModal({
                 <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
                   {weekBars.map((bar) => {
                     const roundClass = bar.roundLeft && bar.roundRight ? "rounded" : bar.roundLeft ? "rounded-l" : bar.roundRight ? "rounded-r" : "";
-                    const bgColor = bar.lead.installTentative ? "bg-green-700" : "bg-green-500";
+                    const bgColor = bar.lead.install_tentative ? "bg-green-700" : "bg-green-500";
                     return (
                       <div
                         key={bar.id}
@@ -402,7 +402,7 @@ export default function DateModal({
           .map((lead, i) => (
             <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
               <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-              <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
+              <span>Install{lead.install_tentative ? " (Tentative)" : ""} — {lead.name}</span>
             </div>
           ))}
         {(groupedByDate[dayViewDate].sc || []).map((sc, i) => (

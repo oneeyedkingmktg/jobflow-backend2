@@ -29,6 +29,17 @@ function shiftDate(dateStr, days) {
   return d.toISOString().split("T")[0];
 }
 
+const A_GAP = 8;
+const A_COLS = 7;
+const A_TOTAL_GAP = (A_COLS - 1) * A_GAP;
+function aBarLeft(col) {
+  if (col === 0) return "0px";
+  return `calc(${col} * ((100% - ${A_TOTAL_GAP}px) / ${A_COLS} + ${A_GAP}px))`;
+}
+function aBarWidth(span) {
+  return `calc(${span} * (100% - ${A_TOTAL_GAP}px) / ${A_COLS} + ${Math.max(span - 1, 0)} * ${A_GAP}px)`;
+}
+
 export default function ApptDateTimeModal({
   apptDate,
   apptTime,
@@ -92,7 +103,7 @@ export default function ApptDateTimeModal({
     if (!fetchCompanyId) return;
     setDotsLoading(true);
     LeadsAPI.getCalendarDots(fetchCompanyId)
-      .then((res) => setDots(res.leads || []))
+      .then((res) => setDots(res.dots || []))
       .catch((err) => console.error("[ApptModal] Failed to load calendar dots:", err))
       .finally(() => setDotsLoading(false));
   }, [fetchCompanyId]);
@@ -134,14 +145,56 @@ export default function ApptDateTimeModal({
   const groupedByDate = useMemo(() => {
     const map = {};
     dots.forEach((lead) => {
-      if (lead.appointmentDate) {
-        const key = lead.appointmentDate.split("T")[0];
-        if (!map[key]) map[key] = [];
-        map[key].push(lead);
+      if (lead.appointment_date) {
+        const key = lead.appointment_date.split("T")[0];
+        if (!map[key]) map[key] = { appt: [], install: [] };
+        map[key].appt.push(lead);
+      }
+      if (lead.install_date) {
+        const startStr = lead.install_date.split("T")[0];
+        const endStr = lead.install_end_date ? lead.install_end_date.split("T")[0] : startStr;
+        const start = new Date(startStr + "T12:00:00");
+        const end = new Date(endStr + "T12:00:00");
+        const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
+        for (let d = 0; d < days; d++) {
+          const date = new Date(startStr + "T12:00:00");
+          date.setDate(date.getDate() + d);
+          const key = date.toISOString().split("T")[0];
+          if (!map[key]) map[key] = { appt: [], install: [] };
+          map[key].install.push({ ...lead, _barStart: d === 0, _barEnd: d === days - 1 });
+        }
       }
     });
     return map;
   }, [dots]);
+
+  const getWeekInstallBars = (week) => {
+    const byLead = {};
+    week.forEach((day, colIdx) => {
+      if (!day) return;
+      const key = formatDateKey(day);
+      (groupedByDate[key]?.install || []).forEach((lead) => {
+        if (!byLead[lead.id]) byLead[lead.id] = { lead, cols: [] };
+        byLead[lead.id].cols.push(colIdx);
+      });
+    });
+    const bars = Object.values(byLead).map(({ lead, cols }) => {
+      const colStart = Math.min(...cols);
+      const colEnd = Math.max(...cols);
+      const startEntry = groupedByDate[formatDateKey(week[colStart])]?.install.find(l => l.id === lead.id);
+      const endEntry = groupedByDate[formatDateKey(week[colEnd])]?.install.find(l => l.id === lead.id);
+      return { id: lead.id, lead, colStart, colEnd, colSpan: colEnd - colStart + 1, roundLeft: startEntry?._barStart || false, roundRight: endEntry?._barEnd || false };
+    });
+    bars.sort((a, b) => a.colStart - b.colStart);
+    const rowEndCols = [];
+    bars.forEach((bar) => {
+      let rowIdx = rowEndCols.findIndex(e => e < bar.colStart);
+      if (rowIdx === -1) rowIdx = rowEndCols.length;
+      rowEndCols[rowIdx] = bar.colEnd;
+      bar.rowIdx = rowIdx;
+    });
+    return bars;
+  };
 
   const getMonthName = () =>
     new Date(currentYear, currentMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -223,37 +276,67 @@ export default function ApptDateTimeModal({
 
       {/* Week-by-week grid — all weeks always render */}
       <div className="text-xs">
-        {weeks.map((week, wIdx) => (
-          <div key={wIdx} className="grid grid-cols-7 gap-px mb-0.5 text-center">
-            {week.map((day, dIdx) => {
-              if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[36px]" />;
-              const key = formatDateKey(day);
-              const appts = groupedByDate[key] || [];
-              const isToday = key === formatDateKey(today);
-              const isSelected = key === selectedDate;
-              return (
-                <div
-                  key={key}
-                  onClick={() => handleDayClick(key)}
-                  className={`rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors
-                    ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
-                >
-                  <span className="font-medium leading-none">{day.getDate()}</span>
-                  <div className="flex gap-px mt-0.5 flex-wrap justify-center">
-                    {appts.map((_, i) => (
-                      <div key={i} className="w-2 h-2 rounded-full" style={{ backgroundColor: isSelected ? "white" : "#3b82f6" }} />
-                    ))}
-                  </div>
+        {weeks.map((week, wIdx) => {
+          const installBars = getWeekInstallBars(week);
+          const installRowCount = installBars.length > 0 ? Math.max(...installBars.map(b => b.rowIdx)) + 1 : 0;
+          const installAreaHeight = installRowCount * 28;
+          return (
+            <div key={wIdx} className="mb-0.5">
+              {/* Day cells */}
+              <div className="grid grid-cols-7 gap-x-2 text-center">
+                {week.map((day, dIdx) => {
+                  if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[36px]" />;
+                  const key = formatDateKey(day);
+                  const appts = groupedByDate[key]?.appt || [];
+                  const isToday = key === formatDateKey(today);
+                  const isSelected = key === selectedDate;
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => handleDayClick(key)}
+                      className={`rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors
+                        ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
+                    >
+                      <span className="font-medium leading-none">{day.getDate()}</span>
+                      {appts.length > 0 && (
+                        <div className="flex flex-col gap-px mt-0.5 w-full px-px">
+                          {appts.map((lead, i) => (
+                            <div key={i} className="w-full h-5 bg-blue-500 rounded-sm flex items-center px-0.5 overflow-hidden">
+                              <span className="text-white text-[9px] font-semibold truncate leading-none">{lead.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Install bars */}
+              {installAreaHeight > 0 && (
+                <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${installAreaHeight}px` }}>
+                  {installBars.map((bar) => {
+                    const roundClass = bar.roundLeft && bar.roundRight ? "rounded" : bar.roundLeft ? "rounded-l" : bar.roundRight ? "rounded-r" : "";
+                    const bgColor = bar.lead.install_tentative ? "bg-green-700" : "bg-green-500";
+                    return (
+                      <div
+                        key={bar.id}
+                        className={`absolute h-6 ${bgColor} ${roundClass} overflow-hidden flex items-center px-1`}
+                        style={{ left: aBarLeft(bar.colStart), width: aBarWidth(bar.colSpan), top: `${bar.rowIdx * 28}px` }}
+                      >
+                        <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </>
   );
 
-  const apptsList = dayDate ? (groupedByDate[dayDate] || []) : [];
+  const apptsList = dayDate ? (groupedByDate[dayDate]?.appt || []) : [];
 
   const dayViewBlock = (
     <div>
@@ -292,11 +375,11 @@ export default function ApptDateTimeModal({
           <div className="space-y-1">
             {apptsList
               .slice()
-              .sort((a, b) => (a.appointmentTime || "").localeCompare(b.appointmentTime || ""))
+              .sort((a, b) => (a.appointment_time || "").localeCompare(b.appointment_time || ""))
               .map((lead, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs text-gray-700">
                   <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="font-medium w-16 flex-shrink-0">{lead.appointmentTime ? formatTime12h(lead.appointmentTime) : "—"}</span>
+                  <span className="font-medium w-16 flex-shrink-0">{lead.appointment_time ? formatTime12h(lead.appointment_time) : "—"}</span>
                   <span className="truncate">{lead.name}</span>
                 </div>
               ))}

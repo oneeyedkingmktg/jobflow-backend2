@@ -199,7 +199,7 @@ export const LeadsAPI = {
     }),
 
   getCalendarDots: (companyId) =>
-    apiRequest(`/leads?company_id=${companyId}`),
+    apiRequest(`/leads/calendar-dots?company_id=${companyId}`),
 
   checkApptSlot: (companyId, date, time, excludeLeadId = null) => {
     const params = new URLSearchParams({ company_id: companyId, date, time });
