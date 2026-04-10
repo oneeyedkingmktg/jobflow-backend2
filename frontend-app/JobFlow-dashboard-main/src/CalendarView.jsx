@@ -483,7 +483,7 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                 key={`sc-${i}`}
                 onClick={() => {
                   if (!scLead) return;
-                  window.__pendingOpenServiceCalls = sc.lead_id;
+                  window.__pendingOpenServiceCalls = { leadId: sc.lead_id, scId: sc.id };
                   handleLeadClick(scLead, "day", selectedDate);
                 }}
                 className={`border rounded-md overflow-hidden ${scLead ? "cursor-pointer hover:bg-gray-50" : ""}`}

@@ -21,14 +21,18 @@ export default function LeadAppointmentSection({
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);
+  const [pendingScId, setPendingScId] = useState(null);
 
   useEffect(() => {
     if (!serviceCallsEnabled || !form?.id) return;
     apiRequest(`/leads/${form.id}/service-calls`)
       .then((data) => setServiceCallCount((data.serviceCalls || []).length))
       .catch(() => {});
-    if (window.__pendingOpenServiceCalls === form.id) {
+    const pending = window.__pendingOpenServiceCalls;
+    const pendingLeadId = pending?.leadId ?? pending; // support old plain-ID format
+    if (pendingLeadId === form.id) {
       window.__pendingOpenServiceCalls = null;
+      setPendingScId(pending?.scId ?? null);
       setShowServiceCallsModal(true);
     }
   }, [serviceCallsEnabled, form?.id]);
@@ -119,7 +123,8 @@ export default function LeadAppointmentSection({
       {showServiceCallsModal && (
         <ServiceCallsModal
           leadId={form.id}
-          onClose={() => setShowServiceCallsModal(false)}
+          initialScId={pendingScId}
+          onClose={() => { setShowServiceCallsModal(false); setPendingScId(null); }}
           onCountChange={(count) => setServiceCallCount(count)}
         />
       )}

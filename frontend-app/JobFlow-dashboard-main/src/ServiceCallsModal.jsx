@@ -39,7 +39,7 @@ function to24Hour(hour, minute, ampm) {
   return `${h.toString().padStart(2, "0")}:${minute}`;
 }
 
-export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
+export default function ServiceCallsModal({ leadId, initialScId, onClose, onCountChange }) {
   const [serviceCalls, setServiceCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "edit"
@@ -60,16 +60,20 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
   const [confirmExit, setConfirmExit] = useState(false);
 
   useEffect(() => {
-    loadServiceCalls();
+    loadServiceCalls(initialScId);
   }, [leadId]);
 
-  const loadServiceCalls = async () => {
+  const loadServiceCalls = async (jumpToScId) => {
     setLoading(true);
     try {
       const data = await apiRequest(`/leads/${leadId}/service-calls`);
       const calls = data.serviceCalls || [];
       setServiceCalls(calls);
       if (onCountChange) onCountChange(calls.length);
+      if (jumpToScId) {
+        const target = calls.find((sc) => sc.id === jumpToScId);
+        if (target) openEdit(target);
+      }
     } catch (err) {
       console.error("Failed to load service calls:", err);
     } finally {
@@ -119,7 +123,7 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
           body: JSON.stringify(payload),
         });
       }
-      await loadServiceCalls();
+      await loadServiceCalls(null);
       setView("list");
     } catch (err) {
       console.error("Failed to save service call:", err);
@@ -136,7 +140,7 @@ export default function ServiceCallsModal({ leadId, onClose, onCountChange }) {
       await apiRequest(`/leads/${leadId}/service-calls/${editing.id}`, {
         method: "DELETE",
       });
-      await loadServiceCalls();
+      await loadServiceCalls(null);
       setView("list");
     } catch (err) {
       console.error("Failed to delete service call:", err);
