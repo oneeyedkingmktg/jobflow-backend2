@@ -350,17 +350,25 @@ export default function DateModal({
                   const isStart = key === startDate;
                   const isEnd = allowTentative && key === endDate;
                   const inRange = allowTentative && startDate && endDate && key > startDate && key < endDate;
-                  let cellClass = "rounded cursor-pointer py-1 flex items-center justify-center min-h-[32px] font-medium transition-colors ";
+                  const scItems = groupedByDate[key]?.sc || [];
+                  let cellClass = "rounded cursor-pointer py-1 flex flex-col items-center min-h-[32px] font-medium transition-colors ";
                   if (isStart || isEnd) cellClass += "bg-green-700 text-white";
                   else if (inRange) cellClass += "bg-green-100 text-green-900";
                   else if (isToday) cellClass += "bg-blue-100 text-blue-800";
                   else cellClass += "hover:bg-gray-100 text-gray-800";
-                  const hasSc = (groupedByDate[key]?.sc || []).length > 0;
                   return (
-                    <div key={key} onClick={() => handleDayClick(key)} className={`${cellClass} relative flex-col gap-0`}>
-                      {day.getDate()}
-                      {hasSc && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 absolute bottom-0.5" />
+                    <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
+                      <span className="leading-none">{day.getDate()}</span>
+                      {scItems.length > 0 && (
+                        <div className="flex flex-col gap-px mt-0.5 w-full px-px">
+                          {scItems.map((sc, i) => (
+                            <div key={i} className="w-full h-5 bg-orange-400 rounded-sm flex items-center px-0.5 overflow-hidden">
+                              <span className="text-white text-[9px] font-semibold truncate leading-none">
+                                {sc.lead_name}{sc.title ? ` - ${sc.title}` : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   );
