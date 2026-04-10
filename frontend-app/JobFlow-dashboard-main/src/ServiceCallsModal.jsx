@@ -221,9 +221,10 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   return (
     <>
       {/* Edit form — renders first so DateModal (below) stacks on top */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="absolute inset-0 bg-black/40" />
-        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 max-h-[90vh] flex flex-col mx-4">
+        <div className="flex min-h-full items-center justify-center p-4">
+        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 flex flex-col mx-4">
 
           <div className="flex items-center mb-4">
             <h2 className="text-lg font-bold text-gray-900">
@@ -329,6 +330,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
               </button>
             )}
           </div>
+        </div>
         </div>
       </div>
 
