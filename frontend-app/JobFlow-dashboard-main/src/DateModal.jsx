@@ -91,6 +91,7 @@ export default function DateModal({
 
   const [dayViewDate, setDayViewDate] = useState(null);
   const [dots, setDots] = useState([]);
+  const [scDots, setScDots] = useState([]);
 
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(
@@ -116,6 +117,9 @@ export default function DateModal({
     if (!company?.id) return;
     LeadsAPI.getCalendarDots(company.id)
       .then((res) => setDots(res.leads || []))
+      .catch(() => {});
+    LeadsAPI.getServiceCallsCalendar(company.id)
+      .then((res) => setScDots(res.serviceCalls || []))
       .catch(() => {});
   }, [company?.id]);
 
@@ -144,13 +148,19 @@ export default function DateModal({
           const date = new Date(startStr + "T12:00:00");
           date.setDate(date.getDate() + d);
           const key = date.toISOString().split("T")[0];
-          if (!map[key]) map[key] = { install: [] };
+          if (!map[key]) map[key] = { install: [], sc: [] };
           map[key].install.push({ ...lead, _barStart: d === 0, _barEnd: d === days - 1 });
         }
       }
     });
+    scDots.forEach((sc) => {
+      if (!sc.scheduled_date) return;
+      const key = sc.scheduled_date.split("T")[0];
+      if (!map[key]) map[key] = { install: [], sc: [] };
+      map[key].sc.push(sc);
+    });
     return map;
-  }, [dots]);
+  }, [dots, scDots]);
 
   const weeks = useMemo(() => {
     const result = [];
@@ -345,9 +355,13 @@ export default function DateModal({
                   else if (inRange) cellClass += "bg-green-100 text-green-900";
                   else if (isToday) cellClass += "bg-blue-100 text-blue-800";
                   else cellClass += "hover:bg-gray-100 text-gray-800";
+                  const hasSc = (groupedByDate[key]?.sc || []).length > 0;
                   return (
-                    <div key={key} onClick={() => handleDayClick(key)} className={cellClass}>
+                    <div key={key} onClick={() => handleDayClick(key)} className={`${cellClass} relative flex-col gap-0`}>
                       {day.getDate()}
+                      {hasSc && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 absolute bottom-0.5" />
+                      )}
                     </div>
                   );
                 })}
@@ -377,11 +391,13 @@ export default function DateModal({
     </>
   );
 
-  const dayDetailBlock = dayViewDate && groupedByDate[dayViewDate]?.install?.length > 0 && (
+  const dayDetailBlock = dayViewDate && (
+    (groupedByDate[dayViewDate]?.install?.length > 0 || groupedByDate[dayViewDate]?.sc?.length > 0)
+  ) && (
     <div className="mt-3 border-t pt-2">
       <div className="text-xs font-semibold text-gray-600 mb-1">{formatDisplayDate(dayViewDate)}</div>
       <div className="space-y-1 max-h-28 overflow-y-auto">
-        {groupedByDate[dayViewDate].install
+        {(groupedByDate[dayViewDate].install || [])
           .filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i)
           .map((lead, i) => (
             <div key={`di-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
@@ -389,6 +405,12 @@ export default function DateModal({
               <span>Install{lead.installTentative ? " (Tentative)" : ""} — {lead.name}</span>
             </div>
           ))}
+        {(groupedByDate[dayViewDate].sc || []).map((sc, i) => (
+          <div key={`sc-${i}`} className="flex items-center gap-1 text-xs text-gray-700">
+            <span className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
+            <span>SC — {sc.lead_name}{sc.title ? ` · ${sc.title}` : ""}{sc.scheduled_time ? ` @ ${formatTime12h(sc.scheduled_time)}` : ""}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
