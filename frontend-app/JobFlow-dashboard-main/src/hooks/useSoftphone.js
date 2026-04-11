@@ -177,6 +177,10 @@ export function useSoftphone() {
     setIsSpeaker(next);
   }, [isSpeaker]);
 
+  const sendDtmf = useCallback(async (tone) => {
+    await Softphone.sendDTMF({ tone });
+  }, []);
+
   // =========================================================================
   // FORMAT TIMER
   // =========================================================================
@@ -209,6 +213,7 @@ export function useSoftphone() {
     declineCall,
     toggleMute,
     toggleSpeaker,
+    sendDtmf,
     reinitialize: initialize,
   };
 }

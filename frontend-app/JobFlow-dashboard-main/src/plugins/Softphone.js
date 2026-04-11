@@ -39,6 +39,7 @@ const Softphone = registerPlugin('Softphone', {
     hangup: async () => {},
     setMuted: async () => {},
     setSpeaker: async () => {},
+    sendDTMF: async () => {},
     getStatus: async () => ({ callState: 'idle', initialized: false, muted: false }),
     destroy: async () => {},
     addListener: () => ({ remove: () => {} }),

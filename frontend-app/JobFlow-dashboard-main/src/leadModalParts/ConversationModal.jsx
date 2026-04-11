@@ -136,6 +136,7 @@ export default function ConversationModal({ lead, onClose }) {
         onDecline={softphone.declineCall}
         onToggleMute={softphone.toggleMute}
         onToggleSpeaker={softphone.toggleSpeaker}
+        onSendDtmf={softphone.sendDtmf}
         pendingCall={pendingCall}
         onConfirmCall={() => {
           setPendingCall(null);

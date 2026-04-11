@@ -313,6 +313,7 @@ const handlePauseSave = (pauseFields) => {
         onDecline={softphone.declineCall}
         onToggleMute={softphone.toggleMute}
         onToggleSpeaker={softphone.toggleSpeaker}
+        onSendDtmf={softphone.sendDtmf}
         pendingCall={pendingCall}
         onConfirmCall={() => {
           setPendingCall(null);
