@@ -550,6 +550,7 @@ const STATUS_TAGS = {
   appointment_set: "status - appointment set",
   sold: "status - sold",
   not_sold: "status - not sold",
+  complete: "status - complete",
   completed: "status - complete",
   status_junk: "status - junk",
 };
