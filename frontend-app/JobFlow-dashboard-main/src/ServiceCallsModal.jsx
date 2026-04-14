@@ -1,9 +1,13 @@
 // File: src/ServiceCallsModal.jsx
-// Service Calls — list and edit modal for per-lead additional install/visit dates
+// Service Calls — list and edit modal with inline calendar, start+end time, title and notes
 
-import React, { useState, useEffect } from "react";
-import DateModal from "./DateModal";
-import { apiRequest } from "./api";
+import React, { useState, useEffect, useMemo } from "react";
+import { apiRequest, LeadsAPI } from "./api";
+import { useCompany } from "./CompanyContext";
+
+function formatDateKey(date) {
+  return date.toISOString().split("T")[0];
+}
 
 function formatDateDisplay(dateStr) {
   if (!dateStr) return "No date set";
@@ -21,7 +25,6 @@ function formatTimeDisplay(timeStr) {
   return `${hour}:${m} ${ampm}`;
 }
 
-// Parse "HH:MM" or "HH:MM:SS" → { hour, minute, ampm }
 function parseTime(t) {
   if (!t) return { hour: "8", minute: "00", ampm: "AM" };
   const [h, m] = t.split(":").map((v) => parseInt(v, 10));
@@ -31,7 +34,6 @@ function parseTime(t) {
   return { hour: String(hour12), minute: (m || 0).toString().padStart(2, "0"), ampm };
 }
 
-// Convert hour/minute/ampm → "HH:MM"
 function to24Hour(hour, minute, ampm) {
   let h = parseInt(hour, 10);
   if (ampm === "PM" && h < 12) h += 12;
@@ -39,7 +41,49 @@ function to24Hour(hour, minute, ampm) {
   return `${h.toString().padStart(2, "0")}:${minute}`;
 }
 
+function shiftDate(dateStr, days) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function TimeSelects({ hour, minute, ampm, onHour, onMinute, onAmpm }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <select
+        value={hour}
+        onChange={(e) => onHour(e.target.value)}
+        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+      >
+        {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
+      <select
+        value={minute}
+        onChange={(e) => onMinute(e.target.value)}
+        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+      >
+        {["00", "15", "30", "45"].map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+      <select
+        value={ampm}
+        onChange={(e) => onAmpm(e.target.value)}
+        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  );
+}
+
 export default function ServiceCallsModal({ leadId, initialScId, onClose, onCountChange, onServiceCallsChange }) {
+  const { currentCompany } = useCompany();
+  const companyId = currentCompany?.id;
+
   const [serviceCalls, setServiceCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "edit"
@@ -48,22 +92,62 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   // Edit form state
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [hour, setHour] = useState("8");
-  const [minute, setMinute] = useState("00");
-  const [ampm, setAmpm] = useState("AM");
+  const [startHour, setStartHour] = useState("8");
+  const [startMinute, setStartMinute] = useState("00");
+  const [startAmpm, setStartAmpm] = useState("AM");
+  const [endHour, setEndHour] = useState("9");
+  const [endMinute, setEndMinute] = useState("00");
+  const [endAmpm, setEndAmpm] = useState("AM");
   const [notes, setNotes] = useState("");
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  // Calendar state
+  const today = new Date();
+  const [calViewMode, setCalViewMode] = useState("calendar"); // "calendar" | "day"
+  const [calYear, setCalYear] = useState(today.getFullYear());
+  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [dayDate, setDayDate] = useState(null);
+  const [dots, setDots] = useState([]);
+  const [scDots, setScDots] = useState([]);
+  const [dotsLoading, setDotsLoading] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
 
+  // Landscape
+  const [isLandscape, setIsLandscape] = useState(
+    () => typeof window !== "undefined" && window.innerWidth > window.innerHeight
+  );
+  useEffect(() => {
+    const handler = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener("resize", handler);
+    window.addEventListener("orientationchange", handler);
+    return () => {
+      window.removeEventListener("resize", handler);
+      window.removeEventListener("orientationchange", handler);
+    };
+  }, []);
+
   useEffect(() => {
     loadServiceCalls(initialScId);
   }, [leadId]);
+
+  // Load calendar dots whenever we enter edit view
+  useEffect(() => {
+    if (view !== "edit" || !companyId) return;
+    setDotsLoading(true);
+    Promise.all([
+      LeadsAPI.getCalendarDots(companyId),
+      LeadsAPI.getServiceCallsCalendar(companyId),
+    ])
+      .then(([leadsRes, scRes]) => {
+        setDots(leadsRes.dots || []);
+        setScDots(scRes.serviceCalls || []);
+      })
+      .catch((err) => console.error("[SC Modal] Failed to load calendar data:", err))
+      .finally(() => setDotsLoading(false));
+  }, [view, companyId]);
 
   const loadServiceCalls = async (jumpToScId) => {
     setLoading(true);
@@ -87,10 +171,12 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEditing(null);
     setTitle("");
     setDate(null);
-    setEndDate(null);
-    setHour("8"); setMinute("00"); setAmpm("AM");
+    setStartHour("8"); setStartMinute("00"); setStartAmpm("AM");
+    setEndHour("9"); setEndMinute("00"); setEndAmpm("AM");
     setNotes("");
     setDirty(false);
+    setCalViewMode("calendar");
+    setDayDate(null);
     setView("edit");
   };
 
@@ -98,22 +184,25 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEditing(sc);
     setTitle(sc.title || "");
     setDate(sc.scheduled_date ? sc.scheduled_date.split("T")[0] : null);
-    setEndDate(sc.scheduled_end_date ? sc.scheduled_end_date.split("T")[0] : null);
-    const parsed = parseTime(sc.scheduled_time);
-    setHour(parsed.hour); setMinute(parsed.minute); setAmpm(parsed.ampm);
+    const parsedStart = parseTime(sc.scheduled_time);
+    setStartHour(parsedStart.hour); setStartMinute(parsedStart.minute); setStartAmpm(parsedStart.ampm);
+    const parsedEnd = parseTime(sc.scheduled_end_time);
+    setEndHour(parsedEnd.hour); setEndMinute(parsedEnd.minute); setEndAmpm(parsedEnd.ampm);
     setNotes(sc.notes || "");
     setDirty(false);
+    setCalViewMode("calendar");
+    setDayDate(null);
     setView("edit");
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const timeStr = to24Hour(hour, minute, ampm);
       const payload = {
         scheduled_date: date || null,
-        scheduled_end_date: (endDate && endDate !== date) ? endDate : null,
-        scheduled_time: timeStr,
+        scheduled_end_date: null,
+        scheduled_time: to24Hour(startHour, startMinute, startAmpm),
+        scheduled_end_time: to24Hour(endHour, endMinute, endAmpm),
         title: title || null,
         notes: notes || null,
       };
@@ -144,9 +233,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     if (!editing) return;
     setDeleting(true);
     try {
-      await apiRequest(`/leads/${leadId}/service-calls/${editing.id}`, {
-        method: "DELETE",
-      });
+      await apiRequest(`/leads/${leadId}/service-calls/${editing.id}`, { method: "DELETE" });
       await loadServiceCalls(null);
       setView("list");
       onServiceCallsChange?.();
@@ -160,14 +247,234 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   };
 
   const handleExitEdit = () => {
-    if (dirty) {
-      setConfirmExit(true);
-    } else {
-      setView("list");
-    }
+    if (dirty) setConfirmExit(true);
+    else setView("list");
   };
 
+  // ── Calendar helpers ──────────────────────────────────────────────────────
+
+  const getDaysInMonth = (year, month) => {
+    const d = new Date(year, month, 1);
+    const days = [];
+    while (d.getMonth() === month) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+    return days;
+  };
+
+  const monthDays = useMemo(() => getDaysInMonth(calYear, calMonth), [calYear, calMonth]);
+
+  const weeks = useMemo(() => {
+    const result = [];
+    let week = Array(monthDays[0].getDay()).fill(null);
+    monthDays.forEach((day) => {
+      week.push(day);
+      if (week.length === 7) { result.push([...week]); week = []; }
+    });
+    if (week.length > 0) { while (week.length < 7) week.push(null); result.push(week); }
+    return result;
+  }, [monthDays]);
+
+  const getMonthName = () =>
+    new Date(calYear, calMonth, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const goToPrevMonth = () => {
+    if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); }
+    else setCalMonth(calMonth - 1);
+  };
+
+  const goToNextMonth = () => {
+    if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); }
+    else setCalMonth(calMonth + 1);
+  };
+
+  // Build per-day event map from dots + scDots
+  const groupedByDate = useMemo(() => {
+    const map = {};
+    dots.forEach((lead) => {
+      if (lead.appointment_date) {
+        const key = lead.appointment_date.split("T")[0];
+        if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
+        map[key].appt.push(lead);
+      }
+      if (lead.install_date) {
+        const endDateStr = lead.install_end_date || lead.install_date;
+        const start = new Date(lead.install_date + "T12:00:00");
+        const end = new Date(endDateStr + "T12:00:00");
+        const duration = Math.max(1, Math.round((end - start) / 86400000) + 1);
+        for (let d = 0; d < duration; d++) {
+          const dt = new Date(lead.install_date + "T12:00:00");
+          dt.setDate(dt.getDate() + d);
+          const key = dt.toISOString().split("T")[0];
+          if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
+          map[key].install.push(lead);
+        }
+      }
+    });
+    scDots.forEach((sc) => {
+      if (!sc.scheduled_date) return;
+      const key = sc.scheduled_date.split("T")[0];
+      if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
+      map[key].sc.push(sc);
+    });
+    return map;
+  }, [dots, scDots]);
+
+  const handleDayClick = (key) => {
+    setDate(key);
+    setDirty(true);
+    setDayDate(key);
+    setCalViewMode("day");
+  };
+
+  const dayAppts = dayDate ? (groupedByDate[dayDate]?.appt || []) : [];
+  const dayInstalls = dayDate ? (groupedByDate[dayDate]?.install || []) : [];
+  const dayScs = dayDate ? (groupedByDate[dayDate]?.sc || []) : [];
+
+  // ── Calendar block ────────────────────────────────────────────────────────
+
+  const calendarBlock = (
+    <>
+      <div className="flex items-center justify-between mb-1.5 bg-gray-50 rounded border border-gray-200 px-2 py-1">
+        <button onClick={goToPrevMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Previous month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-xs font-medium text-gray-700">{getMonthName()}</span>
+        <button onClick={goToNextMonth} className="p-1 hover:bg-gray-200 rounded text-gray-600" aria-label="Next month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 mb-1">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => <div key={d}>{d}</div>)}
+      </div>
+
+      {dotsLoading && <p className="text-xs text-gray-400 italic text-center mb-1">Loading schedule...</p>}
+
+      <div className="text-xs">
+        {weeks.map((week, wIdx) => (
+          <div key={wIdx} className="mb-0.5">
+            <div className="grid grid-cols-7 gap-x-1 text-center">
+              {week.map((day, dIdx) => {
+                if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[36px]" />;
+                const key = formatDateKey(day);
+                const dayData = groupedByDate[key] || { appt: [], install: [], sc: [] };
+                const isToday = key === formatDateKey(today);
+                const isSelected = key === date;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => handleDayClick(key)}
+                    className={`rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors
+                      ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
+                  >
+                    <span className="font-medium leading-none">{day.getDate()}</span>
+                    {/* Indicator dots */}
+                    {(dayData.appt.length > 0 || dayData.install.length > 0 || dayData.sc.length > 0) && (
+                      <div className="flex gap-0.5 mt-0.5">
+                        {dayData.appt.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-blue-500"}`} />}
+                        {dayData.install.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-green-500"}`} />}
+                        {dayData.sc.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-purple-500"}`} />}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-3 mt-1 text-xs text-gray-500">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Appt</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Install</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />Service Call</span>
+      </div>
+    </>
+  );
+
+  // ── Day view block ────────────────────────────────────────────────────────
+
+  const dayViewBlock = (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => setCalViewMode("calendar")}
+          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Calendar
+        </button>
+        <span className="text-xs font-semibold text-gray-700 flex-1 text-center px-2">
+          {dayDate ? new Date(dayDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : ""}
+        </span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => { const d = shiftDate(dayDate, -1); setDayDate(d); setDate(d); setDirty(true); }}
+            className="p-1 hover:bg-gray-200 rounded text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={() => { const d = shiftDate(dayDate, 1); setDayDate(d); setDate(d); setDirty(true); }}
+            className="p-1 hover:bg-gray-200 rounded text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="border rounded-lg bg-gray-50 p-2 mb-2 min-h-[60px] max-h-[130px] overflow-y-auto space-y-1">
+        {dotsLoading ? (
+          <p className="text-xs text-gray-400 italic text-center mt-2">Loading...</p>
+        ) : (dayAppts.length + dayInstalls.length + dayScs.length === 0) ? (
+          <p className="text-xs text-gray-400 italic text-center mt-2">Nothing scheduled this day</p>
+        ) : (
+          <>
+            {dayAppts.map((l, i) => (
+              <div key={`a-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
+                <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="font-medium w-16 flex-shrink-0">
+                  {l.appointment_time ? formatTimeDisplay(l.appointment_time) : "—"}
+                </span>
+                <span className="truncate text-gray-600">{l.name}</span>
+                <span className="text-gray-400 flex-shrink-0">Appt</span>
+              </div>
+            ))}
+            {dayInstalls.map((l, i) => (
+              <div key={`i-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
+                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="font-medium w-16 flex-shrink-0">Install</span>
+                <span className="truncate text-gray-600">{l.name}</span>
+              </div>
+            ))}
+            {dayScs.map((sc, i) => (
+              <div key={`sc-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
+                <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+                <span className="font-medium w-16 flex-shrink-0">
+                  {sc.scheduled_time ? formatTimeDisplay(sc.scheduled_time) : "SC"}
+                </span>
+                <span className="truncate text-gray-600">{sc.lead_name}</span>
+                {sc.title && <span className="text-gray-400 flex-shrink-0 truncate">· {sc.title}</span>}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   // ── LIST VIEW ─────────────────────────────────────────────────────────────
+
   if (view === "list") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -200,10 +507,9 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                     {sc.title || "Untitled"}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
-                    {sc.scheduled_end_date && sc.scheduled_end_date.split("T")[0] !== sc.scheduled_date?.split("T")[0]
-                      ? `${formatDateDisplay(sc.scheduled_date)} – ${formatDateDisplay(sc.scheduled_end_date)}`
-                      : formatDateDisplay(sc.scheduled_date)}
+                    {formatDateDisplay(sc.scheduled_date)}
                     {sc.scheduled_time && ` · ${formatTimeDisplay(sc.scheduled_time)}`}
+                    {sc.scheduled_end_time && ` – ${formatTimeDisplay(sc.scheduled_end_time)}`}
                   </div>
                   {sc.notes && (
                     <div className="text-xs text-gray-500 mt-1 line-clamp-2">{sc.notes}</div>
@@ -225,167 +531,145 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   }
 
   // ── EDIT VIEW ─────────────────────────────────────────────────────────────
-  return (
-    <>
-      {/* Edit form — renders first so DateModal (below) stacks on top */}
-      <div className="fixed inset-0 z-50 overflow-y-auto">
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl p-5 flex flex-col mx-4">
 
-          <div className="flex items-center mb-4">
-            <h2 className="text-lg font-bold text-gray-900">
-              {editing ? "Edit Service Call" : "New Service Call"}
-            </h2>
-          </div>
+  const formFields = (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">Title</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
+          placeholder="e.g. Final coat, Touch-up visit..."
+          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
+        />
+      </div>
 
-          <div className="flex-1 overflow-y-auto space-y-4">
-
-            {/* Title — first */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
-                placeholder="e.g. Final coat, Touch-up visit..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
-              />
-            </div>
-
-            {/* Date — second */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Start Date</label>
-              <button
-                type="button"
-                onClick={() => setShowDatePicker(true)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 transition"
-              >
-                {date
-                  ? formatDateDisplay(date)
-                  : <span className="text-gray-400 font-normal">Tap to set date</span>}
-              </button>
-            </div>
-
-            {/* End Date — for multi-day service calls */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">End Date <span className="font-normal text-gray-400">(optional, for multi-day)</span></label>
-              <button
-                type="button"
-                onClick={() => setShowEndDatePicker(true)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 transition"
-              >
-                {endDate && endDate !== date
-                  ? formatDateDisplay(endDate)
-                  : <span className="text-gray-400 font-normal">Tap to set end date</span>}
-              </button>
-            </div>
-
-            {/* Time — third: hour / minute / AM-PM selects */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Time</label>
-              <div className="grid grid-cols-3 gap-2">
-                <select
-                  value={hour}
-                  onChange={(e) => { setHour(e.target.value); setDirty(true); }}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-                >
-                  {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-                <select
-                  value={minute}
-                  onChange={(e) => { setMinute(e.target.value); setDirty(true); }}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-                >
-                  {["00", "15", "30", "45"].map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-                <select
-                  value={ampm}
-                  onChange={(e) => { setAmpm(e.target.value); setDirty(true); }}
-                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-                >
-                  <option value="AM">AM</option>
-                  <option value="PM">PM</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Notes — fourth */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => { setNotes(e.target.value); setDirty(true); }}
-                placeholder="Any notes for this visit..."
-                rows={3}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save & Exit"}
-            </button>
-            <button
-              onClick={handleExitEdit}
-              className="w-full bg-gray-100 text-gray-700 rounded-xl py-3 font-semibold text-sm hover:bg-gray-200 transition"
-            >
-              Exit Without Saving
-            </button>
-            {editing && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="w-full bg-red-100 text-red-700 rounded-xl py-3 font-semibold text-sm hover:bg-red-200 transition disabled:opacity-50"
-              >
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Selected date display */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">Date</label>
+        <div className={`text-sm font-semibold px-4 py-2.5 rounded-xl border ${date ? "bg-blue-50 border-blue-300 text-blue-800" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
+          {date
+            ? new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+            : "Select a date on the calendar"}
         </div>
       </div>
 
-      {/* Start date picker */}
-      {showDatePicker && (
-        <DateModal
-          initialDate={date}
-          label="Service Call Start Date"
-          allowTentative={false}
-          onConfirm={(selectedDate) => {
-            setDate(selectedDate);
-            setDirty(true);
-            setShowDatePicker(false);
-          }}
-          onClose={() => setShowDatePicker(false)}
+      {/* Start Time */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">Start Time</label>
+        <TimeSelects
+          hour={startHour} minute={startMinute} ampm={startAmpm}
+          onHour={(v) => { setStartHour(v); setDirty(true); }}
+          onMinute={(v) => { setStartMinute(v); setDirty(true); }}
+          onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
         />
-      )}
+      </div>
 
-      {/* End date picker */}
-      {showEndDatePicker && (
-        <DateModal
-          initialDate={endDate}
-          label="Service Call End Date"
-          allowTentative={false}
-          onConfirm={(selectedDate) => {
-            setEndDate(selectedDate);
-            setDirty(true);
-            setShowEndDatePicker(false);
-          }}
-          onClose={() => setShowEndDatePicker(false)}
+      {/* End Time */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">End Time</label>
+        <TimeSelects
+          hour={endHour} minute={endMinute} ampm={endAmpm}
+          onHour={(v) => { setEndHour(v); setDirty(true); }}
+          onMinute={(v) => { setEndMinute(v); setDirty(true); }}
+          onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
         />
-      )}
+      </div>
 
-      {/* Exit-without-saving confirmation — also after edit form */}
+      {/* Notes */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">Notes</label>
+        <textarea
+          value={notes}
+          onChange={(e) => { setNotes(e.target.value); setDirty(true); }}
+          placeholder="Any notes for this visit..."
+          rows={3}
+          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition resize-none"
+        />
+      </div>
+    </div>
+  );
+
+  const actionButtons = (
+    <div className="mt-4 space-y-2">
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Save & Exit"}
+      </button>
+      <button
+        onClick={handleExitEdit}
+        className="w-full bg-gray-100 text-gray-700 rounded-xl py-3 font-semibold text-sm hover:bg-gray-200 transition"
+      >
+        Exit Without Saving
+      </button>
+      {editing && (
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="w-full bg-red-100 text-red-700 rounded-xl py-3 font-semibold text-sm hover:bg-red-200 transition disabled:opacity-50"
+        >
+          {deleting ? "Deleting..." : "Delete"}
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 overflow-y-auto" onClick={onClose}>
+        <div className={`flex min-h-full items-center justify-center ${isLandscape ? "p-2" : "p-4"}`}>
+          <div
+            className={`bg-white rounded-2xl shadow-xl w-full relative ${isLandscape ? "max-w-5xl flex flex-row" : "max-w-lg"}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* X close */}
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 z-10 text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none w-8 h-8 flex items-center justify-center"
+            >
+              ×
+            </button>
+
+            {isLandscape ? (
+              <>
+                {/* LEFT: calendar */}
+                <div className="flex-1 min-w-0 p-4 border-r border-gray-200">
+                  <h2 className="text-base font-bold text-gray-900 mb-3">
+                    {editing ? "Edit Service Call" : "New Service Call"}
+                  </h2>
+                  {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
+                </div>
+                {/* RIGHT: form + buttons */}
+                <div className="w-72 flex-shrink-0 p-4 flex flex-col overflow-y-auto max-h-[90vh]">
+                  {formFields}
+                  {actionButtons}
+                </div>
+              </>
+            ) : (
+              <div className="p-5">
+                <h2 className="text-lg font-bold text-gray-900 mb-4 pr-8">
+                  {editing ? "Edit Service Call" : "New Service Call"}
+                </h2>
+
+                {/* Calendar section */}
+                <div className="mb-4 border border-gray-200 rounded-xl p-3 bg-gray-50">
+                  {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
+                </div>
+
+                {formFields}
+                {actionButtons}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Exit-without-saving confirmation */}
       {confirmExit && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" />
@@ -404,7 +688,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                 className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
               >
                 Stay
-              </button>
+            </button>
             </div>
           </div>
         </div>

@@ -160,7 +160,7 @@ router.get("/service-calls-calendar", async (req, res) => {
 
     const result = await pool.query(
       `SELECT sc.id, sc.lead_id, sc.scheduled_date::text, sc.scheduled_time::text,
-              sc.title, l.name AS lead_name
+              sc.scheduled_end_time::text, sc.title, l.name AS lead_name
        FROM service_calls sc
        JOIN leads l ON l.id = sc.lead_id
        WHERE sc.company_id = $1

@@ -66,7 +66,7 @@ router.get("/", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, title, notes, ghl_event_id, created_at, updated_at
+      `SELECT id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes, ghl_event_id, created_at, updated_at
        FROM service_calls
        WHERE lead_id = $1
        ORDER BY scheduled_date ASC NULLS LAST, created_at ASC`,
@@ -87,7 +87,7 @@ router.post("/", async (req, res) => {
   try {
     const { leadId } = req.params;
     const companyId = req.user.company_id;
-    const { scheduled_date, scheduled_end_date, scheduled_time, title, notes } = req.body;
+    const { scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes } = req.body;
 
     const leadCheck = await pool.query(
       "SELECT id, company_id FROM leads WHERE id = $1 AND (company_id = $2 OR $3 = 'master')",
@@ -101,10 +101,10 @@ router.post("/", async (req, res) => {
 
     // Insert the service call
     const result = await pool.query(
-      `INSERT INTO service_calls (lead_id, company_id, scheduled_date, scheduled_end_date, scheduled_time, title, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, title, notes, ghl_event_id, created_at, updated_at`,
-      [leadId, leadCompanyId, scheduled_date || null, scheduled_end_date || null, scheduled_time || null, title || null, notes || null]
+      `INSERT INTO service_calls (lead_id, company_id, scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes, ghl_event_id, created_at, updated_at`,
+      [leadId, leadCompanyId, scheduled_date || null, scheduled_end_date || null, scheduled_time || null, scheduled_end_time || null, title || null, notes || null]
     );
 
     const serviceCall = result.rows[0];
@@ -140,7 +140,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { leadId, id } = req.params;
     const companyId = req.user.company_id;
-    const { scheduled_date, scheduled_end_date, scheduled_time, title, notes } = req.body;
+    const { scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes } = req.body;
 
     // Verify ownership and get existing ghl_event_id
     const existing = await pool.query(
@@ -155,10 +155,10 @@ router.put("/:id", async (req, res) => {
 
     const result = await pool.query(
       `UPDATE service_calls
-       SET scheduled_date = $1, scheduled_end_date = $2, scheduled_time = $3, title = $4, notes = $5, updated_at = NOW()
-       WHERE id = $6
-       RETURNING id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, title, notes, ghl_event_id, created_at, updated_at`,
-      [scheduled_date || null, scheduled_end_date || null, scheduled_time || null, title || null, notes || null, id]
+       SET scheduled_date = $1, scheduled_end_date = $2, scheduled_time = $3, scheduled_end_time = $4, title = $5, notes = $6, updated_at = NOW()
+       WHERE id = $7
+       RETURNING id, lead_id, scheduled_date, scheduled_end_date, scheduled_time, scheduled_end_time, title, notes, ghl_event_id, created_at, updated_at`,
+      [scheduled_date || null, scheduled_end_date || null, scheduled_time || null, scheduled_end_time || null, title || null, notes || null, id]
     );
 
     const serviceCall = result.rows[0];
