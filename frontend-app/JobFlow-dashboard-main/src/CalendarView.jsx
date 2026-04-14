@@ -99,9 +99,23 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
     });
     serviceCalls.forEach((sc) => {
       if (!sc.scheduled_date) return;
-      const key = sc.scheduled_date.split("T")[0];
-      if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
-      map[key].sc.push(sc);
+      const startDateStr = sc.scheduled_date.split("T")[0];
+      const endDateStr = sc.scheduled_end_date ? sc.scheduled_end_date.split("T")[0] : startDateStr;
+      const start = new Date(startDateStr + "T12:00:00");
+      const end = new Date(endDateStr + "T12:00:00");
+      const duration = Math.max(1, Math.round((end - start) / 86400000) + 1);
+      for (let d = 0; d < duration; d++) {
+        const date = new Date(startDateStr + "T12:00:00");
+        date.setDate(date.getDate() + d);
+        const key = date.toISOString().split("T")[0];
+        if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
+        map[key].sc.push({
+          ...sc,
+          _barStart: d === 0,
+          _barEnd: d === duration - 1,
+          _multiDay: duration > 1,
+        });
+      }
     });
     return map;
   }, [leads, serviceCalls]);
@@ -156,6 +170,49 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
     });
 
     // Assign row indices using greedy interval scheduling
+    bars.sort((a, b) => a.colStart - b.colStart);
+    const rowEndCols = [];
+    bars.forEach((bar) => {
+      let rowIdx = rowEndCols.findIndex((endCol) => endCol < bar.colStart);
+      if (rowIdx === -1) rowIdx = rowEndCols.length;
+      rowEndCols[rowIdx] = bar.colEnd;
+      bar.rowIdx = rowIdx;
+    });
+
+    return bars;
+  };
+
+  // Compute SC bar segments for a given week (same logic as install bars)
+  const getWeekScBars = (week) => {
+    const scById = {};
+    week.forEach((day, colIdx) => {
+      if (!day) return;
+      const key = formatDateKey(day);
+      (groupedByDate[key]?.sc || []).filter((sc) => sc._multiDay).forEach((scEntry) => {
+        const id = scEntry.id;
+        if (!scById[id]) scById[id] = { scEntry, cols: [] };
+        scById[id].cols.push(colIdx);
+      });
+    });
+
+    const bars = Object.values(scById).map(({ scEntry, cols }) => {
+      const colStart = Math.min(...cols);
+      const colEnd = Math.max(...cols);
+      const startKey = formatDateKey(week[colStart]);
+      const endKey = formatDateKey(week[colEnd]);
+      const startEntry = groupedByDate[startKey]?.sc.find((s) => s.id === scEntry.id);
+      const endEntry = groupedByDate[endKey]?.sc.find((s) => s.id === scEntry.id);
+      return {
+        id: scEntry.id,
+        sc: scEntry,
+        colStart,
+        colEnd,
+        colSpan: colEnd - colStart + 1,
+        roundLeft: startEntry?._barStart || false,
+        roundRight: endEntry?._barEnd || false,
+      };
+    });
+
     bars.sort((a, b) => a.colStart - b.colStart);
     const rowEndCols = [];
     bars.forEach((bar) => {
@@ -246,7 +303,11 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
       {weeks.map((week, wIdx) => {
         const weekBars = getWeekBars(week);
         const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map((b) => b.rowIdx)) + 1 : 0;
-        const barAreaHeight = barRowCount * 28; // 24px bar + 4px gap per row
+        const barAreaHeight = barRowCount * 28;
+
+        const weekScBars = getWeekScBars(week);
+        const scBarRowCount = weekScBars.length > 0 ? Math.max(...weekScBars.map((b) => b.rowIdx)) + 1 : 0;
+        const scBarAreaHeight = scBarRowCount * 28;
 
         return (
           <div key={wIdx} className="mb-1">
@@ -257,6 +318,8 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                 const key = formatDateKey(day);
                 const data = groupedByDate[key] || { appt: [], install: [], sc: [] };
                 const isToday = key === formatDateKey(today);
+                // Only show single-day SCs inline in the cell; multi-day ones render as bars below
+                const singleDayScs = data.sc.filter((sc) => !sc._multiDay);
 
                 return (
                   <div
@@ -276,9 +339,9 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                         ))}
                       </div>
                     )}
-                    {data.sc.length > 0 && (
+                    {singleDayScs.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-0.5">
-                        {data.sc.map((sc, i) => (
+                        {singleDayScs.map((sc, i) => (
                           <div key={`sc-${i}`} className="w-full h-6 bg-orange-400 rounded-sm overflow-hidden flex items-center px-1">
                             <span className="text-white text-xs font-semibold truncate leading-none">
                               {sc.lead_name}{sc.title ? ` - ${sc.title}` : ""}
@@ -292,7 +355,7 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
               })}
             </div>
 
-            {/* Install bar overlay — absolutely positioned, same gap as day cells */}
+            {/* Install bar overlay */}
             {barAreaHeight > 0 && (
               <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${barAreaHeight}px` }}>
                 {weekBars.map((bar) => {
@@ -314,6 +377,35 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                       }}
                     >
                       <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Service call bar overlay (multi-day SCs) */}
+            {scBarAreaHeight > 0 && (
+              <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${scBarAreaHeight}px` }}>
+                {weekScBars.map((bar) => {
+                  const roundClass =
+                    bar.roundLeft && bar.roundRight ? "rounded"
+                    : bar.roundLeft ? "rounded-l"
+                    : bar.roundRight ? "rounded-r"
+                    : "";
+                  return (
+                    <div
+                      key={`sc-bar-${bar.id}-${wIdx}`}
+                      onClick={() => handleDayClick(formatDateKey(week[bar.colStart]))}
+                      className={`absolute h-6 bg-orange-400 ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
+                      style={{
+                        left: barLeftCalc(bar.colStart),
+                        width: barWidthCalc(bar.colSpan),
+                        top: `${bar.rowIdx * 28}px`,
+                      }}
+                    >
+                      <span className="text-white text-xs font-semibold truncate leading-none">
+                        {bar.sc.lead_name}{bar.sc.title ? ` - ${bar.sc.title}` : ""}
+                      </span>
                     </div>
                   );
                 })}

@@ -1328,15 +1328,17 @@ async function clearContactCustomFields(contactId, fieldKeys, company) {
 }
 
 // ----------------------------------------------------------------------------
-// SERVICE CALL → GHL INSTALL CALENDAR SYNC
+// SERVICE CALL → GHL SERVICE CALL CALENDAR SYNC
 // ----------------------------------------------------------------------------
 
 // Create or replace a GHL calendar event for a service call.
+// Uses ghl_sc_calendar if configured, falls back to ghl_install_calendar.
 // Call after INSERT or UPDATE on service_calls.
 // Returns the new GHL event ID, or null if skipped.
 async function syncServiceCallToGhl({ serviceCall, lead, company }) {
-  if (!company.ghl_install_calendar) {
-    console.log("[SC GHL] Skipping — no install calendar configured");
+  const calendarId = company.ghl_sc_calendar || company.ghl_install_calendar;
+  if (!calendarId) {
+    console.log("[SC GHL] Skipping — no service call or install calendar configured");
     return null;
   }
   if (!lead.ghl_contact_id) {
@@ -1358,7 +1360,19 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     : '09:00';
 
   const startDt = convertToUTC(`${dateOnly}T${timeStr}:00`, companyTimezone);
-  const endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // +1 hour
+
+  // Multi-day: end at 1pm on last day; single-day: +1 hour from start
+  let endDt;
+  if (serviceCall.scheduled_end_date) {
+    const endDateOnly = new Date(serviceCall.scheduled_end_date).toISOString().split('T')[0];
+    if (endDateOnly !== dateOnly) {
+      endDt = convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone);
+    } else {
+      endDt = new Date(startDt.getTime() + 60 * 60 * 1000);
+    }
+  } else {
+    endDt = new Date(startDt.getTime() + 60 * 60 * 1000); // +1 hour
+  }
 
   // Title: "Full Name - Service Call Title"  e.g. "Mr Crabs - Spot Repair"
   const displayName = lead.name || 'Unknown';
@@ -1367,15 +1381,17 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
 
   const createPayload = {
     locationId: company.ghl_location_id,
-    calendarId: company.ghl_install_calendar,
+    calendarId,
     contactId: lead.ghl_contact_id,
     title,
     startTime: startDt.toISOString(),
     endTime: endDt.toISOString(),
     ignoreDateRanges: true,
-    // Flag this event as a service call so it can be distinguished from regular installs
-    isRunningLateAsGuest: true,
   };
+
+  if (company.ghl_sc_assigned_user) {
+    createPayload.assignedUserId = company.ghl_sc_assigned_user;
+  }
 
   // If there's an existing event, delete it first
   if (serviceCall.ghl_event_id) {

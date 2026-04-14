@@ -48,12 +48,14 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   // Edit form state
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [hour, setHour] = useState("8");
   const [minute, setMinute] = useState("00");
   const [ampm, setAmpm] = useState("AM");
   const [notes, setNotes] = useState("");
 
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -85,6 +87,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEditing(null);
     setTitle("");
     setDate(null);
+    setEndDate(null);
     setHour("8"); setMinute("00"); setAmpm("AM");
     setNotes("");
     setDirty(false);
@@ -95,6 +98,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEditing(sc);
     setTitle(sc.title || "");
     setDate(sc.scheduled_date ? sc.scheduled_date.split("T")[0] : null);
+    setEndDate(sc.scheduled_end_date ? sc.scheduled_end_date.split("T")[0] : null);
     const parsed = parseTime(sc.scheduled_time);
     setHour(parsed.hour); setMinute(parsed.minute); setAmpm(parsed.ampm);
     setNotes(sc.notes || "");
@@ -108,6 +112,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       const timeStr = to24Hour(hour, minute, ampm);
       const payload = {
         scheduled_date: date || null,
+        scheduled_end_date: (endDate && endDate !== date) ? endDate : null,
         scheduled_time: timeStr,
         title: title || null,
         notes: notes || null,
@@ -195,7 +200,9 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                     {sc.title || "Untitled"}
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
-                    {formatDateDisplay(sc.scheduled_date)}
+                    {sc.scheduled_end_date && sc.scheduled_end_date.split("T")[0] !== sc.scheduled_date?.split("T")[0]
+                      ? `${formatDateDisplay(sc.scheduled_date)} – ${formatDateDisplay(sc.scheduled_end_date)}`
+                      : formatDateDisplay(sc.scheduled_date)}
                     {sc.scheduled_time && ` · ${formatTimeDisplay(sc.scheduled_time)}`}
                   </div>
                   {sc.notes && (
@@ -248,7 +255,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
             {/* Date — second */}
             <div>
-              <label className="text-xs text-gray-500 mb-1 block font-medium">Date</label>
+              <label className="text-xs text-gray-500 mb-1 block font-medium">Start Date</label>
               <button
                 type="button"
                 onClick={() => setShowDatePicker(true)}
@@ -257,6 +264,20 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                 {date
                   ? formatDateDisplay(date)
                   : <span className="text-gray-400 font-normal">Tap to set date</span>}
+              </button>
+            </div>
+
+            {/* End Date — for multi-day service calls */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block font-medium">End Date <span className="font-normal text-gray-400">(optional, for multi-day)</span></label>
+              <button
+                type="button"
+                onClick={() => setShowEndDatePicker(true)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-blue-400 transition"
+              >
+                {endDate && endDate !== date
+                  ? formatDateDisplay(endDate)
+                  : <span className="text-gray-400 font-normal">Tap to set end date</span>}
               </button>
             </div>
 
@@ -334,11 +355,11 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
         </div>
       </div>
 
-      {/* Date picker — renders AFTER edit form so it stacks on top (z-50 same level, later in DOM wins) */}
+      {/* Start date picker */}
       {showDatePicker && (
         <DateModal
           initialDate={date}
-          label="Service Call Date"
+          label="Service Call Start Date"
           allowTentative={false}
           onConfirm={(selectedDate) => {
             setDate(selectedDate);
@@ -346,6 +367,21 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
             setShowDatePicker(false);
           }}
           onClose={() => setShowDatePicker(false)}
+        />
+      )}
+
+      {/* End date picker */}
+      {showEndDatePicker && (
+        <DateModal
+          initialDate={endDate}
+          label="Service Call End Date"
+          allowTentative={false}
+          onConfirm={(selectedDate) => {
+            setEndDate(selectedDate);
+            setDirty(true);
+            setShowEndDatePicker(false);
+          }}
+          onClose={() => setShowEndDatePicker(false)}
         />
       )}
 

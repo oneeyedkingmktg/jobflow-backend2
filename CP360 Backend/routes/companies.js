@@ -135,6 +135,8 @@ const {
   ghl_appt_calendar,
   ghl_appt_assigned_user,          // NEW
   ghl_install_assigned_user,        // NEW
+  ghl_sc_calendar,                  // NEW
+  ghl_sc_assigned_user,             // NEW
   ghl_appt_title_template,          // NEW (optional, uses DB default)
   ghl_install_title_template,       // NEW (optional, uses DB default)
   ghl_appt_description_template,    // NEW (optional, uses DB default)
@@ -181,6 +183,8 @@ const companyResult = await client.query(
           ghl_appt_calendar,
           ghl_appt_assigned_user,
           ghl_install_assigned_user,
+          ghl_sc_calendar,
+          ghl_sc_assigned_user,
           ghl_appt_title_template,
           ghl_install_title_template,
           ghl_appt_description_template,
@@ -189,7 +193,7 @@ const companyResult = await client.query(
           billing_status,
           estimator_code
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
         RETURNING *`,
         [
           finalCompanyName,
@@ -207,6 +211,8 @@ const companyResult = await client.query(
           ghl_appt_calendar || null,
           ghl_appt_assigned_user || null,
           ghl_install_assigned_user || null,
+          ghl_sc_calendar || null,
+          ghl_sc_assigned_user || null,
           ghl_appt_title_template || null,
           ghl_install_title_template || null,
           ghl_appt_description_template || null,
@@ -324,6 +330,8 @@ const {
       ghlApptCalendar,
       ghl_appt_assigned_user,
       ghl_install_assigned_user,
+      ghl_sc_calendar,
+      ghl_sc_assigned_user,
       ghl_appt_title_template,
       ghl_install_title_template,
       ghl_appt_description_template,
@@ -468,24 +476,26 @@ const companyResult = await client.query(
   ghl_appt_calendar = COALESCE($15, ghl_appt_calendar),
   ghl_appt_assigned_user = COALESCE($16, ghl_appt_assigned_user),
   ghl_install_assigned_user = COALESCE($17, ghl_install_assigned_user),
+  ghl_sc_calendar = COALESCE($37, ghl_sc_calendar),
+  ghl_sc_assigned_user = COALESCE($38, ghl_sc_assigned_user),
   ghl_appt_title_template = COALESCE($18, ghl_appt_title_template),
   ghl_install_title_template = COALESCE($19, ghl_install_title_template),
   ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
   ghl_install_description_template = COALESCE($21, ghl_install_description_template),
 show_conversations = COALESCE($22, show_conversations),
   billing_status = COALESCE($23, billing_status),
-  google_base_tag = $25,
-  meta_base_tag = $26,
-  google_conversion_event = $27,
-  meta_conversion_event = $28,
+  google_base_tag = COALESCE($25, google_base_tag),
+  meta_base_tag = COALESCE($26, meta_base_tag),
+  google_conversion_event = COALESCE($27, google_conversion_event),
+  meta_conversion_event = COALESCE($28, meta_conversion_event),
   service_area_zips = COALESCE($29, service_area_zips),
   sip_domain = COALESCE($30, sip_domain),
   plan_type = COALESCE($31, plan_type),
   est_push_title = COALESCE($32, est_push_title),
   est_push_body = COALESCE($33, est_push_body),
   bidder_enabled = COALESCE($34, bidder_enabled),
-  microsoft_base_tag = $35,
-  microsoft_conversion_event = $36,
+  microsoft_base_tag = COALESCE($35, microsoft_base_tag),
+  microsoft_conversion_event = COALESCE($36, microsoft_conversion_event),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -527,6 +537,8 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   bidderValue,                                                 // $34
   sanitizedBody.microsoft_base_tag || null,                    // $35
   sanitizedBody.microsoft_conversion_event || null,            // $36
+  ghl_sc_calendar || null,                                     // $37
+  ghl_sc_assigned_user || null,                                // $38
 ]
 
 );

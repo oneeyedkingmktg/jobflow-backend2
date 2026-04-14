@@ -104,6 +104,8 @@ setGhlForm({
   ghlApptCalendar: "",
   ghlApptAssignedUser: "",
   ghlInstallAssignedUser: "",
+  ghlScCalendar: "",
+  ghlScAssignedUser: "",
   ghlApptTitleTemplate: "",
   ghlInstallTitleTemplate: "",
   ghlApptDescriptionTemplate: "",
@@ -164,6 +166,8 @@ setGhlForm({
     ghlApptCalendar: company.ghlApptCalendar || "",
     ghlApptAssignedUser: company.ghlApptAssignedUser || "",
     ghlInstallAssignedUser: company.ghlInstallAssignedUser || "",
+    ghlScCalendar: company.ghlScCalendar || "",
+    ghlScAssignedUser: company.ghlScAssignedUser || "",
     ghlApptTitleTemplate: company.ghlApptTitleTemplate ?? "",
     ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
@@ -288,6 +292,12 @@ const handleSaveGHLKeys = async () => {
     }
     if (ghlForm.ghlInstallAssignedUser) {
       payload.ghl_install_assigned_user = ghlForm.ghlInstallAssignedUser;
+    }
+    if (ghlForm.ghlScCalendar) {
+      payload.ghl_sc_calendar = ghlForm.ghlScCalendar;
+    }
+    if (ghlForm.ghlScAssignedUser) {
+      payload.ghl_sc_assigned_user = ghlForm.ghlScAssignedUser;
     }
     if (ghlForm.ghlApptTitleTemplate) {
       payload.ghl_appt_title_template = ghlForm.ghlApptTitleTemplate;
@@ -889,6 +899,31 @@ const renderGHLKeys = () => {
 <p className="text-xs text-gray-500 mt-1">
               Available fields: {`{{full_name}}, {{phone}}, {{email}}, {{address}}, {{city}}, {{state}}, {{zip}}, {{square_footage}}, {{finish_type}}, {{notes}}`}
             </p>
+          </div>
+        </div>
+
+        {/* Service Call Calendar Section */}
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-bold text-gray-700 mb-3">Service Call Calendar</h4>
+
+          <div>
+            <div className={viewLabel}>CALENDAR ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlScCalendar}
+              onChange={(e) => handleGhlChange("ghlScCalendar", e.target.value)}
+              placeholder="Calendar ID for service call appointments"
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className={viewLabel}>ASSIGNED USER ID</div>
+            <input
+              className={editBox}
+              value={ghlForm.ghlScAssignedUser}
+              onChange={(e) => handleGhlChange("ghlScAssignedUser", e.target.value)}
+              placeholder="GHL User ID for service call bookings"
+            />
           </div>
         </div>
 
