@@ -47,35 +47,38 @@ function shiftDate(dateStr, days) {
   return d.toISOString().split("T")[0];
 }
 
-function TimeSelects({ hour, minute, ampm, onHour, onMinute, onAmpm }) {
+function TimeSelects({ label, hour, minute, ampm, onHour, onMinute, onAmpm }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <select
-        value={hour}
-        onChange={(e) => onHour(e.target.value)}
-        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-      >
-        {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
-          <option key={h} value={h}>{h}</option>
-        ))}
-      </select>
-      <select
-        value={minute}
-        onChange={(e) => onMinute(e.target.value)}
-        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-      >
-        {["00", "15", "30", "45"].map((m) => (
-          <option key={m} value={m}>{m}</option>
-        ))}
-      </select>
-      <select
-        value={ampm}
-        onChange={(e) => onAmpm(e.target.value)}
-        className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
-      >
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+    <div>
+      <label className="text-xs text-gray-500 mb-1 block font-medium">{label}</label>
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          value={hour}
+          onChange={(e) => onHour(e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+        >
+          {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
+            <option key={h} value={h}>{h}</option>
+          ))}
+        </select>
+        <select
+          value={minute}
+          onChange={(e) => onMinute(e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+        >
+          {["00", "15", "30", "45"].map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        <select
+          value={ampm}
+          onChange={(e) => onAmpm(e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-blue-400"
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
     </div>
   );
 }
@@ -102,6 +105,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
   // Calendar state
   const today = new Date();
+  const [calExpanded, setCalExpanded] = useState(true); // true = calendar+times visible
   const [calViewMode, setCalViewMode] = useState("calendar"); // "calendar" | "day"
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
@@ -115,7 +119,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   const [dirty, setDirty] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
 
-  // Landscape
+  // Landscape detection
   const [isLandscape, setIsLandscape] = useState(
     () => typeof window !== "undefined" && window.innerWidth > window.innerHeight
   );
@@ -133,7 +137,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     loadServiceCalls(initialScId);
   }, [leadId]);
 
-  // Load calendar dots whenever we enter edit view
+  // Load calendar dots when entering edit view
   useEffect(() => {
     if (view !== "edit" || !companyId) return;
     setDotsLoading(true);
@@ -175,6 +179,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEndHour("9"); setEndMinute("00"); setEndAmpm("AM");
     setNotes("");
     setDirty(false);
+    setCalExpanded(true); // always open calendar for new SC
     setCalViewMode("calendar");
     setDayDate(null);
     setView("edit");
@@ -190,6 +195,8 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEndHour(parsedEnd.hour); setEndMinute(parsedEnd.minute); setEndAmpm(parsedEnd.ampm);
     setNotes(sc.notes || "");
     setDirty(false);
+    // Collapse calendar if date already set; expand if no date
+    setCalExpanded(!sc.scheduled_date);
     setCalViewMode("calendar");
     setDayDate(null);
     setView("edit");
@@ -286,7 +293,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     else setCalMonth(calMonth + 1);
   };
 
-  // Build per-day event map from dots + scDots
+  // Build per-day event map — use .split("T")[0] on all dates for safety
   const groupedByDate = useMemo(() => {
     const map = {};
     dots.forEach((lead) => {
@@ -296,12 +303,15 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
         map[key].appt.push(lead);
       }
       if (lead.install_date) {
-        const endDateStr = lead.install_end_date || lead.install_date;
-        const start = new Date(lead.install_date + "T12:00:00");
-        const end = new Date(endDateStr + "T12:00:00");
+        const installStart = lead.install_date.split("T")[0];
+        const installEnd = lead.install_end_date
+          ? lead.install_end_date.split("T")[0]
+          : installStart;
+        const start = new Date(installStart + "T12:00:00");
+        const end = new Date(installEnd + "T12:00:00");
         const duration = Math.max(1, Math.round((end - start) / 86400000) + 1);
         for (let d = 0; d < duration; d++) {
-          const dt = new Date(lead.install_date + "T12:00:00");
+          const dt = new Date(installStart + "T12:00:00");
           dt.setDate(dt.getDate() + d);
           const key = dt.toISOString().split("T")[0];
           if (!map[key]) map[key] = { appt: [], install: [], sc: [] };
@@ -318,16 +328,34 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     return map;
   }, [dots, scDots]);
 
-  const handleDayClick = (key) => {
+  // Click a calendar cell → select date, go to day view
+  const handleCalendarDayClick = (key) => {
     setDate(key);
     setDirty(true);
     setDayDate(key);
     setCalViewMode("day");
   };
 
+  // Called from day view prev/next — updates selected date too
+  const handleDayNav = (key) => {
+    setDayDate(key);
+    setDate(key);
+    setDirty(true);
+  };
+
+  // "Set Date" from day view — collapses calendar
+  const handleConfirmDate = () => {
+    setCalExpanded(false);
+  };
+
   const dayAppts = dayDate ? (groupedByDate[dayDate]?.appt || []) : [];
   const dayInstalls = dayDate ? (groupedByDate[dayDate]?.install || []) : [];
   const dayScs = dayDate ? (groupedByDate[dayDate]?.sc || []) : [];
+
+  // Pill label
+  const pillLabel = date
+    ? `${formatDateDisplay(date)}  ·  ${formatTimeDisplay(to24Hour(startHour, startMinute, startAmpm))} – ${formatTimeDisplay(to24Hour(endHour, endMinute, endAmpm))}`
+    : null;
 
   // ── Calendar block ────────────────────────────────────────────────────────
 
@@ -356,9 +384,9 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       <div className="text-xs">
         {weeks.map((week, wIdx) => (
           <div key={wIdx} className="mb-0.5">
-            <div className="grid grid-cols-7 gap-x-1 text-center">
+            <div className="grid grid-cols-7 gap-x-1">
               {week.map((day, dIdx) => {
-                if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[36px]" />;
+                if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[44px]" />;
                 const key = formatDateKey(day);
                 const dayData = groupedByDate[key] || { appt: [], install: [], sc: [] };
                 const isToday = key === formatDateKey(today);
@@ -366,24 +394,21 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                 return (
                   <div
                     key={key}
-                    onClick={() => handleDayClick(key)}
-                    className={`rounded cursor-pointer py-1 flex flex-col items-start w-full px-0.5 min-h-[44px] transition-colors
+                    onClick={() => handleCalendarDayClick(key)}
+                    className={`rounded cursor-pointer py-1 px-0.5 flex flex-col items-start min-h-[44px] w-full transition-colors
                       ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
                   >
                     <span className="font-medium leading-none w-full text-center">{day.getDate()}</span>
-                    {/* Appointment bars */}
                     {dayData.appt.map((lead, i) => (
                       <div key={`a-${i}`} className="w-full h-4 bg-blue-500 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
                         <span className="text-white text-xs font-semibold truncate leading-none">{lead.name}</span>
                       </div>
                     ))}
-                    {/* Install bars */}
                     {dayData.install.map((lead, i) => (
                       <div key={`i-${i}`} className="w-full h-4 bg-green-500 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
                         <span className="text-white text-xs font-semibold truncate leading-none">{lead.name}</span>
                       </div>
                     ))}
-                    {/* Service call bars */}
                     {dayData.sc.map((sc, i) => (
                       <div key={`sc-${i}`} className="w-full h-4 bg-orange-400 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
                         <span className="text-white text-xs font-semibold truncate leading-none">{sc.lead_name}{sc.title ? ` · ${sc.title}` : ""}</span>
@@ -420,12 +445,12 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
           </svg>
           Calendar
         </button>
-        <span className="text-xs font-semibold text-gray-700 flex-1 text-center px-2">
+        <span className="text-xs font-semibold text-gray-700 flex-1 text-center px-1">
           {dayDate ? new Date(dayDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : ""}
         </span>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => { const d = shiftDate(dayDate, -1); setDayDate(d); setDate(d); setDirty(true); }}
+            onClick={() => handleDayNav(shiftDate(dayDate, -1))}
             className="p-1 hover:bg-gray-200 rounded text-gray-600"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -433,7 +458,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
             </svg>
           </button>
           <button
-            onClick={() => { const d = shiftDate(dayDate, 1); setDayDate(d); setDate(d); setDirty(true); }}
+            onClick={() => handleDayNav(shiftDate(dayDate, 1))}
             className="p-1 hover:bg-gray-200 rounded text-gray-600"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,43 +468,48 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
         </div>
       </div>
 
-      <div className="border rounded-lg bg-gray-50 p-2 mb-2 min-h-[60px] max-h-[130px] overflow-y-auto space-y-1">
+      {/* Events for this day */}
+      <div className="border rounded-lg bg-white p-2 mb-3 min-h-[50px] max-h-[110px] overflow-y-auto space-y-1">
         {dotsLoading ? (
-          <p className="text-xs text-gray-400 italic text-center mt-2">Loading...</p>
+          <p className="text-xs text-gray-400 italic text-center mt-1">Loading...</p>
         ) : (dayAppts.length + dayInstalls.length + dayScs.length === 0) ? (
-          <p className="text-xs text-gray-400 italic text-center mt-2">Nothing scheduled this day</p>
+          <p className="text-xs text-gray-400 italic text-center mt-1">Nothing scheduled this day</p>
         ) : (
           <>
             {dayAppts.map((l, i) => (
               <div key={`a-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
                 <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                <span className="font-medium w-16 flex-shrink-0">
-                  {l.appointment_time ? formatTimeDisplay(l.appointment_time) : "—"}
-                </span>
-                <span className="truncate text-gray-600">{l.name}</span>
-                <span className="text-gray-400 flex-shrink-0">Appt</span>
+                <span className="font-medium w-14 flex-shrink-0">{l.appointment_time ? formatTimeDisplay(l.appointment_time) : "—"}</span>
+                <span className="truncate">{l.name}</span>
+                <span className="text-gray-400 flex-shrink-0 text-xs">Appt</span>
               </div>
             ))}
             {dayInstalls.map((l, i) => (
               <div key={`i-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
                 <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                <span className="font-medium w-16 flex-shrink-0">Install</span>
-                <span className="truncate text-gray-600">{l.name}</span>
+                <span className="font-medium w-14 flex-shrink-0">Install</span>
+                <span className="truncate">{l.name}</span>
               </div>
             ))}
             {dayScs.map((sc, i) => (
               <div key={`sc-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
                 <span className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
-                <span className="font-medium w-16 flex-shrink-0">
-                  {sc.scheduled_time ? formatTimeDisplay(sc.scheduled_time) : "SC"}
-                </span>
-                <span className="truncate text-gray-600">{sc.lead_name}</span>
-                {sc.title && <span className="text-gray-400 flex-shrink-0 truncate">· {sc.title}</span>}
+                <span className="font-medium w-14 flex-shrink-0">{sc.scheduled_time ? formatTimeDisplay(sc.scheduled_time) : "SC"}</span>
+                <span className="truncate">{sc.lead_name}</span>
+                {sc.title && <span className="text-gray-400 flex-shrink-0 truncate text-xs">· {sc.title}</span>}
               </div>
             ))}
           </>
         )}
       </div>
+
+      {/* Confirm date button */}
+      <button
+        onClick={handleConfirmDate}
+        className="w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-700 transition"
+      >
+        Set {dayDate ? new Date(dayDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Date"}
+      </button>
     </div>
   );
 
@@ -542,7 +572,41 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
   // ── EDIT VIEW ─────────────────────────────────────────────────────────────
 
-  const formFields = (
+  const calendarSection = (
+    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 mb-4">
+      {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
+
+      {/* Time pickers inside the collapsible section */}
+      {calViewMode === "calendar" && (
+        <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
+          <TimeSelects
+            label="Start Time"
+            hour={startHour} minute={startMinute} ampm={startAmpm}
+            onHour={(v) => { setStartHour(v); setDirty(true); }}
+            onMinute={(v) => { setStartMinute(v); setDirty(true); }}
+            onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
+          />
+          <TimeSelects
+            label="End Time"
+            hour={endHour} minute={endMinute} ampm={endAmpm}
+            onHour={(v) => { setEndHour(v); setDirty(true); }}
+            onMinute={(v) => { setEndMinute(v); setDirty(true); }}
+            onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
+          />
+          {date && (
+            <button
+              onClick={() => setCalExpanded(false)}
+              className="w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-700 transition"
+            >
+              Done
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const detailFields = (
     <div className="space-y-4">
       {/* Title */}
       <div>
@@ -553,38 +617,6 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
           onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
           placeholder="e.g. Final coat, Touch-up visit..."
           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
-        />
-      </div>
-
-      {/* Selected date display */}
-      <div>
-        <label className="text-xs text-gray-500 mb-1 block font-medium">Date</label>
-        <div className={`text-sm font-semibold px-4 py-2.5 rounded-xl border ${date ? "bg-blue-50 border-blue-300 text-blue-800" : "bg-gray-50 border-gray-200 text-gray-400"}`}>
-          {date
-            ? new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-            : "Select a date on the calendar"}
-        </div>
-      </div>
-
-      {/* Start Time */}
-      <div>
-        <label className="text-xs text-gray-500 mb-1 block font-medium">Start Time</label>
-        <TimeSelects
-          hour={startHour} minute={startMinute} ampm={startAmpm}
-          onHour={(v) => { setStartHour(v); setDirty(true); }}
-          onMinute={(v) => { setStartMinute(v); setDirty(true); }}
-          onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
-        />
-      </div>
-
-      {/* End Time */}
-      <div>
-        <label className="text-xs text-gray-500 mb-1 block font-medium">End Time</label>
-        <TimeSelects
-          hour={endHour} minute={endMinute} ampm={endAmpm}
-          onHour={(v) => { setEndHour(v); setDirty(true); }}
-          onMinute={(v) => { setEndMinute(v); setDirty(true); }}
-          onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
         />
       </div>
 
@@ -637,41 +669,76 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
             className={`bg-white rounded-2xl shadow-xl w-full relative ${isLandscape ? "max-w-5xl flex flex-row" : "max-w-lg"}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* X close */}
-            <button
-              onClick={onClose}
-              className="absolute top-3 right-3 z-10 text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none w-8 h-8 flex items-center justify-center"
-            >
-              ×
-            </button>
-
             {isLandscape ? (
               <>
-                {/* LEFT: calendar */}
-                <div className="flex-1 min-w-0 p-4 border-r border-gray-200">
-                  <h2 className="text-base font-bold text-gray-900 mb-3">
+                {/* LEFT: calendar always visible in landscape */}
+                <div className="flex-1 min-w-0 p-4 border-r border-gray-200 overflow-y-auto max-h-[90vh]">
+                  {/* Heading centered */}
+                  <h2 className="text-base font-bold text-gray-900 text-center mb-1">
                     {editing ? "Edit Service Call" : "New Service Call"}
                   </h2>
+                  {/* Date pill */}
+                  {pillLabel && (
+                    <div className="text-center mb-3">
+                      <span className="inline-block bg-orange-50 border border-orange-300 text-orange-800 text-xs font-semibold px-4 py-1.5 rounded-full">
+                        {pillLabel}
+                      </span>
+                    </div>
+                  )}
                   {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
+                  {calViewMode === "calendar" && (
+                    <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
+                      <TimeSelects
+                        label="Start Time"
+                        hour={startHour} minute={startMinute} ampm={startAmpm}
+                        onHour={(v) => { setStartHour(v); setDirty(true); }}
+                        onMinute={(v) => { setStartMinute(v); setDirty(true); }}
+                        onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
+                      />
+                      <TimeSelects
+                        label="End Time"
+                        hour={endHour} minute={endMinute} ampm={endAmpm}
+                        onHour={(v) => { setEndHour(v); setDirty(true); }}
+                        onMinute={(v) => { setEndMinute(v); setDirty(true); }}
+                        onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
+                      />
+                    </div>
+                  )}
                 </div>
-                {/* RIGHT: form + buttons */}
+                {/* RIGHT: title, notes, buttons */}
                 <div className="w-72 flex-shrink-0 p-4 flex flex-col overflow-y-auto max-h-[90vh]">
-                  {formFields}
+                  {detailFields}
                   {actionButtons}
                 </div>
               </>
             ) : (
+              /* ── Portrait layout ── */
               <div className="p-5">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 pr-8">
+                {/* Heading — centered */}
+                <h2 className="text-lg font-bold text-gray-900 text-center mb-1">
                   {editing ? "Edit Service Call" : "New Service Call"}
                 </h2>
 
-                {/* Calendar section */}
-                <div className="mb-4 border border-gray-200 rounded-xl p-3 bg-gray-50">
-                  {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
-                </div>
+                {/* Date/time pill — centered below heading */}
+                {pillLabel ? (
+                  <div className="text-center mb-4">
+                    <button
+                      onClick={() => { setCalExpanded(true); setCalViewMode("calendar"); }}
+                      className="inline-block bg-orange-50 border border-orange-300 text-orange-800 text-sm font-semibold px-5 py-2 rounded-full hover:bg-orange-100 transition"
+                    >
+                      {pillLabel}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-center text-xs text-gray-400 mb-4">Select a date on the calendar below</p>
+                )}
 
-                {formFields}
+                {/* Collapsible calendar + times */}
+                {calExpanded && calendarSection}
+
+                {/* Title + Notes */}
+                {detailFields}
+
                 {actionButtons}
               </div>
             )}
@@ -698,7 +765,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                 className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
               >
                 Stay
-            </button>
+              </button>
             </div>
           </div>
         </div>
