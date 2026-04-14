@@ -367,18 +367,28 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                   <div
                     key={key}
                     onClick={() => handleDayClick(key)}
-                    className={`rounded cursor-pointer py-1 flex flex-col items-center min-h-[36px] transition-colors
+                    className={`rounded cursor-pointer py-1 flex flex-col items-start w-full px-0.5 min-h-[44px] transition-colors
                       ${isSelected ? "bg-blue-600 text-white" : isToday ? "bg-blue-100 text-blue-800" : "hover:bg-gray-100 text-gray-800"}`}
                   >
-                    <span className="font-medium leading-none">{day.getDate()}</span>
-                    {/* Indicator dots */}
-                    {(dayData.appt.length > 0 || dayData.install.length > 0 || dayData.sc.length > 0) && (
-                      <div className="flex gap-0.5 mt-0.5">
-                        {dayData.appt.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-blue-500"}`} />}
-                        {dayData.install.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-green-500"}`} />}
-                        {dayData.sc.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : "bg-purple-500"}`} />}
+                    <span className="font-medium leading-none w-full text-center">{day.getDate()}</span>
+                    {/* Appointment bars */}
+                    {dayData.appt.map((lead, i) => (
+                      <div key={`a-${i}`} className="w-full h-4 bg-blue-500 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
+                        <span className="text-white text-xs font-semibold truncate leading-none">{lead.name}</span>
                       </div>
-                    )}
+                    ))}
+                    {/* Install bars */}
+                    {dayData.install.map((lead, i) => (
+                      <div key={`i-${i}`} className="w-full h-4 bg-green-500 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
+                        <span className="text-white text-xs font-semibold truncate leading-none">{lead.name}</span>
+                      </div>
+                    ))}
+                    {/* Service call bars */}
+                    {dayData.sc.map((sc, i) => (
+                      <div key={`sc-${i}`} className="w-full h-4 bg-orange-400 rounded-sm flex items-center px-0.5 overflow-hidden mt-0.5">
+                        <span className="text-white text-xs font-semibold truncate leading-none">{sc.lead_name}{sc.title ? ` · ${sc.title}` : ""}</span>
+                      </div>
+                    ))}
                   </div>
                 );
               })}
@@ -389,9 +399,9 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
       {/* Legend */}
       <div className="flex gap-3 mt-1 text-xs text-gray-500">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Appt</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Install</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />Service Call</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-2.5 rounded-sm bg-blue-500 inline-block" />Appt</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-2.5 rounded-sm bg-green-500 inline-block" />Install</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-2.5 rounded-sm bg-orange-400 inline-block" />Service Call</span>
       </div>
     </>
   );
@@ -459,7 +469,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
             ))}
             {dayScs.map((sc, i) => (
               <div key={`sc-${i}`} className="flex items-center gap-2 text-xs text-gray-700">
-                <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
                 <span className="font-medium w-16 flex-shrink-0">
                   {sc.scheduled_time ? formatTimeDisplay(sc.scheduled_time) : "SC"}
                 </span>
