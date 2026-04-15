@@ -1329,8 +1329,9 @@ async function clearContactCustomFields(contactId, fieldKeys, company) {
 // ----------------------------------------------------------------------------
 
 // Create or replace a GHL calendar event for a service call.
-// Uses ghl_sc_calendar if configured, falls back to ghl_install_calendar.
-// Call after INSERT or UPDATE on service_calls.
+// sc_type === 'follow_up_install' → install calendar; all others → SC calendar.
+// On every INSERT or UPDATE the old event is deleted and a fresh one created,
+// so calendar switches (type changes) are handled automatically.
 // Returns the new GHL event ID, or null if skipped.
 async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   // Route to install calendar for Follow Up Install type, SC calendar otherwise
@@ -1338,6 +1339,9 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   const calendarId = isInstallType
     ? (company.ghl_install_calendar || company.ghl_sc_calendar)
     : (company.ghl_sc_calendar || company.ghl_install_calendar);
+
+  console.log(`[SC GHL] sc_type=${serviceCall.sc_type} → calendar=${calendarId} (isInstallType=${isInstallType})`);
+
   if (!calendarId) {
     console.log("[SC GHL] Skipping — no service call or install calendar configured");
     return null;
@@ -1355,20 +1359,19 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   // pg returns DATE as a JS Date object — use toISOString to get "YYYY-MM-DD"
   const dateOnly = new Date(serviceCall.scheduled_date).toISOString().split('T')[0];
 
-  // Use scheduled_time if set, otherwise default to 9:00 AM
-  const timeStr = serviceCall.scheduled_time
+  // Start time: use scheduled_time if set, otherwise 9:00 AM
+  const startTimeStr = serviceCall.scheduled_time
     ? serviceCall.scheduled_time.toString().substring(0, 5) // "HH:MM"
     : '09:00';
+  const startDt = convertToUTC(`${dateOnly}T${startTimeStr}:00`, companyTimezone);
 
-  const startDt = convertToUTC(`${dateOnly}T${timeStr}:00`, companyTimezone);
-
-  // Multi-day: end at 1pm on last day; single-day: +1 hour from start
+  // End time: use scheduled_end_time if set, otherwise start + 1 hour
   let endDt;
-  if (serviceCall.scheduled_end_date) {
-    const endDateOnly = new Date(serviceCall.scheduled_end_date).toISOString().split('T')[0];
-    if (endDateOnly !== dateOnly) {
-      endDt = convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone);
-    } else {
+  if (serviceCall.scheduled_end_time) {
+    const endTimeStr = serviceCall.scheduled_end_time.toString().substring(0, 5);
+    endDt = convertToUTC(`${dateOnly}T${endTimeStr}:00`, companyTimezone);
+    // Guard: if end <= start, default to start + 1 hour
+    if (endDt.getTime() <= startDt.getTime()) {
       endDt = new Date(startDt.getTime() + 60 * 60 * 1000);
     }
   } else {
