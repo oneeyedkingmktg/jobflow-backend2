@@ -618,26 +618,23 @@ async function updateCalendarEvent(company, eventId, payload) {
 
 // ----------------------------------------------------------------------------
 // DELETE CALENDAR EVENT (appointments)
-// GHL IAM does not support DELETE — mark as cancelled via PUT instead.
-// Cancelled appointments show as crossed-off in the GHL calendar.
+// Uses DELETE /calendars/events/appointments/{eventId} to permanently remove
+// the event from GHL. Applies to appointment, install, and service call
+// calendar events across all three calendars.
 // ----------------------------------------------------------------------------
 async function deleteCalendarEvent(company, eventId, contactId) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
 
-  console.log("🗑️ [CALENDAR] Cancelling event:", eventId);
-
-  const body = { appointmentStatus: "cancelled" };
-  if (contactId) body.contactId = contactId;
+  console.log("🗑️ [CALENDAR] Deleting event:", eventId);
 
   try {
     await ghlRequest(company, `/calendars/events/appointments/${eventId}`, {
-      method: "PUT",
-      body,
+      method: "DELETE",
     });
-    console.log("✅ [CALENDAR] Event cancelled successfully");
+    console.log("✅ [CALENDAR] Event deleted successfully");
     return true;
   } catch (err) {
-    console.warn("⚠️ [CALENDAR CANCEL] GHL rejected cancel:", err.message);
+    console.warn("⚠️ [CALENDAR DELETE] GHL rejected delete:", err.message);
     return false;
   }
 }
