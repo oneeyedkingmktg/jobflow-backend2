@@ -1387,14 +1387,16 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     ? (company.ghl_install_assigned_user || company.ghl_sc_assigned_user)
     : (company.ghl_sc_assigned_user || company.ghl_install_assigned_user);
 
-  // If there's an existing event, delete it first
+  // If there's an existing event, delete it first.
+  // SC events may have been created as block-slots OR appointments depending on whether
+  // assignedUser was set at creation time. Try block-slot DELETE first; fall back to
+  // appointment cancel (PUT) so both cases are handled without needing to track the type.
   if (serviceCall.ghl_event_id) {
-    try {
+    const blockDeleted = await deleteBlockSlot(company, serviceCall.ghl_event_id);
+    if (!blockDeleted) {
       await deleteCalendarEvent(company, serviceCall.ghl_event_id, lead.ghl_contact_id);
-      console.log("[SC GHL] Deleted old event:", serviceCall.ghl_event_id);
-    } catch (err) {
-      console.warn("[SC GHL] Could not delete old event:", err.message);
     }
+    console.log("[SC GHL] Deleted old event:", serviceCall.ghl_event_id);
   }
 
   let created;
@@ -1441,14 +1443,15 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
 }
 
 // Delete the GHL event for a service call (call before DELETE on service_calls).
+// Tries block-slot DELETE first (covers events created with assignedUser),
+// falls back to appointment cancel PUT (covers events created without assignedUser).
 async function deleteServiceCallGhlEvent({ company, eventId, contactId }) {
   if (!eventId) return;
-  try {
+  const blockDeleted = await deleteBlockSlot(company, eventId);
+  if (!blockDeleted) {
     await deleteCalendarEvent(company, eventId, contactId);
-    console.log("[SC GHL] Deleted event:", eventId);
-  } catch (err) {
-    console.warn("[SC GHL] Could not delete event:", err.message);
   }
+  console.log("[SC GHL] Deleted event:", eventId);
 }
 
 // ----------------------------------------------------------------------------
