@@ -1400,17 +1400,17 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   let created;
 
   if (assignedUser) {
-    // block-slots endpoint bypasses GHL's slot availability check entirely.
-    // Requires assignedUserId — use this path when an assigned user is configured.
+    // block-slots bypasses GHL's slot availability check entirely.
+    // GHL requires assignedUserId alone (no calendarId) — it routes to the
+    // calendar based on the user's assignment in GHL.
     const blockPayload = {
       locationId: company.ghl_location_id,
-      calendarId,
       title,
       startTime: startDt.toISOString(),
       endTime: endDt.toISOString(),
       assignedUserId: assignedUser,
     };
-    console.log("[SC GHL] Creating via block-slots:", JSON.stringify(blockPayload));
+    console.log("[SC GHL] Creating via block-slots (assignedUser):", JSON.stringify(blockPayload));
     created = await ghlRequest(company, '/calendars/events/block-slots', {
       method: 'POST',
       body: blockPayload,
