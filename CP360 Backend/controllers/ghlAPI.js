@@ -629,7 +629,7 @@ async function deleteCalendarEvent(company, eventId, contactId) {
   try {
     await ghlRequest(company, `/calendars/events/appointments/${eventId}`, {
       method: "PUT",
-      body: { appointmentStatus: "cancelled" },
+      body: { appointmentStatus: "cancelled", contactId },
     });
     console.log("✅ [CALENDAR] Event cancelled successfully");
     return true;
