@@ -94,6 +94,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
   // Edit form state
   const [title, setTitle] = useState("");
+  const [scType, setScType] = useState("");
   const [date, setDate] = useState(null);
   const [startHour, setStartHour] = useState("8");
   const [startMinute, setStartMinute] = useState("00");
@@ -118,6 +119,8 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   const [deleting, setDeleting] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(
@@ -174,11 +177,13 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   const openNew = () => {
     setEditing(null);
     setTitle("");
+    setScType("");
     setDate(null);
     setStartHour("8"); setStartMinute("00"); setStartAmpm("AM");
     setEndHour("9"); setEndMinute("00"); setEndAmpm("AM");
     setNotes("");
     setDirty(false);
+    setSaveError("");
     setCalExpanded(true); // always open calendar for new SC
     setCalViewMode("calendar");
     setDayDate(null);
@@ -188,6 +193,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   const openEdit = (sc) => {
     setEditing(sc);
     setTitle(sc.title || "");
+    setScType(sc.sc_type || "");
     setDate(sc.scheduled_date ? sc.scheduled_date.split("T")[0] : null);
     const parsedStart = parseTime(sc.scheduled_time);
     setStartHour(parsedStart.hour); setStartMinute(parsedStart.minute); setStartAmpm(parsedStart.ampm);
@@ -195,6 +201,7 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     setEndHour(parsedEnd.hour); setEndMinute(parsedEnd.minute); setEndAmpm(parsedEnd.ampm);
     setNotes(sc.notes || "");
     setDirty(false);
+    setSaveError("");
     // Collapse calendar if date already set; expand if no date
     setCalExpanded(!sc.scheduled_date);
     setCalViewMode("calendar");
@@ -203,6 +210,10 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   };
 
   const handleSave = async () => {
+    // Validate required fields
+    if (!title.trim()) { setSaveError("Title is required."); return; }
+    if (!scType) { setSaveError("Service Call Type is required."); return; }
+    setSaveError("");
     setSaving(true);
     try {
       const payload = {
@@ -210,7 +221,8 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
         scheduled_end_date: null,
         scheduled_time: to24Hour(startHour, startMinute, startAmpm),
         scheduled_end_time: to24Hour(endHour, endMinute, endAmpm),
-        title: title || null,
+        sc_type: scType,
+        title: title.trim(),
         notes: notes || null,
       };
       if (editing) {
@@ -236,9 +248,10 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirmed = async () => {
     if (!editing) return;
     setDeleting(true);
+    setConfirmDelete(false);
     try {
       await apiRequest(`/leads/${leadId}/service-calls/${editing.id}`, { method: "DELETE" });
       await loadServiceCalls(null);
@@ -571,6 +584,13 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                     {sc.scheduled_time && ` · ${formatTimeDisplay(sc.scheduled_time)}`}
                     {sc.scheduled_end_time && ` – ${formatTimeDisplay(sc.scheduled_end_time)}`}
                   </div>
+                  {sc.sc_type && (
+                    <div className="mt-1">
+                      <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${sc.sc_type === "follow_up_install" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                        {sc.sc_type === "follow_up_install" ? "Follow Up Install" : "Service Call"}
+                      </span>
+                    </div>
+                  )}
                   {sc.notes && (
                     <div className="text-xs text-gray-500 mt-1 line-clamp-2">{sc.notes}</div>
                   )}
@@ -600,16 +620,34 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
   const detailFields = (
     <div className="space-y-4">
-      {/* Title */}
+      {/* Title — required */}
       <div>
-        <label className="text-xs text-gray-500 mb-1 block font-medium">Title</label>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">
+          Title <span className="text-orange-500">*</span>
+        </label>
         <input
           type="text"
           value={title}
-          onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
+          onChange={(e) => { setTitle(e.target.value); setDirty(true); if (saveError) setSaveError(""); }}
           placeholder="e.g. Final coat, Touch-up visit..."
           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
         />
+      </div>
+
+      {/* Service Call Type — required */}
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block font-medium">
+          Service Call Type <span className="text-orange-500">*</span>
+        </label>
+        <select
+          value={scType}
+          onChange={(e) => { setScType(e.target.value); setDirty(true); if (saveError) setSaveError(""); }}
+          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:border-blue-400 transition"
+        >
+          <option value="">— Select type —</option>
+          <option value="follow_up_install">Follow Up Install</option>
+          <option value="service_call">All Other Service Calls</option>
+        </select>
       </div>
 
       {/* Notes */}
@@ -628,6 +666,9 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
 
   const actionButtons = (
     <div className="mt-4 space-y-2">
+      {saveError && (
+        <p className="text-xs text-orange-600 font-medium text-center pb-1">{saveError}</p>
+      )}
       <button
         onClick={handleSave}
         disabled={saving}
@@ -643,11 +684,11 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
       </button>
       {editing && (
         <button
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           disabled={deleting}
-          className="w-full bg-red-100 text-red-700 rounded-xl py-3 font-semibold text-sm hover:bg-red-200 transition disabled:opacity-50"
+          className="w-full bg-gray-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-gray-700 transition disabled:opacity-50"
         >
-          {deleting ? "Deleting..." : "Delete"}
+          {deleting ? "Deleting..." : "Delete Service Call"}
         </button>
       )}
     </div>
@@ -739,6 +780,33 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                 className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
               >
                 Stay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl p-6 mx-4 w-full max-w-sm shadow-xl text-center">
+            <p className="text-gray-800 font-semibold mb-1">Delete this service call?</p>
+            <p className="text-gray-500 text-sm mb-5">
+              {editing?.title ? `"${editing.title}" will be permanently removed.` : "This cannot be undone."}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteConfirmed}
+                className="flex-1 bg-gray-700 text-white rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-800 transition"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 bg-gray-100 text-gray-700 rounded-xl py-2.5 font-semibold text-sm hover:bg-gray-200 transition"
+              >
+                Cancel
               </button>
             </div>
           </div>

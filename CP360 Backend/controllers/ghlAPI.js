@@ -1336,7 +1336,11 @@ async function clearContactCustomFields(contactId, fieldKeys, company) {
 // Call after INSERT or UPDATE on service_calls.
 // Returns the new GHL event ID, or null if skipped.
 async function syncServiceCallToGhl({ serviceCall, lead, company }) {
-  const calendarId = company.ghl_sc_calendar || company.ghl_install_calendar;
+  // Route to install calendar for Follow Up Install type, SC calendar otherwise
+  const isInstallType = serviceCall.sc_type === 'follow_up_install';
+  const calendarId = isInstallType
+    ? (company.ghl_install_calendar || company.ghl_sc_calendar)
+    : (company.ghl_sc_calendar || company.ghl_install_calendar);
   if (!calendarId) {
     console.log("[SC GHL] Skipping — no service call or install calendar configured");
     return null;
@@ -1389,8 +1393,11 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     ignoreDateRanges: true,
   };
 
-  if (company.ghl_sc_assigned_user) {
-    createPayload.assignedUserId = company.ghl_sc_assigned_user;
+  const assignedUser = isInstallType
+    ? (company.ghl_install_assigned_user || company.ghl_sc_assigned_user)
+    : (company.ghl_sc_assigned_user || company.ghl_install_assigned_user);
+  if (assignedUser) {
+    createPayload.assignedUserId = assignedUser;
   }
 
   // If there's an existing event, delete it first
