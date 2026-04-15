@@ -503,12 +503,32 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
         )}
       </div>
 
-      {/* Confirm date button */}
+      {/* Time pickers — set times before confirming */}
+      <div className="space-y-3 border-t border-gray-200 pt-3 mt-1">
+        <TimeSelects
+          label="Start Time"
+          hour={startHour} minute={startMinute} ampm={startAmpm}
+          onHour={(v) => { setStartHour(v); setDirty(true); }}
+          onMinute={(v) => { setStartMinute(v); setDirty(true); }}
+          onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
+        />
+        <TimeSelects
+          label="End Time"
+          hour={endHour} minute={endMinute} ampm={endAmpm}
+          onHour={(v) => { setEndHour(v); setDirty(true); }}
+          onMinute={(v) => { setEndMinute(v); setDirty(true); }}
+          onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
+        />
+      </div>
+
+      {/* Confirm button — shows date + start time */}
       <button
         onClick={handleConfirmDate}
-        className="w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-700 transition"
+        className="w-full mt-3 bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-700 transition"
       >
-        Set {dayDate ? new Date(dayDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Date"}
+        {dayDate
+          ? `Set ${new Date(dayDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${formatTimeDisplay(to24Hour(startHour, startMinute, startAmpm))}`
+          : "Set Date"}
       </button>
     </div>
   );
@@ -575,34 +595,6 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
   const calendarSection = (
     <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 mb-4">
       {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
-
-      {/* Time pickers inside the collapsible section */}
-      {calViewMode === "calendar" && (
-        <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
-          <TimeSelects
-            label="Start Time"
-            hour={startHour} minute={startMinute} ampm={startAmpm}
-            onHour={(v) => { setStartHour(v); setDirty(true); }}
-            onMinute={(v) => { setStartMinute(v); setDirty(true); }}
-            onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
-          />
-          <TimeSelects
-            label="End Time"
-            hour={endHour} minute={endMinute} ampm={endAmpm}
-            onHour={(v) => { setEndHour(v); setDirty(true); }}
-            onMinute={(v) => { setEndMinute(v); setDirty(true); }}
-            onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
-          />
-          {date && (
-            <button
-              onClick={() => setCalExpanded(false)}
-              className="w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-700 transition"
-            >
-              Done
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 
@@ -686,24 +678,6 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
                     </div>
                   )}
                   {calViewMode === "calendar" ? calendarBlock : dayViewBlock}
-                  {calViewMode === "calendar" && (
-                    <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
-                      <TimeSelects
-                        label="Start Time"
-                        hour={startHour} minute={startMinute} ampm={startAmpm}
-                        onHour={(v) => { setStartHour(v); setDirty(true); }}
-                        onMinute={(v) => { setStartMinute(v); setDirty(true); }}
-                        onAmpm={(v) => { setStartAmpm(v); setDirty(true); }}
-                      />
-                      <TimeSelects
-                        label="End Time"
-                        hour={endHour} minute={endMinute} ampm={endAmpm}
-                        onHour={(v) => { setEndHour(v); setDirty(true); }}
-                        onMinute={(v) => { setEndMinute(v); setDirty(true); }}
-                        onAmpm={(v) => { setEndAmpm(v); setDirty(true); }}
-                      />
-                    </div>
-                  )}
                 </div>
                 {/* RIGHT: title, notes, buttons */}
                 <div className="w-72 flex-shrink-0 p-4 flex flex-col overflow-y-auto max-h-[90vh]">
