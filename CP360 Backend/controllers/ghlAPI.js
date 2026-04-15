@@ -1383,15 +1383,17 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
   const scTitle = serviceCall.title || 'Service Call';
   const title = `${displayName} - ${scTitle}`;
 
-  // Use block-slots endpoint — bypasses GHL slot/availability validation entirely.
-  // Service calls are internal scheduling events, not client-facing booking slots,
-  // so we don't need GHL to enforce calendar availability.
+  // appointmentStatus: "confirmed" bypasses GHL's slot availability check.
+  // ignoreDateRanges only bypasses date-range restrictions, not slot/time validation.
   const createPayload = {
     locationId: company.ghl_location_id,
     calendarId,
+    contactId: lead.ghl_contact_id,
     title,
     startTime: startDt.toISOString(),
     endTime: endDt.toISOString(),
+    appointmentStatus: 'confirmed',
+    ignoreDateRanges: true,
   };
 
   const assignedUser = isInstallType
@@ -1411,8 +1413,8 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     }
   }
 
-  console.log("[SC GHL] Creating block-slot event:", JSON.stringify(createPayload));
-  const created = await ghlRequest(company, '/calendars/events/block-slots', {
+  console.log("[SC GHL] Creating appointment event:", JSON.stringify(createPayload));
+  const created = await ghlRequest(company, '/calendars/events/appointments', {
     method: 'POST',
     body: createPayload,
   });
