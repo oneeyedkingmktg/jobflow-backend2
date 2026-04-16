@@ -1399,43 +1399,26 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     console.log("[SC GHL] Deleted old event:", serviceCall.ghl_event_id);
   }
 
-  let created;
-
-  if (assignedUser) {
-    // block-slots bypasses GHL's slot availability check entirely.
-    // GHL requires assignedUserId alone (no calendarId) — it routes to the
-    // calendar based on the user's assignment in GHL.
-    const blockPayload = {
-      locationId: company.ghl_location_id,
-      title,
-      startTime: startDt.toISOString(),
-      endTime: endDt.toISOString(),
-      assignedUserId: assignedUser,
-    };
-    console.log("[SC GHL] Creating via block-slots (assignedUser):", JSON.stringify(blockPayload));
-    created = await ghlRequest(company, '/calendars/events/block-slots', {
-      method: 'POST',
-      body: blockPayload,
-    });
-  } else {
-    // Fallback: appointments endpoint when no assigned user is configured.
-    const apptPayload = {
-      locationId: company.ghl_location_id,
-      calendarId,
-      contactId: lead.ghl_contact_id,
-      title,
-      startTime: startDt.toISOString(),
-      endTime: endDt.toISOString(),
-      appointmentStatus: 'confirmed',
-      ignoreDateRanges: true,
-      toNotify: false,
-    };
-    console.log("[SC GHL] Creating via appointments (no assigned user):", JSON.stringify(apptPayload));
-    created = await ghlRequest(company, '/calendars/events/appointments', {
-      method: 'POST',
-      body: apptPayload,
-    });
-  }
+  // Always use the appointments endpoint — ignoreDateRanges bypasses slot availability
+  // checks, so no need for block-slots. This ensures calendarId and contactId are
+  // always included so the event is attached to the correct calendar and contact.
+  const apptPayload = {
+    locationId: company.ghl_location_id,
+    calendarId,
+    contactId: lead.ghl_contact_id,
+    title,
+    startTime: startDt.toISOString(),
+    endTime: endDt.toISOString(),
+    appointmentStatus: 'confirmed',
+    ignoreDateRanges: true,
+    toNotify: false,
+  };
+  if (assignedUser) apptPayload.assignedUserId = assignedUser;
+  console.log("[SC GHL] Creating appointment:", JSON.stringify(apptPayload));
+  const created = await ghlRequest(company, '/calendars/events/appointments', {
+    method: 'POST',
+    body: apptPayload,
+  });
 
   const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
   console.log("[SC GHL] Created event ID:", eventId);
