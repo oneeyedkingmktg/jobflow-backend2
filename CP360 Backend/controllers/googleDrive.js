@@ -9,8 +9,30 @@ const { Readable } = require("stream");
 const db = require("../config/database");
 
 // ------------------------------------------------------------------
+// Build a service account Drive client
+// ------------------------------------------------------------------
+function getServiceAccountDriveClient() {
+  let auth;
+  if (process.env.GOOGLE_DRIVE_CREDENTIALS) {
+    const credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
+    auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/drive"],
+    });
+  } else {
+    auth = new google.auth.GoogleAuth({
+      keyFile: "./keys/google-drive.json",
+      scopes: ["https://www.googleapis.com/auth/drive"],
+    });
+  }
+  return google.drive({ version: "v3", auth });
+}
+
+// ------------------------------------------------------------------
 // Build an authenticated Drive client
-// Prefers OAuth2 (Becky's account) → falls back to service account
+// Prefers OAuth2 (stored refresh token) → falls back to service account.
+// If the stored token is invalid (expired/revoked), clears it from DB
+// and falls back to service account automatically.
 // ------------------------------------------------------------------
 async function getDriveClient() {
   // Try stored OAuth refresh token first
@@ -26,28 +48,36 @@ async function getDriveClient() {
         process.env.GOOGLE_OAUTH_REDIRECT_URI
       );
       oauth2Client.setCredentials({ refresh_token: result.rows[0].value });
-      return google.drive({ version: "v3", auth: oauth2Client });
+
+      // Validate the token by doing a lightweight refresh.
+      // If the token is expired/revoked Google throws invalid_grant here
+      // rather than on the first real API call, so we can fall back cleanly.
+      try {
+        await oauth2Client.getAccessToken();
+        return google.drive({ version: "v3", auth: oauth2Client });
+      } catch (tokenErr) {
+        const isInvalidGrant =
+          tokenErr.message?.includes("invalid_grant") ||
+          tokenErr.response?.data?.error === "invalid_grant";
+
+        if (isInvalidGrant) {
+          console.warn("⚠️  [DRIVE] OAuth refresh token is invalid/expired — clearing stored token and falling back to service account");
+          // Clear the bad token so the UI shows "not connected"
+          await db.query(
+            `DELETE FROM platform_settings WHERE key = 'google_oauth_refresh_token'`
+          );
+        } else {
+          console.warn("⚠️  [DRIVE] OAuth token validation failed:", tokenErr.message);
+        }
+        // Fall through to service account
+      }
     }
   } catch (err) {
-    console.warn("⚠️  Could not load OAuth token from DB, falling back to service account:", err.message);
+    console.warn("⚠️  [DRIVE] Could not load OAuth token from DB, falling back to service account:", err.message);
   }
 
-  // Fall back to service account (read-only operations still work)
-  let auth;
-  if (process.env.GOOGLE_DRIVE_CREDENTIALS) {
-    const credentials = JSON.parse(process.env.GOOGLE_DRIVE_CREDENTIALS);
-    auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ["https://www.googleapis.com/auth/drive"],
-    });
-  } else {
-    auth = new google.auth.GoogleAuth({
-      keyFile: "./keys/google-drive.json",
-      scopes: ["https://www.googleapis.com/auth/drive"],
-    });
-  }
-
-  return google.drive({ version: "v3", auth });
+  // Fall back to service account
+  return getServiceAccountDriveClient();
 }
 
 // ------------------------------------------------------------------
