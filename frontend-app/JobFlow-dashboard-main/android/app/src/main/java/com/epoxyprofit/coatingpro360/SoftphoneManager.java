@@ -240,7 +240,9 @@ public class SoftphoneManager {
         if (core == null) return;
         Call call = core.getCurrentCall();
         if (call != null && !tone.isEmpty()) {
-            call.sendDtmf(tone.charAt(0));
+            char dtmf = tone.charAt(0);
+            call.sendDtmf(dtmf);      // send RFC 2833 signal to remote party
+            core.playDtmf(dtmf, 200); // play tone locally for audio feedback (200ms)
         }
     }
 
