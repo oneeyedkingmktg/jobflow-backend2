@@ -92,14 +92,12 @@ function getOAuthClient() {
 }
 
 // ------------------------------------------------------------------
-// Get or create a folder by name under a parent folder.
+// Search for a folder by name under a parent — returns null if not found.
 // supportsAllDrives + includeItemsFromAllDrives are required for
 // Shared Drives; they are harmless on personal My Drive folders.
 // ------------------------------------------------------------------
-async function getOrCreateFolder(folderName, parentFolderId) {
+async function findFolder(folderName, parentFolderId) {
   const drive = await getDriveClient();
-
-  // Escape single quotes in folder name to prevent query injection
   const safeName = folderName.replace(/'/g, "\\'");
 
   const searchRes = await drive.files.list({
@@ -109,10 +107,17 @@ async function getOrCreateFolder(folderName, parentFolderId) {
     includeItemsFromAllDrives: true,
   });
 
-  if (searchRes.data.files.length > 0) {
-    return searchRes.data.files[0];
-  }
+  return searchRes.data.files[0] || null;
+}
 
+// ------------------------------------------------------------------
+// Get or create a folder by name under a parent folder.
+// ------------------------------------------------------------------
+async function getOrCreateFolder(folderName, parentFolderId) {
+  const existing = await findFolder(folderName, parentFolderId);
+  if (existing) return existing;
+
+  const drive = await getDriveClient();
   const createRes = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -169,6 +174,7 @@ async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
 module.exports = {
   getDriveClient,
   getOAuthClient,
+  findFolder,
   getOrCreateFolder,
   listFilesInFolder,
   uploadFileToFolder,

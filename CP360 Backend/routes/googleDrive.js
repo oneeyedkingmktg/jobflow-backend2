@@ -10,6 +10,7 @@ const multer = require("multer");
 const db = require("../config/database");
 const {
   getOAuthClient,
+  findFolder,
   getOrCreateFolder,
   listFilesInFolder,
   uploadFileToFolder,
@@ -22,9 +23,11 @@ const upload = multer({
 });
 
 // ------------------------------------------------------------------
-// Helper: resolve lead folder (get or create) for a given leadId
+// Helper: resolve lead folder for a given leadId.
+// create=true  → get or create the folder (used on upload)
+// create=false → find only, return null if folder doesn't exist yet (used on list)
 // ------------------------------------------------------------------
-async function resolveLeadFolder(leadId) {
+async function resolveLeadFolder(leadId, { create = true } = {}) {
   const leadResult = await db.query(
     `SELECT id, name, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
     [leadId]
@@ -49,11 +52,10 @@ async function resolveLeadFolder(leadId) {
     );
   }
 
-  const folder = await getOrCreateFolder(
-    lead.name || "Lead",
-    company.google_drive_base_folder_id
-  );
-  return folder;
+  if (create) {
+    return getOrCreateFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+  }
+  return findFolder(lead.name || "Lead", company.google_drive_base_folder_id);
 }
 
 // ============================================================================
@@ -177,9 +179,11 @@ router.get("/lead-files", async (req, res) => {
     const { leadId } = req.query;
     if (!leadId) return res.status(400).json({ error: "Missing leadId" });
 
-    const folder = await resolveLeadFolder(leadId);
-    const files = await listFilesInFolder(folder.id);
+    // find-only: don't create the folder just to list files
+    const folder = await resolveLeadFolder(leadId, { create: false });
+    if (!folder) return res.json({ ok: true, files: [] });
 
+    const files = await listFilesInFolder(folder.id);
     return res.json({ ok: true, files });
   } catch (err) {
     console.error("❌ LIST FILES ERROR", err);
