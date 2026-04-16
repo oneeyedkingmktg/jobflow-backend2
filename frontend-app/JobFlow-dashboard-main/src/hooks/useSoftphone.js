@@ -148,6 +148,9 @@ export function useSoftphone() {
     setCallerName(displayName);
     setCallerNumber(phoneNumber);
     if (!initialized || registrationStateRef.current !== 'ok') {
+      // Destroy any stale/broken Linphone core before starting fresh
+      await Softphone.destroy();
+      setInitialized(false);
       registrationStateRef.current = 'none';
       setRegistrationState('none');
       await initialize();
