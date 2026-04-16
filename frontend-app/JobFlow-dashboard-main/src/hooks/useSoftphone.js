@@ -147,11 +147,12 @@ export function useSoftphone() {
 
     setCallerName(displayName);
     setCallerNumber(phoneNumber);
-    if (!initialized) {
+    if (!initialized || registrationStateRef.current !== 'ok') {
       await initialize();
+      await waitForRegistration(12000);
     }
     await Softphone.makeCall({ phoneNumber });
-  }, [initialized, initialize]);
+  }, [initialized, initialize, waitForRegistration]);
 
   const hangup = useCallback(async () => {
     await Softphone.hangup();
