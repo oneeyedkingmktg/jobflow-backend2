@@ -123,7 +123,7 @@ export function useSoftphone() {
   // =========================================================================
   // WAIT FOR REGISTRATION
   // =========================================================================
-  const waitForRegistration = useCallback((timeoutMs = 10000) => {
+  const waitForRegistration = useCallback((timeoutMs = 15000) => {
     return new Promise((resolve, reject) => {
       if (registrationStateRef.current === 'ok') { resolve(); return; }
       const start = Date.now();
@@ -131,9 +131,9 @@ export function useSoftphone() {
         if (registrationStateRef.current === 'ok') {
           clearInterval(interval);
           resolve();
-        } else if (registrationStateRef.current === 'failed' || Date.now() - start > timeoutMs) {
+        } else if (Date.now() - start > timeoutMs) {
           clearInterval(interval);
-          reject(new Error('SIP registration failed or timed out'));
+          reject(new Error('SIP registration timed out — check network or SIP credentials'));
         }
       }, 100);
     });
@@ -148,8 +148,10 @@ export function useSoftphone() {
     setCallerName(displayName);
     setCallerNumber(phoneNumber);
     if (!initialized || registrationStateRef.current !== 'ok') {
+      registrationStateRef.current = 'none';
+      setRegistrationState('none');
       await initialize();
-      await waitForRegistration(12000);
+      await waitForRegistration(15000);
     }
     await Softphone.makeCall({ phoneNumber });
   }, [initialized, initialize, waitForRegistration]);
