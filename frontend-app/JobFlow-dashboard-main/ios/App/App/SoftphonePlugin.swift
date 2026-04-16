@@ -213,11 +213,12 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
     // =========================================================================
     @objc func sendDTMF(_ call: CAPPluginCall) {
         guard let tone = call.getString("tone"), !tone.isEmpty,
-              let char = tone.unicodeScalars.first.map({ Character($0) }) else {
+              let ascii = tone.utf8.first else {
             call.reject("tone is required"); return
         }
+        let dtmf = CChar(bitPattern: ascii)
         DispatchQueue.main.async { [weak self] in
-            try? self?.mCore?.currentCall?.sendDtmf(dtmf: char)
+            try? self?.mCore?.currentCall?.sendDtmf(dtmf: dtmf)
             call.resolve()
         }
     }
