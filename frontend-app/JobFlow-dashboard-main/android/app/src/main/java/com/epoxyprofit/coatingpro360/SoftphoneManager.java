@@ -2,7 +2,6 @@ package com.epoxyprofit.coatingpro360;
 
 import android.content.Context;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 
@@ -35,7 +34,6 @@ public class SoftphoneManager {
     private static SoftphoneManager instance;
 
     private Core core;
-    private HandlerThread iterateThread;
     private Handler iterateHandler;
     private SoftphoneListener listener;
     private boolean initialized = false;
@@ -86,10 +84,10 @@ public class SoftphoneManager {
             // Add Core listener
             core.addListener(coreListener);
 
-            // Start background thread for iterate loop (keeps off UI thread)
-            iterateThread = new HandlerThread("LinphoneIterate");
-            iterateThread.start();
-            iterateHandler = new Handler(iterateThread.getLooper());
+            // Run iterate on the main thread — required for Android DNS resolution.
+            // c-ares (Linphone's DNS resolver) gets EPERM when run from a background
+            // HandlerThread on Android 9+. Main thread has proper network access.
+            iterateHandler = new Handler(Looper.getMainLooper());
 
             // Start Core before registering accounts
             core.start();
@@ -267,10 +265,6 @@ public class SoftphoneManager {
         if (iterateHandler != null) {
             iterateHandler.removeCallbacks(iterateRunnable);
             iterateHandler = null;
-        }
-        if (iterateThread != null) {
-            iterateThread.quitSafely();
-            iterateThread = null;
         }
         if (core != null) {
             core.stop();
