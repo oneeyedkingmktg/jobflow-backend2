@@ -128,12 +128,19 @@ export function useSoftphone() {
       if (registrationStateRef.current === 'ok') { resolve(); return; }
       const start = Date.now();
       const interval = setInterval(() => {
-        if (registrationStateRef.current === 'ok') {
+        const state = registrationStateRef.current;
+        if (state === 'ok') {
+          // Registered — proceed
+          clearInterval(interval);
+          resolve();
+        } else if (state === 'failed' || state === 'cleared') {
+          // Twilio Elastic SIP does not require registration for outbound calls.
+          // 403 on REGISTER is normal — Linphone will auth per-call on the INVITE.
           clearInterval(interval);
           resolve();
         } else if (Date.now() - start > timeoutMs) {
           clearInterval(interval);
-          reject(new Error('SIP registration timed out — check network or SIP credentials'));
+          reject(new Error('SIP connection timed out — check network'));
         }
       }, 100);
     });
