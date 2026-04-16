@@ -135,7 +135,7 @@ public class SoftphoneManager {
 
         Address serverAddr = Factory.instance().createAddress("sip:" + sipDomain);
         if (serverAddr != null) {
-            serverAddr.setTransport(TransportType.Udp);
+            serverAddr.setTransport(TransportType.Tcp);
             params.setServerAddress(serverAddr);
         }
 
