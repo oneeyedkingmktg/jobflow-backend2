@@ -92,7 +92,9 @@ function getOAuthClient() {
 }
 
 // ------------------------------------------------------------------
-// Get or create a folder by name under a parent folder
+// Get or create a folder by name under a parent folder.
+// supportsAllDrives + includeItemsFromAllDrives are required for
+// Shared Drives; they are harmless on personal My Drive folders.
 // ------------------------------------------------------------------
 async function getOrCreateFolder(folderName, parentFolderId) {
   const drive = await getDriveClient();
@@ -103,6 +105,8 @@ async function getOrCreateFolder(folderName, parentFolderId) {
   const searchRes = await drive.files.list({
     q: `mimeType = 'application/vnd.google-apps.folder' and name = '${safeName}' and '${parentFolderId}' in parents and trashed = false`,
     fields: "files(id, name, webViewLink)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   if (searchRes.data.files.length > 0) {
@@ -116,6 +120,7 @@ async function getOrCreateFolder(folderName, parentFolderId) {
       parents: [parentFolderId],
     },
     fields: "id, name, webViewLink",
+    supportsAllDrives: true,
   });
 
   return createRes.data;
@@ -131,6 +136,8 @@ async function listFilesInFolder(folderId) {
     q: `'${folderId}' in parents and trashed = false`,
     fields: "files(id, name, mimeType, webViewLink, thumbnailLink, createdTime, size)",
     orderBy: "createdTime desc",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   return res.data.files || [];
@@ -153,6 +160,7 @@ async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
       body: stream,
     },
     fields: "id, name, webViewLink, mimeType",
+    supportsAllDrives: true,
   });
 
   return res.data;
