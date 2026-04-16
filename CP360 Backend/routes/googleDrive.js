@@ -183,6 +183,18 @@ router.get("/lead-files", async (req, res) => {
     return res.json({ ok: true, files });
   } catch (err) {
     console.error("❌ LIST FILES ERROR", err);
+    const isDriveAuthError =
+      err.message?.includes("invalid_grant") ||
+      err.message?.includes("storage quota") ||
+      err.message?.includes("insufficientPermissions") ||
+      err.code === 401 || err.code === 403;
+    if (isDriveAuthError) {
+      return res.status(503).json({
+        ok: false,
+        error: "Google Drive is not connected. Please reconnect Google Drive in platform settings.",
+        needsReauth: true,
+      });
+    }
     return res.status(err.status || 500).json({ ok: false, error: err.message });
   }
 });
@@ -208,6 +220,18 @@ router.post("/upload-file", upload.single("file"), async (req, res) => {
     return res.json({ ok: true, file: uploaded });
   } catch (err) {
     console.error("❌ UPLOAD FILE ERROR", err);
+    const isDriveAuthError =
+      err.message?.includes("invalid_grant") ||
+      err.message?.includes("storage quota") ||
+      err.message?.includes("insufficientPermissions") ||
+      err.code === 401 || err.code === 403;
+    if (isDriveAuthError) {
+      return res.status(503).json({
+        ok: false,
+        error: "Google Drive is not connected. Please reconnect Google Drive in platform settings.",
+        needsReauth: true,
+      });
+    }
     return res.status(err.status || 500).json({ ok: false, error: err.message });
   }
 });
