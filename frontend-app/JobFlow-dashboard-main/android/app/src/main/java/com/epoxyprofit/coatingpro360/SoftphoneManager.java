@@ -278,7 +278,7 @@ public class SoftphoneManager {
     // =========================================================================
     private final CoreListenerStub coreListener = new CoreListenerStub() {
 
-        public void onRegistrationStateChanged(Core core, Account account, RegistrationState state, String message) {
+        public void onAccountRegistrationStateChanged(Core core, Account account, RegistrationState state, String message) {
             Log.d(TAG, "Registration state: " + state + " — " + message);
             if (listener != null) {
                 listener.onRegistrationState(state.toString().toLowerCase(), message);
