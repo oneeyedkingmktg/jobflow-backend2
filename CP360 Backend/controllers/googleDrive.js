@@ -56,20 +56,10 @@ async function getDriveClient() {
         await oauth2Client.getAccessToken();
         return google.drive({ version: "v3", auth: oauth2Client });
       } catch (tokenErr) {
-        const isInvalidGrant =
-          tokenErr.message?.includes("invalid_grant") ||
-          tokenErr.response?.data?.error === "invalid_grant";
-
-        if (isInvalidGrant) {
-          console.warn("⚠️  [DRIVE] OAuth refresh token is invalid/expired — clearing stored token and falling back to service account");
-          // Clear the bad token so the UI shows "not connected"
-          await db.query(
-            `DELETE FROM platform_settings WHERE key = 'google_oauth_refresh_token'`
-          );
-        } else {
-          console.warn("⚠️  [DRIVE] OAuth token validation failed:", tokenErr.message);
-        }
-        // Fall through to service account
+        console.warn("⚠️  [DRIVE] OAuth token refresh failed, falling back to service account:", tokenErr.message);
+        // Do NOT delete the token — it may be a temporary error, and deleting it
+        // would break uploads permanently until manually re-authorized.
+        // Fall through to service account for this request.
       }
     }
   } catch (err) {
