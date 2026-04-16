@@ -21,6 +21,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "hangup",      returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setMuted",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSpeaker",  returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendDTMF",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStatus",   returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "destroy",     returnType: CAPPluginReturnPromise),
     ]
@@ -203,6 +204,20 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
                     core.outputAudioDevice = device; break
                 }
             }
+            call.resolve()
+        }
+    }
+
+    // =========================================================================
+    // SEND DTMF TONE
+    // =========================================================================
+    @objc func sendDTMF(_ call: CAPPluginCall) {
+        guard let tone = call.getString("tone"), !tone.isEmpty,
+              let char = tone.unicodeScalars.first.map({ Character($0) }) else {
+            call.reject("tone is required"); return
+        }
+        DispatchQueue.main.async { [weak self] in
+            try? self?.mCore?.currentCall?.sendDtmf(dtmf: char)
             call.resolve()
         }
     }

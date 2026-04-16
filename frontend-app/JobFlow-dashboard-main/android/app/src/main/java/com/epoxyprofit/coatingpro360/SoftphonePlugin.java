@@ -196,6 +196,20 @@ public class SoftphonePlugin extends Plugin {
     }
 
     // =========================================================================
+    // sendDTMF({ tone: string }) — send a DTMF key during a live call
+    // =========================================================================
+    @PluginMethod
+    public void sendDTMF(PluginCall call) {
+        String tone = call.getString("tone", "");
+        if (tone == null || tone.isEmpty()) {
+            call.reject("tone is required");
+            return;
+        }
+        SoftphoneManager.getInstance().sendDtmf(tone);
+        call.resolve();
+    }
+
+    // =========================================================================
     // destroy() — unregister and clean up
     // =========================================================================
     @PluginMethod

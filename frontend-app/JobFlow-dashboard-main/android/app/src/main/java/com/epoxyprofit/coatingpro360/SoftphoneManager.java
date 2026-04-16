@@ -236,6 +236,17 @@ public class SoftphoneManager {
     }
 
     // =========================================================================
+    // SEND DTMF TONE
+    // =========================================================================
+    public void sendDtmf(String tone) {
+        if (core == null) return;
+        Call call = core.getCurrentCall();
+        if (call != null && !tone.isEmpty()) {
+            call.sendDtmf(tone.charAt(0));
+        }
+    }
+
+    // =========================================================================
     // STATUS
     // =========================================================================
     public String getCallState() {
