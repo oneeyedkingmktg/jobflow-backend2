@@ -223,20 +223,14 @@ router.post("/upload-file", upload.single("file"), async (req, res) => {
 
     return res.json({ ok: true, file: uploaded });
   } catch (err) {
-    console.error("❌ UPLOAD FILE ERROR", err);
-    const isDriveAuthError =
-      err.message?.includes("invalid_grant") ||
-      err.message?.includes("storage quota") ||
-      err.message?.includes("insufficientPermissions") ||
-      err.code === 401 || err.code === 403;
-    if (isDriveAuthError) {
-      return res.status(503).json({
-        ok: false,
-        error: "Google Drive is not connected. Please reconnect Google Drive in platform settings.",
-        needsReauth: true,
-      });
-    }
-    return res.status(err.status || 500).json({ ok: false, error: err.message });
+    console.error("❌ UPLOAD FILE ERROR", err?.message || err);
+    // Surface the actual Google error message so it's visible in the UI
+    const googleMessage =
+      err?.response?.data?.error?.message ||
+      err?.errors?.[0]?.message ||
+      err?.message ||
+      "Upload failed";
+    return res.status(err.status || 500).json({ ok: false, error: googleMessage });
   }
 });
 
