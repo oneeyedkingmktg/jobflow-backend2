@@ -673,15 +673,6 @@ try {
       }
 
       try {
-        if (config.microsoft_conversion_event) {
-          // eslint-disable-next-line no-new-func
-          new Function(config.microsoft_conversion_event)();
-        }
-      } catch (e) {
-        console.warn("Microsoft conversion event error:", e);
-      }
-
-      try {
         if (typeof gtag === 'function') {
           gtag('event', 'estimate_submitted');
         }
@@ -689,7 +680,10 @@ try {
         console.warn("GA4 event error:", e);
       }
 
-      // Notify parent window so UET tags on contractor sites can fire
+      // Notify parent window so tags on contractor sites can fire.
+      // Microsoft UET lives on the parent page (not inside the iframe),
+      // so postMessage is the only correct path — do NOT also call it
+      // directly here or it will double-fire.
       try {
         window.parent.postMessage({
           event: 'estimator_conversion',
