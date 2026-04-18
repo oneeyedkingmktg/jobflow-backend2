@@ -108,19 +108,6 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
     // =========================================================================
     private func attachDelegate() {
         let delegate = CoreDelegateStub(
-            onAccountRegistrationStateChanged: { [weak self] (_, _, state, message) in
-                guard let self = self else { return }
-                let s: String
-                switch state {
-                case .None:     s = "none"
-                case .Progress: s = "progress"
-                case .Ok:       s = "ok"
-                case .Cleared:  s = "cleared"
-                case .Failed:   s = "failed"
-                default:        s = "none"
-                }
-                self.notifyListeners("registrationState", data: ["state": s, "message": message])
-            },
             onCallStateChanged: { [weak self] (_, call, state, message) in
                 guard let self = self else { return }
                 let callerNumber = call.remoteAddress?.asStringUriOnly() ?? ""
@@ -140,6 +127,19 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
                 default:                  s = "idle"
                 }
                 self.notifyListeners("callState", data: ["state": s, "callerNumber": callerNumber, "message": message])
+            },
+            onAccountRegistrationStateChanged: { [weak self] (_, _, state, message) in
+                guard let self = self else { return }
+                let s: String
+                switch state {
+                case .None:     s = "none"
+                case .Progress: s = "progress"
+                case .Ok:       s = "ok"
+                case .Cleared:  s = "cleared"
+                case .Failed:   s = "failed"
+                default:        s = "none"
+                }
+                self.notifyListeners("registrationState", data: ["state": s, "message": message])
             }
         )
         mDelegate = delegate
@@ -220,7 +220,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async { [weak self] in
             guard let core = self?.mCore else { call.resolve(); return }
             try? core.currentCall?.sendDtmf(dtmf: dtmf) // send RFC 2833 signal to remote
-            core.playDtmf(dtmf: dtmf, ms: 200)          // play tone locally for audio feedback
+            core.playDtmf(dtmf: dtmf, durationMs: 200)          // play tone locally for audio feedback
             call.resolve()
         }
     }
