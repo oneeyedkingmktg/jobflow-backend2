@@ -334,12 +334,12 @@ const handleSaveTracking = async () => {
       setError("");
       const payload = {
         name: form.name,
-        google_base_tag: trackingForm.google_base_tag || null,
-        meta_base_tag: trackingForm.meta_base_tag || null,
-        google_conversion_event: trackingForm.google_conversion_event || null,
-        meta_conversion_event: trackingForm.meta_conversion_event || null,
-        microsoft_base_tag: trackingForm.microsoft_base_tag || null,
-        microsoft_conversion_event: trackingForm.microsoft_conversion_event || null,
+        google_base_tag: trackingForm.google_base_tag ?? "",
+        meta_base_tag: trackingForm.meta_base_tag ?? "",
+        google_conversion_event: trackingForm.google_conversion_event ?? "",
+        meta_conversion_event: trackingForm.meta_conversion_event ?? "",
+        microsoft_base_tag: trackingForm.microsoft_base_tag ?? "",
+        microsoft_conversion_event: trackingForm.microsoft_conversion_event ?? "",
       };
       await onSave(payload);
       setError("");

@@ -484,18 +484,18 @@ const companyResult = await client.query(
   ghl_install_description_template = COALESCE($21, ghl_install_description_template),
 show_conversations = COALESCE($22, show_conversations),
   billing_status = COALESCE($23, billing_status),
-  google_base_tag = COALESCE($25, google_base_tag),
-  meta_base_tag = COALESCE($26, meta_base_tag),
-  google_conversion_event = COALESCE($27, google_conversion_event),
-  meta_conversion_event = COALESCE($28, meta_conversion_event),
+  google_base_tag = CASE WHEN $25 IS NULL THEN google_base_tag WHEN $25 = '' THEN NULL ELSE $25 END,
+  meta_base_tag = CASE WHEN $26 IS NULL THEN meta_base_tag WHEN $26 = '' THEN NULL ELSE $26 END,
+  google_conversion_event = CASE WHEN $27 IS NULL THEN google_conversion_event WHEN $27 = '' THEN NULL ELSE $27 END,
+  meta_conversion_event = CASE WHEN $28 IS NULL THEN meta_conversion_event WHEN $28 = '' THEN NULL ELSE $28 END,
   service_area_zips = COALESCE($29, service_area_zips),
   sip_domain = COALESCE($30, sip_domain),
   plan_type = COALESCE($31, plan_type),
   est_push_title = COALESCE($32, est_push_title),
   est_push_body = COALESCE($33, est_push_body),
   bidder_enabled = COALESCE($34, bidder_enabled),
-  microsoft_base_tag = COALESCE($35, microsoft_base_tag),
-  microsoft_conversion_event = COALESCE($36, microsoft_conversion_event),
+  microsoft_base_tag = CASE WHEN $35 IS NULL THEN microsoft_base_tag WHEN $35 = '' THEN NULL ELSE $35 END,
+  microsoft_conversion_event = CASE WHEN $36 IS NULL THEN microsoft_conversion_event WHEN $36 = '' THEN NULL ELSE $36 END,
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -525,18 +525,18 @@ show_conversations = COALESCE($22, show_conversations),
   show_conversations ?? null,         // $22
   billing_status,                     // $23
   companyId,                          // $24
-sanitizedBody.google_base_tag || null,        // $25
-  sanitizedBody.meta_base_tag || null,          // $26
-  sanitizedBody.google_conversion_event || null,// $27
-  sanitizedBody.meta_conversion_event || null,  // $28
+sanitizedBody.google_base_tag ?? null,        // $25
+  sanitizedBody.meta_base_tag ?? null,          // $26
+  sanitizedBody.google_conversion_event ?? null,// $27
+  sanitizedBody.meta_conversion_event ?? null,  // $28
 service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   sip_domain || null,                                          // $30
   plan_type || null,                                           // $31
   est_push_title || null,                                      // $32
   est_push_body || null,                                       // $33
   bidderValue,                                                 // $34
-  sanitizedBody.microsoft_base_tag || null,                    // $35
-  sanitizedBody.microsoft_conversion_event || null,            // $36
+  sanitizedBody.microsoft_base_tag ?? null,                    // $35
+  sanitizedBody.microsoft_conversion_event ?? null,            // $36
   ghl_sc_calendar || null,                                     // $37
   ghl_sc_assigned_user || null,                                // $38
 ]
