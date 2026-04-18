@@ -89,7 +89,9 @@ function applyConfig(data, setConfig, setCustomStyles) {
   setConfig(data);
   injectTrackingTag(data.google_base_tag);
   injectTrackingTag(data.meta_base_tag);
-  injectTrackingTag(data.microsoft_base_tag);
+  // Microsoft UET must NOT be injected into the iframe — it lives on the parent page only.
+  // Injecting it here causes UET to auto-track the form submission from inside the iframe,
+  // doubling the conversion when the postMessage also fires it on the parent page.
   setCustomStyles(generateCustomStyles(data));
 }
 
