@@ -90,7 +90,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
             if let identity = try? Factory.Instance.createAddress(addr: "sip:\(user)@\(domain)") {
                 try? params.setIdentityaddress(newValue: identity)
             }
-            if let serverAddr = try? Factory.Instance.createAddress(addr: "sip:\(domain);transport=udp") {
+            if let serverAddr = try? Factory.Instance.createAddress(addr: "sip:\(domain);transport=tcp") {
                 try? params.setServeraddress(newValue: serverAddr)
             }
             params.registerEnabled = true
@@ -108,7 +108,7 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
     // =========================================================================
     private func attachDelegate() {
         let delegate = CoreDelegateStub(
-            onRegistrationStateChanged: { [weak self] (_, _, state, message) in
+            onAccountRegistrationStateChanged: { [weak self] (_, _, state, message) in
                 guard let self = self else { return }
                 let s: String
                 switch state {
@@ -218,7 +218,9 @@ public class SoftphonePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let dtmf = CChar(bitPattern: ascii)
         DispatchQueue.main.async { [weak self] in
-            try? self?.mCore?.currentCall?.sendDtmf(dtmf: dtmf)
+            guard let core = self?.mCore else { call.resolve(); return }
+            try? core.currentCall?.sendDtmf(dtmf: dtmf) // send RFC 2833 signal to remote
+            core.playDtmf(dtmf: dtmf, ms: 200)          // play tone locally for audio feedback
             call.resolve()
         }
     }
