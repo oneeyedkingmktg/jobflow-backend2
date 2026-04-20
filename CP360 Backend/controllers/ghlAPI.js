@@ -293,7 +293,10 @@ function isCalendarConflict(err) {
 // CHANGE DETECTION
 // ----------------------------------------------------------------------------
 function detectAppointmentChange(currentLead, lastSyncedDate, lastSyncedTime) {
-  const hasAppointment = currentLead.appointment_date && currentLead.appointment_time;
+  // Treat midnight / zero time as "no time set" — triggers delete rather than update
+  const apptTime = currentLead.appointment_time;
+  const timeIsZero = !apptTime || normalizeTimeTo24h(apptTime) === '00:00:00' || normalizeTimeTo24h(apptTime) === '00:00';
+  const hasAppointment = currentLead.appointment_date && apptTime && !timeIsZero;
   const hadAppointment = lastSyncedDate && lastSyncedTime;
   const hasEventId = currentLead.appointment_calendar_event_id;
 
@@ -1205,9 +1208,14 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   const ghlContactId = contactId || lead.ghl_contact_id;
 
   if (changeType === 'cancelled') {
-    // DELETE — both appointments and installs use the same cancel endpoint
     if (existingEventId) {
-      await deleteCalendarEvent(company, existingEventId, ghlContactId);
+      if (calendarType === 'install') {
+        // Installs are block slots — try block-slot DELETE, fall back to appointment cancel
+        const deleted = await deleteBlockSlot(company, existingEventId);
+        if (!deleted) await deleteCalendarEvent(company, existingEventId, ghlContactId);
+      } else {
+        await deleteCalendarEvent(company, existingEventId, ghlContactId);
+      }
       return { type, action: 'deleted', calendarEventId: null };
     }
     return null;
