@@ -618,24 +618,32 @@ async function updateCalendarEvent(company, eventId, payload) {
 
 // ----------------------------------------------------------------------------
 // DELETE CALENDAR EVENT (appointments)
-// GHL IAM does not support DELETE on this route — use PUT to cancel instead.
-// Applies to appointment, install, and service call calendar events.
+// Tries DELETE first; falls back to PUT cancel if GHL rejects the DELETE.
 // ----------------------------------------------------------------------------
 async function deleteCalendarEvent(company, eventId, contactId) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
 
-  console.log("🗑️ [CALENDAR] Cancelling event:", eventId);
+  console.log("🗑️ [CALENDAR] Deleting event:", eventId);
 
   try {
     await ghlRequest(company, `/calendars/events/appointments/${eventId}`, {
-      method: "PUT",
-      body: { appointmentStatus: "cancelled", contactId },
+      method: "DELETE",
     });
-    console.log("✅ [CALENDAR] Event cancelled successfully");
+    console.log("✅ [CALENDAR] Event deleted successfully");
     return true;
   } catch (err) {
-    console.warn("⚠️ [CALENDAR DELETE] GHL rejected cancel:", err.message);
-    return false;
+    console.warn("⚠️ [CALENDAR DELETE] DELETE failed, falling back to cancel PUT:", err.message);
+    try {
+      await ghlRequest(company, `/calendars/events/appointments/${eventId}`, {
+        method: "PUT",
+        body: { appointmentStatus: "cancelled", contactId },
+      });
+      console.log("✅ [CALENDAR] Event cancelled (fallback) successfully");
+      return true;
+    } catch (err2) {
+      console.warn("⚠️ [CALENDAR DELETE] Fallback cancel also failed:", err2.message);
+      return false;
+    }
   }
 }
 
