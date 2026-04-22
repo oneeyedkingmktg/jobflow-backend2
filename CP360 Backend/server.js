@@ -115,6 +115,25 @@ app.get("/", (req, res) => {
 // ============================================================================
 // START SERVER
 // ============================================================================
+// ============================================================================
+// STARTUP MIGRATIONS
+// ============================================================================
+const { pool } = require('./config/database');
+async function runMigrations() {
+  const migrations = [
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_name TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_email TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_top_text TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS invoice_top_text TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_domain TEXT`,
+  ];
+  for (const sql of migrations) {
+    try { await pool.query(sql); } catch (e) { console.warn('Migration skipped:', e.message); }
+  }
+  console.log('Migrations complete');
+}
+runMigrations();
+
 // Initialize Firebase
 initializeFirebase();
 app.listen(PORT, () => {
