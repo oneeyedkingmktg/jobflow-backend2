@@ -250,9 +250,14 @@ export default function PublicProposal({ proposalId }) {
               {discounts.map(d => {
                 const val = parseFloat(d.discount_value) || 0;
                 const amt = d.discount_type === 'dollar' ? val : preDiscount * (val / 100);
+                const acceptDate = d.if_accepted_by ? String(d.if_accepted_by).substring(0, 10) : '';
                 return (
                   <div key={d.id} className="flex justify-between text-sm text-red-600">
-                    <span>{d.description || 'Discount'}</span><span>-{fmt(amt)}</span>
+                    <span>
+                      {d.description || 'Discount'}
+                      {acceptDate && <span className="block text-xs font-normal">If accepted by {fmtDate(acceptDate)}</span>}
+                    </span>
+                    <span className="shrink-0 ml-3">-{fmt(amt)}</span>
                   </div>
                 );
               })}

@@ -268,12 +268,14 @@ export function printProposal({
   }).join('');
 
   const discountRows = discounts.map(d => {
-    const type = d._type || d.discount_type;
-    const val  = parseFloat(d._val ?? d.discount_value) || 0;
-    const amt  = type === 'dollar' ? val : preDiscountTotal * (val / 100);
-    const name = d._desc || d.description || 'Discount';
+    const type        = d._type || d.discount_type;
+    const val         = parseFloat(d._val ?? d.discount_value) || 0;
+    const amt         = type === 'dollar' ? val : preDiscountTotal * (val / 100);
+    const name        = d._desc || d.description || 'Discount';
+    const acceptDate  = d._date || d.if_accepted_by || '';
+    const acceptLabel = acceptDate ? `<div style="font-size:9pt;color:#b00;margin-top:2px">If accepted by ${fmtDate(acceptDate)}</div>` : '';
     return `<tr>
-      <td colspan="3" style="text-align:right;color:#b00;font-size:10.5pt">${name}</td>
+      <td colspan="3" style="text-align:right;color:#b00;font-size:10.5pt">${name}${acceptLabel}</td>
       <td class="r" style="color:#b00">-${fmt(amt)}</td>
     </tr>`;
   }).join('');
