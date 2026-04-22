@@ -163,7 +163,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     try {
       const lineTotal = parseFloat(libItem.default_unit_price) || 0;
       // If this library item is already on the bid, add a second copy as a freeform line
-      if (checkedMap[libItem.id]) {
+      // Search map values by library_item_id field (avoids key type coercion issues)
+      const alreadyOnBid = Object.values(checkedMap).some(pi => Number(pi.library_item_id) === Number(libItem.id));
+      if (alreadyOnBid) {
         const newItem = await BidderAPI.createCustomItem({
           proposal_id: proposalId,
           description: libItem.name,
