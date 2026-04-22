@@ -162,6 +162,19 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     setShowItemPicker(false);
     try {
       const lineTotal = parseFloat(libItem.default_unit_price) || 0;
+      // If this library item is already on the bid, add a second copy as a freeform line
+      if (checkedMap[libItem.id]) {
+        const newItem = await BidderAPI.createCustomItem({
+          proposal_id: proposalId,
+          description: libItem.name,
+          quantity:    1,
+          price_each:  parseFloat(libItem.default_unit_price) || 0,
+          line_total:  lineTotal,
+          sort_order:  nextSortOrder(),
+        });
+        setCustomItems(prev => [...prev, { ...newItem, _desc: libItem.name, _qty: 1, _price: parseFloat(libItem.default_unit_price) || 0 }]);
+        return;
+      }
       const newItem = await BidderAPI.createItem({
         proposal_id:     proposalId,
         library_item_id: libItem.id,
