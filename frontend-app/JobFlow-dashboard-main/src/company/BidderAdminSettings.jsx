@@ -87,6 +87,7 @@ export default function BidderAdminSettings({ companyId }) {
         email_from_email: data.email_from_email || '',
         proposal_top_text: data.proposal_top_text || '',
         invoice_top_text: data.invoice_top_text || '',
+        proposal_domain: data.proposal_domain || '',
       });
     } catch (e) {
       console.error('Failed to load settings', e);
@@ -231,6 +232,7 @@ export default function BidderAdminSettings({ companyId }) {
         ...settingsForm,
         down_payment_default_percent: parseFloat(settingsForm.down_payment_default_percent) || 50,
         preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
+        proposal_domain: settingsForm.proposal_domain.trim() || null,
       }, companyId);
       setSettingsMsg('Saved');
       setTimeout(() => setSettingsMsg(''), 3000);
@@ -438,6 +440,37 @@ export default function BidderAdminSettings({ companyId }) {
 
     return (
       <div className="space-y-6">
+        {/* Custom Proposal Domain */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Custom Proposal Domain</h3>
+          <div className="space-y-3">
+            <div>
+              <label className={labelCls}>Subdomain for proposal links</label>
+              <input
+                className={inputCls}
+                value={settingsForm.proposal_domain}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, proposal_domain: e.target.value }))}
+                placeholder="sales.rfcfloors.com"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Enter the full subdomain only — e.g. <strong>sales.rfcfloors.com</strong>. Leave blank to use the default system URL.
+                When set, proposal links emailed to customers will use this domain.
+              </p>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-600 space-y-2">
+              <p className="font-semibold text-gray-700">DNS Setup Instructions</p>
+              <p>To point your subdomain here, log in to your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.) and add this DNS record:</p>
+              <div className="bg-white border border-gray-300 rounded px-3 py-2 font-mono text-xs space-y-1">
+                <div><span className="text-gray-400">Type:</span> CNAME</div>
+                <div><span className="text-gray-400">Name:</span> sales <span className="text-gray-400">(or whatever subdomain prefix you're using)</span></div>
+                <div><span className="text-gray-400">Value:</span> cname.vercel-dns.com</div>
+                <div><span className="text-gray-400">TTL:</span> Auto (or 3600)</div>
+              </div>
+              <p>After adding the DNS record, the subdomain also needs to be added in Vercel. Contact your JobFlow administrator to complete the Vercel side — DNS changes can take up to 48 hours to propagate but usually resolve within a few minutes.</p>
+            </div>
+          </div>
+        </div>
+
         {/* Payment */}
         <div>
           <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Payment</h3>

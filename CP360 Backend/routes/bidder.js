@@ -732,11 +732,12 @@ router.put('/company-settings', async (req, res) => {
       default_payment_url, include_payment_button, down_payment_default_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
+      proposal_domain,
     } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO bidder_company_settings (company_id, default_payment_url, include_payment_button, down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions, system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+      `INSERT INTO bidder_company_settings (company_id, default_payment_url, include_payment_button, down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions, system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text, proposal_domain, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          default_payment_url = EXCLUDED.default_payment_url,
          include_payment_button = EXCLUDED.include_payment_button,
@@ -748,6 +749,7 @@ router.put('/company-settings', async (req, res) => {
          email_from_email = EXCLUDED.email_from_email,
          proposal_top_text = EXCLUDED.proposal_top_text,
          invoice_top_text = EXCLUDED.invoice_top_text,
+         proposal_domain = EXCLUDED.proposal_domain,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -756,6 +758,7 @@ router.put('/company-settings', async (req, res) => {
         clean(terms_and_conditions), clean(system_notes),
         clean(email_from_name), clean(email_from_email),
         clean(proposal_top_text), clean(invoice_top_text),
+        clean(proposal_domain),
       ]
     );
 
@@ -972,7 +975,7 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       `SELECT bp.bid_name, bp.bid_total, bp.company_id,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
-              bcs.email_from_name, bcs.email_from_email
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -988,7 +991,10 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
 
     const companyName  = row.ghl_company_from_name || row.company_db_name || '';
     const customerName = row.lead_name || row.lead_name_short || '';
-    const proposalUrl  = `${process.env.APP_URL}/proposal/${req.params.id}`;
+    const baseUrl      = row.proposal_domain
+      ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+      : process.env.APP_URL;
+    const proposalUrl  = `${baseUrl}/proposal/${req.params.id}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
     const emailType    = req.body.type || 'proposal';
