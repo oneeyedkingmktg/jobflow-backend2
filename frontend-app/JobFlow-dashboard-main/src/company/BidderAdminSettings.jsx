@@ -450,23 +450,24 @@ export default function BidderAdminSettings({ companyId }) {
                 className={inputCls}
                 value={settingsForm.proposal_domain}
                 onChange={(e) => setSettingsForm((p) => ({ ...p, proposal_domain: e.target.value }))}
-                placeholder="sales.rfcfloors.com"
+                placeholder="sales.coatingpro360.com"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Enter the full subdomain only — e.g. <strong>sales.rfcfloors.com</strong>. Leave blank to use the default system URL.
+                Enter the full subdomain — e.g. <strong>sales.yourcompany.com</strong>. Leave blank to use the default system URL.
                 When set, proposal links emailed to customers will use this domain.
               </p>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-600 space-y-2">
-              <p className="font-semibold text-gray-700">DNS Setup Instructions</p>
-              <p>To point your subdomain here, log in to your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.) and add this DNS record:</p>
+              <p className="font-semibold text-gray-700">DNS Setup — 2 steps required</p>
+              <p><strong>Step 1:</strong> Contact your JobFlow administrator to add the subdomain in Vercel first. Vercel will provide a unique CNAME target value specific to your domain.</p>
+              <p><strong>Step 2:</strong> Log in to your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.) and add this DNS record using the value Vercel gave you:</p>
               <div className="bg-white border border-gray-300 rounded px-3 py-2 font-mono text-xs space-y-1">
                 <div><span className="text-gray-400">Type:</span> CNAME</div>
-                <div><span className="text-gray-400">Name:</span> sales <span className="text-gray-400">(or whatever subdomain prefix you're using)</span></div>
-                <div><span className="text-gray-400">Value:</span> cname.vercel-dns.com</div>
+                <div><span className="text-gray-400">Name:</span> sales <span className="text-gray-400">(the subdomain prefix you chose)</span></div>
+                <div><span className="text-gray-400">Value:</span> <span className="italic text-gray-500">provided by Vercel — do not guess this value</span></div>
                 <div><span className="text-gray-400">TTL:</span> Auto (or 3600)</div>
               </div>
-              <p>After adding the DNS record, the subdomain also needs to be added in Vercel. Contact your JobFlow administrator to complete the Vercel side — DNS changes can take up to 48 hours to propagate but usually resolve within a few minutes.</p>
+              <p>DNS changes can take up to 48 hours to propagate but usually resolve within a few minutes.</p>
             </div>
           </div>
         </div>
