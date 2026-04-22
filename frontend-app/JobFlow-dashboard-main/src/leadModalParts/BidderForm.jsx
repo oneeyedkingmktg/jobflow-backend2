@@ -549,7 +549,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 <option value="__subtotal__">── Insert Subtotal Line ──</option>
                 {library.map(cat => (
                   <optgroup key={cat.id} label={cat.name}>
-                    {(cat.items || []).filter(i => i.is_active !== false && !checkedMap[i.id]).map(i => (
+                    {(cat.items || []).filter(i => i.is_active !== false).map(i => (
                       <option key={i.id} value={`${cat.id}::${i.id}`}>{i.name}</option>
                     ))}
                   </optgroup>
