@@ -943,10 +943,11 @@ router.get('/public/:id', async (req, res) => {
       [proposal.lead_id]
     );
 
-    const [items, customItems, discounts] = await Promise.all([
+    const [items, customItems, discounts, paymentSchedules] = await Promise.all([
       pool.query('SELECT * FROM bidder_proposal_items WHERE proposal_id = $1 ORDER BY sort_order, id', [proposal.id]),
       pool.query('SELECT * FROM bidder_custom_items WHERE proposal_id = $1 ORDER BY sort_order, id', [proposal.id]),
       pool.query('SELECT * FROM bidder_discounts WHERE proposal_id = $1 ORDER BY sort_order, id', [proposal.id]),
+      pool.query('SELECT * FROM bidder_payment_schedules WHERE proposal_id = $1 ORDER BY sort_order, id', [proposal.id]),
     ]);
 
     res.json({
@@ -955,6 +956,7 @@ router.get('/public/:id', async (req, res) => {
       items: items.rows,
       customItems: customItems.rows,
       discounts: discounts.rows,
+      paymentSchedules: paymentSchedules.rows,
     });
   } catch (err) {
     console.error('GET /bidder/public/:id error:', err);
