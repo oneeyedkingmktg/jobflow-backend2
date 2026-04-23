@@ -96,9 +96,17 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
             type="datetime-local"
             value={scheduledAt}
             min={minScheduleTime()}
+            step={900}
             onChange={(e) => setScheduledAt(e.target.value)}
             className="flex-1 px-2 py-1.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
+          <button
+            onClick={() => { setType("SMS"); setScheduledAt(""); setError(null); }}
+            className="text-xs text-gray-400 hover:text-red-500 transition whitespace-nowrap px-1"
+            title="Cancel scheduled send"
+          >
+            ✕ Cancel
+          </button>
         </div>
       )}
 
