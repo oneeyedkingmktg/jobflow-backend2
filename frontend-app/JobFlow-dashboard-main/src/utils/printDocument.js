@@ -222,7 +222,7 @@ export function printProposal({
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
   proposalTopText = '',
 }) {
-  const docNum  = `PRO-${String(proposal.id).padStart(4, '0')}`;
+  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
   const extra   = proposal.salesman ? `<br>Prepared by: ${proposal.salesman}` : '';
 
@@ -353,7 +353,7 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
   const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
   const label  = payEntry._desc || payEntry.description || `Payment ${payIdx + 1}`;
   const detail = type === 'percent' ? `${val}% of ${fmt(bidTotal)}` : '';
-  const docNum = `INV-${String(proposal.id).padStart(4, '0')}-${payIdx + 1}`;
+  const docNum = `INV-${String(proposal.id + 121).padStart(4, '0')}-${payIdx + 1}`;
   const docDate = `Date: ${fmtDate(null)}`;
 
   const rawPayUrl = (proposal.payment_url || '').trim();
@@ -399,7 +399,7 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
 // ── FINAL INVOICE ─────────────────────────────────────────────────────────────
 
 export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '' }) {
-  const docNum  = `INV-${String(proposal.id).padStart(4, '0')}-F`;
+  const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
   const docDate = `Date: ${fmtDate(null)}`;
   const rawPayUrlF = (proposal.payment_url || '').trim();
   const payUrl  = rawPayUrlF && !rawPayUrlF.startsWith('http') ? `https://${rawPayUrlF}` : rawPayUrlF;
