@@ -14,11 +14,24 @@ const ALL_SEND_TYPES = [
   { value: "SCHEDULE_SMS", label: "Schedule SMS" },
 ];
 
-// Minimum datetime-local value = now + 5 minutes
-function minScheduleTime() {
-  const d = new Date(Date.now() + 5 * 60 * 1000);
-  // datetime-local format: YYYY-MM-DDTHH:MM
-  return d.toISOString().slice(0, 16);
+// All 15-minute time slots as { value: "HH:MM", label: "h:MM AM/PM" }
+const TIME_SLOTS = (() => {
+  const slots = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2, '0');
+      const mm = String(m).padStart(2, '0');
+      const period = h < 12 ? 'AM' : 'PM';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      slots.push({ value: `${hh}:${mm}`, label: `${h12}:${mm} ${period}` });
+    }
+  }
+  return slots;
+})();
+
+// Today's date in YYYY-MM-DD for the date input min
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export default function ReplyBox({ conversationId, contactId, channelType, availableTypes, onSent }) {
@@ -35,7 +48,8 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
   const [type,        setType]        = useState(
     SEND_TYPES.find((t) => t.value === channelType) ? channelType : "SMS"
   );
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [schedDate,   setSchedDate]   = useState("");
+  const [schedTime,   setSchedTime]   = useState("");
   const [sending,     setSending]     = useState(false);
   const [error,       setError]       = useState(null);
 
@@ -44,7 +58,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
   async function handleSend() {
     const trimmed = message.trim();
     if (!trimmed || sending) return;
-    if (isScheduled && !scheduledAt) {
+    if (isScheduled && (!schedDate || !schedTime)) {
       setError("Please pick a date and time to schedule the message.");
       return;
     }
@@ -62,7 +76,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
 
       if (isScheduled) {
         // GHL expects Unix timestamp in milliseconds
-        body.scheduledTimestamp = new Date(scheduledAt).getTime();
+        body.scheduledTimestamp = new Date(`${schedDate}T${schedTime}:00`).getTime();
       }
 
       await apiRequest("/api/messages/send", {
@@ -71,7 +85,8 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
       });
 
       setMessage("");
-      setScheduledAt("");
+      setSchedDate("");
+      setSchedTime("");
       if (typeof onSent === "function") onSent();
     } catch (err) {
       console.error("Failed to send message:", err);
@@ -93,15 +108,24 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
         <div className="flex items-center gap-2 px-1">
           <span className="text-xs text-gray-500 whitespace-nowrap">Send at:</span>
           <input
-            type="datetime-local"
-            value={scheduledAt}
-            min={minScheduleTime()}
-            step={900}
-            onChange={(e) => setScheduledAt(e.target.value)}
-            className="flex-1 px-2 py-1.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            type="date"
+            value={schedDate}
+            min={todayStr()}
+            onChange={(e) => setSchedDate(e.target.value)}
+            className="px-2 py-1.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
+          <select
+            value={schedTime}
+            onChange={(e) => setSchedTime(e.target.value)}
+            className="px-2 py-1.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          >
+            <option value="" disabled>Time</option>
+            {TIME_SLOTS.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
           <button
-            onClick={() => { setType("SMS"); setScheduledAt(""); setError(null); }}
+            onClick={() => { setType("SMS"); setSchedDate(""); setSchedTime(""); setError(null); }}
             className="text-xs text-gray-400 hover:text-red-500 transition whitespace-nowrap px-1"
             title="Cancel scheduled send"
           >
@@ -132,7 +156,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
 
         <button
           onClick={handleSend}
-          disabled={!message.trim() || sending || (isScheduled && !scheduledAt)}
+          disabled={!message.trim() || sending || (isScheduled && (!schedDate || !schedTime))}
           className={`flex-shrink-0 p-2 text-white rounded-xl transition disabled:opacity-40 ${
             isScheduled ? "bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300" : "bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300"
           }`}
