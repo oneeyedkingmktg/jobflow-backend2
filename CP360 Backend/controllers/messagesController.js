@@ -203,7 +203,7 @@ async function markAsRead(req, res) {
 // POST /api/messages/send
 async function sendMessage(req, res) {
   try {
-    let { conversationId, contactId, message, type } = req.body;
+    let { conversationId, contactId, message, type, scheduledTimestamp } = req.body;
     const companyId = req.body.company_id || req.user?.company_id;
 
     if (!message || !companyId) {
@@ -248,13 +248,15 @@ async function sendMessage(req, res) {
       return res.status(400).json({ error: "Could not resolve contactId for this conversation." });
     }
 
-    const ghlResponse = await sendMessageGHL(company, {
+    const ghlPayload = {
       type: type || "SMS",
       conversationId,
       contactId,
       message,
       locationId: company.ghl_location_id,
-    });
+    };
+    if (scheduledTimestamp) ghlPayload.scheduledTimestamp = Number(scheduledTimestamp);
+    const ghlResponse = await sendMessageGHL(company, ghlPayload);
 
     res.json({ success: true, messageId: ghlResponse?.messageId || null });
   } catch (error) {
