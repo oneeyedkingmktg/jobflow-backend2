@@ -255,7 +255,7 @@ async function sendMessage(req, res) {
       message,
       locationId: company.ghl_location_id,
     };
-    if (scheduledTimestamp) ghlPayload.scheduledTimestamp = Number(scheduledTimestamp);
+    if (scheduledTimestamp) ghlPayload.scheduledTimestamp = Math.floor(Number(scheduledTimestamp) / 1000);
     const ghlResponse = await sendMessageGHL(company, ghlPayload);
 
     res.json({ success: true, messageId: ghlResponse?.messageId || null });
