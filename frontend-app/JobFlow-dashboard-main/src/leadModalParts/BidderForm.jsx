@@ -21,10 +21,8 @@ const sectionHd = 'text-sm font-bold text-gray-700 uppercase tracking-wide borde
 const noSpin    = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 
 const STATUS_OPTIONS = [
-  { value: 'pending',   label: 'Pending'   },
-  { value: 'accepted',  label: 'Accepted'  },
-  { value: 'not_sold',  label: 'Not Sold'  },
-  { value: 'completed', label: 'Completed' },
+  { value: 'pending',  label: 'Pending'  },
+  { value: 'accepted', label: 'Accepted' },
 ];
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -43,7 +41,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [hdr, setHdr] = useState({
     bid_name: '', bid_description: '', status: 'pending',
     presented_date: '', accepted_date: '',
-    install_crew: '', install_date: '', install_date_tbd: false,
     customer_notes: '', internal_notes: '',
     payment_url: '', include_payment_button: true,
   });
@@ -88,9 +85,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         status:                 p.status            || 'pending',
         presented_date:         p.presented_date    ? p.presented_date.slice(0,10) : '',
         accepted_date:          p.accepted_date     ? p.accepted_date.slice(0,10)  : '',
-        install_crew:           p.install_crew      || '',
-        install_date:           p.install_date      ? p.install_date.slice(0,10)   : '',
-        install_date_tbd:       p.install_date_tbd  || false,
         customer_notes:         p.customer_notes    || '',
         internal_notes:         p.internal_notes    || '',
         payment_url:            p.payment_url       || '',
@@ -140,6 +134,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
   const payTotal   = paySchedule.reduce((a, ps) => a + calcPayAmt(ps), 0);
   const balanceDue = bidTotal - payTotal;
+
+  // Lock everything except payment schedule once accepted
+  const isLocked = hdr.status === 'accepted';
 
   // ── Unified sort order across all item types ──────────────────────────
   function nextSortOrder() {
@@ -411,48 +408,59 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-5 space-y-6">
 
+        {/* ── ACCEPTED BANNER ──────────────────────────────────────────── */}
+        {isLocked && (
+          <div className="bg-green-50 border border-green-300 rounded-xl px-4 py-3 flex items-center gap-2">
+            <span className="text-green-700 font-semibold text-sm">Proposal Accepted</span>
+            {hdr.accepted_date && (
+              <span className="text-green-600 text-sm">— signed {hdr.accepted_date}</span>
+            )}
+            <span className="ml-auto text-xs text-green-600">Bid details are locked. Only payment schedule can be edited.</span>
+          </div>
+        )}
+
         {/* ── BID INFO ─────────────────────────────────────────────────── */}
         <section>
           <p className={sectionHd}>Bid Info</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className={labelCls}>Bid Name *</label>
-              <input className={inputCls} value={hdr.bid_name} onChange={e => setHdr(p => ({ ...p, bid_name: e.target.value }))} />
+              <input className={inputCls} value={hdr.bid_name} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, bid_name: e.target.value }))} />
             </div>
             <div className="col-span-2">
               <label className={labelCls}>Description</label>
-              <input className={inputCls} value={hdr.bid_description} onChange={e => setHdr(p => ({ ...p, bid_description: e.target.value }))} placeholder="Short subtitle shown in bid list" />
+              <input className={inputCls} value={hdr.bid_description} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, bid_description: e.target.value }))} placeholder="Short subtitle shown in bid list" />
             </div>
             <div>
               <label className={labelCls}>Status</label>
-              <select className={inputCls} value={hdr.status} onChange={e => setHdr(p => ({ ...p, status: e.target.value }))}>
+              <select
+                className={inputCls}
+                value={hdr.status}
+                disabled={isLocked}
+                onChange={e => {
+                  const newStatus = e.target.value;
+                  setHdr(p => ({
+                    ...p,
+                    status: newStatus,
+                    accepted_date: newStatus === 'accepted' && !p.accepted_date
+                      ? new Date().toISOString().slice(0, 10)
+                      : p.accepted_date,
+                  }));
+                }}
+              >
                 {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls}>Presented Date</label>
-              <input className={inputCls} type="date" value={hdr.presented_date} onChange={e => setHdr(p => ({ ...p, presented_date: e.target.value }))} />
+              <input className={inputCls} type="date" value={hdr.presented_date} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, presented_date: e.target.value }))} />
             </div>
             {hdr.status === 'accepted' && (
               <div>
                 <label className={labelCls}>Accepted Date</label>
-                <input className={inputCls} type="date" value={hdr.accepted_date} onChange={e => setHdr(p => ({ ...p, accepted_date: e.target.value }))} />
+                <input className={inputCls} type="date" value={hdr.accepted_date} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, accepted_date: e.target.value }))} />
               </div>
             )}
-            <div>
-              <label className={labelCls}>Install Crew</label>
-              <input className={inputCls} value={hdr.install_crew} onChange={e => setHdr(p => ({ ...p, install_crew: e.target.value }))} placeholder="Optional" />
-            </div>
-            <div>
-              <label className={labelCls}>Install Date</label>
-              <div className="flex items-center gap-2">
-                <input className={inputCls} type="date" value={hdr.install_date} disabled={hdr.install_date_tbd} onChange={e => setHdr(p => ({ ...p, install_date: e.target.value }))} />
-                <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap cursor-pointer">
-                  <input type="checkbox" checked={hdr.install_date_tbd} onChange={e => setHdr(p => ({ ...p, install_date_tbd: e.target.checked, install_date: e.target.checked ? '' : p.install_date }))} />
-                  TBD
-                </label>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -483,7 +491,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       <div key={`sub-${item.id}`} className="flex items-center gap-2 border-t-2 border-gray-300 pt-2">
                         <span className="flex-1 text-xs font-bold text-gray-500 uppercase tracking-wide">Subtotal</span>
                         <span className="text-sm font-bold text-gray-800">{fmt(total)}</span>
-                        <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none">×</button>
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none">×</button>
+                        )}
                       </div>
                     );
                   }
@@ -496,29 +506,39 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-semibold text-gray-800">{pi.name}</span>
-                          <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
+                          {!isLocked && (
+                            <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <input className={`w-14 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
                             type="number" step="1" min="1" value={Math.round(pi._qty)}
+                            disabled={isLocked}
                             onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _qty: e.target.value } }))}
                             onBlur={() => handleItemQtyBlur(libItemId)} />
                           <span className="text-gray-400 text-xs">× $</span>
                           <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
                             type="number" step="0.01" value={pi._price || ''}
+                            disabled={isLocked}
                             onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
                             onBlur={() => handleItemPriceBlur(libItemId)} />
                           {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
                           <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
                         </div>
-                        <label className="mt-2 flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={!!pi.breakout_price}
-                            onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
-                            className="accent-blue-600 w-4 h-4" />
-                          <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
-                        </label>
+                        {!isLocked && (
+                          <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={!!pi.breakout_price}
+                              onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
+                              className="accent-blue-600 w-4 h-4" />
+                            <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
+                          </label>
+                        )}
+                        {!!pi.breakout_price && isLocked && (
+                          <p className="mt-1 text-xs text-gray-400">Pricing broken out on proposal</p>
+                        )}
                         <input className="mt-1 w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
                           placeholder="Description (optional)" value={pi._desc}
+                          disabled={isLocked}
                           onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _desc: e.target.value } }))}
                           onBlur={() => handleItemDescBlur(libItemId)} />
                       </div>
@@ -531,18 +551,23 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     <div key={`ci-${item.id}`} className="border border-gray-200 rounded-lg bg-white px-3 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <input className="flex-1 px-2 py-1 border rounded text-sm font-medium" value={item._desc} placeholder="Description"
+                          disabled={isLocked}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)} />
-                        <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <input className={`w-14 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="1"
                           value={Math.round(item._qty)}
+                          disabled={isLocked}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _qty: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)} />
                         <span className="text-gray-400 text-xs">× $</span>
                         <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
                           value={item._price || ''}
+                          disabled={isLocked}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)} />
                         <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
@@ -554,29 +579,31 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             );
           })()}
 
-          {/* Picker */}
-          {library.length === 0 ? (
-            <p className="text-sm text-gray-400 mt-2">No items in library. Add items in Company Settings → Bidder.</p>
-          ) : showItemPicker ? (
-            <div className="mt-2 flex items-center gap-2">
-              <select className={`flex-1 ${inputCls}`} defaultValue="" onChange={handlePickItem} autoFocus>
-                <option value="" disabled>— Select item —</option>
-                <option value="__subtotal__">── Insert Subtotal Line ──</option>
-                {library.map(cat => (
-                  <optgroup key={cat.id} label={cat.name}>
-                    {(cat.items || []).filter(i => i.is_active !== false).map(i => (
-                      <option key={i.id} value={`${cat.id}::${i.id}`}>{i.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <button onClick={() => setShowItemPicker(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-            </div>
-          ) : (
-            <div className="mt-3 flex gap-3">
-              <button onClick={() => setShowItemPicker(true)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
-              <button onClick={handleAddCustomItem} className="text-sm text-blue-600 hover:underline">+ Custom Line</button>
-            </div>
+          {/* Picker — hidden when locked */}
+          {!isLocked && (
+            library.length === 0 ? (
+              <p className="text-sm text-gray-400 mt-2">No items in library. Add items in Company Settings → Bidder.</p>
+            ) : showItemPicker ? (
+              <div className="mt-2 flex items-center gap-2">
+                <select className={`flex-1 ${inputCls}`} defaultValue="" onChange={handlePickItem} autoFocus>
+                  <option value="" disabled>— Select item —</option>
+                  <option value="__subtotal__">── Insert Subtotal Line ──</option>
+                  {library.map(cat => (
+                    <optgroup key={cat.id} label={cat.name}>
+                      {(cat.items || []).filter(i => i.is_active !== false).map(i => (
+                        <option key={i.id} value={`${cat.id}::${i.id}`}>{i.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <button onClick={() => setShowItemPicker(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+              </div>
+            ) : (
+              <div className="mt-3 flex gap-3">
+                <button onClick={() => setShowItemPicker(true)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
+                <button onClick={handleAddCustomItem} className="text-sm text-blue-600 hover:underline">+ Custom Line</button>
+              </div>
+            )
           )}
         </section>
 
@@ -588,12 +615,16 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               <div key={d.id} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-white">
                 <div className="flex items-center gap-2">
                   <input className={`${inputCls} flex-1`} value={d._desc} placeholder="Discount name"
+                    disabled={isLocked}
                     onChange={e => setDiscounts(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
                     onBlur={() => handleDiscountBlur(idx)} />
-                  <button onClick={() => handleDeleteDiscount(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none">×</button>
+                  {!isLocked && (
+                    <button onClick={() => handleDeleteDiscount(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none">×</button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <select className={`${inputCls} w-16`} value={d._type}
+                    disabled={isLocked}
                     onChange={e => setDiscounts(prev => prev.map((it, i) => i === idx ? { ...it, _type: e.target.value } : it))}
                     onBlur={() => handleDiscountBlur(idx)}>
                     <option value="dollar">$</option>
@@ -601,21 +632,26 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   </select>
                   <input className={`w-24 px-2 py-2 border border-gray-300 rounded-lg text-sm text-right ${noSpin}`} type="number" step="0.01"
                     value={d._val || ''}
+                    disabled={isLocked}
                     onChange={e => setDiscounts(prev => prev.map((it, i) => i === idx ? { ...it, _val: e.target.value } : it))}
                     onBlur={() => handleDiscountBlur(idx)} />
                   <span className="ml-auto text-sm font-semibold text-red-600">
                     -{fmt(d._type === 'dollar' ? (parseFloat(d._val) || 0) : preDiscountTotal * ((parseFloat(d._val) || 0) / 100))}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500 whitespace-nowrap">If accepted by:</label>
-                  <input className="px-2 py-1 border border-gray-300 rounded-lg text-sm w-36" type="date" value={d._date}
-                    onChange={e => setDiscounts(prev => prev.map((it, i) => i === idx ? { ...it, _date: e.target.value } : it))}
-                    onBlur={() => handleDiscountBlur(idx)} />
-                </div>
+                {!isLocked && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 whitespace-nowrap">If accepted by:</label>
+                    <input className="px-2 py-1 border border-gray-300 rounded-lg text-sm w-36" type="date" value={d._date}
+                      onChange={e => setDiscounts(prev => prev.map((it, i) => i === idx ? { ...it, _date: e.target.value } : it))}
+                      onBlur={() => handleDiscountBlur(idx)} />
+                  </div>
+                )}
               </div>
             ))}
-            <button onClick={handleAddDiscount} className="text-sm text-blue-600 hover:underline">+ Add Discount</button>
+            {!isLocked && (
+              <button onClick={handleAddDiscount} className="text-sm text-blue-600 hover:underline">+ Add Discount</button>
+            )}
           </div>
         </section>
 
@@ -641,7 +677,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           </div>
         </section>
 
-        {/* ── PAYMENT SCHEDULE ─────────────────────────────────────────── */}
+        {/* ── PAYMENT SCHEDULE — always editable ───────────────────────── */}
         <section>
           <p className={sectionHd}>Payment Schedule</p>
           <div className="space-y-2">
@@ -695,11 +731,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           <div className="space-y-3">
             <div>
               <label className={labelCls}>Customer Notes <span className="normal-case text-gray-400 font-normal">— appears on proposal</span></label>
-              <textarea className={`${inputCls} h-20 resize-y`} value={hdr.customer_notes} onChange={e => setHdr(p => ({ ...p, customer_notes: e.target.value }))} />
+              <textarea className={`${inputCls} h-20 resize-y`} value={hdr.customer_notes} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, customer_notes: e.target.value }))} />
             </div>
             <div>
               <label className={labelCls}>🔒 Internal Notes <span className="normal-case text-gray-400 font-normal">— never shown on proposal</span></label>
-              <textarea className={`${inputCls} h-20 resize-y`} value={hdr.internal_notes} onChange={e => setHdr(p => ({ ...p, internal_notes: e.target.value }))} />
+              <textarea className={`${inputCls} h-20 resize-y`} value={hdr.internal_notes} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, internal_notes: e.target.value }))} />
             </div>
           </div>
         </section>
@@ -709,7 +745,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       {/* ── ACTION BAR ───────────────────────────────────────────────────── */}
       <div className="border-t px-5 py-4 bg-white rounded-b-2xl flex items-center gap-3 shrink-0">
         <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save Draft'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
         <button onClick={() => setShowDocsModal(true)} className="px-5 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800">
           Create Documents

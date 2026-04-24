@@ -91,11 +91,9 @@ router.get('/proposals/:leadId', async (req, res) => {
        WHERE lead_id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)
        ORDER BY
          CASE status
-           WHEN 'pending'   THEN 1
-           WHEN 'accepted'  THEN 2
-           WHEN 'completed' THEN 3
-           WHEN 'not_sold'  THEN 4
-           ELSE 5
+           WHEN 'pending'  THEN 1
+           WHEN 'accepted' THEN 2
+           ELSE 3
          END,
          presented_date DESC NULLS LAST,
          created_at DESC`,
@@ -217,6 +215,9 @@ router.put('/proposal/:id', async (req, res) => {
       payment_url, include_payment_button, proposal_design_id,
     } = req.body;
 
+    // Auto-set accepted_date when status transitions to accepted and no date was provided
+    const resolvedAcceptedDate = (status === 'accepted' && !accepted_date) ? new Date() : clean(accepted_date);
+
     const result = await pool.query(
       `UPDATE bidder_proposals SET
         bid_name = $1, bid_description = $2, status = $3,
@@ -231,7 +232,7 @@ router.put('/proposal/:id', async (req, res) => {
        RETURNING *`,
       [
         bid_name, clean(bid_description), status,
-        clean(presented_date), clean(accepted_date), clean(install_crew),
+        clean(presented_date), resolvedAcceptedDate, clean(install_crew),
         clean(install_date), install_date_tbd, output_mode,
         clean(customer_notes), clean(internal_notes), bid_total,
         down_payment_type, down_payment_value,
