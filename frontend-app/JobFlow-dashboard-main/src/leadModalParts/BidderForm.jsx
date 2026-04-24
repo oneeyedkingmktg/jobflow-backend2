@@ -425,18 +425,17 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className={labelCls}>Bid Name *</label>
-              <input className={inputCls} value={hdr.bid_name} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, bid_name: e.target.value }))} />
+              <input className={inputCls} value={hdr.bid_name} onChange={e => setHdr(p => ({ ...p, bid_name: e.target.value }))} />
             </div>
             <div className="col-span-2">
               <label className={labelCls}>Description</label>
-              <input className={inputCls} value={hdr.bid_description} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, bid_description: e.target.value }))} placeholder="Short subtitle shown in bid list" />
+              <input className={inputCls} value={hdr.bid_description} onChange={e => setHdr(p => ({ ...p, bid_description: e.target.value }))} placeholder="Short subtitle shown in bid list" />
             </div>
             <div>
               <label className={labelCls}>Status</label>
               <select
                 className={inputCls}
                 value={hdr.status}
-                disabled={isLocked}
                 onChange={e => {
                   const newStatus = e.target.value;
                   setHdr(p => ({
@@ -453,12 +452,12 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             </div>
             <div>
               <label className={labelCls}>Presented Date</label>
-              <input className={inputCls} type="date" value={hdr.presented_date} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, presented_date: e.target.value }))} />
+              <input className={inputCls} type="date" value={hdr.presented_date} onChange={e => setHdr(p => ({ ...p, presented_date: e.target.value }))} />
             </div>
             {hdr.status === 'accepted' && (
               <div>
                 <label className={labelCls}>Accepted Date</label>
-                <input className={inputCls} type="date" value={hdr.accepted_date} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, accepted_date: e.target.value }))} />
+                <input className={inputCls} type="date" value={hdr.accepted_date} onChange={e => setHdr(p => ({ ...p, accepted_date: e.target.value }))} />
               </div>
             )}
           </div>
