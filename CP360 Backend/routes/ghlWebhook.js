@@ -154,6 +154,8 @@ router.post("/:companyId", verifyGHLWebhook, async (req, res) => {
     const companyId = parseInt(req.params.companyId, 10);
     const body = req.body || {};
 
+    console.log('[GHL WEBHOOK DEBUG] full body:', JSON.stringify(body, null, 2));
+
     const phone =
       body.phone ||
       body.phoneNumber ||
