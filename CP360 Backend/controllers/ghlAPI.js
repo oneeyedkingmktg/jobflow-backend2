@@ -1161,15 +1161,19 @@ const createPayload = {
   title,
   startTime: startDateTime.toISOString(),
   endTime: endDateTime.toISOString(),
-
-  // ✅ THIS is the field GHL actually displays
   description: description,
-
-  // Bypass GHL's slot availability validator — we manage scheduling in CP360
   ignoreDateRanges: true,
-  ignoreSlotsAvailability: true,
 };
 
+// Block slot payload for installs — bypasses slot availability entirely
+const blockSlotPayload = {
+  locationId: company.ghl_location_id,
+  calendarId: calendarId,
+  contactId: lead.ghl_contact_id,
+  title,
+  startTime: startDateTime.toISOString(),
+  endTime: endDateTime.toISOString(),
+};
 
 // Only add address if it exists
 if (address) {
@@ -1188,7 +1192,6 @@ const updatePayload = {
   endTime: endDateTime.toISOString(),
   description: description,
   ignoreDateRanges: true,
-  ignoreSlotsAvailability: true,
   contactId: lead.ghl_contact_id,
 };
 
@@ -1225,15 +1228,11 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
 
   if (changeType === 'changed' && existingEventId) {
     if (type === 'install') {
-      // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
-      // then create a fresh appointment so the new event ID is stored
-      await deleteCalendarEvent(company, existingEventId, ghlContactId);
-      const created = await ghlRequest(company, "/calendars/events/appointments", {
-        method: "POST",
-        body: createPayload,
-      });
-      const newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-      console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
+      // Delete old event (may be block-slot or appointment), create new block slot
+      const blockDeleted = await deleteBlockSlot(company, existingEventId);
+      if (!blockDeleted) await deleteCalendarEvent(company, existingEventId, ghlContactId);
+      const newEventId = await createBlockSlot(company, blockSlotPayload);
+      console.log("[INSTALL UPDATE] Deleted old, created new block slot ID:", newEventId);
       return { type, action: 'updated', calendarEventId: newEventId };
     }
     // Appointments use standard PUT update
@@ -1247,9 +1246,13 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     return { type, action: 'skipped', calendarEventId: existingEventId };
   }
 
-  // CREATE NEW — both appointments and installs use the appointments endpoint
+  // CREATE NEW
   let eventId;
-  {
+  if (type === 'install') {
+    // Installs use block slots — bypasses GHL slot availability checks entirely
+    eventId = await createBlockSlot(company, blockSlotPayload);
+    console.log("[INSTALL CREATE SUCCESS] Block slot event ID:", eventId);
+  } else {
     const created = await ghlRequest(
       company,
       "/calendars/events/appointments",
