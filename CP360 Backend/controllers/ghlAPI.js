@@ -1165,11 +1165,11 @@ const createPayload = {
   ignoreDateRanges: true,
 };
 
-// Block slot payload for installs — bypasses slot availability entirely
+// Block slot payload — bypasses slot availability entirely
+// NOTE: block-slots endpoint does not accept contactId
 const blockSlotPayload = {
   locationId: company.ghl_location_id,
   calendarId: calendarId,
-  contactId: lead.ghl_contact_id,
   title,
   startTime: startDateTime.toISOString(),
   endTime: endDateTime.toISOString(),
