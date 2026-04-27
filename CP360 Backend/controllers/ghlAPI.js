@@ -1167,6 +1167,7 @@ const createPayload = {
 
   // Bypass GHL's slot availability validator — we manage scheduling in CP360
   ignoreDateRanges: true,
+  ignoreSlotsAvailability: true,
 };
 
 
@@ -1187,6 +1188,7 @@ const updatePayload = {
   endTime: endDateTime.toISOString(),
   description: description,
   ignoreDateRanges: true,
+  ignoreSlotsAvailability: true,
   contactId: lead.ghl_contact_id,
 };
 
