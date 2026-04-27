@@ -166,7 +166,7 @@ router.post("/lead-folder", async (req, res) => {
     return res.json({ ok: true, url: folder.webViewLink, folderId: folder.id });
   } catch (err) {
     console.error("❌ GOOGLE DRIVE ERROR", err);
-    return res.status(err.status || 500).json({ ok: false, error: err.message });
+    return res.status(err.status || 500).json({ ok: false, error: err.message, needsReauth: err.needsReauth || false });
   }
 });
 
@@ -224,13 +224,12 @@ router.post("/upload-file", upload.single("file"), async (req, res) => {
     return res.json({ ok: true, file: uploaded });
   } catch (err) {
     console.error("❌ UPLOAD FILE ERROR", err?.message || err);
-    // Surface the actual Google error message so it's visible in the UI
     const googleMessage =
       err?.response?.data?.error?.message ||
       err?.errors?.[0]?.message ||
       err?.message ||
       "Upload failed";
-    return res.status(err.status || 500).json({ ok: false, error: googleMessage });
+    return res.status(err.status || 500).json({ ok: false, error: googleMessage, needsReauth: err.needsReauth || false });
   }
 });
 

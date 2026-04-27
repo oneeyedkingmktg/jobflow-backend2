@@ -31,11 +31,10 @@ function getServiceAccountDriveClient() {
 // ------------------------------------------------------------------
 // Build an authenticated Drive client
 // Prefers OAuth2 (stored refresh token) → falls back to service account.
-// If the stored token is invalid (expired/revoked), clears it from DB
-// and falls back to service account automatically.
+// Service account fallback is only safe for READ operations on Shared Drives.
+// For writes, use requireOAuthDriveClient() instead.
 // ------------------------------------------------------------------
 async function getDriveClient() {
-  // Try stored OAuth refresh token first
   try {
     const result = await db.query(
       `SELECT value FROM platform_settings WHERE key = 'google_oauth_refresh_token' LIMIT 1`
@@ -49,25 +48,59 @@ async function getDriveClient() {
       );
       oauth2Client.setCredentials({ refresh_token: result.rows[0].value });
 
-      // Validate the token by doing a lightweight refresh.
-      // If the token is expired/revoked Google throws invalid_grant here
-      // rather than on the first real API call, so we can fall back cleanly.
       try {
         await oauth2Client.getAccessToken();
         return google.drive({ version: "v3", auth: oauth2Client });
       } catch (tokenErr) {
         console.warn("⚠️  [DRIVE] OAuth token refresh failed, falling back to service account:", tokenErr.message);
-        // Do NOT delete the token — it may be a temporary error, and deleting it
-        // would break uploads permanently until manually re-authorized.
-        // Fall through to service account for this request.
       }
     }
   } catch (err) {
     console.warn("⚠️  [DRIVE] Could not load OAuth token from DB, falling back to service account:", err.message);
   }
 
-  // Fall back to service account
   return getServiceAccountDriveClient();
+}
+
+// ------------------------------------------------------------------
+// Like getDriveClient() but throws if OAuth isn't available.
+// Use this for WRITE operations (upload, create folder) — service accounts
+// cannot upload to personal My Drive folders (no storage quota).
+// ------------------------------------------------------------------
+async function requireOAuthDriveClient() {
+  try {
+    const result = await db.query(
+      `SELECT value FROM platform_settings WHERE key = 'google_oauth_refresh_token' LIMIT 1`
+    );
+
+    if (result.rows.length && result.rows[0].value) {
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_OAUTH_CLIENT_ID,
+        process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+        process.env.GOOGLE_OAUTH_REDIRECT_URI
+      );
+      oauth2Client.setCredentials({ refresh_token: result.rows[0].value });
+
+      try {
+        await oauth2Client.getAccessToken();
+        return google.drive({ version: "v3", auth: oauth2Client });
+      } catch (tokenErr) {
+        console.warn("⚠️  [DRIVE] OAuth token refresh failed:", tokenErr.message);
+        const err = new Error("Google Drive authorization has expired. Please reconnect Google Drive in platform settings.");
+        err.status = 503;
+        err.needsReauth = true;
+        throw err;
+      }
+    }
+  } catch (err) {
+    if (err.needsReauth) throw err;
+    console.warn("⚠️  [DRIVE] Could not load OAuth token from DB:", err.message);
+  }
+
+  const err = new Error("Google Drive is not connected. Please connect Google Drive in platform settings.");
+  err.status = 503;
+  err.needsReauth = true;
+  throw err;
 }
 
 // ------------------------------------------------------------------
@@ -107,7 +140,7 @@ async function getOrCreateFolder(folderName, parentFolderId) {
   const existing = await findFolder(folderName, parentFolderId);
   if (existing) return existing;
 
-  const drive = await getDriveClient();
+  const drive = await requireOAuthDriveClient();
   const createRes = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -142,7 +175,7 @@ async function listFilesInFolder(folderId) {
 // Upload a file buffer to a folder
 // ------------------------------------------------------------------
 async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
-  const drive = await getDriveClient();
+  const drive = await requireOAuthDriveClient();
   const stream = Readable.from(buffer);
 
   const res = await drive.files.create({
@@ -163,6 +196,7 @@ async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
 
 module.exports = {
   getDriveClient,
+  requireOAuthDriveClient,
   getOAuthClient,
   findFolder,
   getOrCreateFolder,
