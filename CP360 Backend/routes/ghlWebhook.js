@@ -199,7 +199,12 @@ const leadSource =
       (body.customData && body.customData.referral_source) ||
       "CRM Lead";
 
-    const notes = body.notes || null;
+    const notes =
+      body['JF Notes'] ||
+      body.customField?.find(f => f.id === 'jf_notes')?.value ||
+      body.customFields?.find(f => f.id === 'jf_notes')?.value ||
+      body.notes ||
+      null;
 
     const nameParts = fullName.split(" ");
     const firstName = nameParts[0] || "";
