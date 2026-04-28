@@ -765,6 +765,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
           proposalTopText: companySettings?.proposal_top_text || '',
           invoiceTopText: companySettings?.invoice_top_text || '',
+          designId: proposal.proposal_design_id || companySettings?.preferred_proposal_design_id || null,
+          logoUrl: companySettings?.logo_url || '',
         };
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1100] p-4">

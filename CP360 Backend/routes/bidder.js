@@ -927,7 +927,8 @@ router.get('/public/:id', async (req, res) => {
               c.ghl_company_state, c.ghl_company_zip,
               bcs.terms_and_conditions, bcs.system_notes,
               bcs.include_payment_button as company_include_payment_button,
-              bcs.default_payment_url as company_payment_url
+              bcs.default_payment_url as company_payment_url,
+              bcs.preferred_proposal_design_id, bcs.logo_url
        FROM bidder_proposals bp
        JOIN companies c ON bp.company_id = c.id
        LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id

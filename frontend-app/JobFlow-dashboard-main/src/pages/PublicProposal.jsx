@@ -119,9 +119,294 @@ export default function PublicProposal({ proposalId }) {
   const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
   const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && payUrl;
 
-  const termsText = proposal.terms_and_conditions || '';
+  const termsText   = proposal.terms_and_conditions || '';
   const systemNotes = proposal.system_notes || '';
 
+  // Determine if a styled design is active
+  const designId = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
+
+  // Pre-sort items for both render branches
+  const allSortedItems = [
+    ...libItems.map(i => ({ ...i, _type: 'lib' })),
+    ...customItems.map(i => ({ ...i, _type: 'custom' })),
+  ].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const runningSubtotal = (upTo) =>
+    [...libItems, ...customItems.filter(i => !i.is_subtotal)]
+      .filter(i => (i.sort_order ?? 0) < upTo)
+      .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+
+  // ── Styled (Professional) render ──────────────────────────────────────────
+  if (designId) {
+    const AC  = '#f97316'; // orange accent
+    const HBG = '#1c2333'; // charcoal header/footer bg
+    const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+    const logoSrc = proposal.logo_url || null;
+
+    const SignForm = signed ? (
+      <div className="rounded-xl px-5 py-6 text-center" style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
+        <div className="text-4xl mb-2">✅</div>
+        <h3 className="text-lg font-bold text-green-800 mb-1">Proposal Accepted</h3>
+        <p className="text-green-700 text-sm">
+          Signed by <strong>{signedBy}</strong>
+          {signedAt && ` on ${new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
+        </p>
+      </div>
+    ) : (
+      <div className="bg-white rounded-xl shadow-sm px-5 py-6">
+        <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: HBG }}>Accept &amp; Sign</p>
+        {termsText && (
+          <label className="flex items-start gap-3 mb-4 cursor-pointer">
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 shrink-0" style={{ accentColor: AC }} />
+            <span className="text-sm text-gray-700">I have read and agree to the Terms &amp; Conditions above.</span>
+          </label>
+        )}
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Type your full name to sign</label>
+          <input
+            type="text" value={sigName} onChange={e => setSigName(e.target.value)}
+            placeholder="Full Name"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2"
+            style={{ '--tw-ring-color': AC }}
+          />
+        </div>
+        {submitErr && <p className="text-red-500 text-sm mb-3">{submitErr}</p>}
+        <button onClick={handleSign} disabled={signing}
+          className="w-full py-4 text-white font-bold text-base rounded-xl disabled:opacity-50 transition"
+          style={{ background: AC }}
+        >
+          {signing ? 'Submitting…' : 'Accept This Proposal'}
+        </button>
+        <p className="text-xs text-gray-400 text-center mt-3">By signing, you agree to the terms of this proposal. Your electronic signature is legally binding.</p>
+      </div>
+    );
+
+    return (
+      <div className="min-h-screen bg-gray-100">
+
+        {/* Header */}
+        <div style={{ background: HBG }} className="flex justify-between items-center px-6 py-5">
+          <div>
+            {logoSrc
+              ? <img src={logoSrc} alt={companyName} className="max-h-16 max-w-[200px] object-contain" />
+              : <div className="text-xl font-black text-white tracking-wide">{companyName}</div>
+            }
+          </div>
+          <div className="text-right">
+            <div className="text-4xl font-black text-white tracking-widest leading-none">PROPOSAL</div>
+            <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
+              PREMIUM COATING. EXCEPTIONAL RESULTS.
+            </div>
+          </div>
+        </div>
+
+        {/* Date / Number strip */}
+        <div className="bg-gray-100 flex justify-between items-center px-6 py-2.5" style={{ borderBottom: `3px solid ${AC}` }}>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Date</div>
+            <div className="text-sm font-bold" style={{ color: HBG }}>{fmtDate(proposal.presented_date) || '—'}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Proposal No.</div>
+            <div className="text-sm font-bold" style={{ color: HBG }}>{docNum}</div>
+          </div>
+        </div>
+
+        {/* Prepared For / By */}
+        <div className="bg-white grid grid-cols-2 border-b border-gray-200">
+          <div className="px-6 py-4 border-r border-gray-200">
+            <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared For:</div>
+            {lead && (
+              <>
+                <div className="text-base font-bold" style={{ color: HBG }}>{lead.full_name || lead.name}</div>
+                {lead.email && <div className="text-sm text-gray-500 mt-0.5">{lead.email}</div>}
+                {lead.phone && <div className="text-sm text-gray-500">{lead.phone}</div>}
+                {lead.address && <div className="text-sm text-gray-500">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
+              </>
+            )}
+          </div>
+          <div className="px-6 py-4">
+            <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared By:</div>
+            <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
+            {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
+            {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
+            {companyEmail && <div className="text-sm text-gray-500">{companyEmail}</div>}
+            {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+
+          {/* Bid name / description */}
+          {(proposal.bid_name || proposal.bid_description || proposal.install_date || proposal.install_date_tbd) && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              {proposal.bid_name && <h2 className="text-lg font-bold" style={{ color: HBG }}>{proposal.bid_name}</h2>}
+              {proposal.bid_description && <p className="text-sm text-gray-500 mt-1">{proposal.bid_description}</p>}
+              {proposal.install_date && !proposal.install_date_tbd && (
+                <p className="text-sm text-gray-600 mt-2"><strong>Install Date:</strong> {fmtDate(proposal.install_date)}</p>
+              )}
+              {proposal.install_date_tbd && (
+                <p className="text-sm text-gray-600 mt-2"><strong>Install Date:</strong> To Be Determined</p>
+              )}
+            </div>
+          )}
+
+          {/* Scope of Work table */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
+              <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+              <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Scope of Work</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: HBG }}>
+                    <th className="text-left px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider">Description</th>
+                    <th className="text-right px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider w-14">Qty</th>
+                    <th className="text-right px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider w-28">Unit Price</th>
+                    <th className="text-right px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider w-28">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {allSortedItems.map((item, idx) => {
+                    if (item.is_subtotal) {
+                      const t = runningSubtotal(item.sort_order ?? 0);
+                      return (
+                        <tr key={`sub-${item.id}`} className="bg-gray-50">
+                          <td colSpan={3} className="px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-gray-500 border-t-2 border-gray-300">Running Subtotal</td>
+                          <td className="px-4 py-2 text-right font-bold text-gray-800 border-t-2 border-gray-300">{fmt(t)}</td>
+                        </tr>
+                      );
+                    }
+                    if (item._type === 'lib') {
+                      return (
+                        <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2.5">
+                            <div className="font-semibold text-gray-900">{item.name}</div>
+                            {item.description && <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">{item.breakout_price ? item.quantity : ''}</td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">{item.breakout_price ? fmt(item.unit_price) : ''}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
+                            {item.breakout_price ? fmt(item.line_total) : <span className="text-gray-400 italic font-normal text-xs">Included</span>}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-2.5 font-semibold text-gray-900">{item.description}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-600">{item.quantity}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-600">{fmt(item.price_each)}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(item.line_total)}</td>
+                      </tr>
+                    );
+                  })}
+                  {discounts.map(d => {
+                    const val = parseFloat(d.discount_value) || 0;
+                    const amt = d.discount_type === 'dollar' ? val : preDiscount * (val / 100);
+                    const acceptDate = d.if_accepted_by ? String(d.if_accepted_by).substring(0, 10) : '';
+                    return (
+                      <tr key={d.id} className="text-red-600">
+                        <td colSpan={3} className="px-4 py-2 text-right text-sm">
+                          {d.description || 'Discount'}
+                          {acceptDate && <span className="block text-xs font-normal">If accepted by {fmtDate(acceptDate)}</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold">-{fmt(amt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Investment Summary */}
+          <div className="flex">
+            <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: HBG, minWidth: '280px' }}>
+              <div className="px-6 py-5">
+                <div className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: AC }}>Investment Summary</div>
+                {discountTotal > 0 && (
+                  <>
+                    <div className="flex justify-between items-center py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span className="text-sm text-gray-400">Subtotal</span>
+                      <span className="text-gray-300 font-semibold">{fmt(preDiscount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span className="text-sm text-gray-400">Discounts</span>
+                      <span className="text-red-400 font-semibold">-{fmt(discountTotal)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
+                  <span className="text-sm text-gray-300 font-bold uppercase tracking-wider">Total Project Cost</span>
+                  <span className="text-xl font-black" style={{ color: AC }}>{fmt(bidTotal)}</span>
+                </div>
+                {paymentSchedules.map((ps, i) => (
+                  <div key={ps.id} className="flex justify-between items-center py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span className="text-sm text-gray-400">{ps.description || `Payment ${i + 1}`}</span>
+                    <span className="font-bold text-base" style={{ color: AC }}>{fmt(calcAmt(ps, bidTotal))}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center py-2 mt-1">
+                  <span className="text-sm text-gray-300 font-bold uppercase tracking-wider">Balance Due</span>
+                  <span className="text-xl font-black" style={{ color: AC }}>{fmt(balanceDue)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* System Notes */}
+          {systemNotes && (
+            <div className="rounded-xl px-5 py-4" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Notes</div>
+              <p className="text-sm text-orange-900 whitespace-pre-line">{systemNotes}</p>
+            </div>
+          )}
+
+          {/* Customer Notes */}
+          {proposal.customer_notes && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: HBG }}>Additional Notes</div>
+              <p className="text-sm text-gray-700 whitespace-pre-line">{proposal.customer_notes}</p>
+            </div>
+          )}
+
+          {/* Terms */}
+          {termsText && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: HBG }}>Terms &amp; Conditions</div>
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg px-4 py-3">
+                <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{termsText}</p>
+              </div>
+            </div>
+          )}
+
+          {SignForm}
+
+          {showPayButton && (
+            <a href={payUrl} target="_blank" rel="noopener noreferrer"
+              className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition"
+              style={{ background: AC }}
+            >
+              Make Your Payment
+            </a>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div style={{ background: HBG }} className="mt-4 py-4 px-6 text-center">
+          <p className="text-sm font-semibold tracking-wide" style={{ color: AC }}>
+            ★ Thank you for the opportunity to earn your business!
+          </p>
+        </div>
+
+      </div>
+    );
+  }
+
+  // ── Classic render ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100">
 

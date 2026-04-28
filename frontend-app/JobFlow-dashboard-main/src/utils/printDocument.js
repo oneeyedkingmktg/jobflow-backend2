@@ -215,13 +215,262 @@ function docShell(title, docNum, dateStr, extraMeta, companyHtml, body) {
   </div></body></html>`;
 }
 
+// ── STYLED PROPOSAL — Professional template ───────────────────────────────────
+
+function printProposalV2({
+  proposal, checkedMap, customItems, discounts, paySchedule,
+  lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
+  logoUrl = '',
+}) {
+  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+  const docDate = fmtDate(proposal.presented_date);
+
+  const coName    = company?.ghlCompanyFromName || company?.companyName || company?.name || '';
+  const coPhone   = company?.ghlCompanyPhone    || company?.phone   || '';
+  const coEmail   = company?.ghlCompanyFromEmail || company?.email  || '';
+  const coStreet  = company?.ghlCompanyStreetAddress || '';
+  const coCity    = company?.ghlCompanyCity     || '';
+  const coWebsite = company?.ghlCompanyWebsite  || '';
+  const coAddr    = [coStreet, coCity].filter(Boolean).join(', ');
+  const custAddr  = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" alt="${coName}" style="max-height:72px;max-width:200px;object-fit:contain;">`
+    : `<span style="font-size:18pt;font-weight:900;color:#fff;letter-spacing:0.5px;">${coName}</span>`;
+
+  const libEntries = Object.entries(checkedMap).map(([, pi]) => ({ ...pi, _type: 'lib' }));
+  const allItems   = [...libEntries, ...customItems]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const runningTotal = (upTo) =>
+    [...libEntries, ...customItems.filter(i => !i.is_subtotal)]
+      .filter(i => (i.sort_order ?? 0) < upTo)
+      .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+
+  const TD  = 'padding:9px 12px;border-bottom:1px solid #efefef;vertical-align:top;font-size:10.5pt;';
+  const TDR = TD + 'text-align:right;';
+
+  const rows = allItems.map(item => {
+    if (item.is_subtotal) {
+      const t = runningTotal(item.sort_order ?? 0);
+      return `<tr style="background:#f0f2f5;">
+        <td colspan="3" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">Running Subtotal</td>
+        <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
+      </tr>`;
+    }
+    if (item._type === 'lib') {
+      const show = !!item.breakout_price;
+      const qty  = Math.round(item._qty ?? item.quantity ?? 1);
+      return `<tr>
+        <td style="${TD}">
+          <div style="font-weight:600;">${item.name}</div>
+          ${(item._desc || item.description) ? `<div style="font-size:8.5pt;color:#888;margin-top:2px;">${item._desc || item.description}</div>` : ''}
+        </td>
+        <td style="${TDR}">${show ? qty : ''}</td>
+        <td style="${TDR}">${show ? fmt(item._price ?? item.unit_price) : ''}</td>
+        <td style="${TDR}">${show ? fmt(item.line_total) : '<em style="color:#bbb;font-size:9pt;">Included</em>'}</td>
+      </tr>`;
+    }
+    const qty = Math.round(item._qty ?? item.quantity ?? 1);
+    return `<tr>
+      <td style="${TD}font-weight:600;">${item._desc || item.description || ''}</td>
+      <td style="${TDR}">${qty}</td>
+      <td style="${TDR}">${fmt(item._price ?? item.price_each)}</td>
+      <td style="${TDR}">${fmt(item.line_total)}</td>
+    </tr>`;
+  }).join('');
+
+  const discountRows = discounts.map(d => {
+    const type = d._type || d.discount_type;
+    const val  = parseFloat(d._val ?? d.discount_value) || 0;
+    const amt  = type === 'dollar' ? val : preDiscountTotal * (val / 100);
+    const lbl  = d._desc || d.description || 'Discount';
+    const aDate = d._date || d.if_accepted_by || '';
+    return `<tr style="color:#c0392b;">
+      <td colspan="3" style="${TDR}font-size:10pt;">
+        ${lbl}${aDate ? `<div style="font-size:8pt;margin-top:2px;">If accepted by ${fmtDate(aDate)}</div>` : ''}
+      </td>
+      <td style="${TDR}">-${fmt(amt)}</td>
+    </tr>`;
+  }).join('');
+
+  let investRows = '';
+  if (discountTotal > 0) {
+    investRows += `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span style="font-size:9.5pt;color:#ccc;">Subtotal</span>
+        <span style="color:#ccc;font-weight:600;">${fmt(preDiscountTotal)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span style="font-size:9.5pt;color:#ccc;">Discounts</span>
+        <span style="color:#ef4444;font-weight:600;">-${fmt(discountTotal)}</span>
+      </div>`;
+  }
+  investRows += `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+      <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total Project Cost</span>
+      <span style="font-size:14pt;font-weight:900;color:#f97316;">${fmt(bidTotal)}</span>
+    </div>`;
+  paySchedule.forEach((ps, i) => {
+    const amt   = calcAmt(ps, bidTotal);
+    const label = ps._desc || ps.description || `Payment ${i + 1}`;
+    investRows += `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span style="font-size:9.5pt;color:#ccc;">${label}</span>
+        <span style="font-size:12pt;font-weight:700;color:#f97316;">${fmt(amt)}</span>
+      </div>`;
+  });
+  investRows += `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;margin-top:3px;">
+      <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Balance Due</span>
+      <span style="font-size:14pt;font-weight:900;color:#f97316;">${fmt(balanceDue)}</span>
+    </div>`;
+
+  const SEC_HEAD = (label) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="width:4px;height:18px;background:#f97316;border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:9pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#1c2333;">${label}</span>
+    </div>`;
+
+  const notesHtml = proposal.customer_notes ? `
+    <div style="padding:16px 36px 0;">${SEC_HEAD('Notes')}
+      <p style="font-size:10.5pt;line-height:1.7;white-space:pre-line;color:#444;">${proposal.customer_notes}</p>
+    </div>` : '';
+
+  const termsHtml = proposal.terms_and_conditions ? `
+    <div style="padding:16px 36px 0;">${SEC_HEAD('Terms &amp; Conditions')}
+      <p style="font-size:8.5pt;color:#777;line-height:1.6;white-space:pre-line;">${proposal.terms_and_conditions}</p>
+    </div>` : '';
+
+  const installHtml = proposal.install_date_tbd
+    ? `<p style="font-size:10pt;color:#555;margin-top:6px;"><strong>Install Date:</strong> TBD</p>`
+    : proposal.install_date
+    ? `<p style="font-size:10pt;color:#555;margin-top:6px;"><strong>Install Date:</strong> ${fmtDate(proposal.install_date)}</p>`
+    : '';
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8">
+    <title>Proposal ${docNum}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #222; background: #fff; }
+      .page { max-width: 780px; margin: 0 auto; }
+      table { width: 100%; border-collapse: collapse; }
+      table th { background: #1c2333; color: #fff; padding: 8px 12px; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+      table th.r { text-align: right; }
+      table tr:nth-child(even) td { background: #fafafa; }
+      @media print {
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        @page { margin: 0.35in; size: letter; }
+      }
+    </style>
+  </head><body><div class="page">
+
+    <div style="background:#1c2333;display:flex;justify-content:space-between;align-items:center;padding:20px 36px;">
+      <div>${logoHtml}</div>
+      <div style="text-align:right;">
+        <div style="font-size:26pt;font-weight:900;letter-spacing:4px;color:#fff;line-height:1;">PROPOSAL</div>
+        <div style="font-size:8pt;color:#f97316;letter-spacing:2px;margin-top:5px;text-transform:uppercase;">PREMIUM COATING. EXCEPTIONAL RESULTS.</div>
+      </div>
+    </div>
+
+    <div style="background:#f4f5f7;display:flex;justify-content:space-between;align-items:center;padding:10px 36px;border-bottom:3px solid #f97316;">
+      <div>
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Date</div>
+        <div style="font-size:11.5pt;font-weight:700;color:#1c2333;">${docDate || '—'}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Proposal No.</div>
+        <div style="font-size:11.5pt;font-weight:700;color:#1c2333;">${docNum}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e5e7eb;">
+      <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared For:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
+        ${lead.email  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>`  : ''}
+        ${lead.phone  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>`  : ''}
+        ${custAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`    : ''}
+      </div>
+      <div style="padding:16px 36px;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared By:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${coName}</div>
+        ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
+        ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
+        ${coEmail   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coEmail}</div>`   : ''}
+        ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
+        ${proposal.salesman ? `<div style="font-size:9pt;color:#888;margin-top:4px;font-style:italic;">Prepared by: ${proposal.salesman}</div>` : ''}
+      </div>
+    </div>
+
+    ${(proposal.bid_name || proposal.bid_description || installHtml) ? `
+    <div style="padding:14px 36px 0;">
+      ${proposal.bid_name        ? `<div style="font-size:13pt;font-weight:700;color:#1c2333;margin-bottom:2px;">${proposal.bid_name}</div>`        : ''}
+      ${proposal.bid_description ? `<div style="font-size:10pt;color:#777;">${proposal.bid_description}</div>` : ''}
+      ${installHtml}
+    </div>` : ''}
+
+    <div style="padding:16px 36px 0;">
+      ${SEC_HEAD('Scope of Work')}
+      <table>
+        <thead><tr>
+          <th style="width:50%;">Description</th>
+          <th class="r" style="width:8%;">Qty</th>
+          <th class="r" style="width:18%;">Unit Price</th>
+          <th class="r" style="width:24%;">Total</th>
+        </tr></thead>
+        <tbody>${rows}${discountRows}</tbody>
+      </table>
+    </div>
+
+    <div style="padding:20px 36px;">
+      <div style="background:#1c2333;border-radius:6px;padding:18px 24px;display:inline-block;min-width:300px;">
+        <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:12px;">Investment Summary</div>
+        ${investRows}
+      </div>
+    </div>
+
+    ${notesHtml}
+    ${termsHtml}
+
+    <div style="padding:16px 36px 20px;">
+      ${SEC_HEAD('Acceptance')}
+      <p style="font-size:10pt;color:#555;margin-bottom:20px;line-height:1.6;">By signing below, I/we accept the terms of this proposal and authorize the work described above.</p>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:40px;">
+        <div><div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:44px;">Client Signature</div></div>
+        <div><div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:44px;">Date</div></div>
+      </div>
+      <div style="margin-top:20px;max-width:300px;">
+        <div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:24px;">Printed Name</div>
+      </div>
+    </div>
+
+    <div style="background:#1c2333;color:#fff;text-align:center;padding:16px 36px;margin-top:20px;">
+      <span style="color:#f97316;">★</span>
+      <span style="font-size:9.5pt;letter-spacing:1px;margin-left:6px;">Thank you for the opportunity to earn your business!</span>
+    </div>
+
+  </div></body></html>`;
+
+  openPrintWindow(html);
+}
+
 // ── PROPOSAL ─────────────────────────────────────────────────────────────────
 
 export function printProposal({
   proposal, checkedMap, customItems, discounts, paySchedule,
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
   proposalTopText = '',
+  designId = null,
+  logoUrl = '',
 }) {
+  if (designId) {
+    return printProposalV2({
+      proposal, checkedMap, customItems, discounts, paySchedule,
+      lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl,
+    });
+  }
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
   const extra   = proposal.salesman ? `<br>Prepared by: ${proposal.salesman}` : '';
