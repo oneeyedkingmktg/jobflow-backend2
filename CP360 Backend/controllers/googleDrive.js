@@ -1,7 +1,7 @@
 // ============================================================================
 // File: controllers/googleDrive.js
-// Purpose: Google Drive operations using OAuth2 (Becky's account) with
-//          service account fallback for read-only operations
+// Purpose: Google Drive operations using the platform service account.
+//          Each company grants the service account access to their Drive folder.
 // ============================================================================
 
 const { google } = require("googleapis");
@@ -120,7 +120,7 @@ function getOAuthClient() {
 // Shared Drives; they are harmless on personal My Drive folders.
 // ------------------------------------------------------------------
 async function findFolder(folderName, parentFolderId) {
-  const drive = await getDriveClient();
+  const drive = getServiceAccountDriveClient();
   const safeName = folderName.replace(/'/g, "\\'");
 
   const searchRes = await drive.files.list({
@@ -140,7 +140,7 @@ async function getOrCreateFolder(folderName, parentFolderId) {
   const existing = await findFolder(folderName, parentFolderId);
   if (existing) return existing;
 
-  const drive = await requireOAuthDriveClient();
+  const drive = getServiceAccountDriveClient();
   const createRes = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -158,7 +158,7 @@ async function getOrCreateFolder(folderName, parentFolderId) {
 // List files in a folder
 // ------------------------------------------------------------------
 async function listFilesInFolder(folderId) {
-  const drive = await getDriveClient();
+  const drive = getServiceAccountDriveClient();
 
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
@@ -175,7 +175,7 @@ async function listFilesInFolder(folderId) {
 // Upload a file buffer to a folder
 // ------------------------------------------------------------------
 async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
-  const drive = await requireOAuthDriveClient();
+  const drive = getServiceAccountDriveClient();
   const stream = Readable.from(buffer);
 
   const res = await drive.files.create({
