@@ -135,12 +135,13 @@ async function findFolder(folderName, parentFolderId) {
 
 // ------------------------------------------------------------------
 // Get or create a folder by name under a parent folder.
+// Uses OAuth client because creating a folder is a write operation.
 // ------------------------------------------------------------------
 async function getOrCreateFolder(folderName, parentFolderId) {
   const existing = await findFolder(folderName, parentFolderId);
   if (existing) return existing;
 
-  const drive = getServiceAccountDriveClient();
+  const drive = await requireOAuthDriveClient();
   const createRes = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -173,9 +174,10 @@ async function listFilesInFolder(folderId) {
 
 // ------------------------------------------------------------------
 // Upload a file buffer to a folder
+// Uses OAuth client because uploading is a write operation.
 // ------------------------------------------------------------------
 async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
-  const drive = getServiceAccountDriveClient();
+  const drive = await requireOAuthDriveClient();
   const stream = Readable.from(buffer);
 
   const res = await drive.files.create({
