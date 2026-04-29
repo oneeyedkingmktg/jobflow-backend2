@@ -363,7 +363,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         ...hdr,
         bid_total:    bidTotal,
         balance_due:  balanceDue,
-        salesman:     proposal?.salesman || user?.email || '',
+        salesman:     user?.name || user?.email || '',
       });
       setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 3000);
@@ -767,6 +767,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           invoiceTopText: companySettings?.invoice_top_text || '',
           designId: proposal.proposal_design_id || companySettings?.preferred_proposal_design_id || null,
           logoUrl: companySettings?.logo_url || '',
+          userName: user?.name || '',
         };
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1100] p-4">

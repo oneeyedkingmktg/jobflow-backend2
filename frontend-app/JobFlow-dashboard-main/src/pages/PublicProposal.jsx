@@ -231,9 +231,9 @@ export default function PublicProposal({ proposalId }) {
             <div className="px-4 py-4">
               <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared By:</div>
               <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
-              {proposal.salesman && <div className="text-sm font-semibold text-gray-700 mt-0.5">{proposal.salesman}</div>}
               {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
               {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
+              {proposal.salesman && <div className="text-sm font-semibold text-gray-700">{proposal.salesman}</div>}
               {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
             </div>
           </div>

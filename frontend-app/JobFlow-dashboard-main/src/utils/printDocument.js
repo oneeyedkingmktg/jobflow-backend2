@@ -220,7 +220,7 @@ function docShell(title, docNum, dateStr, extraMeta, companyHtml, body) {
 function printProposalV2({
   proposal, checkedMap, customItems, discounts, paySchedule,
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
-  logoUrl = '',
+  logoUrl = '', userName = '',
 }) {
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = fmtDate(proposal.presented_date);
@@ -399,9 +399,9 @@ function printProposalV2({
       <div style="padding:16px 36px;">
         <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared By:</div>
         <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${coName}</div>
-        ${proposal.salesman ? `<div style="font-size:11pt;font-weight:600;color:#1c2333;margin-bottom:4px;">${proposal.salesman}</div>` : ''}
         ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
         ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
+        ${(userName || proposal.salesman) ? `<div style="font-size:9.5pt;color:#444;font-weight:600;line-height:1.65;">${userName || proposal.salesman}</div>` : ''}
         ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
       </div>
     </div>
@@ -466,11 +466,12 @@ export function printProposal({
   proposalTopText = '',
   designId = null,
   logoUrl = '',
+  userName = '',
 }) {
   if (designId) {
     return printProposalV2({
       proposal, checkedMap, customItems, discounts, paySchedule,
-      lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl,
+      lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl, userName,
     });
   }
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;

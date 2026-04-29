@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { BidderAPI } from '../api';
 import BidderForm from './BidderForm';
+import { useAuth } from '../AuthContext';
 
 const STATUS_COLORS = {
   pending:  { bg: 'bg-yellow-50', border: 'border-yellow-300', badge: 'bg-yellow-100 text-yellow-800' },
@@ -28,6 +29,7 @@ function fmtDate(d) {
 }
 
 export default function BidderPanel({ lead, onClose }) {
+  const { user } = useAuth();
   const [bids, setBids]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [creating, setCreating]   = useState(false);
@@ -57,6 +59,7 @@ export default function BidderPanel({ lead, onClose }) {
         company_id: lead.companyId,
         bid_name: `Bid ${bids.length + 1}`,
         status: 'pending',
+        salesman: user?.name || user?.email || '',
       });
       setActiveBidId(proposal.id);
     } catch (e) {

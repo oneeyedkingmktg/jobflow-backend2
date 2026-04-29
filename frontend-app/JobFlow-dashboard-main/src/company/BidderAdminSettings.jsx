@@ -88,6 +88,7 @@ export default function BidderAdminSettings({ companyId }) {
         proposal_top_text: data.proposal_top_text || '',
         invoice_top_text: data.invoice_top_text || '',
         proposal_domain: data.proposal_domain || '',
+        logo_url: data.logo_url || '',
       });
     } catch (e) {
       console.error('Failed to load settings', e);
@@ -531,6 +532,29 @@ export default function BidderAdminSettings({ companyId }) {
             </div>
           </div>
         )}
+
+        {/* Company Logo */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Company Logo</h3>
+          <div className="space-y-3">
+            <div>
+              <label className={labelCls}>Logo URL</label>
+              <input
+                className={inputCls}
+                value={settingsForm.logo_url}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, logo_url: e.target.value }))}
+                placeholder="https://example.com/logo.png"
+              />
+              <p className="text-xs text-gray-400 mt-1">Direct URL to your company logo image. Appears on Professional proposal templates.</p>
+            </div>
+            {settingsForm.logo_url && (
+              <div className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg">
+                <img src={settingsForm.logo_url} alt="Logo preview" className="max-h-12 max-w-[120px] object-contain" onError={e => { e.target.style.display='none'; }} />
+                <span className="text-xs text-gray-400">Preview</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* System Notes */}
         <div>

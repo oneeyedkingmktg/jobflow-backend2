@@ -733,12 +733,12 @@ router.put('/company-settings', async (req, res) => {
       default_payment_url, include_payment_button, down_payment_default_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
-      proposal_domain,
+      proposal_domain, logo_url,
     } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO bidder_company_settings (company_id, default_payment_url, include_payment_button, down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions, system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text, proposal_domain, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+      `INSERT INTO bidder_company_settings (company_id, default_payment_url, include_payment_button, down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions, system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text, proposal_domain, logo_url, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          default_payment_url = EXCLUDED.default_payment_url,
          include_payment_button = EXCLUDED.include_payment_button,
@@ -751,6 +751,7 @@ router.put('/company-settings', async (req, res) => {
          proposal_top_text = EXCLUDED.proposal_top_text,
          invoice_top_text = EXCLUDED.invoice_top_text,
          proposal_domain = EXCLUDED.proposal_domain,
+         logo_url = EXCLUDED.logo_url,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -759,7 +760,7 @@ router.put('/company-settings', async (req, res) => {
         clean(terms_and_conditions), clean(system_notes),
         clean(email_from_name), clean(email_from_email),
         clean(proposal_top_text), clean(invoice_top_text),
-        clean(proposal_domain),
+        clean(proposal_domain), clean(logo_url),
       ]
     );
 
