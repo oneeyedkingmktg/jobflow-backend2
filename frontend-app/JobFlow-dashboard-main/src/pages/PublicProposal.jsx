@@ -362,9 +362,11 @@ export default function PublicProposal({ proposalId }) {
 
           {/* System Notes */}
           {systemNotes && (
-            <div className="rounded-xl px-5 py-4" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Notes</div>
-              <p className="text-sm text-orange-900 whitespace-pre-line">{systemNotes}</p>
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: HBG }}>Notes</div>
+              <div className="border border-gray-200 rounded-lg px-4 py-3">
+                <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{systemNotes}</p>
+              </div>
             </div>
           )}
 
@@ -579,9 +581,11 @@ export default function PublicProposal({ proposalId }) {
 
         {/* ── System Notes ───────────────────────────────────────────────── */}
         {systemNotes && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4">
-            <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Notes</p>
-            <p className="text-sm text-blue-900 whitespace-pre-line">{systemNotes}</p>
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Notes</p>
+            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{systemNotes}</p>
+            </div>
           </div>
         )}
 

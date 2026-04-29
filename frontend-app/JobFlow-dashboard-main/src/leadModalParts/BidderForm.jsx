@@ -89,6 +89,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         internal_notes:         p.internal_notes    || '',
         payment_url:            p.payment_url       || '',
         include_payment_button: p.include_payment_button ?? true,
+        salesman:               p.salesman          || user?.name || '',
       });
 
       // Library items (non-freeform only)
@@ -179,7 +180,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         library_item_id: libItem.id,
         category_name:   cat.name,
         name:            libItem.name,
-        description:     libItem.default_description || '',
+        description:     libItem.description || '',
         unit_price:      libItem.default_unit_price,
         unit_label:      libItem.default_unit_label,
         quantity:        1,
@@ -361,10 +362,19 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     try {
       await BidderAPI.updateProposal(proposalId, {
         ...hdr,
-        bid_total:    bidTotal,
-        balance_due:  balanceDue,
-        salesman:     user?.name || user?.email || '',
+        bid_total:   bidTotal,
+        balance_due: balanceDue,
       });
+      setProposal(prev => ({
+        ...prev,
+        bid_name:        hdr.bid_name,
+        bid_description: hdr.bid_description,
+        status:          hdr.status,
+        customer_notes:  hdr.customer_notes,
+        salesman:        hdr.salesman,
+        bid_total:       bidTotal,
+        balance_due:     balanceDue,
+      }));
       setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 3000);
     } catch (e) {
@@ -460,6 +470,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 <input className={inputCls} type="date" value={hdr.accepted_date} onChange={e => setHdr(p => ({ ...p, accepted_date: e.target.value }))} />
               </div>
             )}
+            <div className="col-span-2">
+              <label className={labelCls}>Prepared By <span className="normal-case text-gray-400 font-normal">— appears on proposal</span></label>
+              <input className={inputCls} value={hdr.salesman} onChange={e => setHdr(p => ({ ...p, salesman: e.target.value }))} placeholder="Your name" />
+            </div>
           </div>
         </section>
 
@@ -767,7 +781,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           invoiceTopText: companySettings?.invoice_top_text || '',
           designId: proposal.proposal_design_id || companySettings?.preferred_proposal_design_id || null,
           logoUrl: companySettings?.logo_url || '',
-          userName: user?.name || '',
+          userName: hdr.salesman || '',
         };
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1100] p-4">
