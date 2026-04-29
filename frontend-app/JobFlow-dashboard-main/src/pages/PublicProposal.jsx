@@ -222,9 +222,9 @@ export default function PublicProposal({ proposalId }) {
               {lead && (
                 <>
                   <div className="text-base font-bold" style={{ color: HBG }}>{lead.full_name || lead.name}</div>
-                  {lead.email && <div className="text-sm text-gray-500 mt-0.5">{lead.email}</div>}
+                  {lead.address && <div className="text-sm text-gray-500 mt-0.5">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
                   {lead.phone && <div className="text-sm text-gray-500">{lead.phone}</div>}
-                  {lead.address && <div className="text-sm text-gray-500">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
+                  {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
                 </>
               )}
             </div>
@@ -233,8 +233,8 @@ export default function PublicProposal({ proposalId }) {
               <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
               {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
               {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
-              {proposal.salesman && <div className="text-sm font-semibold text-gray-700">{proposal.salesman}</div>}
               {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
+              {proposal.salesman && <div className="text-sm font-semibold text-gray-700">{proposal.salesman}</div>}
             </div>
           </div>
         </div>

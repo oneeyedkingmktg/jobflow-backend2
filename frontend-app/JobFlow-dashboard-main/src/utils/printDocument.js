@@ -392,17 +392,17 @@ function printProposalV2({
       <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
         <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared For:</div>
         <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
-        ${lead.email  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>`  : ''}
-        ${lead.phone  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>`  : ''}
         ${custAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`    : ''}
+        ${lead.phone  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>`  : ''}
+        ${lead.email  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>`  : ''}
       </div>
       <div style="padding:16px 36px;">
         <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared By:</div>
         <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${coName}</div>
         ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
         ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
-        ${(userName || proposal.salesman) ? `<div style="font-size:9.5pt;color:#444;font-weight:600;line-height:1.65;">${userName || proposal.salesman}</div>` : ''}
         ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
+        ${(userName || proposal.salesman) ? `<div style="font-size:9.5pt;color:#444;font-weight:600;line-height:1.65;">${userName || proposal.salesman}</div>` : ''}
       </div>
     </div>
 
