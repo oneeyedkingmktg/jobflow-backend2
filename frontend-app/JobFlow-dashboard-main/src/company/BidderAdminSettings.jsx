@@ -6,6 +6,27 @@
 import React, { useEffect, useState } from 'react';
 import { BidderAPI, CompaniesAPI } from '../api';
 
+function resizeImageToDataUrl(file, maxWidth = 400) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function BidderAdminSettings({ companyId }) {
   // ── Library state ──────────────────────────────────────────────────────────
   const [library, setLibrary] = useState([]);         // [{id, name, items:[...]}, ...]
@@ -221,6 +242,22 @@ export default function BidderAdminSettings({ companyId }) {
       await loadLibrary();
     } catch (e) {
       alert('Failed to delete item');
+    }
+  }
+
+  // ── Logo upload ────────────────────────────────────────────────────────────
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  async function handleLogoFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 400);
+      setSettingsForm(p => ({ ...p, logo_url: dataUrl }));
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
   }
 
@@ -537,22 +574,65 @@ export default function BidderAdminSettings({ companyId }) {
         <div>
           <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Company Logo</h3>
           <div className="space-y-3">
+
+            {/* Preview */}
+            {settingsForm.logo_url ? (
+              <div className="flex items-center gap-4 p-4 bg-gray-900 rounded-xl">
+                <img
+                  src={settingsForm.logo_url}
+                  alt="Logo preview"
+                  className="max-h-16 max-w-[180px] object-contain flex-shrink-0"
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-400 mb-2">Current logo</p>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsForm(p => ({ ...p, logo_url: '' }))}
+                    className="text-xs text-red-400 hover:text-red-300"
+                  >
+                    Remove logo
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-20 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl">
+                <p className="text-sm text-gray-400">No logo set</p>
+              </div>
+            )}
+
+            {/* Upload button */}
             <div>
-              <label className={labelCls}>Logo URL</label>
+              <label className={labelCls}>Upload Image</label>
+              <label className={`flex items-center gap-2 w-full px-4 py-2.5 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer hover:bg-blue-50 transition ${logoUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm text-blue-600 font-medium">
+                  {logoUploading ? 'Processing…' : 'Choose image file (PNG, JPG, SVG)'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                  onChange={handleLogoFileChange}
+                  className="sr-only"
+                />
+              </label>
+              <p className="text-xs text-gray-400 mt-1">Image will be automatically resized. Hit Save Settings after uploading.</p>
+            </div>
+
+            {/* URL input */}
+            <div>
+              <label className={labelCls}>Or paste image URL</label>
               <input
                 className={inputCls}
-                value={settingsForm.logo_url}
+                value={settingsForm.logo_url?.startsWith('data:') ? '' : (settingsForm.logo_url || '')}
                 onChange={(e) => setSettingsForm((p) => ({ ...p, logo_url: e.target.value }))}
                 placeholder="https://example.com/logo.png"
               />
-              <p className="text-xs text-gray-400 mt-1">Direct URL to your company logo image. Appears on Professional proposal templates.</p>
+              <p className="text-xs text-gray-400 mt-1">Use a direct image link if your logo is already hosted online.</p>
             </div>
-            {settingsForm.logo_url && (
-              <div className="flex items-center gap-3 p-3 bg-gray-900 rounded-lg">
-                <img src={settingsForm.logo_url} alt="Logo preview" className="max-h-12 max-w-[120px] object-contain" onError={e => { e.target.style.display='none'; }} />
-                <span className="text-xs text-gray-400">Preview</span>
-              </div>
-            )}
+
           </div>
         </div>
 
