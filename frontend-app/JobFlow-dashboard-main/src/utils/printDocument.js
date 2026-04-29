@@ -235,7 +235,10 @@ function printProposalV2({
   const custAddr  = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
 
   const logoHtml = logoUrl
-    ? `<img src="${logoUrl}" alt="${coName}" style="max-height:72px;max-width:200px;object-fit:contain;">`
+    ? `<div style="display:flex;align-items:center;gap:14px;">
+        <img src="${logoUrl}" alt="${coName}" style="max-height:64px;max-width:150px;object-fit:contain;">
+        <span style="font-size:16pt;font-weight:900;color:#fff;letter-spacing:0.3px;line-height:1.2;">${coName}</span>
+      </div>`
     : `<span style="font-size:18pt;font-weight:900;color:#fff;letter-spacing:0.5px;">${coName}</span>`;
 
   const libEntries = Object.entries(checkedMap).map(([, pi]) => ({ ...pi, _type: 'lib' }));
@@ -396,11 +399,10 @@ function printProposalV2({
       <div style="padding:16px 36px;">
         <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared By:</div>
         <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${coName}</div>
+        ${proposal.salesman ? `<div style="font-size:11pt;font-weight:600;color:#1c2333;margin-bottom:4px;">${proposal.salesman}</div>` : ''}
         ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
         ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
-        ${coEmail   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coEmail}</div>`   : ''}
         ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
-        ${proposal.salesman ? `<div style="font-size:9pt;color:#888;margin-top:4px;font-style:italic;">Prepared by: ${proposal.salesman}</div>` : ''}
       </div>
     </div>
 
@@ -424,7 +426,7 @@ function printProposalV2({
       </table>
     </div>
 
-    <div style="padding:20px 36px;">
+    <div style="padding:20px 36px;display:flex;justify-content:flex-end;">
       <div style="background:#1c2333;border-radius:6px;padding:18px 24px;display:inline-block;min-width:300px;">
         <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:12px;">Investment Summary</div>
         ${investRows}

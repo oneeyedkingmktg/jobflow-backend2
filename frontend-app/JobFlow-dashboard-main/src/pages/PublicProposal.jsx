@@ -185,53 +185,57 @@ export default function PublicProposal({ proposalId }) {
       <div className="min-h-screen bg-gray-100">
 
         {/* Header */}
-        <div style={{ background: HBG }} className="flex justify-between items-center px-6 py-5">
-          <div>
-            {logoSrc
-              ? <img src={logoSrc} alt={companyName} className="max-h-16 max-w-[200px] object-contain" />
-              : <div className="text-xl font-black text-white tracking-wide">{companyName}</div>
-            }
-          </div>
-          <div className="text-right">
-            <div className="text-4xl font-black text-white tracking-widest leading-none">PROPOSAL</div>
-            <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
-              PREMIUM COATING. EXCEPTIONAL RESULTS.
+        <div style={{ background: HBG }}>
+          <div className="max-w-3xl mx-auto flex justify-between items-center px-4 py-5">
+            <div className="flex items-center gap-3">
+              {logoSrc && <img src={logoSrc} alt={companyName} className="max-h-14 max-w-[140px] object-contain flex-shrink-0" />}
+              <div className="text-xl font-black text-white tracking-wide leading-tight">{companyName}</div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-4">
+              <div className="text-4xl font-black text-white tracking-widest leading-none">PROPOSAL</div>
+              <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
+                PREMIUM COATING. EXCEPTIONAL RESULTS.
+              </div>
             </div>
           </div>
         </div>
 
         {/* Date / Number strip */}
-        <div className="bg-gray-100 flex justify-between items-center px-6 py-2.5" style={{ borderBottom: `3px solid ${AC}` }}>
-          <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Date</div>
-            <div className="text-sm font-bold" style={{ color: HBG }}>{fmtDate(proposal.presented_date) || '—'}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Proposal No.</div>
-            <div className="text-sm font-bold" style={{ color: HBG }}>{docNum}</div>
+        <div className="bg-gray-100" style={{ borderBottom: `3px solid ${AC}` }}>
+          <div className="max-w-3xl mx-auto flex justify-between items-center px-4 py-2.5">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Date</div>
+              <div className="text-sm font-bold" style={{ color: HBG }}>{fmtDate(proposal.presented_date) || '—'}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Proposal No.</div>
+              <div className="text-sm font-bold" style={{ color: HBG }}>{docNum}</div>
+            </div>
           </div>
         </div>
 
         {/* Prepared For / By */}
-        <div className="bg-white grid grid-cols-2 border-b border-gray-200">
-          <div className="px-6 py-4 border-r border-gray-200">
-            <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared For:</div>
-            {lead && (
-              <>
-                <div className="text-base font-bold" style={{ color: HBG }}>{lead.full_name || lead.name}</div>
-                {lead.email && <div className="text-sm text-gray-500 mt-0.5">{lead.email}</div>}
-                {lead.phone && <div className="text-sm text-gray-500">{lead.phone}</div>}
-                {lead.address && <div className="text-sm text-gray-500">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
-              </>
-            )}
-          </div>
-          <div className="px-6 py-4">
-            <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared By:</div>
-            <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
-            {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
-            {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
-            {companyEmail && <div className="text-sm text-gray-500">{companyEmail}</div>}
-            {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-3xl mx-auto grid grid-cols-2">
+            <div className="px-4 py-4 border-r border-gray-200">
+              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared For:</div>
+              {lead && (
+                <>
+                  <div className="text-base font-bold" style={{ color: HBG }}>{lead.full_name || lead.name}</div>
+                  {lead.email && <div className="text-sm text-gray-500 mt-0.5">{lead.email}</div>}
+                  {lead.phone && <div className="text-sm text-gray-500">{lead.phone}</div>}
+                  {lead.address && <div className="text-sm text-gray-500">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
+                </>
+              )}
+            </div>
+            <div className="px-4 py-4">
+              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Prepared By:</div>
+              <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
+              {proposal.salesman && <div className="text-sm font-semibold text-gray-700 mt-0.5">{proposal.salesman}</div>}
+              {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
+              {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
+              {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
+            </div>
           </div>
         </div>
 
@@ -322,7 +326,7 @@ export default function PublicProposal({ proposalId }) {
           </div>
 
           {/* Investment Summary */}
-          <div className="flex">
+          <div className="flex justify-end">
             <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: HBG, minWidth: '280px' }}>
               <div className="px-6 py-5">
                 <div className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: AC }}>Investment Summary</div>
@@ -396,10 +400,12 @@ export default function PublicProposal({ proposalId }) {
         </div>
 
         {/* Footer */}
-        <div style={{ background: HBG }} className="mt-4 py-4 px-6 text-center">
-          <p className="text-sm font-semibold tracking-wide" style={{ color: AC }}>
-            ★ Thank you for the opportunity to earn your business!
-          </p>
+        <div style={{ background: HBG }} className="mt-4">
+          <div className="max-w-3xl mx-auto py-4 px-4 text-center">
+            <p className="text-sm font-semibold tracking-wide" style={{ color: AC }}>
+              ★ Thank you for the opportunity to earn your business!
+            </p>
+          </div>
         </div>
 
       </div>
