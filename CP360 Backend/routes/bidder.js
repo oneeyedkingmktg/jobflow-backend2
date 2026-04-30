@@ -61,13 +61,14 @@ router.use((req, res, next) => {
   return authenticateToken(req, res, next);
 });
 
-// Master users pass ?company_id=X to target a specific company.
-// Override always applies for master role — JWT company_id is ignored.
+// Master users: always reset company_id from query param (or null if absent).
+// This ensures IS NULL bypasses in WHERE clauses work correctly for masters
+// who may have a non-null company_id baked into their JWT.
 router.use((req, res, next) => {
   if (req.path.startsWith('/public/')) return next();
   if (req.user && req.user.role === 'master') {
     const cid = req.query.company_id || req.body?.company_id;
-    if (cid) req.user.company_id = parseInt(cid);
+    req.user.company_id = cid ? parseInt(cid) : null;
   }
   next();
 });
@@ -528,9 +529,7 @@ router.get('/library', async (req, res) => {
 
     // Auto-seed defaults if library is empty
     if (catResult.rows.length === 0) {
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
+      await pool.transaction(async (client) => {
         for (let ci = 0; ci < DEFAULT_LIBRARY.length; ci++) {
           const cat = DEFAULT_LIBRARY[ci];
           const catRow = await client.query(
@@ -547,13 +546,7 @@ router.get('/library', async (req, res) => {
             );
           }
         }
-        await client.query('COMMIT');
-      } catch (seedErr) {
-        await client.query('ROLLBACK');
-        throw seedErr;
-      } finally {
-        client.release();
-      }
+      });
     }
 
     // Fetch full library
