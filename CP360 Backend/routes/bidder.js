@@ -114,10 +114,7 @@ router.get('/proposal/:id', async (req, res) => {
     const { id } = req.params;
 
     const proposalResult = await pool.query(
-      `SELECT bp.*, u.name AS created_by_name
-       FROM bidder_proposals bp
-       LEFT JOIN users u ON bp.created_by_user_id = u.id
-       WHERE bp.id = $1 AND ($2::integer IS NULL OR bp.company_id = $2::integer)`,
+      'SELECT * FROM bidder_proposals WHERE id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)',
       [id, companyId]
     );
 
@@ -184,10 +181,9 @@ router.post('/proposal', async (req, res) => {
         presented_date, accepted_date, salesman, install_crew, install_date,
         install_date_tbd, output_mode, customer_notes, internal_notes,
         bid_total, down_payment_type, down_payment_value, down_payment_amount,
-        balance_due, payment_url, include_payment_button, proposal_design_id,
-        created_by_user_id
+        balance_due, payment_url, include_payment_button, proposal_design_id
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
       ) RETURNING *`,
       [
         lead_id, companyId, bid_name, clean(bid_description), status,
@@ -196,7 +192,6 @@ router.post('/proposal', async (req, res) => {
         clean(customer_notes), clean(internal_notes),
         bid_total, down_payment_type, down_payment_value, down_payment_amount,
         balance_due, clean(payment_url), include_payment_button, clean(proposal_design_id),
-        req.user.id || null,
       ]
     );
 
@@ -934,12 +929,10 @@ router.get('/public/:id', async (req, res) => {
               bcs.terms_and_conditions, bcs.system_notes,
               bcs.include_payment_button as company_include_payment_button,
               bcs.default_payment_url as company_payment_url,
-              bcs.preferred_proposal_design_id, bcs.logo_url,
-              u.name AS created_by_name
+              bcs.preferred_proposal_design_id, bcs.logo_url
        FROM bidder_proposals bp
        JOIN companies c ON bp.company_id = c.id
        LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
-       LEFT JOIN users u ON bp.created_by_user_id = u.id
        WHERE bp.id = $1`,
       [req.params.id]
     );
