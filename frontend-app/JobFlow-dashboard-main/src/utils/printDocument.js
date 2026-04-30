@@ -225,13 +225,15 @@ function printProposalV2({
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = fmtDate(proposal.presented_date);
 
-  const coName    = company?.ghlCompanyFromName || company?.companyName || company?.name || '';
-  const coPhone   = company?.ghlCompanyPhone    || company?.phone   || '';
-  const coEmail   = company?.ghlCompanyFromEmail || company?.email  || '';
-  const coStreet  = company?.ghlCompanyStreetAddress || '';
-  const coCity    = company?.ghlCompanyCity     || '';
-  const coWebsite = company?.ghlCompanyWebsite  || '';
-  const coAddr    = [coStreet, coCity].filter(Boolean).join(', ');
+  const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
+  const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
+  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
+  const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
+  const coCity    = company?.city    || company?.ghlCompanyCity     || '';
+  const coState   = company?.state   || company?.ghlCompanyState   || '';
+  const coZip     = company?.zip     || company?.ghlCompanyZip     || '';
+  const coWebsite = company?.website || company?.ghlCompanyWebsite  || '';
+  const coAddr    = [coStreet, coCity, coState, coZip].filter(Boolean).join(', ');
   const custAddr  = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
 
   const logoHtml = logoUrl

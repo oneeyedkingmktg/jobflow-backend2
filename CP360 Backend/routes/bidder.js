@@ -922,7 +922,7 @@ router.delete('/payment/:id', async (req, res) => {
 router.get('/public/:id', async (req, res) => {
   try {
     const proposalResult = await pool.query(
-      `SELECT bp.*, c.company_name as company_name_db,
+      `SELECT bp.*, COALESCE(c.company_name, c.name) as company_name_db,
               c.phone as company_phone_db, c.email as company_email_db,
               c.address as company_address_db, c.city as company_city_db,
               c.state as company_state_db, c.zip as company_zip_db,
