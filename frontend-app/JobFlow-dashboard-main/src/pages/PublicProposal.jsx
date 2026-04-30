@@ -234,7 +234,7 @@ export default function PublicProposal({ proposalId }) {
               {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
               {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
               {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
-              {proposal.salesman && <div className="text-sm font-semibold text-gray-700">{proposal.salesman}</div>}
+              {(proposal.created_by_name || proposal.salesman) && <div className="text-sm font-semibold text-gray-700">{proposal.created_by_name || proposal.salesman}</div>}
             </div>
           </div>
         </div>
