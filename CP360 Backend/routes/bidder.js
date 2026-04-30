@@ -61,11 +61,11 @@ router.use((req, res, next) => {
   return authenticateToken(req, res, next);
 });
 
-// Master users have no company_id on their JWT.
-// When viewing a specific company's data they pass ?company_id=X.
+// Master users pass ?company_id=X to target a specific company.
+// Override always applies for master role — JWT company_id is ignored.
 router.use((req, res, next) => {
   if (req.path.startsWith('/public/')) return next();
-  if (req.user && req.user.company_id == null && req.user.role === 'master') {
+  if (req.user && req.user.role === 'master') {
     const cid = req.query.company_id || req.body?.company_id;
     if (cid) req.user.company_id = parseInt(cid);
   }
