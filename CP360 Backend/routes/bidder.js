@@ -528,7 +528,9 @@ router.get('/library', async (req, res) => {
 
     // Auto-seed defaults if library is empty
     if (catResult.rows.length === 0) {
-      await pool.transaction(async (client) => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
         for (let ci = 0; ci < DEFAULT_LIBRARY.length; ci++) {
           const cat = DEFAULT_LIBRARY[ci];
           const catRow = await client.query(
@@ -545,7 +547,13 @@ router.get('/library', async (req, res) => {
             );
           }
         }
-      });
+        await client.query('COMMIT');
+      } catch (seedErr) {
+        await client.query('ROLLBACK');
+        throw seedErr;
+      } finally {
+        client.release();
+      }
     }
 
     // Fetch full library
