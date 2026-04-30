@@ -92,15 +92,15 @@ export default function PublicProposal({ proposalId }) {
 
   const { proposal, lead, items = [], customItems = [], discounts = [], paymentSchedules = [] } = data;
 
-  // Company info — GHL fields take priority, fall back to DB fields
-  const companyName   = proposal.ghl_company_from_name  || proposal.company_name_db     || '';
-  const companyPhone  = proposal.ghl_company_phone       || proposal.company_phone_db    || '';
-  const companyEmail  = proposal.ghl_company_from_email  || proposal.company_email_db    || '';
-  const companyStreet = proposal.ghl_company_street_address || proposal.company_address_db || '';
-  const companyCity   = proposal.ghl_company_city        || proposal.company_city_db     || '';
-  const companyState  = proposal.ghl_company_state       || proposal.company_state_db    || '';
-  const companyZip    = proposal.ghl_company_zip         || proposal.company_zip_db      || '';
-  const companyWeb    = proposal.ghl_company_website     || proposal.company_website_db  || '';
+  // Company info — DB fields take priority, GHL fields as fallback
+  const companyName   = proposal.company_name_db     || proposal.ghl_company_from_name  || proposal.ghl_company_name || '';
+  const companyPhone  = proposal.company_phone_db    || proposal.ghl_company_phone       || '';
+  const companyEmail  = proposal.company_email_db    || proposal.ghl_company_from_email  || '';
+  const companyStreet = proposal.company_address_db  || proposal.ghl_company_street_address || '';
+  const companyCity   = proposal.company_city_db     || proposal.ghl_company_city        || '';
+  const companyState  = proposal.company_state_db    || proposal.ghl_company_state       || '';
+  const companyZip    = proposal.company_zip_db      || proposal.ghl_company_zip         || '';
+  const companyWeb    = proposal.company_website_db  || proposal.ghl_company_website     || '';
 
   // Calculations
   const libItems = items.filter(i => !i.is_freeform);
