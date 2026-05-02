@@ -12,9 +12,20 @@ import EstimatorResults from "./components/EstimatorResults";
 
 const params = new URLSearchParams(window.location.search);
 const companyId = params.get("company");
-const utmSource = params.get("utm_source") || null;
-const utmMedium = params.get("utm_medium") || null;
-const utmCampaign = params.get("utm_campaign") || null;
+let utmSource = params.get("utm_source") || null;
+let utmMedium = params.get("utm_medium") || null;
+let utmCampaign = params.get("utm_campaign") || null;
+
+// Fallback: detect Google/Bing paid clicks when UTM params are missing
+// (happens when ad platform tracking template doesn't include UTM tags)
+if (!utmSource && params.get("gclid")) {
+  utmSource = "google";
+  utmMedium = utmMedium || "cpc";
+}
+if (!utmSource && params.get("msclkid")) {
+  utmSource = "bing";
+  utmMedium = utmMedium || "cpc";
+}
 
 // ============================================================================
 // Modal shown when a returning customer already has 2 estimates on file
