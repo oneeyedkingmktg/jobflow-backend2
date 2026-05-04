@@ -24,55 +24,18 @@ function calcAmt(ps, bidTotal) {
 }
 
 export default function PublicProposal({ proposalId }) {
-  const [data,      setData]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
-  const [sigName,   setSigName]   = useState('');
-  const [agreed,    setAgreed]    = useState(false);
-  const [signing,   setSigning]   = useState(false);
-  const [signed,    setSigned]    = useState(false);
-  const [signedBy,  setSignedBy]  = useState('');
-  const [signedAt,  setSignedAt]  = useState('');
-  const [submitErr, setSubmitErr] = useState('');
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
     fetch(`${apiBase}/api/bidder/public/${proposalId}`)
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        setData(d);
-        if (d.proposal?.signed_at) {
-          setSigned(true);
-          setSignedBy(d.proposal.signature_name || '');
-          setSignedAt(d.proposal.signed_at);
-        }
-      })
+      .then(d => setData(d))
       .catch(() => setError('Proposal not found or no longer available.'))
       .finally(() => setLoading(false));
   }, [proposalId]);
-
-  async function handleSign() {
-    if (!sigName.trim()) { setSubmitErr('Please type your full name to sign.'); return; }
-    if (!agreed) { setSubmitErr('Please agree to the Terms & Conditions.'); return; }
-    setSigning(true);
-    setSubmitErr('');
-    try {
-      const res = await fetch(`${import.meta.env.APP_URL || import.meta.env.VITE_API_URL}/api/bidder/public/${proposalId}/accept`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signature_name: sigName.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to submit');
-      setSigned(true);
-      setSignedBy(sigName.trim());
-      setSignedAt(json.signed_at);
-    } catch (e) {
-      setSubmitErr(e.message || 'Something went wrong. Please try again.');
-    } finally {
-      setSigning(false);
-    }
-  }
 
   // ── Loading / Error ────────────────────────────────────────────────────────
   if (loading) return (
@@ -142,44 +105,6 @@ export default function PublicProposal({ proposalId }) {
     const HBG = '#1c2333'; // charcoal header/footer bg
     const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
     const logoSrc = proposal.logo_url || null;
-
-    const SignForm = signed ? (
-      <div className="rounded-xl px-5 py-6 text-center" style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
-        <div className="text-4xl mb-2">✅</div>
-        <h3 className="text-lg font-bold text-green-800 mb-1">Proposal Accepted</h3>
-        <p className="text-green-700 text-sm">
-          Signed by <strong>{signedBy}</strong>
-          {signedAt && ` on ${new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
-        </p>
-      </div>
-    ) : (
-      <div className="bg-white rounded-xl shadow-sm px-5 py-6">
-        <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: HBG }}>Accept &amp; Sign</p>
-        {termsText && (
-          <label className="flex items-start gap-3 mb-4 cursor-pointer">
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 shrink-0" style={{ accentColor: AC }} />
-            <span className="text-sm text-gray-700">I have read and agree to the Terms &amp; Conditions above.</span>
-          </label>
-        )}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Type your full name to sign</label>
-          <input
-            type="text" value={sigName} onChange={e => setSigName(e.target.value)}
-            placeholder="Full Name"
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2"
-            style={{ '--tw-ring-color': AC }}
-          />
-        </div>
-        {submitErr && <p className="text-red-500 text-sm mb-3">{submitErr}</p>}
-        <button onClick={handleSign} disabled={signing}
-          className="w-full py-4 text-white font-bold text-base rounded-xl disabled:opacity-50 transition"
-          style={{ background: AC }}
-        >
-          {signing ? 'Submitting…' : 'Accept This Proposal'}
-        </button>
-        <p className="text-xs text-gray-400 text-center mt-3">By signing, you agree to the terms of this proposal. Your electronic signature is legally binding.</p>
-      </div>
-    );
 
     return (
       <div className="min-h-screen bg-gray-100">
@@ -359,36 +284,6 @@ export default function PublicProposal({ proposalId }) {
               </div>
             </div>
           </div>
-
-          {/* System Notes */}
-          {systemNotes && (
-            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
-              <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: HBG }}>Notes</div>
-              <div className="border border-gray-200 rounded-lg px-4 py-3">
-                <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{systemNotes}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Customer Notes */}
-          {proposal.customer_notes && (
-            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
-              <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: HBG }}>Additional Notes</div>
-              <p className="text-sm text-gray-700 whitespace-pre-line">{proposal.customer_notes}</p>
-            </div>
-          )}
-
-          {/* Terms */}
-          {termsText && (
-            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
-              <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: HBG }}>Terms &amp; Conditions</div>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg px-4 py-3">
-                <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{termsText}</p>
-              </div>
-            </div>
-          )}
-
-          {SignForm}
 
           {showPayButton && (
             <a href={payUrl} target="_blank" rel="noopener noreferrer"
@@ -576,93 +471,6 @@ export default function PublicProposal({ proposalId }) {
                 <span>Balance Due</span><span>{fmt(balanceDue)}</span>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* ── System Notes ───────────────────────────────────────────────── */}
-        {systemNotes && (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Notes</p>
-            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{systemNotes}</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Customer Notes ─────────────────────────────────────────────── */}
-        {proposal.customer_notes && (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Additional Notes</p>
-            <p className="text-sm text-gray-700 whitespace-pre-line">{proposal.customer_notes}</p>
-          </div>
-        )}
-
-        {/* ── Terms & Conditions ─────────────────────────────────────────── */}
-        {termsText && (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Terms &amp; Conditions</p>
-            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{termsText}</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Sign / Already Signed ──────────────────────────────────────── */}
-        {signed ? (
-          <div className="bg-green-50 border border-green-300 rounded-2xl px-5 py-6 text-center">
-            <div className="text-4xl mb-2">✅</div>
-            <h3 className="text-lg font-bold text-green-800 mb-1">Proposal Accepted</h3>
-            <p className="text-green-700 text-sm">
-              Signed by <strong>{signedBy}</strong>
-              {signedAt && ` on ${new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-6">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Accept &amp; Sign</p>
-
-            {termsText && (
-              <label className="flex items-start gap-3 mb-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agreed}
-                  onChange={e => setAgreed(e.target.checked)}
-                  className="mt-0.5 w-5 h-5 accent-blue-600 shrink-0"
-                />
-                <span className="text-sm text-gray-700">
-                  I have read and agree to the Terms &amp; Conditions above.
-                </span>
-              </label>
-            )}
-
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Type your full name to sign
-              </label>
-              <input
-                type="text"
-                value={sigName}
-                onChange={e => setSigName(e.target.value)}
-                placeholder="Full Name"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-
-            {submitErr && (
-              <p className="text-red-500 text-sm mb-3">{submitErr}</p>
-            )}
-
-            <button
-              onClick={handleSign}
-              disabled={signing}
-              className="w-full py-4 bg-green-600 text-white font-bold text-base rounded-xl hover:bg-green-700 disabled:opacity-50 transition"
-            >
-              {signing ? 'Submitting…' : 'Accept This Proposal'}
-            </button>
-
-            <p className="text-xs text-gray-400 text-center mt-3">
-              By signing, you agree to the terms of this proposal. Your electronic signature is legally binding.
-            </p>
           </div>
         )}
 

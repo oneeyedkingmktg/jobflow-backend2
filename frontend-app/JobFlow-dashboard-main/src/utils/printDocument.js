@@ -438,18 +438,6 @@ function printProposalV2({
     ${notesHtml}
     ${termsHtml}
 
-    <div style="padding:16px 36px 20px;">
-      ${SEC_HEAD('Acceptance')}
-      <p style="font-size:10pt;color:#555;margin-bottom:20px;line-height:1.6;">By signing below, I/we accept the terms of this proposal and authorize the work described above.</p>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:40px;">
-        <div><div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:44px;">Client Signature</div></div>
-        <div><div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:44px;">Date</div></div>
-      </div>
-      <div style="margin-top:20px;max-width:300px;">
-        <div style="border-top:1px solid #1c2333;padding-top:5px;font-size:8.5pt;color:#888;margin-top:24px;">Printed Name</div>
-      </div>
-    </div>
-
     <div style="background:#1c2333;color:#fff;text-align:center;padding:16px 36px;margin-top:20px;">
       <span style="color:#f97316;">★</span>
       <span style="font-size:9.5pt;letter-spacing:1px;margin-left:6px;">Thank you for the opportunity to earn your business!</span>
@@ -583,16 +571,6 @@ export function printProposal({
     ${totalsHtml}
     ${payHtml}
     ${notesHtml}
-
-    <div class="section-label">Acceptance</div>
-    <div style="font-size:10.5pt;margin-bottom:16px;line-height:1.6;">
-      By signing below, I/we accept the terms of this proposal and authorize the work described above.
-    </div>
-    <div class="sig-grid">
-      <div><div class="sig-line-wrap"><div class="sig-line">Customer Signature</div></div></div>
-      <div><div class="sig-line-wrap"><div class="sig-line">Date</div></div></div>
-      <div style="margin-top:20px"><div class="sig-line-wrap"><div class="sig-line">Printed Name</div></div></div>
-    </div>
 
     <div class="doc-footer">${companyFooterText(company)}</div>`;
 
