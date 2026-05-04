@@ -984,9 +984,11 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const companyId = req.user.company_id;
     const result = await pool.query(
       `SELECT bp.bid_name, bp.bid_total, bp.company_id,
+              bp.proposal_design_id,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
-              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.preferred_proposal_design_id
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1000,15 +1002,16 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const toEmail = req.body.email || row.lead_email;
     if (!toEmail) return res.status(400).json({ error: 'No email address on file for this customer' });
 
-    const companyName  = row.ghl_company_from_name || row.company_db_name || '';
-    const customerName = row.lead_name || row.lead_name_short || '';
-    const baseUrl      = row.proposal_domain
+    const companyName      = row.ghl_company_from_name || row.company_db_name || '';
+    const customerName     = row.lead_name || row.lead_name_short || '';
+    const baseUrl          = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
-    const proposalUrl  = `${baseUrl}/proposal/${req.params.id}`;
-    const fromName     = row.email_from_name || companyName || undefined;
-    const fromEmail    = row.email_from_email || undefined;
-    const emailType    = req.body.type || 'proposal';
+    const proposalUrl      = `${baseUrl}/proposal/${req.params.id}`;
+    const fromName         = row.email_from_name || companyName || undefined;
+    const fromEmail        = row.email_from_email || undefined;
+    const emailType        = req.body.type || 'proposal';
+    const useStyledDesign  = !!(row.proposal_design_id || row.preferred_proposal_design_id);
 
     await sendProposalLinkEmail({
       toEmail,
@@ -1020,6 +1023,7 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       fromName,
       fromEmail,
       emailType,
+      useStyledDesign,
     });
 
     res.json({ success: true, sentTo: toEmail });

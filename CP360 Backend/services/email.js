@@ -97,29 +97,79 @@ async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, 
   }
 }
 
-async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidName, bidTotal, proposalUrl, fromName, fromEmail, emailType }) {
+async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidName, bidTotal, proposalUrl, fromName, fromEmail, emailType, useStyledDesign = false }) {
   const totalStr = `$${(parseFloat(bidTotal) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const displayName = fromName || companyName || 'CoatingPro360';
   const senderEmail = fromEmail || process.env.SMTP_USER || process.env.EMAIL_FROM;
   const fromHeader  = `"${displayName}" <${senderEmail}>`;
 
-  const isInvoice   = emailType === 'invoice';
-  const subject     = isInvoice
+  const isInvoice = emailType === 'invoice';
+  const subject   = isInvoice
     ? `Your Invoice from ${displayName} — ${bidName}`
     : `Your Proposal from ${displayName} is Ready`;
-  const buttonText  = isInvoice ? 'Click to See and Pay Your Invoice' : 'View &amp; Sign Your Proposal';
-  const buttonColor = isInvoice ? '#1d4ed8' : '#16a34a';
-  const docLabel    = isInvoice ? 'Invoice' : 'Proposal';
-  const preheader   = isInvoice
+  const preheader = isInvoice
     ? `Your invoice from ${displayName} for ${bidName} is ready.`
-    : `Your proposal from ${displayName} is ready to review and sign.`;
+    : `Your proposal from ${displayName} is ready to review.`;
+  const docLabel  = isInvoice ? 'Invoice' : 'Proposal';
+  const btnText   = isInvoice ? 'View Your Invoice' : 'View Your Proposal';
 
-  await transporter.sendMail({
-    from: fromHeader,
-    to: toEmail,
-    subject,
-    html: [
+  let html;
+
+  if (useStyledDesign) {
+    // ── Professional (charcoal + orange) ──────────────────────────────────────
+    const HBG = '#1c2333';
+    const AC  = '#f97316';
+    html = [
+      `<div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;color:#ffffff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${preheader}</div>`,
+      `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
+
+      // Header
+      `<tr><td bgcolor="${HBG}" style="padding:24px 28px">`,
+      `<h2 style="color:#fff;margin:0;font-size:22px;font-weight:900;letter-spacing:0.5px;font-family:Arial,sans-serif">${displayName}</h2>`,
+      `</td></tr>`,
+
+      // Orange accent strip
+      `<tr><td bgcolor="${AC}" style="height:4px;font-size:1px;line-height:1px">&nbsp;</td></tr>`,
+
+      // Body
+      `<tr><td bgcolor="#ffffff" style="padding:28px;border:1px solid #e5e7eb;border-top:none">`,
+      `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
+      isInvoice
+        ? `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Your invoice is ready. Click the button below to view and pay online.</p>`
+        : `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Your proposal is ready to review. Click the button below to view the full details.</p>`,
+
+      // Bid card
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border:2px solid ${HBG};border-radius:6px">`,
+      `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
+      `<p style="margin:0;font-size:10px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">${docLabel}</p>`,
+      `</td></tr>`,
+      `<tr><td style="padding:16px">`,
+      `<p style="margin:0 0 6px;font-size:17px;font-weight:bold;color:${HBG};font-family:Arial,sans-serif">${bidName}</p>`,
+      `<p style="margin:0;font-size:26px;font-weight:900;color:${AC};font-family:Arial,sans-serif">${totalStr}</p>`,
+      `</td></tr></table>`,
+
+      // Button
+      `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
+      `<tr><td bgcolor="${AC}" style="border-radius:6px;padding:14px 32px">`,
+      `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">${btnText}</a>`,
+      `</td></tr></table>`,
+
+      `<p style="font-size:12px;color:#9ca3af;margin:0;font-family:Arial,sans-serif">Or copy this link into your browser:<br>`,
+      `<a href="${proposalUrl}" style="color:${AC}">${proposalUrl}</a></p>`,
+      `</td></tr>`,
+
+      // Footer
+      `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
+      `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; Thank you for the opportunity to earn your business!</p>`,
+      `</td></tr>`,
+
+      `</table>`,
+    ].join('');
+  } else {
+    // ── Classic (blue) ────────────────────────────────────────────────────────
+    const buttonColor = isInvoice ? '#1d4ed8' : '#16a34a';
+    html = [
       `<div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;color:#f9fafb;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${preheader}</div>`,
       `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
       `<tr><td bgcolor="#1d4ed8" style="padding:24px 28px;border-radius:8px 8px 0 0">`,
@@ -129,7 +179,7 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
       `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
       isInvoice
         ? `<p style="font-size:15px;color:#374151;margin:0 0 20px;font-family:Arial,sans-serif">Your invoice is ready. Click the button below to view and pay online.</p>`
-        : `<p style="font-size:15px;color:#374151;margin:0 0 20px;font-family:Arial,sans-serif">Your proposal is ready to review. Click the button below to view the full details and sign when you're ready.</p>`,
+        : `<p style="font-size:15px;color:#374151;margin:0 0 20px;font-family:Arial,sans-serif">Your proposal is ready to review. Click the button below to view the full details.</p>`,
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">`,
       `<tr><td bgcolor="#ffffff" style="border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px">`,
       `<p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:bold;font-family:Arial,sans-serif">${docLabel}</p>`,
@@ -138,15 +188,17 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
       `</td></tr></table>`,
       `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
       `<tr><td bgcolor="${buttonColor}" style="border-radius:8px;padding:14px 28px">`,
-      `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:16px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">${buttonText}</a>`,
+      `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:16px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">${btnText}</a>`,
       `</td></tr></table>`,
       `<p style="font-size:12px;color:#9ca3af;margin:0;font-family:Arial,sans-serif">Or copy this link into your browser:<br>`,
       `<a href="${proposalUrl}" style="color:#1d4ed8">${proposalUrl}</a></p>`,
       `<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">`,
       `<p style="color:#9ca3af;font-size:12px;margin:0;font-family:Arial,sans-serif">${displayName}</p>`,
       `</td></tr></table>`,
-    ].join(''),
-  });
+    ].join('');
+  }
+
+  await transporter.sendMail({ from: fromHeader, to: toEmail, subject, html });
 }
 
 module.exports = {
