@@ -599,9 +599,330 @@ export function printProposal({
   openPrintWindow(docShell('Proposal', docNum, docDate, extra, companyBlock(company), body));
 }
 
+// ── STYLED PAYMENT INVOICE — Professional template ────────────────────────────
+
+function printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl = '', userName = '' }) {
+  const AC  = '#f97316';
+  const HBG = '#1c2333';
+
+  const amt    = calcAmt(payEntry, bidTotal);
+  const type   = payEntry._type || payEntry.amount_type;
+  const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
+  const label  = payEntry._desc || payEntry.description || `Payment ${payIdx + 1}`;
+  const detail = type === 'percent' ? `${val}% of ${fmt(bidTotal)}` : '';
+  const docNum = `INV-${String(proposal.id + 121).padStart(4, '0')}-${payIdx + 1}`;
+  const docDate = fmtDate(null);
+
+  const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
+  const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
+  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
+  const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
+  const coCity    = company?.city    || company?.ghlCompanyCity     || '';
+  const coState   = company?.state   || company?.ghlCompanyState   || '';
+  const coZip     = company?.zip     || company?.ghlCompanyZip     || '';
+  const coWebsite = company?.website || company?.ghlCompanyWebsite  || '';
+  const coAddr    = [coStreet, coCity, coState, coZip].filter(Boolean).join(', ');
+  const custAddr  = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+
+  const logoHtml = logoUrl
+    ? `<div style="display:flex;align-items:center;gap:14px;">
+        <img src="${logoUrl}" alt="${coName}" style="max-height:64px;max-width:150px;object-fit:contain;">
+        <span style="font-size:16pt;font-weight:900;color:#fff;letter-spacing:0.3px;line-height:1.2;">${coName}</span>
+      </div>`
+    : `<span style="font-size:18pt;font-weight:900;color:#fff;letter-spacing:0.5px;">${coName}</span>`;
+
+  const rawPayUrl = (proposal.payment_url || '').trim();
+  const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
+
+  const payUrlHtml = payUrl && proposal.include_payment_button ? `
+    <div style="padding:20px 36px 0;">
+      <a href="${payUrl}" style="display:block;background:${AC};color:#fff;text-align:center;padding:14px 24px;font-size:11pt;font-weight:700;border-radius:6px;text-decoration:none;letter-spacing:0.5px;">
+        Make Your Payment Online
+      </a>
+      <div style="font-size:9pt;color:#999;text-align:center;margin-top:6px;">${payUrl}</div>
+    </div>` : '';
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8">
+    <title>Invoice ${docNum}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #222; background: #fff; }
+      .page { max-width: 780px; margin: 0 auto; }
+      table { width: 100%; border-collapse: collapse; }
+      table th { background: ${HBG}; color: #fff; padding: 8px 12px; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+      table th.r { text-align: right; }
+      table tr:nth-child(even) td { background: #fafafa; }
+      @media print {
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        @page { margin: 0.35in; size: letter; }
+      }
+    </style>
+  </head><body><div class="page">
+
+    <div style="background:${HBG};display:flex;justify-content:space-between;align-items:center;padding:20px 36px;">
+      <div>${logoHtml}</div>
+      <div style="text-align:right;">
+        <div style="font-size:26pt;font-weight:900;letter-spacing:4px;color:#fff;line-height:1;">INVOICE</div>
+        <div style="font-size:8pt;color:${AC};letter-spacing:2px;margin-top:5px;text-transform:uppercase;">PREMIUM COATING. EXCEPTIONAL RESULTS.</div>
+      </div>
+    </div>
+
+    <div style="background:#f4f5f7;display:flex;justify-content:space-between;align-items:center;padding:10px 36px;border-bottom:3px solid ${AC};">
+      <div>
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Date</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docDate}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Invoice No.</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docNum}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e5e7eb;">
+      <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">Bill To:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
+        ${custAddr  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`   : ''}
+        ${lead.phone ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>` : ''}
+        ${lead.email ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>` : ''}
+      </div>
+      <div style="padding:16px 36px;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">From:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${coName}</div>
+        ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
+        ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
+        ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
+        ${(userName || proposal.salesman) ? `<div style="font-size:9.5pt;color:#444;font-weight:600;line-height:1.65;">${userName || proposal.salesman}</div>` : ''}
+      </div>
+    </div>
+
+    <div style="padding:14px 36px 0;">
+      <div style="font-size:10pt;color:#555;margin-bottom:14px;">
+        <strong>Invoice for:</strong> ${proposal.bid_name || ''} — ${lead.name || lead.fullName || ''}
+      </div>
+    </div>
+
+    <div style="padding:0 36px;">
+      <table>
+        <thead><tr>
+          <th>Description</th>
+          <th class="r" style="width:26%;">Amount</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td>
+              <div style="font-weight:600;">${label}</div>
+              ${detail ? `<div style="font-size:8.5pt;color:#888;margin-top:2px;">${detail}</div>` : ''}
+            </td>
+            <td style="text-align:right;font-weight:600;">${fmt(amt)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="padding:20px 36px;display:flex;justify-content:flex-end;">
+      <div style="background:${HBG};border-radius:6px;padding:18px 24px;display:inline-block;min-width:260px;">
+        <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:12px;">Amount Due</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;">
+          <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total Due Now</span>
+          <span style="font-size:18pt;font-weight:900;color:${AC};">${fmt(amt)}</span>
+        </div>
+      </div>
+    </div>
+
+    ${payUrlHtml}
+
+    <div style="padding:20px 36px 0;font-size:10pt;color:#555;">
+      Please make checks payable to <strong>${coName}</strong>.
+    </div>
+
+    <div style="background:${HBG};color:#fff;text-align:center;padding:16px 36px;margin-top:28px;">
+      <span style="color:${AC};">★</span>
+      <span style="font-size:9.5pt;letter-spacing:1px;margin-left:6px;">Thank you for your business!</span>
+    </div>
+
+  </div></body></html>`;
+
+  openPrintWindow(html);
+}
+
+// ── STYLED FINAL INVOICE — Professional template ──────────────────────────────
+
+function printFinalInvoiceV2({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl = '', userName = '' }) {
+  const AC  = '#f97316';
+  const HBG = '#1c2333';
+
+  const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
+  const docDate = fmtDate(null);
+
+  const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
+  const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
+  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
+  const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
+  const coCity    = company?.city    || company?.ghlCompanyCity     || '';
+  const coState   = company?.state   || company?.ghlCompanyState   || '';
+  const coZip     = company?.zip     || company?.ghlCompanyZip     || '';
+  const coWebsite = company?.website || company?.ghlCompanyWebsite  || '';
+  const coAddr    = [coStreet, coCity, coState, coZip].filter(Boolean).join(', ');
+  const custAddr  = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ');
+
+  const logoHtml = logoUrl
+    ? `<div style="display:flex;align-items:center;gap:14px;">
+        <img src="${logoUrl}" alt="${coName}" style="max-height:64px;max-width:150px;object-fit:contain;">
+        <span style="font-size:16pt;font-weight:900;color:#fff;letter-spacing:0.3px;line-height:1.2;">${coName}</span>
+      </div>`
+    : `<span style="font-size:18pt;font-weight:900;color:#fff;letter-spacing:0.5px;">${coName}</span>`;
+
+  const rawPayUrl = (proposal.payment_url || '').trim();
+  const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
+
+  const payUrlHtml = payUrl && proposal.include_payment_button ? `
+    <div style="padding:20px 36px 0;">
+      <a href="${payUrl}" style="display:block;background:${AC};color:#fff;text-align:center;padding:14px 24px;font-size:11pt;font-weight:700;border-radius:6px;text-decoration:none;letter-spacing:0.5px;">
+        Make Your Payment Online
+      </a>
+      <div style="font-size:9pt;color:#999;text-align:center;margin-top:6px;">${payUrl}</div>
+    </div>` : '';
+
+  const TD  = `padding:9px 12px;border-bottom:1px solid #efefef;vertical-align:top;font-size:10.5pt;`;
+  const TDR = TD + 'text-align:right;';
+
+  const prevPayRows = paySchedule.map((ps, i) => {
+    const amt   = calcAmt(ps, bidTotal);
+    const lbl   = ps._desc || ps.description || `Payment ${i + 1}`;
+    return `<tr>
+      <td style="${TD}color:#777;font-style:italic;">${lbl} <span style="font-size:8.5pt;">(previously invoiced)</span></td>
+      <td style="${TDR}color:#777;">-${fmt(amt)}</td>
+    </tr>`;
+  }).join('');
+
+  let investRows = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+      <span style="font-size:9.5pt;color:#ccc;">Bid Total</span>
+      <span style="color:#ccc;font-weight:600;">${fmt(bidTotal)}</span>
+    </div>`;
+  paySchedule.forEach((ps, i) => {
+    const amt   = calcAmt(ps, bidTotal);
+    const lbl   = ps._desc || ps.description || `Payment ${i + 1}`;
+    investRows += `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span style="font-size:9.5pt;color:#ccc;">${lbl}</span>
+        <span style="color:#ef4444;font-weight:600;">-${fmt(amt)}</span>
+      </div>`;
+  });
+  investRows += `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;margin-top:3px;">
+      <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Balance Due</span>
+      <span style="font-size:18pt;font-weight:900;color:${AC};">${fmt(balanceDue)}</span>
+    </div>`;
+
+  const html = `<!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8">
+    <title>Final Invoice ${docNum}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #222; background: #fff; }
+      .page { max-width: 780px; margin: 0 auto; }
+      table { width: 100%; border-collapse: collapse; }
+      table th { background: ${HBG}; color: #fff; padding: 8px 12px; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+      table th.r { text-align: right; }
+      table tr:nth-child(even) td { background: #fafafa; }
+      @media print {
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        @page { margin: 0.35in; size: letter; }
+      }
+    </style>
+  </head><body><div class="page">
+
+    <div style="background:${HBG};display:flex;justify-content:space-between;align-items:center;padding:20px 36px;">
+      <div>${logoHtml}</div>
+      <div style="text-align:right;">
+        <div style="font-size:26pt;font-weight:900;letter-spacing:4px;color:#fff;line-height:1;">INVOICE</div>
+        <div style="font-size:8pt;color:${AC};letter-spacing:2px;margin-top:5px;text-transform:uppercase;">FINAL BALANCE</div>
+      </div>
+    </div>
+
+    <div style="background:#f4f5f7;display:flex;justify-content:space-between;align-items:center;padding:10px 36px;border-bottom:3px solid ${AC};">
+      <div>
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Date</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docDate}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Invoice No.</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docNum}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e5e7eb;">
+      <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">Bill To:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
+        ${custAddr   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`   : ''}
+        ${lead.phone ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>` : ''}
+        ${lead.email ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>` : ''}
+      </div>
+      <div style="padding:16px 36px;">
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">From:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${coName}</div>
+        ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
+        ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
+        ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
+        ${(userName || proposal.salesman) ? `<div style="font-size:9.5pt;color:#444;font-weight:600;line-height:1.65;">${userName || proposal.salesman}</div>` : ''}
+      </div>
+    </div>
+
+    <div style="padding:14px 36px 0;">
+      <div style="font-size:10pt;color:#555;margin-bottom:14px;">
+        <strong>Invoice for:</strong> ${proposal.bid_name || ''} — ${lead.name || lead.fullName || ''}
+      </div>
+    </div>
+
+    <div style="padding:0 36px;">
+      <table>
+        <thead><tr>
+          <th>Description</th>
+          <th class="r" style="width:26%;">Amount</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td style="${TD}font-weight:600;">Bid Total</td>
+            <td style="${TDR}font-weight:600;">${fmt(bidTotal)}</td>
+          </tr>
+          ${prevPayRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="padding:20px 36px;display:flex;justify-content:flex-end;">
+      <div style="background:${HBG};border-radius:6px;padding:18px 24px;display:inline-block;min-width:300px;">
+        <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:12px;">Final Balance</div>
+        ${investRows}
+      </div>
+    </div>
+
+    ${payUrlHtml}
+
+    <div style="padding:20px 36px 0;font-size:10pt;color:#555;">
+      Please make checks payable to <strong>${coName}</strong>.
+    </div>
+
+    <div style="background:${HBG};color:#fff;text-align:center;padding:16px 36px;margin-top:28px;">
+      <span style="color:${AC};">★</span>
+      <span style="font-size:9.5pt;letter-spacing:1px;margin-left:6px;">Thank you for your business!</span>
+    </div>
+
+  </div></body></html>`;
+
+  openPrintWindow(html);
+}
+
 // ── PAYMENT INVOICE ───────────────────────────────────────────────────────────
 
-export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '' }) {
+export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '', designId = null, logoUrl = '', userName = '' }) {
+  if (designId) {
+    return printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl, userName });
+  }
   const amt    = calcAmt(payEntry, bidTotal);
   const type   = payEntry._type || payEntry.amount_type;
   const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
@@ -652,7 +973,10 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
 
 // ── FINAL INVOICE ─────────────────────────────────────────────────────────────
 
-export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '' }) {
+export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '', designId = null, logoUrl = '', userName = '' }) {
+  if (designId) {
+    return printFinalInvoiceV2({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl, userName });
+  }
   const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
   const docDate = `Date: ${fmtDate(null)}`;
   const rawPayUrlF = (proposal.payment_url || '').trim();
