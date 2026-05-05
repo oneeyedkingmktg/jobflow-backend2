@@ -6,7 +6,9 @@ export default function PauseModal({ form, onSave, onClose }) {
 
   const [toggleOn, setToggleOn] = useState(isPaused);
   const [pauseMode, setPauseMode] = useState(form.pauseUntil ? "date" : "indefinite");
-  const [pauseUntil, setPauseUntil] = useState(form.pauseUntil || "");
+  const [pauseUntil, setPauseUntil] = useState(
+    form.pauseUntil ? form.pauseUntil.slice(0, 10) : ""
+  );
   const [resumeAction, setResumeAction] = useState(form.resumeAction || "Notify Only");
   const [pauseNotes, setPauseNotes] = useState(form.pauseNotes || "");
   const [showUnpauseChoice, setShowUnpauseChoice] = useState(false);

@@ -1,6 +1,12 @@
 import React from "react";
 import { STATUS_COLORS } from "./statusConfig";
 
+function formatPauseDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.slice(0, 10).split("-");
+  return `${parseInt(m)}-${parseInt(d)}-${y.slice(2)}`;
+}
+
 export default function LeadHeader({
   name,
   status,
@@ -10,6 +16,7 @@ export default function LeadHeader({
   onMap,
   onUploadPhotos,
   isPaused,
+  pauseUntil,
   proceedWithAutomation,
 }) {
   const bgColor = STATUS_COLORS[status] || "#59687d";
@@ -30,7 +37,7 @@ export default function LeadHeader({
 
         {isPaused && (
           <span className="flex items-center gap-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">
-            ⏸ PAUSED
+            ⏸ {pauseUntil ? `PAUSED Until ${formatPauseDate(pauseUntil)}` : "PAUSED"}
           </span>
         )}
 

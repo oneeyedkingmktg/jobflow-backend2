@@ -217,6 +217,7 @@ const handlePauseSave = (pauseFields) => {
   onText={handleText}
   onMap={handleOpenMaps}
   isPaused={form.pauseStatus === "Paused"}
+  pauseUntil={form.pauseUntil || null}
   proceedWithAutomation={form.proceedWithAutomation}
 />
 
