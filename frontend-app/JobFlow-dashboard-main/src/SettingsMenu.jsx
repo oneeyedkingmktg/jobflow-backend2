@@ -11,6 +11,7 @@ import SettingsModal from "./SettingsModal";
 import CompanyWizard from "./CompanyWizard";
 import UserProfileModal from "./UserProfileModal";
 import NotificationSettings from "./components/NotificationSettings";
+import BidderMasterAdmin from "./components/BidderMasterAdmin";
 import { canUseNotifications } from "./utils/platform";
 
 // IMPORT SCREENS
@@ -37,6 +38,7 @@ export default function SettingsMenu({ onRefresh }) {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showBidderAdmin, setShowBidderAdmin] = useState(false);
 
   // 🔒 CRITICAL: normalize isMaster safely
   const isMasterUser =
@@ -77,6 +79,10 @@ const handleNotificationSettings = () => {
   setShowNotificationSettings(true);
 };
 
+  const handleBidderAdmin = () => {
+    setShowMenu(false);
+    setShowBidderAdmin(true);
+  };
 
     const handleRefresh = () => {
     setShowMenu(false);
@@ -195,13 +201,19 @@ const handleNotificationSettings = () => {
                     >
                       Manage Companies
                     </button>
-                    <button 
-                      onClick={handleManageUsers} 
+                    <button
+                      onClick={handleManageUsers}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
                     >
                       Manage Users
                     </button>
-                    <button 
+                    <button
+                      onClick={handleBidderAdmin}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
+                    >
+                      Bidder Admin
+                    </button>
+                    <button
                       onClick={handleMyProfile} 
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
                     >
@@ -319,6 +331,13 @@ const handleNotificationSettings = () => {
 
       {/* MODALS */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showBidderAdmin && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[999] p-4 overflow-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-auto">
+            <BidderMasterAdmin onBack={() => setShowBidderAdmin(false)} />
+          </div>
+        </div>
+      )}
       {showCompanyWizard && (
         <CompanyWizard
           onComplete={() => setShowCompanyWizard(false)}
