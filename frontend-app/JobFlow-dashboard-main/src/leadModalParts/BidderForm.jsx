@@ -780,7 +780,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           proposalTopText: companySettings?.proposal_top_text || '',
           invoiceTopText: companySettings?.invoice_top_text || '',
           designId: proposal.proposal_design_id || companySettings?.preferred_proposal_design_id || null,
-          designScheme: companySettings?.preferred_design_scheme || null,
+          primaryColor: companySettings?.preferred_design_primary_color || null,
+          accentColor: companySettings?.preferred_design_accent_color || null,
           logoUrl: companySettings?.logo_url || '',
           userName: hdr.salesman || '',
         };

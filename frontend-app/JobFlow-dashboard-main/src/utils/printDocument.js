@@ -788,15 +788,17 @@ export function printProposal({
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
   proposalTopText = '',
   designId = null,
-  designScheme = null,
+  primaryColor = null,
+  accentColor = null,
   logoUrl = '',
   userName = '',
 }) {
   if (designId) {
-    const scheme = designScheme || 'charcoal-orange';
+    const AC  = accentColor  || '#f97316';
+    const HBG = primaryColor || '#1c2333';
     const args = { proposal, checkedMap, customItems, discounts, paySchedule,
       lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl, userName };
-    return scheme === 'blue-gold' ? printProposalV3(args) : printProposalV2(args);
+    return _printProposalStyled({ ...args, AC, HBG });
   }
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
@@ -911,11 +913,12 @@ export function printProposal({
 
 // ── PAYMENT INVOICE (exported) ────────────────────────────────────────────────
 
-export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '', designId = null, designScheme = null, logoUrl = '', userName = '' }) {
+export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '', designId = null, primaryColor = null, accentColor = null, logoUrl = '', userName = '' }) {
   if (designId) {
-    const scheme = designScheme || 'charcoal-orange';
+    const AC  = accentColor  || '#f97316';
+    const HBG = primaryColor || '#1c2333';
     const args = { proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl, userName };
-    return scheme === 'blue-gold' ? printPaymentInvoiceV3(args) : printPaymentInvoiceV2(args);
+    return _printPaymentInvoiceStyled({ ...args, AC, HBG });
   }
   const amt    = calcAmt(payEntry, bidTotal);
   const type   = payEntry._type || payEntry.amount_type;
@@ -967,11 +970,12 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
 
 // ── FINAL INVOICE (exported) ──────────────────────────────────────────────────
 
-export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '', designId = null, designScheme = null, logoUrl = '', userName = '' }) {
+export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '', designId = null, primaryColor = null, accentColor = null, logoUrl = '', userName = '' }) {
   if (designId) {
-    const scheme = designScheme || 'charcoal-orange';
+    const AC  = accentColor  || '#f97316';
+    const HBG = primaryColor || '#1c2333';
     const args = { proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl, userName };
-    return scheme === 'blue-gold' ? printFinalInvoiceV3(args) : printFinalInvoiceV2(args);
+    return _printFinalInvoiceStyled({ ...args, AC, HBG });
   }
   const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
   const docDate = `Date: ${fmtDate(null)}`;

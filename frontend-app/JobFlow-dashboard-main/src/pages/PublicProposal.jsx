@@ -101,8 +101,8 @@ export default function PublicProposal({ proposalId }) {
 
   // ── Styled (Professional) render ──────────────────────────────────────────
   if (designId) {
-    const AC  = '#f97316'; // orange accent
-    const HBG = '#1c2333'; // charcoal header/footer bg
+    const AC  = proposal.design_accent_color  || '#f97316';
+    const HBG = proposal.design_primary_color || '#1c2333';
     const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
     const logoSrc = proposal.logo_url || null;
 

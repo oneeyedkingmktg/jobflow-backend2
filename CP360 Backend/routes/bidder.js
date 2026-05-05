@@ -711,7 +711,9 @@ router.get('/company-settings', async (req, res) => {
     const companyId = req.user.company_id;
 
     let result = await pool.query(
-      `SELECT bcs.*, bpd.color_scheme AS preferred_design_scheme
+      `SELECT bcs.*,
+              bpd.primary_color AS preferred_design_primary_color,
+              bpd.accent_color  AS preferred_design_accent_color
        FROM bidder_company_settings bcs
        LEFT JOIN bidder_proposal_designs bpd ON bpd.id = bcs.preferred_proposal_design_id
        WHERE bcs.company_id = $1`,
@@ -722,7 +724,7 @@ router.get('/company-settings', async (req, res) => {
     if (!result.rows.length) {
       result = await pool.query(
         `INSERT INTO bidder_company_settings (company_id, terms_and_conditions)
-         VALUES ($1, $2) RETURNING *, NULL AS preferred_design_scheme`,
+         VALUES ($1, $2) RETURNING *, NULL AS preferred_design_primary_color, NULL AS preferred_design_accent_color`,
         [companyId, DEFAULT_TERMS]
       );
     }
@@ -784,12 +786,23 @@ router.put('/company-settings', async (req, res) => {
 // PROPOSAL DESIGNS (master role only)
 // ============================================================================
 
-// GET /api/bidder/proposal-designs — all companies can read (to pick a design)
+// GET /api/bidder/proposal-designs — master sees all; companies see public + their private
 router.get('/proposal-designs', async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM bidder_proposal_designs WHERE is_active = true ORDER BY name'
-    );
+    const isMaster = req.user?.role === 'master';
+    const companyId = req.user?.company_id || null;
+    let result;
+    if (isMaster) {
+      result = await pool.query('SELECT * FROM bidder_proposal_designs ORDER BY name');
+    } else {
+      result = await pool.query(
+        `SELECT * FROM bidder_proposal_designs
+         WHERE visibility = 'public'
+            OR (visibility = 'private' AND private_company_id = $1)
+         ORDER BY name`,
+        [companyId]
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     console.error('GET /bidder/proposal-designs error:', err);
@@ -800,12 +813,13 @@ router.get('/proposal-designs', async (req, res) => {
 // POST /api/bidder/proposal-designs — master only
 router.post('/proposal-designs', requireRole('master'), async (req, res) => {
   try {
-    const { name, description, template_content, is_active = true, color_scheme = 'charcoal-orange' } = req.body;
+    const { name, description, template_content, primary_color = '#1c2333', accent_color = '#f97316', visibility = 'public', private_company_id = null } = req.body;
+    const is_active = visibility !== 'inactive';
 
     const result = await pool.query(
-      `INSERT INTO bidder_proposal_designs (name, description, template_content, is_active, color_scheme)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [name, clean(description), clean(template_content), is_active, color_scheme]
+      `INSERT INTO bidder_proposal_designs (name, description, template_content, is_active, primary_color, accent_color, visibility, private_company_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [name, clean(description), clean(template_content), is_active, primary_color, accent_color, visibility, private_company_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -818,12 +832,15 @@ router.post('/proposal-designs', requireRole('master'), async (req, res) => {
 // PUT /api/bidder/proposal-designs/:id — master only
 router.put('/proposal-designs/:id', requireRole('master'), async (req, res) => {
   try {
-    const { name, description, template_content, is_active, color_scheme = 'charcoal-orange' } = req.body;
+    const { name, description, template_content, primary_color = '#1c2333', accent_color = '#f97316', visibility = 'public', private_company_id = null } = req.body;
+    const is_active = visibility !== 'inactive';
 
     const result = await pool.query(
-      `UPDATE bidder_proposal_designs SET name = $1, description = $2, template_content = $3, is_active = $4, color_scheme = $5
-       WHERE id = $6 RETURNING *`,
-      [name, clean(description), clean(template_content), is_active, color_scheme, req.params.id]
+      `UPDATE bidder_proposal_designs
+       SET name = $1, description = $2, template_content = $3, is_active = $4,
+           primary_color = $5, accent_color = $6, visibility = $7, private_company_id = $8
+       WHERE id = $9 RETURNING *`,
+      [name, clean(description), clean(template_content), is_active, primary_color, accent_color, visibility, private_company_id, req.params.id]
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Design not found' });
@@ -939,11 +956,15 @@ router.get('/public/:id', async (req, res) => {
               bcs.include_payment_button as company_include_payment_button,
               bcs.default_payment_url as company_payment_url,
               bcs.preferred_proposal_design_id, bcs.logo_url,
-              u.name AS created_by_name
+              u.name AS created_by_name,
+              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN companies c ON bp.company_id = c.id
        LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
        LEFT JOIN users u ON bp.created_by_user_id = u.id
+       LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
+       LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
        WHERE bp.id = $1`,
       [req.params.id]
     );
@@ -992,7 +1013,8 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
               c.ghl_company_from_name, c.name as company_db_name,
               bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
               bcs.preferred_proposal_design_id,
-              COALESCE(bpd_prop.color_scheme, bpd_pref.color_scheme) AS design_color_scheme
+              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1017,8 +1039,11 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
     const emailType    = req.body.type || 'proposal';
-    const designScheme = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_color_scheme || 'charcoal-orange')
+    const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_primary_color || '#1c2333')
+      : null;
+    const accentColor = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_accent_color || '#f97316')
       : null;
 
     await sendProposalLinkEmail({
@@ -1031,7 +1056,8 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       fromName,
       fromEmail,
       emailType,
-      designScheme,
+      primaryColor,
+      accentColor,
     });
 
     res.json({ success: true, sentTo: toEmail });
