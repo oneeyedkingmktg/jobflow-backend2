@@ -215,19 +215,26 @@ function docShell(title, docNum, dateStr, extraMeta, companyHtml, body) {
   </div></body></html>`;
 }
 
-// ── STYLED PROPOSAL — Professional template ───────────────────────────────────
+// ── STYLED PROPOSAL — shared renderer (V2=charcoal/orange, V3=blue/gold) ─────
 
-function printProposalV2({
+function printProposalV2(args) {
+  return _printProposalStyled({ ...args, AC: '#f97316', HBG: '#1c2333' });
+}
+
+function printProposalV3(args) {
+  return _printProposalStyled({ ...args, AC: '#FFC133', HBG: '#1E73BE' });
+}
+
+function _printProposalStyled({
   proposal, checkedMap, customItems, discounts, paySchedule,
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
-  logoUrl = '', userName = '',
+  logoUrl = '', userName = '', AC, HBG,
 }) {
   const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
   const docDate = fmtDate(proposal.presented_date);
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
   const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
-  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
   const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
   const coCity    = company?.city    || company?.ghlCompanyCity     || '';
   const coState   = company?.state   || company?.ghlCompanyState   || '';
@@ -314,7 +321,7 @@ function printProposalV2({
   investRows += `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
       <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Total Project Cost</span>
-      <span style="font-size:14pt;font-weight:900;color:#f97316;">${fmt(bidTotal)}</span>
+      <span style="font-size:14pt;font-weight:900;color:${AC};">${fmt(bidTotal)}</span>
     </div>`;
   paySchedule.forEach((ps, i) => {
     const amt   = calcAmt(ps, bidTotal);
@@ -322,19 +329,19 @@ function printProposalV2({
     investRows += `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
         <span style="font-size:9.5pt;color:#ccc;">${label}</span>
-        <span style="font-size:12pt;font-weight:700;color:#f97316;">${fmt(amt)}</span>
+        <span style="font-size:12pt;font-weight:700;color:${AC};">${fmt(amt)}</span>
       </div>`;
   });
   investRows += `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;margin-top:3px;">
       <span style="font-size:9.5pt;color:#ccc;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Balance Due</span>
-      <span style="font-size:14pt;font-weight:900;color:#f97316;">${fmt(balanceDue)}</span>
+      <span style="font-size:14pt;font-weight:900;color:${AC};">${fmt(balanceDue)}</span>
     </div>`;
 
   const SEC_HEAD = (label) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <div style="width:4px;height:18px;background:#f97316;border-radius:2px;flex-shrink:0;"></div>
-      <span style="font-size:9pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#1c2333;">${label}</span>
+      <div style="width:4px;height:18px;background:${AC};border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:9pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${HBG};">${label}</span>
     </div>`;
 
   const notesHtml = proposal.customer_notes ? `
@@ -361,7 +368,7 @@ function printProposalV2({
       body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #222; background: #fff; }
       .page { max-width: 780px; margin: 0 auto; }
       table { width: 100%; border-collapse: collapse; }
-      table th { background: #1c2333; color: #fff; padding: 8px 12px; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+      table th { background: ${HBG}; color: #fff; padding: 8px 12px; font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
       table th.r { text-align: right; }
       table tr:nth-child(even) td { background: #fafafa; }
       @media print {
@@ -371,36 +378,36 @@ function printProposalV2({
     </style>
   </head><body><div class="page">
 
-    <div style="background:#1c2333;display:flex;justify-content:space-between;align-items:center;padding:20px 36px;">
+    <div style="background:${HBG};display:flex;justify-content:space-between;align-items:center;padding:20px 36px;">
       <div>${logoHtml}</div>
       <div style="text-align:right;">
         <div style="font-size:26pt;font-weight:900;letter-spacing:4px;color:#fff;line-height:1;">PROPOSAL</div>
-        <div style="font-size:8pt;color:#f97316;letter-spacing:2px;margin-top:5px;text-transform:uppercase;">PREMIUM COATING. EXCEPTIONAL RESULTS.</div>
+        <div style="font-size:8pt;color:${AC};letter-spacing:2px;margin-top:5px;text-transform:uppercase;">PREMIUM COATING. EXCEPTIONAL RESULTS.</div>
       </div>
     </div>
 
-    <div style="background:#f4f5f7;display:flex;justify-content:space-between;align-items:center;padding:10px 36px;border-bottom:3px solid #f97316;">
+    <div style="background:#f4f5f7;display:flex;justify-content:space-between;align-items:center;padding:10px 36px;border-bottom:3px solid ${AC};">
       <div>
         <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Date</div>
-        <div style="font-size:11.5pt;font-weight:700;color:#1c2333;">${docDate || '—'}</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docDate || '—'}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#999;">Proposal No.</div>
-        <div style="font-size:11.5pt;font-weight:700;color:#1c2333;">${docNum}</div>
+        <div style="font-size:11.5pt;font-weight:700;color:${HBG};">${docNum}</div>
       </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #e5e7eb;">
       <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
-        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared For:</div>
-        <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">Prepared For:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
         ${custAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`    : ''}
         ${lead.phone  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>`  : ''}
         ${lead.email  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>`  : ''}
       </div>
       <div style="padding:16px 36px;">
-        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:6px;">Prepared By:</div>
-        <div style="font-size:12.5pt;font-weight:700;color:#1c2333;margin-bottom:3px;">${coName}</div>
+        <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">Prepared By:</div>
+        <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${coName}</div>
         ${coAddr    ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coAddr}</div>`    : ''}
         ${coPhone   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coPhone}</div>`   : ''}
         ${coWebsite ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${coWebsite}</div>` : ''}
@@ -410,7 +417,7 @@ function printProposalV2({
 
     ${(proposal.bid_name || proposal.bid_description || installHtml) ? `
     <div style="padding:14px 36px 0;">
-      ${proposal.bid_name        ? `<div style="font-size:13pt;font-weight:700;color:#1c2333;margin-bottom:2px;">${proposal.bid_name}</div>`        : ''}
+      ${proposal.bid_name        ? `<div style="font-size:13pt;font-weight:700;color:${HBG};margin-bottom:2px;">${proposal.bid_name}</div>`        : ''}
       ${proposal.bid_description ? `<div style="font-size:10pt;color:#777;">${proposal.bid_description}</div>` : ''}
       ${installHtml}
     </div>` : ''}
@@ -429,8 +436,8 @@ function printProposalV2({
     </div>
 
     <div style="padding:20px 36px;display:flex;justify-content:flex-end;">
-      <div style="background:#1c2333;border-radius:6px;padding:18px 24px;display:inline-block;min-width:300px;">
-        <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#f97316;margin-bottom:12px;">Investment Summary</div>
+      <div style="background:${HBG};border-radius:6px;padding:18px 24px;display:inline-block;min-width:300px;">
+        <div style="font-size:8pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:12px;">Investment Summary</div>
         ${investRows}
       </div>
     </div>
@@ -438,8 +445,8 @@ function printProposalV2({
     ${notesHtml}
     ${termsHtml}
 
-    <div style="background:#1c2333;color:#fff;text-align:center;padding:16px 36px;margin-top:20px;">
-      <span style="color:#f97316;">★</span>
+    <div style="background:${HBG};color:#fff;text-align:center;padding:16px 36px;margin-top:20px;">
+      <span style="color:${AC};">★</span>
       <span style="font-size:9.5pt;letter-spacing:1px;margin-left:6px;">Thank you for the opportunity to earn your business!</span>
     </div>
 
@@ -448,141 +455,17 @@ function printProposalV2({
   openPrintWindow(html);
 }
 
-// ── PROPOSAL ─────────────────────────────────────────────────────────────────
+// ── STYLED INVOICE — shared renderer (V2=charcoal/orange, V3=blue/gold) ──────
 
-export function printProposal({
-  proposal, checkedMap, customItems, discounts, paySchedule,
-  lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
-  proposalTopText = '',
-  designId = null,
-  logoUrl = '',
-  userName = '',
-}) {
-  if (designId) {
-    return printProposalV2({
-      proposal, checkedMap, customItems, discounts, paySchedule,
-      lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl, userName,
-    });
-  }
-  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
-  const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
-  const extra   = proposal.salesman ? `<br>Prepared by: ${proposal.salesman}` : '';
-
-  // Merge library items + custom items into one sorted list
-  const libEntries = Object.entries(checkedMap).map(([, pi]) => ({ ...pi, _type: 'lib' }));
-  const allItems = [...libEntries, ...customItems]
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-
-  const runningTotal = (upToSortOrder) =>
-    [...libEntries, ...customItems.filter(i => !i.is_subtotal)]
-      .filter(i => (i.sort_order ?? 0) < upToSortOrder)
-      .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
-
-  const allRows = allItems.map(item => {
-    if (item.is_subtotal) {
-      const total = runningTotal(item.sort_order ?? 0);
-      return `<tr>
-        <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">Running Subtotal</td>
-        <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
-      </tr>`;
-    }
-    if (item._type === 'lib') {
-      const showPrice = !!item.breakout_price;
-      const qty = Math.round(item._qty ?? item.quantity ?? 1);
-      return `<tr>
-        <td>
-          <div>${item.name}</div>
-          ${item._desc || item.description ? `<div class="item-desc">${item._desc || item.description}</div>` : ''}
-        </td>
-        <td class="r">${showPrice ? qty : ''}</td>
-        <td class="r">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
-        <td class="r">${showPrice ? fmt(item.line_total) : '<span class="included">Included</span>'}</td>
-      </tr>`;
-    }
-    // Custom line item
-    const qty = Math.round(item._qty ?? item.quantity ?? 1);
-    return `<tr>
-      <td>${item._desc || item.description || ''}</td>
-      <td class="r">${qty}</td>
-      <td class="r">${fmt(item._price ?? item.price_each)}</td>
-      <td class="r">${fmt(item.line_total)}</td>
-    </tr>`;
-  }).join('');
-
-  const discountRows = discounts.map(d => {
-    const type        = d._type || d.discount_type;
-    const val         = parseFloat(d._val ?? d.discount_value) || 0;
-    const amt         = type === 'dollar' ? val : preDiscountTotal * (val / 100);
-    const name        = d._desc || d.description || 'Discount';
-    const acceptDate  = d._date || d.if_accepted_by || '';
-    const acceptLabel = acceptDate ? `<div style="font-size:9pt;color:#b00;margin-top:2px">If accepted by ${fmtDate(acceptDate)}</div>` : '';
-    return `<tr>
-      <td colspan="3" style="text-align:right;color:#b00;font-size:10.5pt">${name}${acceptLabel}</td>
-      <td class="r" style="color:#b00">-${fmt(amt)}</td>
-    </tr>`;
-  }).join('');
-
-  const totalsHtml = `
-    <div class="totals-wrap"><div class="totals-inner">
-      <div class="tot-row"><span>Subtotal</span><span>${fmt(preDiscountTotal)}</span></div>
-      ${discountTotal > 0 ? `<div class="tot-row discount"><span>Discounts</span><span>-${fmt(discountTotal)}</span></div>` : ''}
-      <div class="tot-row grand"><span>Bid Total</span><span>${fmt(bidTotal)}</span></div>
-    </div></div>`;
-
-  const payHtml = paySchedule.length > 0 ? `
-    <div class="section-label">Payment Schedule</div>
-    ${paySchedule.map((ps, i) => {
-      const amt   = calcAmt(ps, bidTotal);
-      const label = ps._desc || ps.description || `Payment ${i + 1}`;
-      return `<div class="pay-row"><span>${label}</span><span>${fmt(amt)}</span></div>`;
-    }).join('')}
-    <div class="pay-balance"><span>Balance Due</span><span>${fmt(balanceDue)}</span></div>
-  ` : '';
-
-  const notesHtml = proposal.customer_notes ? `
-    <div class="section-label">Notes</div>
-    <div class="notes-box">${proposal.customer_notes}</div>` : '';
-
-  const installHtml = proposal.install_date_tbd
-    ? `<div class="install-row"><strong>Install Date:</strong> TBD</div>`
-    : proposal.install_date
-    ? `<div class="install-row"><strong>Install Date:</strong> ${fmtDate(proposal.install_date)}</div>`
-    : '';
-
-  const body = `
-    ${clientBlock(lead, 'Prepared For')}
-    ${proposalTopText ? `<div style="font-size:11pt;line-height:1.7;margin-bottom:14px;white-space:pre-line">${proposalTopText}</div>` : ''}
-
-    <div class="bid-title">${proposal.bid_name || 'Proposal'}</div>
-    ${proposal.bid_description ? `<div class="bid-sub">${proposal.bid_description}</div>` : '<div style="margin-bottom:14px"></div>'}
-
-    ${installHtml}
-
-    <table>
-      <thead><tr>
-        <th style="width:48%">Description</th>
-        <th class="r" style="width:8%">Qty</th>
-        <th class="r" style="width:20%">Unit Price</th>
-        <th class="r" style="width:24%">Total</th>
-      </tr></thead>
-      <tbody>${allRows}${discountRows}</tbody>
-    </table>
-
-    ${totalsHtml}
-    ${payHtml}
-    ${notesHtml}
-
-    <div class="doc-footer">${companyFooterText(company)}</div>`;
-
-  openPrintWindow(docShell('Proposal', docNum, docDate, extra, companyBlock(company), body));
+function printPaymentInvoiceV2(args) {
+  return _printPaymentInvoiceStyled({ ...args, AC: '#f97316', HBG: '#1c2333' });
 }
 
-// ── STYLED PAYMENT INVOICE — Professional template ────────────────────────────
+function printPaymentInvoiceV3(args) {
+  return _printPaymentInvoiceStyled({ ...args, AC: '#FFC133', HBG: '#1E73BE' });
+}
 
-function printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl = '', userName = '' }) {
-  const AC  = '#f97316';
-  const HBG = '#1c2333';
-
+function _printPaymentInvoiceStyled({ proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl = '', userName = '', AC, HBG }) {
   const amt    = calcAmt(payEntry, bidTotal);
   const type   = payEntry._type || payEntry.amount_type;
   const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
@@ -593,7 +476,6 @@ function printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidT
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
   const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
-  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
   const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
   const coCity    = company?.city    || company?.ghlCompanyCity     || '';
   const coState   = company?.state   || company?.ghlCompanyState   || '';
@@ -661,7 +543,7 @@ function printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidT
       <div style="padding:16px 36px;border-right:1px solid #e5e7eb;">
         <div style="font-size:7.5pt;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:${AC};margin-bottom:6px;">Bill To:</div>
         <div style="font-size:12.5pt;font-weight:700;color:${HBG};margin-bottom:3px;">${lead.name || lead.fullName || ''}</div>
-        ${custAddr  ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`   : ''}
+        ${custAddr   ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${custAddr}</div>`   : ''}
         ${lead.phone ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.phone}</div>` : ''}
         ${lead.email ? `<div style="font-size:9.5pt;color:#666;line-height:1.65;">${lead.email}</div>` : ''}
       </div>
@@ -725,18 +607,22 @@ function printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidT
   openPrintWindow(html);
 }
 
-// ── STYLED FINAL INVOICE — Professional template ──────────────────────────────
+// ── STYLED FINAL INVOICE — shared renderer ────────────────────────────────────
 
-function printFinalInvoiceV2({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl = '', userName = '' }) {
-  const AC  = '#f97316';
-  const HBG = '#1c2333';
+function printFinalInvoiceV2(args) {
+  return _printFinalInvoiceStyled({ ...args, AC: '#f97316', HBG: '#1c2333' });
+}
 
+function printFinalInvoiceV3(args) {
+  return _printFinalInvoiceStyled({ ...args, AC: '#FFC133', HBG: '#1E73BE' });
+}
+
+function _printFinalInvoiceStyled({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl = '', userName = '', AC, HBG }) {
   const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
   const docDate = fmtDate(null);
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
   const coPhone   = company?.phone   || company?.ghlCompanyPhone    || '';
-  const coEmail   = company?.email   || company?.ghlCompanyFromEmail || '';
   const coStreet  = company?.address || company?.ghlCompanyStreetAddress || '';
   const coCity    = company?.city    || company?.ghlCompanyCity     || '';
   const coState   = company?.state   || company?.ghlCompanyState   || '';
@@ -895,11 +781,141 @@ function printFinalInvoiceV2({ proposal, paySchedule, lead, company, bidTotal, b
   openPrintWindow(html);
 }
 
-// ── PAYMENT INVOICE ───────────────────────────────────────────────────────────
+// ── PROPOSAL (exported) ───────────────────────────────────────────────────────
 
-export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '', designId = null, logoUrl = '', userName = '' }) {
+export function printProposal({
+  proposal, checkedMap, customItems, discounts, paySchedule,
+  lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
+  proposalTopText = '',
+  designId = null,
+  designScheme = null,
+  logoUrl = '',
+  userName = '',
+}) {
   if (designId) {
-    return printPaymentInvoiceV2({ proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl, userName });
+    const scheme = designScheme || 'charcoal-orange';
+    const args = { proposal, checkedMap, customItems, discounts, paySchedule,
+      lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl, userName };
+    return scheme === 'blue-gold' ? printProposalV3(args) : printProposalV2(args);
+  }
+  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+  const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
+  const extra   = proposal.salesman ? `<br>Prepared by: ${proposal.salesman}` : '';
+
+  const libEntries = Object.entries(checkedMap).map(([, pi]) => ({ ...pi, _type: 'lib' }));
+  const allItems = [...libEntries, ...customItems]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const runningTotal = (upToSortOrder) =>
+    [...libEntries, ...customItems.filter(i => !i.is_subtotal)]
+      .filter(i => (i.sort_order ?? 0) < upToSortOrder)
+      .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+
+  const allRows = allItems.map(item => {
+    if (item.is_subtotal) {
+      const total = runningTotal(item.sort_order ?? 0);
+      return `<tr>
+        <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">Running Subtotal</td>
+        <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
+      </tr>`;
+    }
+    if (item._type === 'lib') {
+      const showPrice = !!item.breakout_price;
+      const qty = Math.round(item._qty ?? item.quantity ?? 1);
+      return `<tr>
+        <td>
+          <div>${item.name}</div>
+          ${item._desc || item.description ? `<div class="item-desc">${item._desc || item.description}</div>` : ''}
+        </td>
+        <td class="r">${showPrice ? qty : ''}</td>
+        <td class="r">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
+        <td class="r">${showPrice ? fmt(item.line_total) : '<span class="included">Included</span>'}</td>
+      </tr>`;
+    }
+    const qty = Math.round(item._qty ?? item.quantity ?? 1);
+    return `<tr>
+      <td>${item._desc || item.description || ''}</td>
+      <td class="r">${qty}</td>
+      <td class="r">${fmt(item._price ?? item.price_each)}</td>
+      <td class="r">${fmt(item.line_total)}</td>
+    </tr>`;
+  }).join('');
+
+  const discountRows = discounts.map(d => {
+    const type        = d._type || d.discount_type;
+    const val         = parseFloat(d._val ?? d.discount_value) || 0;
+    const amt         = type === 'dollar' ? val : preDiscountTotal * (val / 100);
+    const name        = d._desc || d.description || 'Discount';
+    const acceptDate  = d._date || d.if_accepted_by || '';
+    const acceptLabel = acceptDate ? `<div style="font-size:9pt;color:#b00;margin-top:2px">If accepted by ${fmtDate(acceptDate)}</div>` : '';
+    return `<tr>
+      <td colspan="3" style="text-align:right;color:#b00;font-size:10.5pt">${name}${acceptLabel}</td>
+      <td class="r" style="color:#b00">-${fmt(amt)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalsHtml = `
+    <div class="totals-wrap"><div class="totals-inner">
+      <div class="tot-row"><span>Subtotal</span><span>${fmt(preDiscountTotal)}</span></div>
+      ${discountTotal > 0 ? `<div class="tot-row discount"><span>Discounts</span><span>-${fmt(discountTotal)}</span></div>` : ''}
+      <div class="tot-row grand"><span>Bid Total</span><span>${fmt(bidTotal)}</span></div>
+    </div></div>`;
+
+  const payHtml = paySchedule.length > 0 ? `
+    <div class="section-label">Payment Schedule</div>
+    ${paySchedule.map((ps, i) => {
+      const amt   = calcAmt(ps, bidTotal);
+      const label = ps._desc || ps.description || `Payment ${i + 1}`;
+      return `<div class="pay-row"><span>${label}</span><span>${fmt(amt)}</span></div>`;
+    }).join('')}
+    <div class="pay-balance"><span>Balance Due</span><span>${fmt(balanceDue)}</span></div>
+  ` : '';
+
+  const notesHtml = proposal.customer_notes ? `
+    <div class="section-label">Notes</div>
+    <div class="notes-box">${proposal.customer_notes}</div>` : '';
+
+  const installHtml = proposal.install_date_tbd
+    ? `<div class="install-row"><strong>Install Date:</strong> TBD</div>`
+    : proposal.install_date
+    ? `<div class="install-row"><strong>Install Date:</strong> ${fmtDate(proposal.install_date)}</div>`
+    : '';
+
+  const body = `
+    ${clientBlock(lead, 'Prepared For')}
+    ${proposalTopText ? `<div style="font-size:11pt;line-height:1.7;margin-bottom:14px;white-space:pre-line">${proposalTopText}</div>` : ''}
+
+    <div class="bid-title">${proposal.bid_name || 'Proposal'}</div>
+    ${proposal.bid_description ? `<div class="bid-sub">${proposal.bid_description}</div>` : '<div style="margin-bottom:14px"></div>'}
+
+    ${installHtml}
+
+    <table>
+      <thead><tr>
+        <th style="width:48%">Description</th>
+        <th class="r" style="width:8%">Qty</th>
+        <th class="r" style="width:20%">Unit Price</th>
+        <th class="r" style="width:24%">Total</th>
+      </tr></thead>
+      <tbody>${allRows}${discountRows}</tbody>
+    </table>
+
+    ${totalsHtml}
+    ${payHtml}
+    ${notesHtml}
+
+    <div class="doc-footer">${companyFooterText(company)}</div>`;
+
+  openPrintWindow(docShell('Proposal', docNum, docDate, extra, companyBlock(company), body));
+}
+
+// ── PAYMENT INVOICE (exported) ────────────────────────────────────────────────
+
+export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company, bidTotal, invoiceTopText = '', designId = null, designScheme = null, logoUrl = '', userName = '' }) {
+  if (designId) {
+    const scheme = designScheme || 'charcoal-orange';
+    const args = { proposal, payEntry, payIdx, lead, company, bidTotal, logoUrl, userName };
+    return scheme === 'blue-gold' ? printPaymentInvoiceV3(args) : printPaymentInvoiceV2(args);
   }
   const amt    = calcAmt(payEntry, bidTotal);
   const type   = payEntry._type || payEntry.amount_type;
@@ -949,11 +965,13 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
   openPrintWindow(docShell('Invoice', docNum, docDate, '', companyBlock(company), body));
 }
 
-// ── FINAL INVOICE ─────────────────────────────────────────────────────────────
+// ── FINAL INVOICE (exported) ──────────────────────────────────────────────────
 
-export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '', designId = null, logoUrl = '', userName = '' }) {
+export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTotal, balanceDue, invoiceTopText = '', designId = null, designScheme = null, logoUrl = '', userName = '' }) {
   if (designId) {
-    return printFinalInvoiceV2({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl, userName });
+    const scheme = designScheme || 'charcoal-orange';
+    const args = { proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl, userName };
+    return scheme === 'blue-gold' ? printFinalInvoiceV3(args) : printFinalInvoiceV2(args);
   }
   const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
   const docDate = `Date: ${fmtDate(null)}`;

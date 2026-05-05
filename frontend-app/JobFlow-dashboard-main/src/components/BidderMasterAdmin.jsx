@@ -10,7 +10,7 @@ export default function BidderMasterAdmin({ onBack }) {
   const [designs, setDesigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState(null);   // null = list view, 'new' = new form, number = edit
-  const [form, setForm] = useState({ name: '', description: '', template_content: '', is_active: true });
+  const [form, setForm] = useState({ name: '', description: '', color_scheme: 'charcoal-orange', template_content: '', is_active: true });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -34,7 +34,7 @@ export default function BidderMasterAdmin({ onBack }) {
   }
 
   function startNew() {
-    setForm({ name: '', description: '', template_content: '', is_active: true });
+    setForm({ name: '', description: '', color_scheme: 'charcoal-orange', template_content: '', is_active: true });
     setEditId('new');
     setMsg('');
   }
@@ -43,6 +43,7 @@ export default function BidderMasterAdmin({ onBack }) {
     setForm({
       name: design.name,
       description: design.description || '',
+      color_scheme: design.color_scheme || 'charcoal-orange',
       template_content: design.template_content || '',
       is_active: design.is_active,
     });
@@ -124,6 +125,18 @@ export default function BidderMasterAdmin({ onBack }) {
             onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
             placeholder="Optional — shown to company admins when selecting a design"
           />
+        </div>
+
+        <div>
+          <label className={labelCls}>Color Scheme</label>
+          <select
+            className={inputCls}
+            value={form.color_scheme}
+            onChange={(e) => setForm((p) => ({ ...p, color_scheme: e.target.value }))}
+          >
+            <option value="charcoal-orange">Charcoal &amp; Orange</option>
+            <option value="blue-gold">Blue &amp; Gold</option>
+          </select>
         </div>
 
         <div>
