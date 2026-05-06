@@ -81,12 +81,13 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
       setMessages(reversed);
       setHasMore(msgs.length >= limit);
 
-      const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
-      const IG_TYPES = ['IG','TYPE_IG'];
-      const WEBCHAT_TYPES = ['WEBCHAT','TYPE_WEBCHAT','LIVE_CHAT','TYPE_LIVE_CHAT'];
-      const hasFB = msgs.some(m => FB_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
-      const hasIG = msgs.some(m => IG_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
-      const hasWebchat = msgs.some(m => WEBCHAT_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
+      const FB_TYPES = new Set(['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK']);
+      const IG_TYPES = new Set(['IG','TYPE_IG']);
+      const WEBCHAT_TYPES = new Set(['WEBCHAT','TYPE_WEBCHAT','LIVE_CHAT','TYPE_LIVE_CHAT','TYPE_WEB_CHAT','TYPE_CHAT_WIDGET','CHAT_WIDGET']);
+      const msgType = (m) => String(m.messageType || m.type || '').toUpperCase();
+      const hasFB = msgs.some(m => FB_TYPES.has(msgType(m)));
+      const hasIG = msgs.some(m => IG_TYPES.has(msgType(m)));
+      const hasWebchat = msgs.some(m => WEBCHAT_TYPES.has(msgType(m)));
       setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : []), ...(hasWebchat ? ['WEBCHAT'] : [])]);
     } catch (err) {
       console.error("Failed to fetch thread messages:", err);
