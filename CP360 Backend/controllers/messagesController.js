@@ -248,8 +248,16 @@ async function sendMessage(req, res) {
       return res.status(400).json({ error: "Could not resolve contactId for this conversation." });
     }
 
+    // Normalize frontend type values to GHL-accepted send enum values
+    const GHL_TYPE_MAP = {
+      WEBCHAT: "Live_Chat", TYPE_WEBCHAT: "Live_Chat", LIVE_CHAT: "Live_Chat",
+      TYPE_LIVE_CHAT: "Live_Chat", TYPE_WEB_CHAT: "Live_Chat",
+      TYPE_CHAT_WIDGET: "Live_Chat", CHAT_WIDGET: "Live_Chat",
+    };
+    const ghlType = GHL_TYPE_MAP[(type || "").toUpperCase()] || type || "SMS";
+
     const ghlPayload = {
-      type: type || "SMS",
+      type: ghlType,
       conversationId,
       contactId,
       message,
