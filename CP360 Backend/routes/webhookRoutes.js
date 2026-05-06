@@ -17,7 +17,10 @@ router.post('/message-arrived', async (req, res) => {
     const locationId = payload.locationId || payload.location_id;
     const conversationId = payload.conversationId || payload.conversation_id;
 
+    console.log('📨 message-arrived webhook:', { locationId, conversationId, keys: Object.keys(payload) });
+
     if (!locationId || !conversationId) {
+      console.warn('📨 message-arrived: missing fields, full body:', JSON.stringify(payload));
       return res.status(400).json({ error: 'Missing locationId or conversationId' });
     }
 
@@ -38,6 +41,7 @@ router.post('/message-arrived', async (req, res) => {
       [conversationId, companyId]
     );
 
+    console.log('📨 message-arrived: stored update for conversation', conversationId, 'company', companyId);
     res.json({ success: true });
   } catch (error) {
     console.error('Message-arrived webhook error:', error);

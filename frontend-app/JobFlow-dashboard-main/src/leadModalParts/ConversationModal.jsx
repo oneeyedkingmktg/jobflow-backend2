@@ -55,11 +55,10 @@ export default function ConversationModal({ lead, onClose }) {
     fetchConversations();
   }, [lead.id]);
 
-  // Poll for new messages — lightweight timestamp check every 15s, no spinner
+  // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
     if (!conversationId || !companyId) return;
-    const lastKnownAt = { current: null };
-    let initialized = false;
+    const lastKnownAt = { current: undefined };
 
     const poll = async () => {
       try {
@@ -70,14 +69,13 @@ export default function ConversationModal({ lead, onClose }) {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = await res.json();
-        if (!initialized) {
+        if (lastKnownAt.current === undefined) {
+          // First call: capture baseline, don't refresh
           lastKnownAt.current = data.lastMessageAt;
-          initialized = true;
           return;
         }
         if (data.lastMessageAt && data.lastMessageAt !== lastKnownAt.current) {
           lastKnownAt.current = data.lastMessageAt;
-          // Silent refresh — no spinner, preserves scroll position
           try {
             const msgRes = await fetch(
               `${base}/leads/${lead.id}/conversations?limit=20`,
@@ -96,6 +94,8 @@ export default function ConversationModal({ lead, onClose }) {
       } catch { /* ignore */ }
     };
 
+    // Run immediately to capture baseline, then every 15s
+    poll();
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [conversationId, companyId]);

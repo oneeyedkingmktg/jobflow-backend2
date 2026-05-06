@@ -53,25 +53,23 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
     markRead();
   }, [conversation?.id, companyId]);
 
-  // Poll for new messages — lightweight timestamp check every 15s, no spinner
+  // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
     if (!conversation?.id || !companyId) return;
-    const lastKnownAt = { current: null };
-    let initialized = false;
+    const lastKnownAt = { current: undefined };
 
     const poll = async () => {
       try {
         const res = await apiRequest(
           `/api/messages/check-update?conversationId=${conversation.id}&company_id=${companyId}`
         );
-        if (!initialized) {
+        if (lastKnownAt.current === undefined) {
+          // First call: capture baseline, don't refresh
           lastKnownAt.current = res.lastMessageAt;
-          initialized = true;
           return;
         }
         if (res.lastMessageAt && res.lastMessageAt !== lastKnownAt.current) {
           lastKnownAt.current = res.lastMessageAt;
-          // Silent refresh — no spinner, preserves scroll position
           try {
             const msgRes = await apiRequest(
               `/api/messages/${conversation.id}/messages?company_id=${companyId}&limit=20`
@@ -88,6 +86,8 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
       } catch { /* ignore */ }
     };
 
+    // Run immediately to capture baseline, then every 15s
+    poll();
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
   }, [conversation?.id, companyId]);
