@@ -53,6 +53,45 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
     markRead();
   }, [conversation?.id, companyId]);
 
+  // Poll for new messages — lightweight timestamp check every 15s, no spinner
+  useEffect(() => {
+    if (!conversation?.id || !companyId) return;
+    const lastKnownAt = { current: null };
+    let initialized = false;
+
+    const poll = async () => {
+      try {
+        const res = await apiRequest(
+          `/api/messages/check-update?conversationId=${conversation.id}&company_id=${companyId}`
+        );
+        if (!initialized) {
+          lastKnownAt.current = res.lastMessageAt;
+          initialized = true;
+          return;
+        }
+        if (res.lastMessageAt && res.lastMessageAt !== lastKnownAt.current) {
+          lastKnownAt.current = res.lastMessageAt;
+          // Silent refresh — no spinner, preserves scroll position
+          try {
+            const msgRes = await apiRequest(
+              `/api/messages/${conversation.id}/messages?company_id=${companyId}&limit=20`
+            );
+            const msgs = Array.isArray(msgRes?.messages?.messages)
+              ? msgRes.messages.messages
+              : Array.isArray(msgRes?.messages)
+              ? msgRes.messages
+              : [];
+            setMessages([...msgs].reverse());
+            setHasMore(msgs.length >= 20);
+          } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    };
+
+    const interval = setInterval(poll, 15000);
+    return () => clearInterval(interval);
+  }, [conversation?.id, companyId]);
+
   async function markRead() {
     try {
       await apiRequest(`/api/messages/${conversation.id}/read?company_id=${companyId}`, {

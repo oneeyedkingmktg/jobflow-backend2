@@ -337,4 +337,31 @@ let text = null;
   }
 }
 
-module.exports = { getConversations, getThreadMessages, lookupLeadByContact, markAsRead, sendMessage, getRecording, getTranscription };
+// GET /api/messages/check-update?conversationId=X&company_id=Y
+async function checkUpdate(req, res) {
+  try {
+    const { conversationId } = req.query;
+    const companyId = req.query.company_id || req.user?.company_id;
+
+    if (!conversationId || !companyId) {
+      return res.status(400).json({ error: "conversationId and company_id required" });
+    }
+
+    if (req.user.role !== "master" && parseInt(req.user.company_id) !== parseInt(companyId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const result = await pool.query(
+      `SELECT last_message_at FROM conversation_updates
+       WHERE conversation_id = $1 AND company_id = $2`,
+      [conversationId, companyId]
+    );
+
+    res.json({ lastMessageAt: result.rows[0]?.last_message_at || null });
+  } catch (error) {
+    console.error("Error checking conversation update:", error);
+    res.status(500).json({ error: "Failed to check update" });
+  }
+}
+
+module.exports = { getConversations, getThreadMessages, lookupLeadByContact, markAsRead, sendMessage, getRecording, getTranscription, checkUpdate };

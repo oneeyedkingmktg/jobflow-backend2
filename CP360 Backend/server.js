@@ -126,6 +126,11 @@ async function runMigrations() {
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_top_text TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS invoice_top_text TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_domain TEXT`,
+    `CREATE TABLE IF NOT EXISTS conversation_updates (
+      conversation_id TEXT PRIMARY KEY,
+      company_id INTEGER,
+      last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
   ];
   for (const sql of migrations) {
     try { await pool.query(sql); } catch (e) { console.warn('Migration skipped:', e.message); }

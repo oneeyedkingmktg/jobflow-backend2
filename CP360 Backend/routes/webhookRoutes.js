@@ -10,6 +10,41 @@ const verifyGHLWebhook = require('../middleware/verifyGHLWebhook');
 router.post('/ghl/contact', verifyGHLWebhook, webhookController.handleGHLContact);
 router.post('/ghl/calendar', verifyGHLWebhook, calendarWebhookController.handleGHLCalendar);
 
+// Message-arrived — called by GHL automation on any inbound message
+router.post('/message-arrived', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const locationId = payload.locationId || payload.location_id;
+    const conversationId = payload.conversationId || payload.conversation_id;
+
+    if (!locationId || !conversationId) {
+      return res.status(400).json({ error: 'Missing locationId or conversationId' });
+    }
+
+    const result = await pool.query(
+      'SELECT id FROM companies WHERE ghl_location_id = $1',
+      [locationId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    const companyId = result.rows[0].id;
+    await pool.query(
+      `INSERT INTO conversation_updates (conversation_id, company_id, last_message_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (conversation_id)
+       DO UPDATE SET last_message_at = NOW(), company_id = EXCLUDED.company_id`,
+      [conversationId, companyId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Message-arrived webhook error:', error);
+    res.status(500).json({ error: 'Failed to process webhook' });
+  }
+});
+
 // Push notification trigger — called by GHL automations
 router.post('/push', async (req, res) => {
   try {

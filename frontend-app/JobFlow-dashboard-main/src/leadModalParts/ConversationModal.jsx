@@ -55,6 +55,51 @@ export default function ConversationModal({ lead, onClose }) {
     fetchConversations();
   }, [lead.id]);
 
+  // Poll for new messages — lightweight timestamp check every 15s, no spinner
+  useEffect(() => {
+    if (!conversationId || !companyId) return;
+    const lastKnownAt = { current: null };
+    let initialized = false;
+
+    const poll = async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        const base = import.meta.env.VITE_API_URL;
+        const res = await fetch(
+          `${base}/api/messages/check-update?conversationId=${conversationId}&company_id=${companyId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = await res.json();
+        if (!initialized) {
+          lastKnownAt.current = data.lastMessageAt;
+          initialized = true;
+          return;
+        }
+        if (data.lastMessageAt && data.lastMessageAt !== lastKnownAt.current) {
+          lastKnownAt.current = data.lastMessageAt;
+          // Silent refresh — no spinner, preserves scroll position
+          try {
+            const msgRes = await fetch(
+              `${base}/leads/${lead.id}/conversations?limit=20`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const msgData = await msgRes.json();
+            const msgs = Array.isArray(msgData.messages?.messages)
+              ? msgData.messages.messages
+              : Array.isArray(msgData.messages)
+              ? msgData.messages
+              : [];
+            setMessages([...msgs].reverse());
+            setHasMore(msgs.length >= 20);
+          } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    };
+
+    const interval = setInterval(poll, 15000);
+    return () => clearInterval(interval);
+  }, [conversationId, companyId]);
+
   async function fetchConversations(limit = 20) {
     try {
       setLoading(true);
