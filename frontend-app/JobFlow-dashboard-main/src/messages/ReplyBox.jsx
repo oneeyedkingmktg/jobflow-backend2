@@ -11,6 +11,7 @@ const ALL_SEND_TYPES = [
   { value: "SMS",          label: "SMS" },
   { value: "FB",           label: "Facebook" },
   { value: "IG",           label: "Instagram" },
+  { value: "WEBCHAT",      label: "Webchat" },
   { value: "SCHEDULE_SMS", label: "Schedule SMS" },
 ];
 

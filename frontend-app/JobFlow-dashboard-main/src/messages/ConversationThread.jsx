@@ -83,9 +83,11 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
       const FB_TYPES = ['FB','TYPE_FB','FACEBOOK','TYPE_FACEBOOK'];
       const IG_TYPES = ['IG','TYPE_IG'];
+      const WEBCHAT_TYPES = ['WEBCHAT','TYPE_WEBCHAT','LIVE_CHAT','TYPE_LIVE_CHAT'];
       const hasFB = msgs.some(m => FB_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
       const hasIG = msgs.some(m => IG_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
-      setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : [])]);
+      const hasWebchat = msgs.some(m => WEBCHAT_TYPES.includes(String(m.type || m.messageType || '').toUpperCase()));
+      setAvailableTypes(['SMS', ...(hasFB ? ['FB'] : []), ...(hasIG ? ['IG'] : []), ...(hasWebchat ? ['WEBCHAT'] : [])]);
     } catch (err) {
       console.error("Failed to fetch thread messages:", err);
       setError("Could not load messages. Please try again.");
