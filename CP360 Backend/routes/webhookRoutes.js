@@ -13,9 +13,10 @@ router.post('/ghl/calendar', verifyGHLWebhook, calendarWebhookController.handleG
 // Message-arrived — called by GHL automation on any inbound message
 router.post('/message-arrived', async (req, res) => {
   try {
-    const payload = req.body || {};
+    const raw = req.body || {};
+    const payload = raw.customData || raw;
     const locationId = payload.locationId || payload.location_id;
-    const conversationId = payload.conversationId || payload.conversation_id;
+    const conversationId = payload.conversationId || payload.conversation_id || payload.conersationId;
 
     console.log('📨 message-arrived webhook:', { locationId, conversationId, keys: Object.keys(payload) });
 
