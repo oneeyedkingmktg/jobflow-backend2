@@ -1187,7 +1187,7 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: `${company_name ? company_name + ' — ' : ''}${bid_name || 'Proposal Payment'}`,
+            name: bid_name || 'Proposal Payment',
             ...(productDescription ? { description: productDescription } : {}),
           },
           unit_amount: baseCents,

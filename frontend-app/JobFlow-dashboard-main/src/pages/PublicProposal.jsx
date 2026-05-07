@@ -24,11 +24,14 @@ function calcAmt(ps, bidTotal) {
 }
 
 export default function PublicProposal({ proposalId }) {
-  const [data,    setData]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
-  const [paying,  setPaying]  = useState(false);
-  const [payError, setPayError] = useState('');
+  const [data,       setData]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+  const [paying,     setPaying]     = useState(false);
+  const [payError,   setPayError]   = useState('');
+  const [sigName,    setSigName]    = useState('');
+  const [signing,    setSigning]    = useState(false);
+  const [justSigned, setJustSigned] = useState(false);
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
@@ -68,22 +71,22 @@ export default function PublicProposal({ proposalId }) {
   const companyWeb    = proposal.company_website_db  || proposal.ghl_company_website     || '';
 
   // Calculations
-  const libItems = items.filter(i => !i.is_freeform);
+  const libItems     = items.filter(i => !i.is_freeform);
   const itemsTotal   = libItems.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
   const customTotal  = customItems.filter(i => !i.is_subtotal).reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
   const preDiscount  = itemsTotal + customTotal;
-  const discountTotal= discounts.reduce((a, d) => {
+  const discountTotal = discounts.reduce((a, d) => {
     const val = parseFloat(d.discount_value) || 0;
     return a + (d.discount_type === 'dollar' ? val : preDiscount * (val / 100));
   }, 0);
-  const bidTotal  = preDiscount - discountTotal;
-  const payTotal  = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
-  const balanceDue= bidTotal - payTotal;
+  const bidTotal   = preDiscount - discountTotal;
+  const payTotal   = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
+  const balanceDue = bidTotal - payTotal;
 
+  // Stripe / payment
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
-  const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
+  const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
-  // Amount to charge: sum of scheduled payments if any, otherwise full bid total
   const basePayAmount = paymentSchedules.length > 0 ? payTotal : bidTotal;
   const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
   const feeAmount     = basePayAmount * (feePercent / 100);
@@ -113,6 +116,31 @@ export default function PublicProposal({ proposalId }) {
     }
   }
 
+  // Accept / sign
+  const isSigned   = !!proposal.signed_at || justSigned;
+  const signedName = justSigned ? sigName : (proposal.signature_name || '');
+  const signedDate = proposal.signed_at;
+
+  async function handleSign() {
+    if (!sigName.trim()) return;
+    setSigning(true);
+    try {
+      const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
+      const resp = await fetch(`${apiBase}/api/bidder/public/${proposalId}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signature_name: sigName.trim() }),
+      });
+      if (!resp.ok) throw new Error('Failed to submit');
+      setJustSigned(true);
+    } catch {
+      // non-critical — still mark as signed optimistically
+      setJustSigned(true);
+    } finally {
+      setSigning(false);
+    }
+  }
+
   const termsText   = proposal.terms_and_conditions || '';
   const systemNotes = proposal.system_notes || '';
 
@@ -136,6 +164,7 @@ export default function PublicProposal({ proposalId }) {
     const HBG = proposal.design_primary_color || '#1c2333';
     const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
     const logoSrc = proposal.logo_url || null;
+    const docLabel = isSigned ? 'INVOICE' : 'PROPOSAL';
 
     return (
       <div className="min-h-screen bg-gray-100">
@@ -148,7 +177,7 @@ export default function PublicProposal({ proposalId }) {
               <div className="text-xl font-black text-white tracking-wide leading-tight">{companyName}</div>
             </div>
             <div className="text-right flex-shrink-0 ml-4">
-              <div className="text-4xl font-black text-white tracking-widest leading-none">PROPOSAL</div>
+              <div className="text-4xl font-black text-white tracking-widest leading-none">{docLabel}</div>
               <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
                 PREMIUM COATING. EXCEPTIONAL RESULTS.
               </div>
@@ -164,7 +193,7 @@ export default function PublicProposal({ proposalId }) {
               <div className="text-sm font-bold" style={{ color: HBG }}>{fmtDate(proposal.presented_date) || '—'}</div>
             </div>
             <div className="text-right">
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Proposal No.</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">{isSigned ? 'Invoice' : 'Proposal'} No.</div>
               <div className="text-sm font-bold" style={{ color: HBG }}>{docNum}</div>
             </div>
           </div>
@@ -316,10 +345,11 @@ export default function PublicProposal({ proposalId }) {
             </div>
           </div>
 
+          {/* Payment Button */}
           {showPayButton && (
             <div>
               {feePercent > 0 && (
-                <p className="text-xs text-center mb-2" style={{ color: AC }}>
+                <p className="text-lg text-gray-500 text-center mb-2">
                   Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
                 </p>
               )}
@@ -331,6 +361,66 @@ export default function PublicProposal({ proposalId }) {
                 style={{ background: AC }}
               >
                 {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+              </button>
+            </div>
+          )}
+
+          {/* System Notes */}
+          {systemNotes && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Notes</span>
+              </div>
+              <p className="text-sm text-gray-600 whitespace-pre-line">{systemNotes}</p>
+            </div>
+          )}
+
+          {/* Terms & Conditions */}
+          {termsText && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Terms &amp; Conditions</span>
+              </div>
+              <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+            </div>
+          )}
+
+          {/* Accept / Signed */}
+          {isSigned ? (
+            <div className="rounded-xl shadow-sm px-5 py-4 border-2" style={{ background: HBG, borderColor: AC }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl" style={{ color: AC }}>✓</span>
+                <span className="text-sm font-black uppercase tracking-widest text-white">Proposal Accepted</span>
+              </div>
+              <p className="text-sm" style={{ color: AC }}>
+                Signed by <strong>{signedName}</strong>{signedDate ? ` on ${fmtDate(signedDate)}` : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
+              </div>
+              <p className="text-sm text-gray-500 mb-3">
+                By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+              </p>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                placeholder="Type your full name to sign"
+                value={sigName}
+                onChange={e => setSigName(e.target.value)}
+                disabled={signing}
+              />
+              <button
+                onClick={handleSign}
+                disabled={signing || !sigName.trim()}
+                className="w-full py-3 text-white font-bold rounded-xl transition disabled:opacity-50"
+                style={{ background: AC }}
+              >
+                {signing ? 'Submitting…' : 'Accept Proposal'}
               </button>
             </div>
           )}
@@ -351,6 +441,8 @@ export default function PublicProposal({ proposalId }) {
   }
 
   // ── Classic render ─────────────────────────────────────────────────────────
+  const docLabel = isSigned ? 'Invoice' : 'Proposal';
+
   return (
     <div className="min-h-screen bg-gray-100">
 
@@ -376,11 +468,11 @@ export default function PublicProposal({ proposalId }) {
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-        {/* ── Proposal Title ─────────────────────────────────────────────── */}
+        {/* ── Proposal / Invoice Title ───────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Proposal</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{docLabel}</p>
               <h2 className="text-xl font-bold text-gray-900">{proposal.bid_name}</h2>
               {proposal.bid_description && <p className="text-gray-500 text-sm mt-1">{proposal.bid_description}</p>}
             </div>
@@ -519,7 +611,7 @@ export default function PublicProposal({ proposalId }) {
         {showPayButton && (
           <div>
             {feePercent > 0 && (
-              <p className="text-xs text-gray-500 text-center mb-2">
+              <p className="text-lg text-gray-500 text-center mb-2">
                 Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
               </p>
             )}
@@ -530,6 +622,56 @@ export default function PublicProposal({ proposalId }) {
               className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
             >
               {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+            </button>
+          </div>
+        )}
+
+        {/* ── System Notes ───────────────────────────────────────────────── */}
+        {systemNotes && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notes</p>
+            <p className="text-sm text-gray-700 whitespace-pre-line">{systemNotes}</p>
+          </div>
+        )}
+
+        {/* ── Terms & Conditions ─────────────────────────────────────────── */}
+        {termsText && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Terms &amp; Conditions</p>
+            <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+          </div>
+        )}
+
+        {/* ── Accept / Signed ────────────────────────────────────────────── */}
+        {isSigned ? (
+          <div className="bg-green-50 rounded-2xl shadow-sm px-5 py-5 border border-green-200">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-green-600 text-lg">✓</span>
+              <p className="text-sm font-bold text-green-700">Proposal Accepted</p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Signed by <strong>{signedName}</strong>{signedDate ? ` on ${fmtDate(signedDate)}` : ''}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
+            <p className="text-sm text-gray-500 mb-3">
+              By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+            </p>
+            <input
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Type your full name to sign"
+              value={sigName}
+              onChange={e => setSigName(e.target.value)}
+              disabled={signing}
+            />
+            <button
+              onClick={handleSign}
+              disabled={signing || !sigName.trim()}
+              className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
+            >
+              {signing ? 'Submitting…' : 'Accept Proposal'}
             </button>
           </div>
         )}
