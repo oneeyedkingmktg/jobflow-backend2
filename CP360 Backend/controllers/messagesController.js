@@ -357,6 +357,7 @@ async function checkUpdate(req, res) {
       [contactId, companyId]
     );
 
+    res.set('Cache-Control', 'no-store');
     res.json({ lastMessageAt: result.rows[0]?.last_message_at || null });
   } catch (error) {
     console.error("Error checking conversation update:", error);

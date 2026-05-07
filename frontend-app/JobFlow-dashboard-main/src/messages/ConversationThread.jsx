@@ -56,11 +56,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
   // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
     const contactId = conversation?.contactId;
-    console.log('[poll] effect fired — contactId:', contactId, 'companyId:', companyId);
-    if (!contactId || !companyId) {
-      console.warn('[poll] bailing — missing contactId or companyId');
-      return;
-    }
+    if (!contactId || !companyId) return;
     const lastKnownAt = { current: undefined };
 
     const poll = async () => {
@@ -68,13 +64,11 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
         const res = await apiRequest(
           `/api/messages/check-update?contactId=${contactId}&company_id=${companyId}`
         );
-        console.log('[poll] check-update result:', res.lastMessageAt, 'baseline:', lastKnownAt.current);
         if (lastKnownAt.current === undefined) {
           lastKnownAt.current = res.lastMessageAt;
           return;
         }
         if (res.lastMessageAt && res.lastMessageAt !== lastKnownAt.current) {
-          console.log('[poll] NEW MESSAGE detected — refreshing thread');
           lastKnownAt.current = res.lastMessageAt;
           try {
             const msgRes = await apiRequest(
