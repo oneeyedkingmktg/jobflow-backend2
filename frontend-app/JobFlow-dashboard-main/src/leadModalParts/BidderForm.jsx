@@ -817,8 +817,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Payment invoice rows */}
                 {paySchedule.map((ps, idx) => {
                   const invNum = idx + 1;
-                  const isLast = idx === paySchedule.length - 1;
-                  const invSuffix = isLast && paySchedule.length > 1 ? 'F' : String(invNum);
+                  const invSuffix = String(invNum);
                   const invLabel = `INV-${String(proposalId + 121).padStart(4, '0')}-${invSuffix}`;
                   return (
                     <div key={ps.id} className="flex gap-2">
@@ -848,7 +847,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       🧾 Final Invoice ({fmt(balanceDue)})
                     </button>
                     <button
-                      onClick={() => openEmailModal('invoice', 'F')}
+                      onClick={() => openEmailModal('invoice', String(paySchedule.length + 1))}
                       disabled={emailSending}
                       className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
                     >

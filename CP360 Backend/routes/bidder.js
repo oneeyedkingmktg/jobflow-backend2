@@ -1075,11 +1075,8 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       );
       const schedules = schedResult.rows;
       const total = schedules.length;
-      const idx = invoiceNum === 'F'
-        ? Math.max(0, total - 1)
-        : Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, total - 1 || 0));
-      const isLast   = total > 1 && idx === total - 1;
-      const suffix   = isLast ? 'F' : (total <= 1 ? '1' : String(idx + 1));
+      const idx    = Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, total - 1 || 0));
+      const suffix = String(idx + 1);
       const entry    = schedules[idx];
       const bidTotal = parseFloat(row.bid_total) || 0;
       const payAmt   = entry

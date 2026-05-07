@@ -94,11 +94,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
 
   // Resolve which payment schedule entry this invoice is for
   const totalInvoices = paymentSchedules.length;
-  const invoiceIndex  = invoiceNum === 'F'
-    ? Math.max(0, totalInvoices - 1)
-    : Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, totalInvoices - 1 || 0));
-  const isLastInvoice = totalInvoices > 1 && invoiceIndex === totalInvoices - 1;
-  const invSuffix     = isLastInvoice ? 'F' : (totalInvoices <= 1 ? '1' : String(invoiceIndex + 1));
+  const invoiceIndex  = Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, totalInvoices - 1 || 0));
+  const invSuffix     = String(invoiceIndex + 1);
 
   const payEntry      = paymentSchedules[invoiceIndex] || null;
   const basePayAmount = payEntry ? calcAmt(payEntry, bidTotal) : bidTotal;
