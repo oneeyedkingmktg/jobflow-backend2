@@ -8,6 +8,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { sendProposalAcceptedEmails, sendProposalLinkEmail } = require('../services/email');
+const Stripe = require('stripe');
 
 // Default library items seeded for new companies
 const DEFAULT_LIBRARY = [
@@ -729,7 +730,11 @@ router.get('/company-settings', async (req, res) => {
       );
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    // Never expose the secret key — send a boolean so the UI knows if one is saved
+    const { stripe_secret_key, ...safeRow } = row;
+    safeRow.stripe_secret_key_saved = !!stripe_secret_key;
+    res.json(safeRow);
   } catch (err) {
     console.error('GET /bidder/company-settings error:', err);
     res.status(500).json({ error: 'Failed to fetch company settings' });
@@ -741,17 +746,23 @@ router.put('/company-settings', async (req, res) => {
   try {
     const companyId = req.user.company_id;
     const {
-      default_payment_url, include_payment_button, down_payment_default_percent,
+      stripe_publishable_key, stripe_secret_key,
+      include_payment_button, down_payment_default_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
       proposal_domain, logo_url,
     } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO bidder_company_settings (company_id, default_payment_url, include_payment_button, down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions, system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text, proposal_domain, logo_url, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+      `INSERT INTO bidder_company_settings
+         (company_id, stripe_publishable_key, stripe_secret_key, include_payment_button,
+          down_payment_default_percent, preferred_proposal_design_id, terms_and_conditions,
+          system_notes, email_from_name, email_from_email, proposal_top_text, invoice_top_text,
+          proposal_domain, logo_url, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
-         default_payment_url = EXCLUDED.default_payment_url,
+         stripe_publishable_key = EXCLUDED.stripe_publishable_key,
+         stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
          include_payment_button = EXCLUDED.include_payment_button,
          down_payment_default_percent = EXCLUDED.down_payment_default_percent,
          preferred_proposal_design_id = EXCLUDED.preferred_proposal_design_id,
@@ -766,7 +777,9 @@ router.put('/company-settings', async (req, res) => {
          updated_at = NOW()
        RETURNING *`,
       [
-        companyId, clean(default_payment_url), include_payment_button,
+        companyId, clean(stripe_publishable_key),
+        stripe_secret_key ? stripe_secret_key.trim() : null,
+        include_payment_button,
         down_payment_default_percent, clean(preferred_proposal_design_id),
         clean(terms_and_conditions), clean(system_notes),
         clean(email_from_name), clean(email_from_email),
@@ -954,7 +967,7 @@ router.get('/public/:id', async (req, res) => {
               c.ghl_company_state, c.ghl_company_zip,
               bcs.terms_and_conditions, bcs.system_notes,
               bcs.include_payment_button as company_include_payment_button,
-              bcs.default_payment_url as company_payment_url,
+              bcs.stripe_publishable_key as company_stripe_publishable_key,
               bcs.preferred_proposal_design_id, bcs.logo_url,
               u.name AS created_by_name,
               COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
@@ -1126,6 +1139,50 @@ router.post('/public/:id/accept', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/accept error:', err);
     res.status(500).json({ error: 'Failed to record signature' });
+  }
+});
+
+// POST /api/bidder/public/:id/stripe-checkout — create Stripe Checkout Session for a proposal
+router.post('/public/:id/stripe-checkout', async (req, res) => {
+  try {
+    const { amount_cents, success_url, cancel_url } = req.body;
+    if (!amount_cents || amount_cents <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Look up the company's Stripe secret key via the proposal
+    const result = await pool.query(
+      `SELECT bcs.stripe_secret_key, bp.bid_name
+       FROM bidder_proposals bp
+       JOIN bidder_company_settings bcs ON bcs.company_id = bp.company_id
+       WHERE bp.id = $1`,
+      [req.params.id]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+    const { stripe_secret_key, bid_name } = result.rows[0];
+    if (!stripe_secret_key) return res.status(400).json({ error: 'Stripe is not configured for this account' });
+
+    const stripe = Stripe(stripe_secret_key);
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: bid_name || 'Proposal Payment' },
+          unit_amount: Math.round(amount_cents),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: success_url || `${process.env.APP_URL}/proposal/${req.params.id}?payment=success`,
+      cancel_url:  cancel_url  || `${process.env.APP_URL}/proposal/${req.params.id}`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('POST /bidder/public/:id/stripe-checkout error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create checkout session' });
   }
 });
 

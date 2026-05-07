@@ -98,7 +98,9 @@ export default function BidderAdminSettings({ companyId }) {
       const data = await BidderAPI.getCompanySettings(companyId);
       setSettings(data);
       setSettingsForm({
-        default_payment_url: data.default_payment_url || '',
+        stripe_publishable_key: data.stripe_publishable_key || '',
+        stripe_secret_key: '',
+        stripe_secret_key_saved: data.stripe_secret_key_saved || false,
         include_payment_button: data.include_payment_button ?? true,
         down_payment_default_percent: data.down_payment_default_percent ?? 50,
         preferred_proposal_design_id: data.preferred_proposal_design_id || '',
@@ -266,12 +268,16 @@ export default function BidderAdminSettings({ companyId }) {
     setSettingsSaving(true);
     setSettingsMsg('');
     try {
-      await BidderAPI.updateCompanySettings({
+      const payload = {
         ...settingsForm,
         down_payment_default_percent: parseFloat(settingsForm.down_payment_default_percent) || 50,
         preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
         proposal_domain: settingsForm.proposal_domain.trim() || null,
-      }, companyId);
+      };
+      // Don't overwrite a saved secret key if the field was left blank
+      if (!payload.stripe_secret_key) delete payload.stripe_secret_key;
+      delete payload.stripe_secret_key_saved;
+      await BidderAPI.updateCompanySettings(payload, companyId);
       setSettingsMsg('Saved');
       setTimeout(() => setSettingsMsg(''), 3000);
     } catch (e) {
@@ -515,14 +521,25 @@ export default function BidderAdminSettings({ companyId }) {
           <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Payment</h3>
           <div className="space-y-3">
             <div>
-              <label className={labelCls}>Default Payment URL</label>
+              <label className={labelCls}>Stripe Publishable Key</label>
               <input
                 className={inputCls}
-                value={settingsForm.default_payment_url}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, default_payment_url: e.target.value }))}
-                placeholder="https://pay.example.com/your-link"
+                value={settingsForm.stripe_publishable_key}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_publishable_key: e.target.value.trim() }))}
+                placeholder="pk_live_..."
               />
-              <p className="text-xs text-gray-400 mt-1">This URL appears on the web proposal as the payment button link. Can be overridden per bid.</p>
+              <p className="text-xs text-gray-400 mt-1">Your Stripe publishable key — starts with <code>pk_live_</code> or <code>pk_test_</code>.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Stripe Secret Key</label>
+              <input
+                className={inputCls}
+                type="password"
+                value={settingsForm.stripe_secret_key}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_secret_key: e.target.value.trim() }))}
+                placeholder={settingsForm.stripe_secret_key_saved ? '••••••••  (saved — paste new key to replace)' : 'sk_live_...'}
+              />
+              <p className="text-xs text-gray-400 mt-1">Your Stripe secret key — stored securely. Never shared with customers.</p>
             </div>
             <label className="flex items-center gap-3 cursor-pointer">
               <input

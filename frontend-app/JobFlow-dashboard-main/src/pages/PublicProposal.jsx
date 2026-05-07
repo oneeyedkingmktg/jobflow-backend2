@@ -27,6 +27,8 @@ export default function PublicProposal({ proposalId }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
+  const [paying,  setPaying]  = useState(false);
+  const [payError, setPayError] = useState('');
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
@@ -78,9 +80,31 @@ export default function PublicProposal({ proposalId }) {
   const payTotal  = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
   const balanceDue= bidTotal - payTotal;
 
-  const rawPayUrl = (proposal.payment_url || proposal.company_payment_url || '').trim();
-  const payUrl = rawPayUrl && !rawPayUrl.startsWith('http') ? `https://${rawPayUrl}` : rawPayUrl;
-  const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && payUrl;
+  const stripeConfigured = !!(proposal.company_stripe_publishable_key);
+  const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
+
+  async function handleStripePayment(amountDollars) {
+    setPayError('');
+    setPaying(true);
+    try {
+      const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
+      const resp = await fetch(`${apiBase}/api/bidder/public/${proposalId}/stripe-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount_cents: Math.round(amountDollars * 100),
+          success_url: window.location.href + '?payment=success',
+          cancel_url:  window.location.href,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || 'Payment setup failed');
+      window.location.href = json.url;
+    } catch (e) {
+      setPayError(e.message || 'Unable to start payment. Please try again.');
+      setPaying(false);
+    }
+  }
 
   const termsText   = proposal.terms_and_conditions || '';
   const systemNotes = proposal.system_notes || '';
@@ -286,12 +310,17 @@ export default function PublicProposal({ proposalId }) {
           </div>
 
           {showPayButton && (
-            <a href={payUrl} target="_blank" rel="noopener noreferrer"
-              className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition"
-              style={{ background: AC }}
-            >
-              Make Your Payment
-            </a>
+            <div>
+              {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+              <button
+                onClick={() => handleStripePayment(bidTotal)}
+                disabled={paying}
+                className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
+                style={{ background: AC }}
+              >
+                {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+              </button>
+            </div>
           )}
 
         </div>
@@ -476,14 +505,16 @@ export default function PublicProposal({ proposalId }) {
 
         {/* ── Payment Button ─────────────────────────────────────────────── */}
         {showPayButton && (
-          <a
-            href={payUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow"
-          >
-            Make Your Payment
-          </a>
+          <div>
+            {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+            <button
+              onClick={() => handleStripePayment(bidTotal)}
+              disabled={paying}
+              className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
+            >
+              {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+            </button>
+          </div>
         )}
 
         <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
