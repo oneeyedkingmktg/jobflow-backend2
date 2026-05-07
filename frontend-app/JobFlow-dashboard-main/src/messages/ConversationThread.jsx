@@ -55,20 +55,26 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
   // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
-    if (!conversation?.contactId || !companyId) return;
+    const contactId = conversation?.contactId;
+    console.log('[poll] effect fired — contactId:', contactId, 'companyId:', companyId);
+    if (!contactId || !companyId) {
+      console.warn('[poll] bailing — missing contactId or companyId');
+      return;
+    }
     const lastKnownAt = { current: undefined };
 
     const poll = async () => {
       try {
         const res = await apiRequest(
-          `/api/messages/check-update?contactId=${conversation.contactId}&company_id=${companyId}`
+          `/api/messages/check-update?contactId=${contactId}&company_id=${companyId}`
         );
+        console.log('[poll] check-update result:', res.lastMessageAt, 'baseline:', lastKnownAt.current);
         if (lastKnownAt.current === undefined) {
-          // First call: capture baseline, don't refresh
           lastKnownAt.current = res.lastMessageAt;
           return;
         }
         if (res.lastMessageAt && res.lastMessageAt !== lastKnownAt.current) {
+          console.log('[poll] NEW MESSAGE detected — refreshing thread');
           lastKnownAt.current = res.lastMessageAt;
           try {
             const msgRes = await apiRequest(
@@ -86,7 +92,6 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
       } catch { /* ignore */ }
     };
 
-    // Run immediately to capture baseline, then every 15s
     poll();
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
