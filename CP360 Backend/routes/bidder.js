@@ -1060,24 +1060,53 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
     const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_primary_color || '#1c2333')
-      : null;
-    const accentColor = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_accent_color || '#f97316')
-      : null;
+      ? (row.design_primary_color || '#1c2333') : null;
+    const accentColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_accent_color || '#f97316') : null;
+
+    // For invoice emails, fetch the specific payment schedule entry
+    let invoiceLabel = null;
+    let payDescription = null;
+    let payAmountStr = null;
+    if (emailType === 'invoice' && invoiceNum) {
+      const schedResult = await pool.query(
+        'SELECT * FROM bidder_payment_schedules WHERE proposal_id = $1 ORDER BY sort_order, id',
+        [req.params.id]
+      );
+      const schedules = schedResult.rows;
+      const total = schedules.length;
+      const idx = invoiceNum === 'F'
+        ? Math.max(0, total - 1)
+        : Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, total - 1 || 0));
+      const isLast   = total > 1 && idx === total - 1;
+      const suffix   = isLast ? 'F' : (total <= 1 ? '1' : String(idx + 1));
+      const entry    = schedules[idx];
+      const bidTotal = parseFloat(row.bid_total) || 0;
+      const payAmt   = entry
+        ? (entry.amount_type === 'dollar'
+            ? parseFloat(entry.amount_value) || 0
+            : bidTotal * ((parseFloat(entry.amount_value) || 0) / 100))
+        : bidTotal;
+      invoiceLabel   = `INV-${String(parseInt(req.params.id, 10) + 121).padStart(4, '0')}-${suffix}`;
+      payDescription = entry?.description || null;
+      payAmountStr   = `$${payAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
 
     await sendProposalLinkEmail({
       toEmail,
       customerName,
       companyName,
-      bidName:   row.bid_name,
-      bidTotal:  row.bid_total,
+      bidName:      row.bid_name,
+      bidTotal:     row.bid_total,
       proposalUrl,
       fromName,
       fromEmail,
       emailType,
       primaryColor,
       accentColor,
+      invoiceLabel,
+      payDescription,
+      payAmountStr,
     });
 
     res.json({ success: true, sentTo: toEmail });

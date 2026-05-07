@@ -97,22 +97,23 @@ async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, 
   }
 }
 
-async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidName, bidTotal, proposalUrl, fromName, fromEmail, emailType, primaryColor = null, accentColor = null }) {
-  const totalStr = `$${(parseFloat(bidTotal) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidName, bidTotal, proposalUrl, fromName, fromEmail, emailType, primaryColor = null, accentColor = null, invoiceLabel = null, payDescription = null, payAmountStr = null }) {
+  const totalStr = payAmountStr || `$${(parseFloat(bidTotal) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const displayName = fromName || companyName || 'CoatingPro360';
   const senderEmail = fromEmail || process.env.SMTP_USER || process.env.EMAIL_FROM;
   const fromHeader  = `"${displayName}" <${senderEmail}>`;
 
-  const isInvoice = emailType === 'invoice';
-  const subject   = isInvoice
-    ? `Your Invoice from ${displayName} — ${bidName}`
+  const isInvoice   = emailType === 'invoice';
+  const docLabel    = isInvoice ? (invoiceLabel || 'Invoice') : 'Proposal';
+  const lineTitle   = isInvoice ? (payDescription || bidName) : bidName;
+  const subject     = isInvoice
+    ? `${invoiceLabel ? invoiceLabel + ' — ' : ''}Invoice from ${displayName}`
     : `Your Proposal from ${displayName} is Ready`;
-  const preheader = isInvoice
-    ? `Your invoice from ${displayName} for ${bidName} is ready.`
+  const preheader   = isInvoice
+    ? `Invoice from ${displayName}${payDescription ? ' — ' + payDescription : ''} ${totalStr}`
     : `Your proposal from ${displayName} is ready to review.`;
-  const docLabel  = isInvoice ? 'Invoice' : 'Proposal';
-  const btnText   = isInvoice ? 'View Your Invoice' : 'View Your Proposal';
+  const btnText     = isInvoice ? 'View Your Invoice' : 'View Your Proposal';
 
   let html;
 
@@ -139,13 +140,13 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
         ? `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Your invoice is ready. Click the button below to view and pay online.</p>`
         : `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Your proposal is ready to review. Click the button below to view the full details.</p>`,
 
-      // Bid card
+      // Bid / Invoice card
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border:2px solid ${HBG};border-radius:6px">`,
       `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
-      `<p style="margin:0;font-size:10px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">${docLabel}</p>`,
+      `<p style="margin:0;font-size:11px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">${docLabel}</p>`,
       `</td></tr>`,
       `<tr><td style="padding:16px">`,
-      `<p style="margin:0 0 6px;font-size:17px;font-weight:bold;color:${HBG};font-family:Arial,sans-serif">${bidName}</p>`,
+      `<p style="margin:0 0 6px;font-size:17px;font-weight:bold;color:${HBG};font-family:Arial,sans-serif">${lineTitle}</p>`,
       `<p style="margin:0;font-size:26px;font-weight:900;color:${HBG};font-family:Arial,sans-serif">${totalStr}</p>`,
       `</td></tr></table>`,
 
@@ -183,7 +184,7 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">`,
       `<tr><td bgcolor="#ffffff" style="border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px">`,
       `<p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:bold;font-family:Arial,sans-serif">${docLabel}</p>`,
-      `<p style="margin:0 0 8px;font-size:18px;font-weight:bold;color:#111;font-family:Arial,sans-serif">${bidName}</p>`,
+      `<p style="margin:0 0 8px;font-size:18px;font-weight:bold;color:#111;font-family:Arial,sans-serif">${lineTitle}</p>`,
       `<p style="margin:0;font-size:22px;font-weight:bold;color:#1d4ed8;font-family:Arial,sans-serif">${totalStr}</p>`,
       `</td></tr></table>`,
       `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
