@@ -1049,6 +1049,7 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
 
     const companyName  = row.ghl_company_from_name || row.company_db_name || '';
     const customerName = row.lead_name || row.lead_name_short || '';
+    const emailType    = req.body.type || 'proposal';
     const baseUrl      = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
@@ -1057,7 +1058,6 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       : `${baseUrl}/proposal/${req.params.id}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
-    const emailType    = req.body.type || 'proposal';
     const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
       ? (row.design_primary_color || '#1c2333')
       : null;
