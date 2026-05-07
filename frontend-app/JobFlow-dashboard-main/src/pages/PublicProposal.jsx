@@ -29,7 +29,7 @@ function calcAmt(ps, bidTotal) {
   return ps.amount_type === 'dollar' ? val : bidTotal * (val / 100);
 }
 
-export default function PublicProposal({ proposalId, forceView }) {
+export default function PublicProposal({ proposalId, forceView, invoiceNum = '1' }) {
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
@@ -92,15 +92,22 @@ export default function PublicProposal({ proposalId, forceView }) {
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
   const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
-  // Invoice payment entry = first schedule entry, or full bid total
-  const payEntry      = paymentSchedules[0] || null;
+  // Resolve which payment schedule entry this invoice is for
+  const totalInvoices = paymentSchedules.length;
+  const invoiceIndex  = invoiceNum === 'F'
+    ? Math.max(0, totalInvoices - 1)
+    : Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, totalInvoices - 1 || 0));
+  const isLastInvoice = totalInvoices > 1 && invoiceIndex === totalInvoices - 1;
+  const invSuffix     = isLastInvoice ? 'F' : (totalInvoices <= 1 ? '1' : String(invoiceIndex + 1));
+
+  const payEntry      = paymentSchedules[invoiceIndex] || null;
   const basePayAmount = payEntry ? calcAmt(payEntry, bidTotal) : bidTotal;
   const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
   const feeAmount     = basePayAmount * (feePercent / 100);
   const totalWithFee  = basePayAmount + feeAmount;
 
   // Invoice metadata
-  const invNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-1`;
+  const invNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-${invSuffix}`;
   const invDate = fmtDate(proposal.signed_at) || todayStr();
   const payLabel  = payEntry?.description || 'Full Payment';
   const payDetail = payEntry?.amount_type === 'percent'
@@ -118,7 +125,7 @@ export default function PublicProposal({ proposalId, forceView }) {
         body: JSON.stringify({
           base_amount_cents: Math.round(basePayAmount * 100),
           convenience_fee_percent: feePercent,
-          success_url: `${window.location.origin}/payment-success/${proposalId}?amount=${Math.round(totalWithFee * 100)}&label=${encodeURIComponent(payLabel)}`,
+          success_url: `${window.location.origin}/payment-success/${proposalId}?amount=${Math.round(totalWithFee * 100)}&label=${encodeURIComponent(payLabel)}&inv=${invSuffix}`,
           cancel_url:  window.location.href,
         }),
       });
@@ -148,8 +155,9 @@ export default function PublicProposal({ proposalId, forceView }) {
   }
 
   // Invoice route always shows invoice; proposal route always shows proposal
-  const isSigned     = forceView === 'invoice';
-  const isPaid       = !!proposal.paid_at;
+  const isSigned      = forceView === 'invoice';
+  const paidNums      = (proposal.paid_invoice_nums || '').split(',').filter(Boolean);
+  const isPaid        = paidNums.includes(invSuffix) || paidNums.includes(String(invoiceIndex + 1));
   const alreadySigned = !!proposal.signed_at || justSigned;
   const invoiceUrl   = `${window.location.origin}/invoice/${proposalId}`;
   const termsText    = proposal.terms_and_conditions || '';

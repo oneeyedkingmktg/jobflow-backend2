@@ -292,10 +292,10 @@ export default function App() {
     return <ErrorBoundary><PaymentSuccess proposalId={paySuccessMatch[1]} /></ErrorBoundary>;
   }
 
-  // Public invoice page — no auth required
-  const invoiceMatch = window.location.pathname.match(/^\/invoice\/(\d+)$/);
+  // Public invoice page — /invoice/:id or /invoice/:id/:num (1, 2, F, etc.)
+  const invoiceMatch = window.location.pathname.match(/^\/invoice\/(\d+)(?:\/([^/]+))?$/);
   if (invoiceMatch) {
-    return <ErrorBoundary><PublicProposal proposalId={invoiceMatch[1]} forceView="invoice" /></ErrorBoundary>;
+    return <ErrorBoundary><PublicProposal proposalId={invoiceMatch[1]} forceView="invoice" invoiceNum={invoiceMatch[2] || '1'} /></ErrorBoundary>;
   }
 
   // Public proposal page — no auth required

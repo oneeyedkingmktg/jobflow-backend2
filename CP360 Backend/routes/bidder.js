@@ -1050,11 +1050,12 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const companyName  = row.ghl_company_from_name || row.company_db_name || '';
     const customerName = row.lead_name || row.lead_name_short || '';
     const emailType    = req.body.type || 'proposal';
+    const invoiceNum   = req.body.invoice_num ? String(req.body.invoice_num) : null;
     const baseUrl      = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
     const proposalUrl  = emailType === 'invoice'
-      ? `${baseUrl}/invoice/${req.params.id}`
+      ? `${baseUrl}/invoice/${req.params.id}${invoiceNum ? `/${invoiceNum}` : ''}`
       : `${baseUrl}/proposal/${req.params.id}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
@@ -1228,7 +1229,7 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
 // POST /api/bidder/public/:id/payment-received — called from payment success page; sends confirmation emails
 router.post('/public/:id/payment-received', async (req, res) => {
   try {
-    const { amount_cents = 0, pay_label = 'Payment' } = req.body;
+    const { amount_cents = 0, pay_label = 'Payment', invoice_num = '1' } = req.body;
     const amountStr = `$${(amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const result = await pool.query(
@@ -1252,10 +1253,17 @@ router.post('/public/:id/payment-received', async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // Stamp paid_at (idempotent — only sets if not already set)
+    // Stamp paid_at on first payment; append invoice_num to paid_invoice_nums
     await pool.query(
-      `UPDATE bidder_proposals SET paid_at = NOW() WHERE id = $1 AND paid_at IS NULL`,
-      [req.params.id]
+      `UPDATE bidder_proposals
+       SET paid_at = COALESCE(paid_at, NOW()),
+           paid_invoice_nums = CASE
+             WHEN paid_invoice_nums = '' OR paid_invoice_nums IS NULL THEN $2
+             WHEN paid_invoice_nums NOT LIKE '%' || $2 || '%' THEN paid_invoice_nums || ',' || $2
+             ELSE paid_invoice_nums
+           END
+       WHERE id = $1`,
+      [req.params.id, String(invoice_num)]
     );
 
     const row = result.rows[0];

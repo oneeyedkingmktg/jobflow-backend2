@@ -56,7 +56,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [companySettings,  setCompanySettings]  = useState(null);
   const [emailSending,     setEmailSending]     = useState(false);
   const [emailMsg,         setEmailMsg]         = useState('');
-  const [emailModal,       setEmailModal]       = useState({ show: false, addr: '', type: 'proposal' });
+  const [emailModal,       setEmailModal]       = useState({ show: false, addr: '', type: 'proposal', invoiceNum: null });
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -334,19 +334,19 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   }
 
   // ── Send proposal email ───────────────────────────────────────────────
-  function openEmailModal(type) {
+  function openEmailModal(type, invoiceNum = null) {
     setEmailMsg('');
-    setEmailModal({ show: true, addr: lead.email || '', type });
+    setEmailModal({ show: true, addr: lead.email || '', type, invoiceNum });
   }
 
   async function handleSendEmail() {
-    const { addr, type } = emailModal;
+    const { addr, type, invoiceNum } = emailModal;
     if (!addr.trim()) { setEmailMsg('Please enter an email address'); return; }
     setEmailModal(prev => ({ ...prev, show: false }));
     setEmailSending(true);
     setEmailMsg('');
     try {
-      const result = await BidderAPI.sendProposalEmail(proposalId, addr.trim(), type);
+      const result = await BidderAPI.sendProposalEmail(proposalId, addr.trim(), type, invoiceNum);
       setEmailMsg(`Sent to ${result.sentTo}`);
     } catch (e) {
       setEmailMsg(e.message || 'Failed to send');
@@ -815,39 +815,47 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   </p>
                 )}
                 {/* Payment invoice rows */}
-                {paySchedule.map((ps, idx) => (
-                  <div key={ps.id} className="flex gap-2">
+                {paySchedule.map((ps, idx) => {
+                  const invNum = idx + 1;
+                  const isLast = idx === paySchedule.length - 1;
+                  const invSuffix = isLast && paySchedule.length > 1 ? 'F' : String(invNum);
+                  const invLabel = `INV-${String(proposalId + 121).padStart(4, '0')}-${invSuffix}`;
+                  return (
+                    <div key={ps.id} className="flex gap-2">
+                      <button
+                        onClick={() => printPaymentInvoice({ ...printData, payEntry: ps, payIdx: idx })}
+                        className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
+                      >
+                        🧾 {invLabel} — {ps._desc || `Payment ${invNum}`} ({fmt(calcPayAmt(ps))})
+                      </button>
+                      <button
+                        onClick={() => openEmailModal('invoice', invSuffix)}
+                        disabled={emailSending}
+                        className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
+                      >
+                        {emailSending ? '…' : '✉ Email'}
+                      </button>
+                    </div>
+                  );
+                })}
+                {/* Final invoice row — balance not covered by schedule */}
+                {balanceDue > 0.009 && (
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => printPaymentInvoice({ ...printData, payEntry: ps, payIdx: idx })}
+                      onClick={() => printFinalInvoice(printData)}
                       className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                     >
-                      🧾 Invoice — {ps._desc || `Payment ${idx + 1}`} ({fmt(calcPayAmt(ps))})
+                      🧾 Final Invoice ({fmt(balanceDue)})
                     </button>
                     <button
-                      onClick={() => openEmailModal('invoice')}
+                      onClick={() => openEmailModal('invoice', 'F')}
                       disabled={emailSending}
                       className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
                     >
                       {emailSending ? '…' : '✉ Email'}
                     </button>
                   </div>
-                ))}
-                {/* Final invoice row */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => printFinalInvoice(printData)}
-                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
-                  >
-                    🧾 Final Invoice ({fmt(balanceDue)})
-                  </button>
-                  <button
-                    onClick={() => openEmailModal('invoice')}
-                    disabled={emailSending}
-                    className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
-                  >
-                    {emailSending ? '…' : '✉ Email'}
-                  </button>
-                </div>
+                )}
               </div>
               <div className="px-6 pb-4 border-t pt-3">
                 <p className="text-xs text-gray-400 text-center">Print opens a preview — use Print → Save as PDF</p>
@@ -863,7 +871,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-gray-800">
-                {emailModal.type === 'invoice' ? 'Email Invoice' : 'Email Proposal'}
+                {emailModal.type === 'invoice'
+                  ? `Email Invoice${emailModal.invoiceNum ? ` (INV-${String(proposalId + 121).padStart(4, '0')}-${emailModal.invoiceNum})` : ''}`
+                  : 'Email Proposal'}
               </h3>
               <button onClick={() => setEmailModal(prev => ({ ...prev, show: false }))} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>

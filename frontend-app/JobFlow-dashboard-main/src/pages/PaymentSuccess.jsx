@@ -8,9 +8,10 @@ function fmt(cents) {
 export default function PaymentSuccess({ proposalId }) {
   const [data, setData] = useState(null);
 
-  const params     = new URLSearchParams(window.location.search);
+  const params      = new URLSearchParams(window.location.search);
   const amountCents = params.get('amount') || '0';
-  const payLabel   = params.get('label') || 'Payment';
+  const payLabel    = params.get('label') || 'Payment';
+  const invoiceNum  = params.get('inv') || '1';
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
@@ -20,13 +21,13 @@ export default function PaymentSuccess({ proposalId }) {
       .then(d => setData(d))
       .catch(() => {});
 
-    // Send confirmation emails once per session
-    const emailKey = `pay_email_${proposalId}_${amountCents}`;
+    // Send confirmation emails once per session per invoice
+    const emailKey = `pay_email_${proposalId}_${invoiceNum}`;
     if (!sessionStorage.getItem(emailKey)) {
       fetch(`${apiBase}/api/bidder/public/${proposalId}/payment-received`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_cents: parseInt(amountCents, 10), pay_label: payLabel }),
+        body: JSON.stringify({ amount_cents: parseInt(amountCents, 10), pay_label: payLabel, invoice_num: invoiceNum }),
       })
         .then(() => sessionStorage.setItem(emailKey, '1'))
         .catch(() => {});

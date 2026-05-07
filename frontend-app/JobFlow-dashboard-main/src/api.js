@@ -266,8 +266,8 @@ export const BidderAPI = {
   getPublicProposal: (id) => apiRequest(`/api/bidder/public/${id}`),
 
   // Send proposal link email to customer
-  sendProposalEmail: (id, email, type) => apiRequest(`/api/bidder/proposal/${id}/send-email`, {
+  sendProposalEmail: (id, email, type, invoiceNum = null) => apiRequest(`/api/bidder/proposal/${id}/send-email`, {
     method: 'POST',
-    body: JSON.stringify({ ...(email ? { email } : {}), ...(type ? { type } : {}) }),
+    body: JSON.stringify({ ...(email ? { email } : {}), ...(type ? { type } : {}), ...(invoiceNum !== null ? { invoice_num: invoiceNum } : {}) }),
   }),
 };
