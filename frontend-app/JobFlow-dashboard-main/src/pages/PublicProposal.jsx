@@ -29,7 +29,7 @@ function calcAmt(ps, bidTotal) {
   return ps.amount_type === 'dollar' ? val : bidTotal * (val / 100);
 }
 
-export default function PublicProposal({ proposalId }) {
+export default function PublicProposal({ proposalId, forceView }) {
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
@@ -147,10 +147,13 @@ export default function PublicProposal({ proposalId }) {
     }
   }
 
-  const isSigned   = !!proposal.signed_at || justSigned;
-  const termsText  = proposal.terms_and_conditions || '';
-  const systemNotes = proposal.system_notes || '';
-  const designId   = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
+  // Invoice route always shows invoice; proposal route always shows proposal
+  const isSigned     = forceView === 'invoice';
+  const alreadySigned = !!proposal.signed_at || justSigned;
+  const invoiceUrl   = `${window.location.origin}/invoice/${proposalId}`;
+  const termsText    = proposal.terms_and_conditions || '';
+  const systemNotes  = proposal.system_notes || '';
+  const designId     = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
 
   // Pre-sort items for proposal view
   const allSortedItems = [
@@ -638,31 +641,45 @@ export default function PublicProposal({ proposalId }) {
             </div>
           )}
 
-          {/* Accept */}
-          <div className="bg-white rounded-xl shadow-sm px-5 py-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
-              <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
+          {/* Accept / Invoice Link */}
+          {alreadySigned ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm px-5 py-5 text-center">
+              <p className="font-bold text-green-700 text-base mb-1">✓ Proposal Accepted</p>
+              <p className="text-sm text-green-600 mb-4">Thank you! Your proposal has been accepted.</p>
+              <a
+                href={invoiceUrl}
+                className="block w-full py-3 text-white font-bold rounded-xl text-center transition"
+                style={{ background: AC }}
+              >
+                View Invoice
+              </a>
             </div>
-            <p className="text-sm text-gray-500 mb-3">
-              By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
-            </p>
-            <input
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
-              placeholder="Type your full name to sign"
-              value={sigName}
-              onChange={e => setSigName(e.target.value)}
-              disabled={signing}
-            />
-            <button
-              onClick={handleSign}
-              disabled={signing || !sigName.trim()}
-              className="w-full py-3 text-white font-bold rounded-xl transition disabled:opacity-50"
-              style={{ background: AC }}
-            >
-              {signing ? 'Submitting…' : 'Accept Proposal'}
-            </button>
-          </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
+              </div>
+              <p className="text-sm text-gray-500 mb-3">
+                By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+              </p>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                placeholder="Type your full name to sign"
+                value={sigName}
+                onChange={e => setSigName(e.target.value)}
+                disabled={signing}
+              />
+              <button
+                onClick={handleSign}
+                disabled={signing || !sigName.trim()}
+                className="w-full py-3 text-white font-bold rounded-xl transition disabled:opacity-50"
+                style={{ background: AC }}
+              >
+                {signing ? 'Submitting…' : 'Accept Proposal'}
+              </button>
+            </div>
+          )}
 
         </div>
 
@@ -852,27 +869,40 @@ export default function PublicProposal({ proposalId }) {
           </div>
         )}
 
-        {/* Accept */}
-        <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
-          <p className="text-sm text-gray-500 mb-3">
-            By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
-          </p>
-          <input
-            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Type your full name to sign"
-            value={sigName}
-            onChange={e => setSigName(e.target.value)}
-            disabled={signing}
-          />
-          <button
-            onClick={handleSign}
-            disabled={signing || !sigName.trim()}
-            className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
-          >
-            {signing ? 'Submitting…' : 'Accept Proposal'}
-          </button>
-        </div>
+        {/* Accept / Invoice Link */}
+        {alreadySigned ? (
+          <div className="bg-green-50 border border-green-200 rounded-2xl shadow-sm px-5 py-5 text-center">
+            <p className="font-bold text-green-700 text-base mb-1">✓ Proposal Accepted</p>
+            <p className="text-sm text-green-600 mb-4">Thank you! Your proposal has been accepted.</p>
+            <a
+              href={invoiceUrl}
+              className="block w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-center transition"
+            >
+              View Invoice
+            </a>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
+            <p className="text-sm text-gray-500 mb-3">
+              By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+            </p>
+            <input
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Type your full name to sign"
+              value={sigName}
+              onChange={e => setSigName(e.target.value)}
+              disabled={signing}
+            />
+            <button
+              onClick={handleSign}
+              disabled={signing || !sigName.trim()}
+              className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
+            >
+              {signing ? 'Submitting…' : 'Accept Proposal'}
+            </button>
+          </div>
+        )}
 
         <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
           <p>{companyName}</p>

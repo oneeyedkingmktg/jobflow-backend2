@@ -285,10 +285,16 @@ function AppContent() {
    APP PROVIDERS + ERROR BOUNDARY
    =========================================================== */
 export default function App() {
+  // Public invoice page — no auth required
+  const invoiceMatch = window.location.pathname.match(/^\/invoice\/(\d+)$/);
+  if (invoiceMatch) {
+    return <ErrorBoundary><PublicProposal proposalId={invoiceMatch[1]} forceView="invoice" /></ErrorBoundary>;
+  }
+
   // Public proposal page — no auth required
   const proposalMatch = window.location.pathname.match(/^\/proposal\/(\d+)$/);
   if (proposalMatch) {
-    return <ErrorBoundary><PublicProposal proposalId={proposalMatch[1]} /></ErrorBoundary>;
+    return <ErrorBoundary><PublicProposal proposalId={proposalMatch[1]} forceView="proposal" /></ErrorBoundary>;
   }
 
   return (

@@ -1052,7 +1052,9 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
     const baseUrl      = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
-    const proposalUrl  = `${baseUrl}/proposal/${req.params.id}`;
+    const proposalUrl  = emailType === 'invoice'
+      ? `${baseUrl}/invoice/${req.params.id}`
+      : `${baseUrl}/proposal/${req.params.id}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
     const emailType    = req.body.type || 'proposal';
