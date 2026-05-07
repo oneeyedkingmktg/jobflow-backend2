@@ -93,20 +93,23 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
   // Resolve which payment schedule entry this invoice is for
-  const totalInvoices = paymentSchedules.length;
-  const invoiceIndex  = Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, totalInvoices - 1 || 0));
-  const invSuffix     = String(invoiceIndex + 1);
+  const totalInvoices   = paymentSchedules.length;
+  const invoiceIndex    = Math.max(0, parseInt(invoiceNum, 10) - 1);
+  const invSuffix       = String(invoiceIndex + 1);
+  const payEntry        = invoiceIndex < totalInvoices ? paymentSchedules[invoiceIndex] : null;
+  const isBalanceInvoice = payEntry === null && totalInvoices > 0;
 
-  const payEntry      = paymentSchedules[invoiceIndex] || null;
-  const basePayAmount = payEntry ? calcAmt(payEntry, bidTotal) : bidTotal;
+  const basePayAmount = payEntry
+    ? calcAmt(payEntry, bidTotal)
+    : (isBalanceInvoice ? balanceDue : bidTotal);
   const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
   const feeAmount     = basePayAmount * (feePercent / 100);
   const totalWithFee  = basePayAmount + feeAmount;
 
   // Invoice metadata
-  const invNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-${invSuffix}`;
-  const invDate = fmtDate(proposal.signed_at) || todayStr();
-  const payLabel  = payEntry?.description || 'Full Payment';
+  const invNum    = `INV-${String(proposal.id + 121).padStart(4, '0')}-${invSuffix}`;
+  const invDate   = fmtDate(proposal.signed_at) || todayStr();
+  const payLabel  = payEntry?.description || (isBalanceInvoice ? 'Balance Due' : 'Full Payment');
   const payDetail = payEntry?.amount_type === 'percent'
     ? `${parseFloat(payEntry.amount_value) || 0}% of ${fmt(bidTotal)}`
     : '';

@@ -1075,17 +1075,25 @@ router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
       );
       const schedules = schedResult.rows;
       const total = schedules.length;
-      const idx    = Math.max(0, Math.min(parseInt(invoiceNum, 10) - 1, total - 1 || 0));
-      const suffix = String(idx + 1);
-      const entry    = schedules[idx];
+      const idx      = Math.max(0, parseInt(invoiceNum, 10) - 1);
+      const suffix   = String(idx + 1);
+      const entry    = idx < total ? schedules[idx] : null;
       const bidTotal = parseFloat(row.bid_total) || 0;
-      const payAmt   = entry
-        ? (entry.amount_type === 'dollar'
-            ? parseFloat(entry.amount_value) || 0
-            : bidTotal * ((parseFloat(entry.amount_value) || 0) / 100))
-        : bidTotal;
+      let payAmt;
+      if (entry) {
+        payAmt = entry.amount_type === 'dollar'
+          ? parseFloat(entry.amount_value) || 0
+          : bidTotal * ((parseFloat(entry.amount_value) || 0) / 100);
+      } else {
+        // Balance invoice — amount is bid total minus all scheduled payments
+        const payTotal = schedules.reduce((a, s) => {
+          const v = parseFloat(s.amount_value) || 0;
+          return a + (s.amount_type === 'dollar' ? v : bidTotal * v / 100);
+        }, 0);
+        payAmt = Math.max(0, bidTotal - payTotal);
+      }
       invoiceLabel   = `INV-${String(parseInt(req.params.id, 10) + 121).padStart(4, '0')}-${suffix}`;
-      payDescription = entry?.description || null;
+      payDescription = entry?.description || (idx >= total ? 'Balance Due' : null);
       payAmountStr   = `$${payAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 

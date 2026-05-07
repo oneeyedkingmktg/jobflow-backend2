@@ -838,22 +838,27 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   );
                 })}
                 {/* Final invoice row — balance not covered by schedule */}
-                {balanceDue > 0.009 && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => printFinalInvoice(printData)}
-                      className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
-                    >
-                      🧾 Final Invoice ({fmt(balanceDue)})
-                    </button>
-                    <button
-                      onClick={() => openEmailModal('invoice', String(paySchedule.length + 1))}
-                      disabled={emailSending}
-                      className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
-                    >
-                      {emailSending ? '…' : '✉ Email'}
-                    </button>
-                  </div>
+                {balanceDue > 0.009 && (() => {
+                  const finalNum = String(paySchedule.length + 1);
+                  const finalLabel = `INV-${String(proposalId + 121).padStart(4, '0')}-${finalNum}`;
+                  return (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => printFinalInvoice(printData)}
+                        className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
+                      >
+                        🧾 {finalLabel} — Balance Due ({fmt(balanceDue)})
+                      </button>
+                      <button
+                        onClick={() => openEmailModal('invoice', finalNum)}
+                        disabled={emailSending}
+                        className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
+                      >
+                        {emailSending ? '…' : '✉ Email'}
+                      </button>
+                    </div>
+                  );
+                })()}
                 )}
               </div>
               <div className="px-6 pb-4 border-t pt-3">
