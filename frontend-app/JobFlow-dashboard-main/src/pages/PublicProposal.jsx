@@ -83,7 +83,13 @@ export default function PublicProposal({ proposalId }) {
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
   const showPayButton = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
-  async function handleStripePayment(amountDollars) {
+  // Amount to charge: sum of scheduled payments if any, otherwise full bid total
+  const basePayAmount = paymentSchedules.length > 0 ? payTotal : bidTotal;
+  const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
+  const feeAmount     = basePayAmount * (feePercent / 100);
+  const totalWithFee  = basePayAmount + feeAmount;
+
+  async function handleStripePayment() {
     setPayError('');
     setPaying(true);
     try {
@@ -92,7 +98,8 @@ export default function PublicProposal({ proposalId }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount_cents: Math.round(amountDollars * 100),
+          base_amount_cents: Math.round(basePayAmount * 100),
+          convenience_fee_percent: feePercent,
           success_url: window.location.href + '?payment=success',
           cancel_url:  window.location.href,
         }),
@@ -311,9 +318,14 @@ export default function PublicProposal({ proposalId }) {
 
           {showPayButton && (
             <div>
+              {feePercent > 0 && (
+                <p className="text-xs text-center mb-2" style={{ color: AC }}>
+                  Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+                </p>
+              )}
               {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
               <button
-                onClick={() => handleStripePayment(bidTotal)}
+                onClick={handleStripePayment}
                 disabled={paying}
                 className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
                 style={{ background: AC }}
@@ -506,9 +518,14 @@ export default function PublicProposal({ proposalId }) {
         {/* ── Payment Button ─────────────────────────────────────────────── */}
         {showPayButton && (
           <div>
+            {feePercent > 0 && (
+              <p className="text-xs text-gray-500 text-center mb-2">
+                Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+              </p>
+            )}
             {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
             <button
-              onClick={() => handleStripePayment(bidTotal)}
+              onClick={handleStripePayment}
               disabled={paying}
               className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
             >

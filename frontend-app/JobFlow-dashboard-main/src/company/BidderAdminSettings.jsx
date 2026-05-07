@@ -101,6 +101,7 @@ export default function BidderAdminSettings({ companyId }) {
         stripe_publishable_key: data.stripe_publishable_key || '',
         stripe_secret_key: '',
         stripe_secret_key_saved: data.stripe_secret_key_saved || false,
+        convenience_fee_percent: data.convenience_fee_percent ?? 0,
         include_payment_button: data.include_payment_button ?? true,
         down_payment_default_percent: data.down_payment_default_percent ?? 50,
         preferred_proposal_design_id: data.preferred_proposal_design_id || '',
@@ -271,6 +272,7 @@ export default function BidderAdminSettings({ companyId }) {
       const payload = {
         ...settingsForm,
         down_payment_default_percent: parseFloat(settingsForm.down_payment_default_percent) || 50,
+        convenience_fee_percent: parseFloat(settingsForm.convenience_fee_percent) || 0,
         preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
         proposal_domain: settingsForm.proposal_domain.trim() || null,
       };
@@ -540,6 +542,22 @@ export default function BidderAdminSettings({ companyId }) {
                 placeholder={settingsForm.stripe_secret_key_saved ? '••••••••  (saved — paste new key to replace)' : 'sk_live_...'}
               />
               <p className="text-xs text-gray-400 mt-1">Your Stripe secret key — stored securely. Never shared with customers.</p>
+            </div>
+            <div className="w-48">
+              <label className={labelCls}>Online Payment Convenience Fee %</label>
+              <div className="flex items-center gap-2">
+                <input
+                  className={inputCls}
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  value={settingsForm.convenience_fee_percent}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, convenience_fee_percent: e.target.value }))}
+                />
+                <span className="text-gray-500 text-sm">%</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Added to the total when a customer pays online. Set 0 to disable.</p>
             </div>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
