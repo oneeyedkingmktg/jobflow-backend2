@@ -206,11 +206,11 @@ export default function PublicProposal({ proposalId, forceView }) {
       const logoSrc = proposal.logo_url || null;
 
       const paidBadgeStyled = (
-        <div className="flex items-center justify-center gap-3 py-4 rounded-2xl" style={{ background: `${AC}22`, border: `1.5px solid ${AC}` }}>
-          <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke={AC} viewBox="0 0 24 24">
+        <div className="flex items-center justify-center gap-3 py-4 bg-green-50 border border-green-200 rounded-2xl">
+          <svg className="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
-          <span className="font-black text-lg tracking-widest" style={{ color: AC }}>PAID</span>
+          <span className="text-green-700 font-black text-lg tracking-widest">PAID</span>
         </div>
       );
 
