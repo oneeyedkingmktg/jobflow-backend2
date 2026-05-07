@@ -55,13 +55,13 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
 
   // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
-    if (!conversation?.id || !companyId) return;
+    if (!conversation?.contactId || !companyId) return;
     const lastKnownAt = { current: undefined };
 
     const poll = async () => {
       try {
         const res = await apiRequest(
-          `/api/messages/check-update?conversationId=${conversation.id}&company_id=${companyId}`
+          `/api/messages/check-update?contactId=${conversation.contactId}&company_id=${companyId}`
         );
         if (lastKnownAt.current === undefined) {
           // First call: capture baseline, don't refresh

@@ -16,13 +16,13 @@ router.post('/message-arrived', async (req, res) => {
     const raw = req.body || {};
     const payload = raw.customData || raw;
     const locationId = payload.locationId || payload.location_id;
-    const conversationId = payload.conversationId || payload.conversation_id || payload.conersationId;
+    const contactId = payload.contactId || payload.contact_id;
 
-    console.log('📨 message-arrived webhook:', { locationId, conversationId, keys: Object.keys(payload) });
+    console.log('📨 message-arrived webhook:', { locationId, contactId, keys: Object.keys(payload) });
 
-    if (!locationId || !conversationId) {
-      console.warn('📨 message-arrived: missing fields, full body:', JSON.stringify(payload));
-      return res.status(400).json({ error: 'Missing locationId or conversationId' });
+    if (!locationId || !contactId) {
+      console.warn('📨 message-arrived: missing fields, full body:', JSON.stringify(raw));
+      return res.status(400).json({ error: 'Missing locationId or contactId' });
     }
 
     const result = await pool.query(
@@ -35,14 +35,14 @@ router.post('/message-arrived', async (req, res) => {
 
     const companyId = result.rows[0].id;
     await pool.query(
-      `INSERT INTO conversation_updates (conversation_id, company_id, last_message_at)
+      `INSERT INTO conversation_updates (contact_id, company_id, last_message_at)
        VALUES ($1, $2, NOW())
-       ON CONFLICT (conversation_id)
+       ON CONFLICT (contact_id)
        DO UPDATE SET last_message_at = NOW(), company_id = EXCLUDED.company_id`,
-      [conversationId, companyId]
+      [contactId, companyId]
     );
 
-    console.log('📨 message-arrived: stored update for conversation', conversationId, 'company', companyId);
+    console.log('📨 message-arrived: stored update for contact', contactId, 'company', companyId);
     res.json({ success: true });
   } catch (error) {
     console.error('Message-arrived webhook error:', error);

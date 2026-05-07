@@ -337,14 +337,14 @@ let text = null;
   }
 }
 
-// GET /api/messages/check-update?conversationId=X&company_id=Y
+// GET /api/messages/check-update?contactId=X&company_id=Y
 async function checkUpdate(req, res) {
   try {
-    const { conversationId } = req.query;
+    const { contactId } = req.query;
     const companyId = req.query.company_id || req.user?.company_id;
 
-    if (!conversationId || !companyId) {
-      return res.status(400).json({ error: "conversationId and company_id required" });
+    if (!contactId || !companyId) {
+      return res.status(400).json({ error: "contactId and company_id required" });
     }
 
     if (req.user.role !== "master" && parseInt(req.user.company_id) !== parseInt(companyId)) {
@@ -353,8 +353,8 @@ async function checkUpdate(req, res) {
 
     const result = await pool.query(
       `SELECT last_message_at FROM conversation_updates
-       WHERE conversation_id = $1 AND company_id = $2`,
-      [conversationId, companyId]
+       WHERE contact_id = $1 AND company_id = $2`,
+      [contactId, companyId]
     );
 
     res.json({ lastMessageAt: result.rows[0]?.last_message_at || null });

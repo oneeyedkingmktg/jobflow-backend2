@@ -57,7 +57,7 @@ export default function ConversationModal({ lead, onClose }) {
 
   // Poll for new messages — lightweight timestamp check, no spinner
   useEffect(() => {
-    if (!conversationId || !companyId) return;
+    if (!contactId || !companyId) return;
     const lastKnownAt = { current: undefined };
 
     const poll = async () => {
@@ -65,7 +65,7 @@ export default function ConversationModal({ lead, onClose }) {
         const token = localStorage.getItem("authToken");
         const base = import.meta.env.VITE_API_URL;
         const res = await fetch(
-          `${base}/api/messages/check-update?conversationId=${conversationId}&company_id=${companyId}`,
+          `${base}/api/messages/check-update?contactId=${contactId}&company_id=${companyId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = await res.json();
@@ -98,7 +98,7 @@ export default function ConversationModal({ lead, onClose }) {
     poll();
     const interval = setInterval(poll, 15000);
     return () => clearInterval(interval);
-  }, [conversationId, companyId]);
+  }, [contactId, companyId]);
 
   async function fetchConversations(limit = 20) {
     try {
