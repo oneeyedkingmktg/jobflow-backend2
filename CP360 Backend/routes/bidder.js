@@ -1252,6 +1252,12 @@ router.post('/public/:id/payment-received', async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
+    // Stamp paid_at (idempotent — only sets if not already set)
+    await pool.query(
+      `UPDATE bidder_proposals SET paid_at = NOW() WHERE id = $1 AND paid_at IS NULL`,
+      [req.params.id]
+    );
+
     const row = result.rows[0];
     const companyName   = row.ghl_company_from_name || row.company_db_name || '';
     const customerEmail = row.lead_email || null;

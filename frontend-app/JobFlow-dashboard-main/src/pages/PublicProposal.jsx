@@ -149,6 +149,7 @@ export default function PublicProposal({ proposalId, forceView }) {
 
   // Invoice route always shows invoice; proposal route always shows proposal
   const isSigned     = forceView === 'invoice';
+  const isPaid       = !!proposal.paid_at;
   const alreadySigned = !!proposal.signed_at || justSigned;
   const invoiceUrl   = `${window.location.origin}/invoice/${proposalId}`;
   const termsText    = proposal.terms_and_conditions || '';
@@ -166,8 +167,17 @@ export default function PublicProposal({ proposalId, forceView }) {
       .filter(i => (i.sort_order ?? 0) < upTo)
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
 
-  // ── Pay button block (reused in both invoice designs) ─────────────────────
-  const payBlock = showPayButton ? (
+  // ── Pay button / paid badge (reused in both invoice designs) ────────────────
+  const paidBadge = (
+    <div className="flex items-center justify-center gap-3 py-4 bg-green-50 border border-green-200 rounded-2xl">
+      <svg className="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+      </svg>
+      <span className="text-green-700 font-bold text-lg tracking-wide">PAID</span>
+    </div>
+  );
+
+  const payBlock = isPaid ? paidBadge : (showPayButton ? (
     <div>
       {feePercent > 0 && (
         <p className="text-xs text-gray-500 text-center mb-2">
@@ -183,7 +193,7 @@ export default function PublicProposal({ proposalId, forceView }) {
         {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
       </button>
     </div>
-  ) : null;
+  ) : null);
 
   // ============================================================
   // INVOICE VIEW (signed)
@@ -195,7 +205,16 @@ export default function PublicProposal({ proposalId, forceView }) {
       const HBG = proposal.design_primary_color || '#1c2333';
       const logoSrc = proposal.logo_url || null;
 
-      const payBtnStyled = showPayButton ? (
+      const paidBadgeStyled = (
+        <div className="flex items-center justify-center gap-3 py-4 rounded-2xl" style={{ background: `${AC}22`, border: `1.5px solid ${AC}` }}>
+          <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke={AC} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="font-black text-lg tracking-widest" style={{ color: AC }}>PAID</span>
+        </div>
+      );
+
+      const payBtnStyled = isPaid ? paidBadgeStyled : (showPayButton ? (
         <div>
           {feePercent > 0 && (
             <p className="text-xs text-gray-500 text-center mb-2">
@@ -212,7 +231,7 @@ export default function PublicProposal({ proposalId, forceView }) {
             {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
           </button>
         </div>
-      ) : null;
+      ) : null);
 
       return (
         <div className="min-h-screen bg-gray-100">
