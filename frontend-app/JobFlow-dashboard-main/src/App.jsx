@@ -11,6 +11,7 @@ import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
 import PublicProposal from "./pages/PublicProposal.jsx";
+import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import "./index.css";
 import { initializePushNotifications, setupPushListeners } from "./services/pushNotificationService";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -285,6 +286,12 @@ function AppContent() {
    APP PROVIDERS + ERROR BOUNDARY
    =========================================================== */
 export default function App() {
+  // Payment success page — no auth required
+  const paySuccessMatch = window.location.pathname.match(/^\/payment-success\/(\d+)$/);
+  if (paySuccessMatch) {
+    return <ErrorBoundary><PaymentSuccess proposalId={paySuccessMatch[1]} /></ErrorBoundary>;
+  }
+
   // Public invoice page — no auth required
   const invoiceMatch = window.location.pathname.match(/^\/invoice\/(\d+)$/);
   if (invoiceMatch) {

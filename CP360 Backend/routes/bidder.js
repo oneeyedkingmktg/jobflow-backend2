@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { sendProposalAcceptedEmails, sendProposalLinkEmail } = require('../services/email');
+const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail } = require('../services/email');
 const Stripe = require('stripe');
 
 // Default library items seeded for new companies
@@ -1222,6 +1222,75 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/stripe-checkout error:', err);
     res.status(500).json({ error: err.message || 'Failed to create checkout session' });
+  }
+});
+
+// POST /api/bidder/public/:id/payment-received — called from payment success page; sends confirmation emails
+router.post('/public/:id/payment-received', async (req, res) => {
+  try {
+    const { amount_cents = 0, pay_label = 'Payment' } = req.body;
+    const amountStr = `$${(amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const result = await pool.query(
+      `SELECT bp.bid_name, bp.company_id, bp.proposal_design_id,
+              l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
+              COALESCE(c.company_name, c.name) as company_db_name,
+              c.ghl_company_from_name,
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.preferred_proposal_design_id,
+              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+       FROM bidder_proposals bp
+       JOIN leads l ON bp.lead_id = l.id
+       JOIN companies c ON bp.company_id = c.id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
+       LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
+       LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
+       WHERE bp.id = $1`,
+      [req.params.id]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+
+    const row = result.rows[0];
+    const companyName   = row.ghl_company_from_name || row.company_db_name || '';
+    const customerEmail = row.lead_email || null;
+    const customerName  = row.lead_name || row.lead_name_short || '';
+    const baseUrl       = row.proposal_domain
+      ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+      : process.env.APP_URL;
+    const invoiceUrl    = `${baseUrl}/invoice/${req.params.id}`;
+
+    const contractorResult = await pool.query(
+      `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
+      [row.company_id]
+    );
+    const contractorEmail = contractorResult.rows[0]?.email || null;
+
+    const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_primary_color || '#1c2333') : null;
+    const accentColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_accent_color  || '#f97316') : null;
+
+    sendPaymentReceivedEmail({
+      contractorEmail,
+      customerEmail,
+      customerName,
+      companyName,
+      bidName:    row.bid_name,
+      amountStr,
+      payLabel:   pay_label,
+      invoiceUrl,
+      fromName:   row.email_from_name  || null,
+      fromEmail:  row.email_from_email || null,
+      primaryColor,
+      accentColor,
+    }).catch(err => console.error('Payment received email error:', err));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /bidder/public/:id/payment-received error:', err);
+    res.status(500).json({ error: 'Failed to send payment notification' });
   }
 });
 

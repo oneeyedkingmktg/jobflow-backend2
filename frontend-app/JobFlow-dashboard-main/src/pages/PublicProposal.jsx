@@ -118,7 +118,7 @@ export default function PublicProposal({ proposalId, forceView }) {
         body: JSON.stringify({
           base_amount_cents: Math.round(basePayAmount * 100),
           convenience_fee_percent: feePercent,
-          success_url: window.location.href + '?payment=success',
+          success_url: `${window.location.origin}/payment-success/${proposalId}?amount=${Math.round(totalWithFee * 100)}&label=${encodeURIComponent(payLabel)}`,
           cancel_url:  window.location.href,
         }),
       });
