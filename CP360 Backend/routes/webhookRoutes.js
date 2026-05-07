@@ -89,6 +89,18 @@ router.post('/push', async (req, res) => {
 
     await sendPushToCompany(companyId, { type, title, body, data });
 
+    // If this is a new message event, stamp conversation_updates so open threads refresh
+    if (ghlContactId && type === 'new_message') {
+      await pool.query(
+        `INSERT INTO conversation_updates (contact_id, company_id, last_message_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (contact_id)
+         DO UPDATE SET last_message_at = NOW(), company_id = EXCLUDED.company_id`,
+        [ghlContactId, companyId]
+      );
+      console.log('📨 conversation_updates stamped for contact', ghlContactId);
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Push webhook error:', error);
