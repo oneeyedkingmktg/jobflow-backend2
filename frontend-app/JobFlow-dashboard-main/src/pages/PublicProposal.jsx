@@ -1,6 +1,8 @@
 // ============================================================================
 // File: src/pages/PublicProposal.jsx
 // Public proposal page — no auth required. Customers view and sign proposals.
+// Unsigned → proposal view (T&C, notes, accept form).
+// Signed   → invoice view (clean invoice matching print, pay button only).
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -16,6 +18,10 @@ function fmtDate(d) {
   return new Date(dateOnly + 'T12:00:00').toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
   });
+}
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 function calcAmt(ps, bidTotal) {
@@ -42,7 +48,6 @@ export default function PublicProposal({ proposalId }) {
       .finally(() => setLoading(false));
   }, [proposalId]);
 
-  // ── Loading / Error ────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent" />
@@ -60,7 +65,7 @@ export default function PublicProposal({ proposalId }) {
 
   const { proposal, lead, items = [], customItems = [], discounts = [], paymentSchedules = [] } = data;
 
-  // Company info — DB fields take priority, GHL fields as fallback
+  // Company info
   const companyName   = proposal.company_name_db     || proposal.ghl_company_from_name  || proposal.ghl_company_name || '';
   const companyPhone  = proposal.company_phone_db    || proposal.ghl_company_phone       || '';
   const companyEmail  = proposal.company_email_db    || proposal.ghl_company_from_email  || '';
@@ -71,10 +76,10 @@ export default function PublicProposal({ proposalId }) {
   const companyWeb    = proposal.company_website_db  || proposal.ghl_company_website     || '';
 
   // Calculations
-  const libItems     = items.filter(i => !i.is_freeform);
-  const itemsTotal   = libItems.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
-  const customTotal  = customItems.filter(i => !i.is_subtotal).reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
-  const preDiscount  = itemsTotal + customTotal;
+  const libItems      = items.filter(i => !i.is_freeform);
+  const itemsTotal    = libItems.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+  const customTotal   = customItems.filter(i => !i.is_subtotal).reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+  const preDiscount   = itemsTotal + customTotal;
   const discountTotal = discounts.reduce((a, d) => {
     const val = parseFloat(d.discount_value) || 0;
     return a + (d.discount_type === 'dollar' ? val : preDiscount * (val / 100));
@@ -87,10 +92,20 @@ export default function PublicProposal({ proposalId }) {
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
   const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
-  const basePayAmount = paymentSchedules.length > 0 ? calcAmt(paymentSchedules[0], bidTotal) : bidTotal;
+  // Invoice payment entry = first schedule entry, or full bid total
+  const payEntry      = paymentSchedules[0] || null;
+  const basePayAmount = payEntry ? calcAmt(payEntry, bidTotal) : bidTotal;
   const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
   const feeAmount     = basePayAmount * (feePercent / 100);
   const totalWithFee  = basePayAmount + feeAmount;
+
+  // Invoice metadata
+  const invNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-1`;
+  const invDate = fmtDate(proposal.signed_at) || todayStr();
+  const payLabel  = payEntry?.description || 'Full Payment';
+  const payDetail = payEntry?.amount_type === 'percent'
+    ? `${parseFloat(payEntry.amount_value) || 0}% of ${fmt(bidTotal)}`
+    : '';
 
   async function handleStripePayment() {
     setPayError('');
@@ -116,38 +131,28 @@ export default function PublicProposal({ proposalId }) {
     }
   }
 
-  // Accept / sign
-  const isSigned   = !!proposal.signed_at || justSigned;
-  const signedName = justSigned ? sigName : (proposal.signature_name || '');
-  const signedDate = proposal.signed_at;
-
   async function handleSign() {
     if (!sigName.trim()) return;
     setSigning(true);
     try {
       const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
-      const resp = await fetch(`${apiBase}/api/bidder/public/${proposalId}/accept`, {
+      await fetch(`${apiBase}/api/bidder/public/${proposalId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signature_name: sigName.trim() }),
       });
-      if (!resp.ok) throw new Error('Failed to submit');
+    } catch { /* non-critical */ } finally {
       setJustSigned(true);
-    } catch {
-      // non-critical — still mark as signed optimistically
-      setJustSigned(true);
-    } finally {
       setSigning(false);
     }
   }
 
-  const termsText   = proposal.terms_and_conditions || '';
+  const isSigned   = !!proposal.signed_at || justSigned;
+  const termsText  = proposal.terms_and_conditions || '';
   const systemNotes = proposal.system_notes || '';
+  const designId   = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
 
-  // Determine if a styled design is active
-  const designId = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
-
-  // Pre-sort items for both render branches
+  // Pre-sort items for proposal view
   const allSortedItems = [
     ...libItems.map(i => ({ ...i, _type: 'lib' })),
     ...customItems.map(i => ({ ...i, _type: 'custom' })),
@@ -158,13 +163,277 @@ export default function PublicProposal({ proposalId }) {
       .filter(i => (i.sort_order ?? 0) < upTo)
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
 
-  // ── Styled (Professional) render ──────────────────────────────────────────
+  // ── Pay button block (reused in both invoice designs) ─────────────────────
+  const payBlock = showPayButton ? (
+    <div>
+      {feePercent > 0 && (
+        <p className="text-xs text-gray-500 text-center mb-2">
+          Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+        </p>
+      )}
+      {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+      <button
+        onClick={handleStripePayment}
+        disabled={paying}
+        className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60 bg-blue-600 hover:bg-blue-700"
+      >
+        {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+      </button>
+    </div>
+  ) : null;
+
+  // ============================================================
+  // INVOICE VIEW (signed)
+  // ============================================================
+  if (isSigned) {
+    // ── Styled invoice ───────────────────────────────────────
+    if (designId) {
+      const AC  = proposal.design_accent_color  || '#f97316';
+      const HBG = proposal.design_primary_color || '#1c2333';
+      const logoSrc = proposal.logo_url || null;
+
+      const payBtnStyled = showPayButton ? (
+        <div>
+          {feePercent > 0 && (
+            <p className="text-xs text-gray-500 text-center mb-2">
+              Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+            </p>
+          )}
+          {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+          <button
+            onClick={handleStripePayment}
+            disabled={paying}
+            className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
+            style={{ background: AC }}
+          >
+            {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+          </button>
+        </div>
+      ) : null;
+
+      return (
+        <div className="min-h-screen bg-gray-100">
+
+          {/* Header */}
+          <div style={{ background: HBG }}>
+            <div className="max-w-3xl mx-auto flex justify-between items-center px-4 py-5">
+              <div className="flex items-center gap-3">
+                {logoSrc && <img src={logoSrc} alt={companyName} className="max-h-14 max-w-[140px] object-contain flex-shrink-0" />}
+                <div className="text-xl font-black text-white tracking-wide leading-tight">{companyName}</div>
+              </div>
+              <div className="text-right flex-shrink-0 ml-4">
+                <div className="text-4xl font-black text-white tracking-widest leading-none">INVOICE</div>
+                <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
+                  PREMIUM COATING. EXCEPTIONAL RESULTS.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date / Number strip */}
+          <div className="bg-gray-100" style={{ borderBottom: `3px solid ${AC}` }}>
+            <div className="max-w-3xl mx-auto flex justify-between items-center px-4 py-2.5">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Date</div>
+                <div className="text-sm font-bold" style={{ color: HBG }}>{invDate}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Invoice No.</div>
+                <div className="text-sm font-bold" style={{ color: HBG }}>{invNum}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bill To / From */}
+          <div className="bg-white border-b border-gray-200">
+            <div className="max-w-3xl mx-auto grid grid-cols-2">
+              <div className="px-4 py-4 border-r border-gray-200">
+                <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>Bill To:</div>
+                {lead && (
+                  <>
+                    <div className="text-base font-bold" style={{ color: HBG }}>{lead.full_name || lead.name}</div>
+                    {lead.address && <div className="text-sm text-gray-500 mt-0.5">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</div>}
+                    {lead.phone && <div className="text-sm text-gray-500">{lead.phone}</div>}
+                    {lead.email && <div className="text-sm text-gray-500">{lead.email}</div>}
+                  </>
+                )}
+              </div>
+              <div className="px-4 py-4">
+                <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: AC }}>From:</div>
+                <div className="text-base font-bold" style={{ color: HBG }}>{companyName}</div>
+                {companyStreet && <div className="text-sm text-gray-500 mt-0.5">{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</div>}
+                {companyPhone && <div className="text-sm text-gray-500">{companyPhone}</div>}
+                {companyWeb   && <div className="text-sm text-gray-500">{companyWeb}</div>}
+                {(proposal.created_by_name || proposal.salesman) && <div className="text-sm font-semibold text-gray-700">{proposal.created_by_name || proposal.salesman}</div>}
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+
+            {/* Invoice for */}
+            <div className="bg-white rounded-xl shadow-sm px-5 py-3">
+              <p className="text-sm text-gray-600">
+                <strong>Invoice for:</strong> {proposal.bid_name || ''}{lead ? ` — ${lead.full_name || lead.name}` : ''}
+              </p>
+            </div>
+
+            {/* Line item table */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: HBG }}>
+                    <th className="text-left px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider">Description</th>
+                    <th className="text-right px-4 py-2.5 text-white text-xs font-bold uppercase tracking-wider w-36">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bg-white">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">{payLabel}</div>
+                      {payDetail && <div className="text-xs text-gray-400 mt-0.5">{payDetail}</div>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(basePayAmount)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Amount Due */}
+            <div className="flex justify-end">
+              <div className="rounded-xl shadow-sm overflow-hidden" style={{ background: HBG, minWidth: '240px' }}>
+                <div className="px-6 py-4 flex justify-between items-center">
+                  <span className="text-sm font-black uppercase tracking-widest text-gray-300">Amount Due</span>
+                  <span className="text-2xl font-black ml-6" style={{ color: AC }}>{fmt(basePayAmount)}</span>
+                </div>
+              </div>
+            </div>
+
+            {payBtnStyled}
+
+          </div>
+
+          {/* Footer */}
+          <div style={{ background: HBG }} className="mt-4">
+            <div className="max-w-3xl mx-auto py-4 px-4 text-center">
+              <p className="text-sm font-semibold tracking-wide" style={{ color: AC }}>
+                ★ Thank you for your business!
+              </p>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // ── Classic invoice ──────────────────────────────────────
+    return (
+      <div className="min-h-screen bg-gray-100">
+
+        <div className="bg-blue-700 text-white">
+          <div className="max-w-2xl mx-auto px-4 py-6">
+            <h1 className="text-2xl font-bold">{companyName}</h1>
+            {companyStreet && (
+              <p className="text-blue-200 text-sm mt-0.5">
+                {[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-x-4 mt-1 text-blue-200 text-sm">
+              {companyPhone && <a href={`tel:${companyPhone}`} className="hover:text-white">{companyPhone}</a>}
+              {companyEmail && <a href={`mailto:${companyEmail}`} className="hover:text-white">{companyEmail}</a>}
+              {companyWeb   && <a href={companyWeb.startsWith('http') ? companyWeb : `https://${companyWeb}`} className="hover:text-white">{companyWeb}</a>}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+          {/* Invoice header card */}
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice</p>
+                <h2 className="text-xl font-bold text-gray-900">{proposal.bid_name}</h2>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xs text-gray-400">Invoice No.</p>
+                <p className="text-sm font-bold text-gray-700">{invNum}</p>
+                <p className="text-xs text-gray-400 mt-1">Date</p>
+                <p className="text-sm font-semibold text-gray-700">{invDate}</p>
+              </div>
+            </div>
+
+            {/* Bill To */}
+            {lead && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Bill To</p>
+                <p className="font-semibold text-gray-900">{lead.full_name || lead.name}</p>
+                {lead.address && <p className="text-sm text-gray-500">{[lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}</p>}
+                {lead.phone && <p className="text-sm text-gray-500">{lead.phone}</p>}
+                {lead.email && <p className="text-sm text-gray-500">{lead.email}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Invoice for */}
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-3">
+            <p className="text-sm text-gray-600">
+              <strong>Invoice for:</strong> {proposal.bid_name || ''}{lead ? ` — ${lead.full_name || lead.name}` : ''}
+            </p>
+          </div>
+
+          {/* Line item table */}
+          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-800 text-white">
+                  <th className="text-left px-4 py-2.5 text-xs font-bold uppercase tracking-wider">Description</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-bold uppercase tracking-wider w-36">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-white">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-gray-900">{payLabel}</div>
+                    {payDetail && <div className="text-xs text-gray-400 mt-0.5">{payDetail}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(basePayAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Amount Due */}
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-4 flex justify-between items-center">
+            <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Amount Due</span>
+            <span className="text-2xl font-black text-gray-900">{fmt(basePayAmount)}</span>
+          </div>
+
+          {payBlock}
+
+          <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
+            <p>{companyName}</p>
+            {(companyStreet || companyCity) && (
+              <p>{[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}</p>
+            )}
+            <p>{[companyPhone, companyEmail].filter(Boolean).join(' · ')}</p>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // PROPOSAL VIEW (unsigned)
+  // ============================================================
+
+  // ── Styled (Professional) proposal ───────────────────────────────────────
   if (designId) {
     const AC  = proposal.design_accent_color  || '#f97316';
     const HBG = proposal.design_primary_color || '#1c2333';
     const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
     const logoSrc = proposal.logo_url || null;
-    const docLabel = isSigned ? 'INVOICE' : 'PROPOSAL';
 
     return (
       <div className="min-h-screen bg-gray-100">
@@ -177,7 +446,7 @@ export default function PublicProposal({ proposalId }) {
               <div className="text-xl font-black text-white tracking-wide leading-tight">{companyName}</div>
             </div>
             <div className="text-right flex-shrink-0 ml-4">
-              <div className="text-4xl font-black text-white tracking-widest leading-none">{docLabel}</div>
+              <div className="text-4xl font-black text-white tracking-widest leading-none">PROPOSAL</div>
               <div className="text-xs font-bold uppercase tracking-widest mt-1.5" style={{ color: AC }}>
                 PREMIUM COATING. EXCEPTIONAL RESULTS.
               </div>
@@ -193,7 +462,7 @@ export default function PublicProposal({ proposalId }) {
               <div className="text-sm font-bold" style={{ color: HBG }}>{fmtDate(proposal.presented_date) || '—'}</div>
             </div>
             <div className="text-right">
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">{isSigned ? 'Invoice' : 'Proposal'} No.</div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Proposal No.</div>
               <div className="text-sm font-bold" style={{ color: HBG }}>{docNum}</div>
             </div>
           </div>
@@ -240,7 +509,7 @@ export default function PublicProposal({ proposalId }) {
             </div>
           )}
 
-          {/* Scope of Work table */}
+          {/* Scope of Work */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
               <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
@@ -369,63 +638,31 @@ export default function PublicProposal({ proposalId }) {
             </div>
           )}
 
-          {/* Accept / Signed */}
-          {isSigned ? (
-            <div className="rounded-xl shadow-sm px-5 py-4 border-2" style={{ background: HBG, borderColor: AC }}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xl" style={{ color: AC }}>✓</span>
-                <span className="text-sm font-black uppercase tracking-widest text-white">Proposal Accepted</span>
-              </div>
-              <p className="text-sm" style={{ color: AC }}>
-                Signed by <strong>{signedName}</strong>{signedDate ? ` on ${fmtDate(signedDate)}` : ''}
-              </p>
+          {/* Accept */}
+          <div className="bg-white rounded-xl shadow-sm px-5 py-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+              <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
             </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm px-5 py-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
-                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
-              </div>
-              <p className="text-sm text-gray-500 mb-3">
-                By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
-              </p>
-              <input
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
-                placeholder="Type your full name to sign"
-                value={sigName}
-                onChange={e => setSigName(e.target.value)}
-                disabled={signing}
-              />
-              <button
-                onClick={handleSign}
-                disabled={signing || !sigName.trim()}
-                className="w-full py-3 text-white font-bold rounded-xl transition disabled:opacity-50"
-                style={{ background: AC }}
-              >
-                {signing ? 'Submitting…' : 'Accept Proposal'}
-              </button>
-            </div>
-          )}
-
-          {/* Payment Button — shown only after proposal is accepted */}
-          {isSigned && showPayButton && (
-            <div>
-              {feePercent > 0 && (
-                <p className="text-xs text-gray-500 text-center mb-2">
-                  Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
-                </p>
-              )}
-              {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
-              <button
-                onClick={handleStripePayment}
-                disabled={paying}
-                className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
-                style={{ background: AC }}
-              >
-                {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
-              </button>
-            </div>
-          )}
+            <p className="text-sm text-gray-500 mb-3">
+              By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+            </p>
+            <input
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              placeholder="Type your full name to sign"
+              value={sigName}
+              onChange={e => setSigName(e.target.value)}
+              disabled={signing}
+            />
+            <button
+              onClick={handleSign}
+              disabled={signing || !sigName.trim()}
+              className="w-full py-3 text-white font-bold rounded-xl transition disabled:opacity-50"
+              style={{ background: AC }}
+            >
+              {signing ? 'Submitting…' : 'Accept Proposal'}
+            </button>
+          </div>
 
         </div>
 
@@ -442,22 +679,16 @@ export default function PublicProposal({ proposalId }) {
     );
   }
 
-  // ── Classic render ─────────────────────────────────────────────────────────
-  const docLabel = isSigned ? 'Invoice' : 'Proposal';
-
+  // ── Classic proposal ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ── Company Header ─────────────────────────────────────────────── */}
       <div className="bg-blue-700 text-white">
         <div className="max-w-2xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold">{companyName}</h1>
           {companyStreet && (
             <p className="text-blue-200 text-sm mt-0.5">
-              {companyStreet}
-              {companyCity ? ', ' + companyCity : ''}
-              {companyState ? ', ' + companyState : ''}
-              {companyZip ? ' ' + companyZip : ''}
+              {[companyStreet, companyCity, companyState, companyZip].filter(Boolean).join(', ')}
             </p>
           )}
           <div className="flex flex-wrap gap-x-4 mt-1 text-blue-200 text-sm">
@@ -470,11 +701,11 @@ export default function PublicProposal({ proposalId }) {
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-        {/* ── Proposal / Invoice Title ───────────────────────────────────── */}
+        {/* Title */}
         <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{docLabel}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Proposal</p>
               <h2 className="text-xl font-bold text-gray-900">{proposal.bid_name}</h2>
               {proposal.bid_description && <p className="text-gray-500 text-sm mt-1">{proposal.bid_description}</p>}
             </div>
@@ -486,7 +717,6 @@ export default function PublicProposal({ proposalId }) {
             )}
           </div>
 
-          {/* Prepared for */}
           {lead && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Prepared For</p>
@@ -510,7 +740,7 @@ export default function PublicProposal({ proposalId }) {
           )}
         </div>
 
-        {/* ── Line Items ─────────────────────────────────────────────────── */}
+        {/* Line Items */}
         <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Scope of Work</p>
           <div className="divide-y divide-gray-100">
@@ -527,11 +757,10 @@ export default function PublicProposal({ proposalId }) {
 
               return allItems.map(item => {
                 if (item.is_subtotal) {
-                  const total = runningTotal(item.sort_order ?? 0);
                   return (
                     <div key={`sub-${item.id}`} className="py-2 flex items-center justify-between border-t-2 border-gray-300 mt-1">
                       <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Running Subtotal</span>
-                      <span className="text-sm font-bold text-gray-800">{fmt(total)}</span>
+                      <span className="text-sm font-bold text-gray-800">{fmt(runningTotal(item.sort_order ?? 0))}</span>
                     </div>
                   );
                 }
@@ -543,11 +772,9 @@ export default function PublicProposal({ proposalId }) {
                         {item.description && <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>}
                       </div>
                       <div className="text-right shrink-0">
-                        {item.breakout_price ? (
-                          <p className="font-semibold text-gray-900 text-sm">{fmt(item.line_total)}</p>
-                        ) : (
-                          <p className="text-sm text-gray-400 italic">Included</p>
-                        )}
+                        {item.breakout_price
+                          ? <p className="font-semibold text-gray-900 text-sm">{fmt(item.line_total)}</p>
+                          : <p className="text-sm text-gray-400 italic">Included</p>}
                       </div>
                     </div>
                   );
@@ -563,13 +790,11 @@ export default function PublicProposal({ proposalId }) {
           </div>
         </div>
 
-        {/* ── Totals ─────────────────────────────────────────────────────── */}
+        {/* Totals */}
         <div className="bg-white rounded-2xl shadow-sm px-5 py-5 space-y-2">
           {discountTotal > 0 && (
             <>
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Subtotal</span><span>{fmt(preDiscount)}</span>
-              </div>
+              <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>{fmt(preDiscount)}</span></div>
               {discounts.map(d => {
                 const val = parseFloat(d.discount_value) || 0;
                 const amt = d.discount_type === 'dollar' ? val : preDiscount * (val / 100);
@@ -591,7 +816,7 @@ export default function PublicProposal({ proposalId }) {
           </div>
         </div>
 
-        {/* ── Payment Schedule ───────────────────────────────────────────── */}
+        {/* Payment Schedule */}
         {paymentSchedules.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Payment Schedule</p>
@@ -609,7 +834,7 @@ export default function PublicProposal({ proposalId }) {
           </div>
         )}
 
-        {/* ── System Notes ───────────────────────────────────────────────── */}
+        {/* System Notes */}
         {systemNotes && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notes</p>
@@ -617,7 +842,7 @@ export default function PublicProposal({ proposalId }) {
           </div>
         )}
 
-        {/* ── Terms & Conditions ─────────────────────────────────────────── */}
+        {/* Terms & Conditions */}
         {termsText && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Terms &amp; Conditions</p>
@@ -627,58 +852,27 @@ export default function PublicProposal({ proposalId }) {
           </div>
         )}
 
-        {/* ── Accept / Signed ────────────────────────────────────────────── */}
-        {isSigned ? (
-          <div className="bg-green-50 rounded-2xl shadow-sm px-5 py-5 border border-green-200">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-green-600 text-lg">✓</span>
-              <p className="text-sm font-bold text-green-700">Proposal Accepted</p>
-            </div>
-            <p className="text-sm text-gray-600">
-              Signed by <strong>{signedName}</strong>{signedDate ? ` on ${fmtDate(signedDate)}` : ''}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
-            <p className="text-sm text-gray-500 mb-3">
-              By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
-            </p>
-            <input
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              placeholder="Type your full name to sign"
-              value={sigName}
-              onChange={e => setSigName(e.target.value)}
-              disabled={signing}
-            />
-            <button
-              onClick={handleSign}
-              disabled={signing || !sigName.trim()}
-              className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
-            >
-              {signing ? 'Submitting…' : 'Accept Proposal'}
-            </button>
-          </div>
-        )}
-
-        {/* ── Payment Button — shown only after proposal is accepted ──────── */}
-        {isSigned && showPayButton && (
-          <div>
-            {feePercent > 0 && (
-              <p className="text-xs text-gray-500 text-center mb-2">
-                Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
-              </p>
-            )}
-            {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
-            <button
-              onClick={handleStripePayment}
-              disabled={paying}
-              className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
-            >
-              {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
-            </button>
-          </div>
-        )}
+        {/* Accept */}
+        <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
+          <p className="text-sm text-gray-500 mb-3">
+            By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
+          </p>
+          <input
+            className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            placeholder="Type your full name to sign"
+            value={sigName}
+            onChange={e => setSigName(e.target.value)}
+            disabled={signing}
+          />
+          <button
+            onClick={handleSign}
+            disabled={signing || !sigName.trim()}
+            className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
+          >
+            {signing ? 'Submitting…' : 'Accept Proposal'}
+          </button>
+        </div>
 
         <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
           <p>{companyName}</p>
