@@ -1307,7 +1307,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
     const baseUrl       = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
-    const invoiceUrl    = `${baseUrl}/invoice/${req.params.id}`;
+    const invoiceUrl    = `${baseUrl}/invoice/${req.params.id}/${String(invoice_num)}`;
 
     const contractorResult = await pool.query(
       `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
