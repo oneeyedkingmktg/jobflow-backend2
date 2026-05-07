@@ -87,7 +87,7 @@ export default function PublicProposal({ proposalId }) {
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
   const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
 
-  const basePayAmount = paymentSchedules.length > 0 ? payTotal : bidTotal;
+  const basePayAmount = paymentSchedules.length > 0 ? calcAmt(paymentSchedules[0], bidTotal) : bidTotal;
   const feePercent    = parseFloat(proposal.company_convenience_fee_percent) || 0;
   const feeAmount     = basePayAmount * (feePercent / 100);
   const totalWithFee  = basePayAmount + feeAmount;
@@ -345,26 +345,6 @@ export default function PublicProposal({ proposalId }) {
             </div>
           </div>
 
-          {/* Payment Button */}
-          {showPayButton && (
-            <div>
-              {feePercent > 0 && (
-                <p className="text-lg text-gray-500 text-center mb-2">
-                  Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
-                </p>
-              )}
-              {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
-              <button
-                onClick={handleStripePayment}
-                disabled={paying}
-                className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
-                style={{ background: AC }}
-              >
-                {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
-              </button>
-            </div>
-          )}
-
           {/* System Notes */}
           {systemNotes && (
             <div className="bg-white rounded-xl shadow-sm px-5 py-4">
@@ -383,7 +363,9 @@ export default function PublicProposal({ proposalId }) {
                 <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
                 <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Terms &amp; Conditions</span>
               </div>
-              <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+              <div className="max-h-48 overflow-y-auto pr-1">
+                <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+              </div>
             </div>
           )}
 
@@ -421,6 +403,26 @@ export default function PublicProposal({ proposalId }) {
                 style={{ background: AC }}
               >
                 {signing ? 'Submitting…' : 'Accept Proposal'}
+              </button>
+            </div>
+          )}
+
+          {/* Payment Button — shown only after proposal is accepted */}
+          {isSigned && showPayButton && (
+            <div>
+              {feePercent > 0 && (
+                <p className="text-xs text-gray-500 text-center mb-2">
+                  Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+                </p>
+              )}
+              {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+              <button
+                onClick={handleStripePayment}
+                disabled={paying}
+                className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
+                style={{ background: AC }}
+              >
+                {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
               </button>
             </div>
           )}
@@ -607,25 +609,6 @@ export default function PublicProposal({ proposalId }) {
           </div>
         )}
 
-        {/* ── Payment Button ─────────────────────────────────────────────── */}
-        {showPayButton && (
-          <div>
-            {feePercent > 0 && (
-              <p className="text-lg text-gray-500 text-center mb-2">
-                Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
-              </p>
-            )}
-            {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
-            <button
-              onClick={handleStripePayment}
-              disabled={paying}
-              className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
-            >
-              {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
-            </button>
-          </div>
-        )}
-
         {/* ── System Notes ───────────────────────────────────────────────── */}
         {systemNotes && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
@@ -638,7 +621,9 @@ export default function PublicProposal({ proposalId }) {
         {termsText && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Terms &amp; Conditions</p>
-            <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+            <div className="max-h-48 overflow-y-auto pr-1">
+              <p className="text-sm text-gray-600 whitespace-pre-line">{termsText}</p>
+            </div>
           </div>
         )}
 
@@ -672,6 +657,25 @@ export default function PublicProposal({ proposalId }) {
               className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition disabled:opacity-50"
             >
               {signing ? 'Submitting…' : 'Accept Proposal'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Payment Button — shown only after proposal is accepted ──────── */}
+        {isSigned && showPayButton && (
+          <div>
+            {feePercent > 0 && (
+              <p className="text-xs text-gray-500 text-center mb-2">
+                Online payments include a {feePercent}% convenience fee — total: {fmt(totalWithFee)}
+              </p>
+            )}
+            {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
+            <button
+              onClick={handleStripePayment}
+              disabled={paying}
+              className="block w-full py-4 bg-blue-600 text-white font-bold text-base rounded-2xl text-center hover:bg-blue-700 transition shadow disabled:opacity-60"
+            >
+              {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
             </button>
           </div>
         )}
