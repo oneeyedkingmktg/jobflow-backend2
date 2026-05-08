@@ -149,13 +149,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     return orders.length > 0 ? Math.max(...orders) + 1 : 0;
   }
 
-  function getSortForInsertAbove(targetSort) {
-    const libEntries = Object.values(checkedMap);
-    const allSorted = [...libEntries, ...customItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    const idx = allSorted.findIndex(i => (i.sort_order ?? 0) === targetSort);
-    if (idx <= 0) return targetSort - 1;
-    return ((allSorted[idx - 1]?.sort_order ?? 0) + targetSort) / 2;
-  }
 
   // ── Library item — shared picker logic ──────────────────────────────────
   async function addFromPicker(val, sortOrder) {
@@ -196,9 +189,64 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   }
 
   async function handlePickItemAbove(val) {
-    const sortOrder = getSortForInsertAbove(insertAboveSort);
+    const targetSort = insertAboveSort;
+
+    // Build unified sorted list to find neighbours
+    const libEntries = Object.entries(checkedMap).map(([libItemId, pi]) => ({ ...pi, _libItemId: libItemId }));
+    const allSorted = [...libEntries, ...customItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const idx = allSorted.findIndex(i => (i.sort_order ?? 0) === targetSort);
+
+    let newSortOrder;
+
+    if (idx <= 0) {
+      // Before first item — step back one integer
+      newSortOrder = Math.floor(targetSort) - 1;
+    } else {
+      const prevSort = allSorted[idx - 1].sort_order ?? 0;
+      if (targetSort - prevSort > 1) {
+        // There is an integer gap — slot in right after the previous item
+        newSortOrder = Math.floor(prevSort) + 1;
+      } else {
+        // Items are adjacent integers — shift everything at >= targetSort up by 1 to make room
+        newSortOrder = Math.floor(targetSort);
+        const toShift = allSorted.filter(i => (i.sort_order ?? 0) >= targetSort);
+
+        // Update state immediately so UI reflects new order
+        setCheckedMap(prev => {
+          const next = { ...prev };
+          toShift.forEach(item => {
+            if (item._libItemId && next[item._libItemId]) {
+              next[item._libItemId] = { ...next[item._libItemId], sort_order: (item.sort_order ?? 0) + 1 };
+            }
+          });
+          return next;
+        });
+        setCustomItems(prev => prev.map(item =>
+          (item.sort_order ?? 0) >= targetSort
+            ? { ...item, sort_order: (item.sort_order ?? 0) + 1 }
+            : item
+        ));
+
+        // Persist the sort_order bumps (fire-and-forget — display is already correct)
+        toShift.forEach(item => {
+          const newSO = (item.sort_order ?? 0) + 1;
+          if (item._libItemId) {
+            BidderAPI.updateItem(item.id, { ...item, sort_order: newSO }).catch(console.error);
+          } else {
+            BidderAPI.updateCustomItem(item.id, {
+              description: item.description || item._desc || '',
+              quantity: item.quantity ?? 1,
+              price_each: item.price_each ?? 0,
+              line_total: item.line_total ?? 0,
+              sort_order: newSO,
+            }).catch(console.error);
+          }
+        });
+      }
+    }
+
     setInsertAboveSort(null);
-    await addFromPicker(val, sortOrder);
+    await addFromPicker(val, newSortOrder);
   }
 
   async function handleDeleteLibItem(libItemId) {
