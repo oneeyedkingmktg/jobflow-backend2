@@ -52,6 +52,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [paySchedule, setPaySchedule]       = useState([]);
   const [showItemPicker,   setShowItemPicker]   = useState(false);
   const [showDocsModal,    setShowDocsModal]    = useState(false);
+  const [showExitModal,    setShowExitModal]    = useState(false);
+  const [exitFn,           setExitFn]           = useState(null);
   const [company,          setCompany]          = useState(null);
   const [companySettings,  setCompanySettings]  = useState(null);
   const [emailSending,     setEmailSending]     = useState(false);
@@ -463,6 +465,22 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     }
   }
 
+  async function handleSaveAndExit(fn) {
+    setSaving(true);
+    try {
+      await BidderAPI.updateProposal(proposalId, { ...hdr, bid_total: bidTotal, balance_due: balanceDue });
+      fn?.();
+    } catch (e) {
+      setSaveMsg('Failed to save');
+      setSaving(false);
+    }
+  }
+
+  function promptExit(fn) {
+    setExitFn(() => fn);
+    setShowExitModal(true);
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -477,7 +495,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       {/* Header bar */}
       <div className="bg-blue-600 text-white px-5 py-4 rounded-t-2xl flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-blue-200 hover:text-white">
+          <button onClick={() => promptExit(onBack)} className="text-blue-200 hover:text-white">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -487,7 +505,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             <p className="text-blue-200 text-xs">{lead.name || lead.fullName}</p>
           </div>
         </div>
-        <button onClick={onClose} className="text-blue-200 hover:text-white">
+        <button onClick={() => promptExit(onClose)} className="text-blue-200 hover:text-white">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -915,15 +933,18 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       </div>
 
       {/* ── ACTION BAR ───────────────────────────────────────────────────── */}
-      <div className="border-t px-5 py-4 bg-white rounded-b-2xl flex items-center gap-3 shrink-0">
-        <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save'}
+      <div className="border-t px-5 py-4 bg-white rounded-b-2xl flex items-center gap-2 shrink-0">
+        <button onClick={() => handleSaveAndExit(onBack)} disabled={saving} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+          {saving ? 'Saving…' : 'Save & Exit'}
         </button>
-        <button onClick={() => setShowDocsModal(true)} className="px-5 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800">
+        <button onClick={onBack} className="px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
+          Exit
+        </button>
+        <button onClick={() => setShowDocsModal(true)} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
           Create Documents
         </button>
         {saveMsg && (
-          <span className={`text-sm font-medium ml-2 ${saveMsg === 'Saved' ? 'text-green-600' : 'text-red-500'}`}>
+          <span className={`text-sm font-medium ${saveMsg.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>
             {saveMsg}
           </span>
         )}
@@ -1071,6 +1092,38 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 className="flex-1 px-4 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-sm"
               >
                 Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EXIT CONFIRMATION MODAL ──────────────────────────────────────── */}
+      {showExitModal && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowExitModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1 text-center">Exit this bid?</h3>
+            <p className="text-sm text-gray-500 mb-6 text-center">Choose how you'd like to leave.</p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async () => { setShowExitModal(false); await handleSaveAndExit(exitFn); }}
+                disabled={saving}
+                className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save & Exit'}
+              </button>
+              <button
+                onClick={() => { setShowExitModal(false); exitFn?.(); }}
+                className="w-full py-3 bg-gray-100 text-gray-800 rounded-xl font-semibold text-sm hover:bg-gray-200 transition"
+              >
+                Exit Without Saving
+              </button>
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition"
+              >
+                Cancel — keep editing
               </button>
             </div>
           </div>
