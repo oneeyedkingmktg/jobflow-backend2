@@ -6,3 +6,6 @@ ALTER TABLE bidder_proposal_items ADD COLUMN IF NOT EXISTS show_price BOOLEAN DE
 ALTER TABLE bidder_proposal_items ADD COLUMN IF NOT EXISTS show_quantity BOOLEAN DEFAULT true;
 ALTER TABLE bidder_custom_items ADD COLUMN IF NOT EXISTS show_price BOOLEAN DEFAULT true;
 ALTER TABLE bidder_custom_items ADD COLUMN IF NOT EXISTS show_quantity BOOLEAN DEFAULT true;
+
+-- Add subtotal_note for text that appears below a subtotal line on the proposal
+ALTER TABLE bidder_custom_items ADD COLUMN IF NOT EXISTS subtotal_note TEXT;

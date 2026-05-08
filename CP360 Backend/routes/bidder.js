@@ -436,18 +436,18 @@ router.post('/custom-item', async (req, res) => {
 router.put('/custom-item/:id', async (req, res) => {
   try {
     const companyId = req.user.company_id;
-    const { description, quantity, price_each, line_total, sort_order, show_price, show_quantity } = req.body;
+    const { description, quantity, price_each, line_total, sort_order, show_price, show_quantity, subtotal_note } = req.body;
 
     let result;
     try {
       result = await pool.query(
         `UPDATE bidder_custom_items ci
          SET description = $1, quantity = $2, price_each = $3, line_total = $4, sort_order = $5,
-             show_price = $6, show_quantity = $7
+             show_price = $6, show_quantity = $7, subtotal_note = $8
          FROM bidder_proposals p
-         WHERE ci.id = $8 AND ci.proposal_id = p.id AND ($9::integer IS NULL OR p.company_id = $9::integer)
+         WHERE ci.id = $9 AND ci.proposal_id = p.id AND ($10::integer IS NULL OR p.company_id = $10::integer)
          RETURNING ci.*`,
-        [description, quantity, price_each, line_total, sort_order, show_price ?? true, show_quantity ?? true, req.params.id, companyId]
+        [description, quantity, price_each, line_total, sort_order, show_price ?? true, show_quantity ?? true, subtotal_note ?? null, req.params.id, companyId]
       );
     } catch (e) {
       if (e.message && e.message.includes('column') && e.message.includes('does not exist')) {

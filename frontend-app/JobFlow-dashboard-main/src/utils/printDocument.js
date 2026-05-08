@@ -254,10 +254,15 @@ function _printProposalStyled({
   const allItems   = [...libEntries, ...customItems]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-  const runningTotal = (upTo) =>
-    [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
-      .filter(i => (i.sort_order ?? 0) < upTo)
+  const runningTotal = (upTo) => {
+    const prevSorts = customItems
+      .filter(i => i.is_subtotal && (i.sort_order ?? 0) < upTo)
+      .map(i => i.sort_order ?? 0);
+    const prevSort = prevSorts.length > 0 ? Math.max(...prevSorts) : -1;
+    return [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
+      .filter(i => { const so = i.sort_order ?? 0; return so > prevSort && so < upTo; })
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+  };
 
   const TD  = 'padding:9px 12px;border-bottom:1px solid #efefef;vertical-align:top;font-size:10.5pt;';
   const TDR = TD + 'text-align:right;';
@@ -266,10 +271,12 @@ function _printProposalStyled({
     if (item.is_subtotal) {
       const t = runningTotal(item.sort_order ?? 0);
       const lbl = item._desc || item.description || 'Subtotal';
+      const note = item.subtotal_note || item._note || '';
+      const noteRow = note ? `<tr><td colspan="4" style="${TD}font-size:10.5pt;color:#222;">${note}</td></tr>` : '';
       return `<tr style="background:#f0f2f5;">
         <td colspan="3" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
         <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
-      </tr>`;
+      </tr>${noteRow}`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
@@ -279,24 +286,27 @@ function _printProposalStyled({
       </tr>`;
     }
     if (item._type === 'lib') {
-      const show = !!item.breakout_price;
+      const showQty   = item.show_quantity !== false;
+      const showPrice = item.show_price    !== false;
       const qty  = Math.round(item._qty ?? item.quantity ?? 1);
       return `<tr>
         <td style="${TD}">
           <div style="font-weight:600;">${item.name}</div>
           ${(item._desc || item.description) ? `<div style="font-size:8.5pt;color:#888;margin-top:2px;">${item._desc || item.description}</div>` : ''}
         </td>
-        <td style="${TDR}">${show ? qty : ''}</td>
-        <td style="${TDR}">${show ? fmt(item._price ?? item.unit_price) : ''}</td>
-        <td style="${TDR}">${show ? fmt(item.line_total) : '<em style="color:#bbb;font-size:9pt;">Included</em>'}</td>
+        <td style="${TDR}">${showQty ? qty : ''}</td>
+        <td style="${TDR}">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
+        <td style="${TDR}">${showPrice ? fmt(item.line_total) : ''}</td>
       </tr>`;
     }
+    const showQty   = item.show_quantity !== false;
+    const showPrice = item.show_price    !== false;
     const qty = Math.round(item._qty ?? item.quantity ?? 1);
     return `<tr>
       <td style="${TD}font-weight:600;">${item._desc || item.description || ''}</td>
-      <td style="${TDR}">${qty}</td>
-      <td style="${TDR}">${fmt(item._price ?? item.price_each)}</td>
-      <td style="${TDR}">${fmt(item.line_total)}</td>
+      <td style="${TDR}">${showQty ? qty : ''}</td>
+      <td style="${TDR}">${showPrice ? fmt(item._price ?? item.price_each) : ''}</td>
+      <td style="${TDR}">${showPrice ? fmt(item.line_total) : ''}</td>
     </tr>`;
   }).join('');
 
@@ -816,19 +826,26 @@ export function printProposal({
   const allItems = [...libEntries, ...customItems]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-  const runningTotal = (upToSortOrder) =>
-    [...libEntries, ...customItems.filter(i => !i.is_subtotal)]
-      .filter(i => (i.sort_order ?? 0) < upToSortOrder)
+  const runningTotal = (upToSortOrder) => {
+    const prevSorts = customItems
+      .filter(i => i.is_subtotal && (i.sort_order ?? 0) < upToSortOrder)
+      .map(i => i.sort_order ?? 0);
+    const prevSort = prevSorts.length > 0 ? Math.max(...prevSorts) : -1;
+    return [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
+      .filter(i => { const so = i.sort_order ?? 0; return so > prevSort && so < upToSortOrder; })
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+  };
 
   const allRows = allItems.map(item => {
     if (item.is_subtotal) {
       const total = runningTotal(item.sort_order ?? 0);
       const lbl = item._desc || item.description || 'Subtotal';
+      const note = item.subtotal_note || item._note || '';
+      const noteRow = note ? `<tr><td colspan="4" style="font-size:11pt;color:#222;padding:4px 10px 8px;">${note}</td></tr>` : '';
       return `<tr>
         <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
         <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
-      </tr>`;
+      </tr>${noteRow}`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
@@ -838,24 +855,27 @@ export function printProposal({
       </tr>`;
     }
     if (item._type === 'lib') {
-      const showPrice = !!item.breakout_price;
+      const showQty   = item.show_quantity !== false;
+      const showPrice = item.show_price    !== false;
       const qty = Math.round(item._qty ?? item.quantity ?? 1);
       return `<tr>
         <td>
           <div>${item.name}</div>
           ${item._desc || item.description ? `<div class="item-desc">${item._desc || item.description}</div>` : ''}
         </td>
-        <td class="r">${showPrice ? qty : ''}</td>
+        <td class="r">${showQty ? qty : ''}</td>
         <td class="r">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
-        <td class="r">${showPrice ? fmt(item.line_total) : '<span class="included">Included</span>'}</td>
+        <td class="r">${showPrice ? fmt(item.line_total) : ''}</td>
       </tr>`;
     }
+    const showQty   = item.show_quantity !== false;
+    const showPrice = item.show_price    !== false;
     const qty = Math.round(item._qty ?? item.quantity ?? 1);
     return `<tr>
       <td>${item._desc || item.description || ''}</td>
-      <td class="r">${qty}</td>
-      <td class="r">${fmt(item._price ?? item.price_each)}</td>
-      <td class="r">${fmt(item.line_total)}</td>
+      <td class="r">${showQty ? qty : ''}</td>
+      <td class="r">${showPrice ? fmt(item._price ?? item.price_each) : ''}</td>
+      <td class="r">${showPrice ? fmt(item.line_total) : ''}</td>
     </tr>`;
   }).join('');
 
