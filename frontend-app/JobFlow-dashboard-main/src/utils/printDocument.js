@@ -272,11 +272,11 @@ function _printProposalStyled({
       const t = runningTotal(item.sort_order ?? 0);
       const lbl = item._desc || item.description || 'Subtotal';
       const note = item.subtotal_note || item._note || '';
-      const noteRow = note ? `<tr><td colspan="4" style="${TD}font-size:10.5pt;color:#222;">${note}</td></tr>` : '';
       return `<tr style="background:#f0f2f5;">
-        <td colspan="3" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
+        <td style="${TD}font-size:10.5pt;color:#222;border-top:2px solid #ccc;">${note}</td>
+        <td colspan="2" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
         <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
-      </tr>${noteRow}`;
+      </tr>`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
@@ -296,7 +296,7 @@ function _printProposalStyled({
         </td>
         <td style="${TDR}">${showQty ? qty : ''}</td>
         <td style="${TDR}">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
-        <td style="${TDR}">${showPrice ? fmt(item.line_total) : ''}</td>
+        <td style="${TDR}">${showPrice ? fmt(item.line_total) : '<em style="color:#999;font-size:9pt;">Included</em>'}</td>
       </tr>`;
     }
     const showQty   = item.show_quantity !== false;
@@ -306,7 +306,7 @@ function _printProposalStyled({
       <td style="${TD}font-weight:600;">${item._desc || item.description || ''}</td>
       <td style="${TDR}">${showQty ? qty : ''}</td>
       <td style="${TDR}">${showPrice ? fmt(item._price ?? item.price_each) : ''}</td>
-      <td style="${TDR}">${showPrice ? fmt(item.line_total) : ''}</td>
+      <td style="${TDR}">${showPrice ? fmt(item.line_total) : '<em style="color:#999;font-size:9pt;">Included</em>'}</td>
     </tr>`;
   }).join('');
 
@@ -841,11 +841,11 @@ export function printProposal({
       const total = runningTotal(item.sort_order ?? 0);
       const lbl = item._desc || item.description || 'Subtotal';
       const note = item.subtotal_note || item._note || '';
-      const noteRow = note ? `<tr><td colspan="4" style="font-size:11pt;color:#222;padding:4px 10px 8px;">${note}</td></tr>` : '';
       return `<tr>
-        <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
+        <td style="font-size:11pt;color:#222;border-top:2px solid #aaa;padding:8px 10px;">${note}</td>
+        <td colspan="2" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
         <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
-      </tr>${noteRow}`;
+      </tr>`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
@@ -865,7 +865,7 @@ export function printProposal({
         </td>
         <td class="r">${showQty ? qty : ''}</td>
         <td class="r">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>
-        <td class="r">${showPrice ? fmt(item.line_total) : ''}</td>
+        <td class="r">${showPrice ? fmt(item.line_total) : '<span class="included">Included</span>'}</td>
       </tr>`;
     }
     const showQty   = item.show_quantity !== false;
@@ -875,7 +875,7 @@ export function printProposal({
       <td>${item._desc || item.description || ''}</td>
       <td class="r">${showQty ? qty : ''}</td>
       <td class="r">${showPrice ? fmt(item._price ?? item.price_each) : ''}</td>
-      <td class="r">${showPrice ? fmt(item.line_total) : ''}</td>
+      <td class="r">${showPrice ? fmt(item.line_total) : '<span class="included">Included</span>'}</td>
     </tr>`;
   }).join('');
 

@@ -595,30 +595,28 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     const idx = customItems.findIndex(i => i.id === item.id);
                     const total = runningTotal(thisSort);
                     return (
-                      <div key={`sub-${item.id}`} className="border-t-2 border-gray-300 pt-2 pb-1">
-                        <div className="flex items-center gap-2">
-                          {mvBtns(item.id, false)}
-                          <input
-                            className="flex-1 text-sm font-semibold text-gray-700 text-center bg-transparent border-0 border-b border-transparent focus:border-gray-300 focus:outline-none min-w-0"
-                            value={item._desc}
-                            placeholder="Subtotal"
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)}
-                          />
-                          <span className="text-sm font-bold text-gray-800 whitespace-nowrap">{fmt(total)}</span>
-                          {!isLocked && (
-                            <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
-                          )}
-                        </div>
+                      <div key={`sub-${item.id}`} className="flex items-center gap-2 border-t-2 border-gray-300 pt-2 pb-1">
+                        {mvBtns(item.id, false)}
                         <input
-                          className="w-full mt-1 px-1 py-0.5 text-sm text-gray-700 bg-transparent border-0 border-b border-transparent focus:border-gray-200 focus:outline-none"
+                          className="flex-1 text-sm text-gray-600 bg-transparent border-0 border-b border-transparent focus:border-gray-200 focus:outline-none min-w-0"
                           value={item._note || ''}
-                          placeholder="Note (appears on proposal)…"
+                          placeholder="Note…"
                           disabled={isLocked}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _note: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)}
                         />
+                        <input
+                          className="w-28 text-sm font-semibold text-gray-700 text-center bg-transparent border-0 border-b border-transparent focus:border-gray-300 focus:outline-none flex-shrink-0"
+                          value={item._desc}
+                          placeholder="Subtotal"
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)}
+                        />
+                        <span className="text-sm font-bold text-gray-800 whitespace-nowrap">{fmt(total)}</span>
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
+                        )}
                       </div>
                     );
                   }
