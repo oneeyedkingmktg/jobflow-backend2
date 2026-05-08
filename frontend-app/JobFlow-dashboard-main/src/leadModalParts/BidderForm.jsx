@@ -91,7 +91,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         internal_notes:         p.internal_notes    || '',
         payment_url:            p.payment_url       || '',
         include_payment_button: p.include_payment_button ?? true,
-        salesman:               p.created_by_name   || p.salesman || user?.name || '',
+        salesman:               p.salesman || p.created_by_name || user?.name || '',
       });
 
       // Library items (non-freeform only)

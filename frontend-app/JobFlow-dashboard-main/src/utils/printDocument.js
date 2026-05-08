@@ -273,7 +273,7 @@ function _printProposalStyled({
       const lbl = item._desc || item.description || 'Subtotal';
       const note = item.subtotal_note || item._note || '';
       return `<tr style="background:#f0f2f5;">
-        <td style="${TD}font-size:10.5pt;font-weight:600;color:#222;border-top:2px solid #ccc;">${note}</td>
+        <td style="${TD}font-size:10.5pt;font-weight:600;color:#222;border-top:2px solid #ccc;text-align:center;">${note}</td>
         <td colspan="2" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
         <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
       </tr>`;
@@ -842,7 +842,7 @@ export function printProposal({
       const lbl = item._desc || item.description || 'Subtotal';
       const note = item.subtotal_note || item._note || '';
       return `<tr>
-        <td style="font-size:11pt;font-weight:bold;color:#222;border-top:2px solid #aaa;padding:8px 10px;">${note}</td>
+        <td style="font-size:11pt;font-weight:bold;color:#222;border-top:2px solid #aaa;padding:8px 10px;text-align:center;">${note}</td>
         <td colspan="2" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
         <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
       </tr>`;
