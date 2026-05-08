@@ -57,7 +57,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [emailSending,     setEmailSending]     = useState(false);
   const [emailMsg,         setEmailMsg]         = useState('');
   const [emailModal,       setEmailModal]       = useState({ show: false, addr: '', type: 'proposal', invoiceNum: null });
-  const [insertAboveSort,  setInsertAboveSort]  = useState(null);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -188,65 +187,48 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     await addFromPicker(val, nextSortOrder());
   }
 
-  async function handlePickItemAbove(val) {
-    const targetSort = insertAboveSort;
-
-    // Build unified sorted list to find neighbours
-    const libEntries = Object.entries(checkedMap).map(([libItemId, pi]) => ({ ...pi, _libItemId: libItemId }));
+  // ── Move item up or down in the list ────────────────────────────────────
+  async function handleMoveItem(moveId, isLibItem, direction) {
+    const libEntries = Object.entries(checkedMap).map(([k, pi]) => ({ ...pi, _libItemId: k, _isLib: true }));
     const allSorted = [...libEntries, ...customItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    const idx = allSorted.findIndex(i => (i.sort_order ?? 0) === targetSort);
 
-    let newSortOrder;
+    const idx = isLibItem
+      ? allSorted.findIndex(i => i._libItemId === moveId)
+      : allSorted.findIndex(i => !i._isLib && i.id === moveId);
+    if (idx < 0) return;
 
-    if (idx <= 0) {
-      // Before first item — step back one integer
-      newSortOrder = Math.floor(targetSort) - 1;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= allSorted.length) return;
+
+    const itemA = allSorted[idx];
+    const itemB = allSorted[swapIdx];
+    let sortA = itemA.sort_order ?? idx;
+    let sortB = itemB.sort_order ?? swapIdx;
+    if (sortA === sortB) { sortB = direction === 'up' ? sortA - 1 : sortA + 1; }
+
+    // Update state immediately
+    if (itemA._isLib) {
+      setCheckedMap(prev => ({ ...prev, [itemA._libItemId]: { ...prev[itemA._libItemId], sort_order: sortB } }));
     } else {
-      const prevSort = allSorted[idx - 1].sort_order ?? 0;
-      if (targetSort - prevSort > 1) {
-        // There is an integer gap — slot in right after the previous item
-        newSortOrder = Math.floor(prevSort) + 1;
-      } else {
-        // Items are adjacent integers — shift everything at >= targetSort up by 1 to make room
-        newSortOrder = Math.floor(targetSort);
-        const toShift = allSorted.filter(i => (i.sort_order ?? 0) >= targetSort);
-
-        // Update state immediately so UI reflects new order
-        setCheckedMap(prev => {
-          const next = { ...prev };
-          toShift.forEach(item => {
-            if (item._libItemId && next[item._libItemId]) {
-              next[item._libItemId] = { ...next[item._libItemId], sort_order: (item.sort_order ?? 0) + 1 };
-            }
-          });
-          return next;
-        });
-        setCustomItems(prev => prev.map(item =>
-          (item.sort_order ?? 0) >= targetSort
-            ? { ...item, sort_order: (item.sort_order ?? 0) + 1 }
-            : item
-        ));
-
-        // Persist the sort_order bumps (fire-and-forget — display is already correct)
-        toShift.forEach(item => {
-          const newSO = (item.sort_order ?? 0) + 1;
-          if (item._libItemId) {
-            BidderAPI.updateItem(item.id, { ...item, sort_order: newSO }).catch(console.error);
-          } else {
-            BidderAPI.updateCustomItem(item.id, {
-              description: item.description || item._desc || '',
-              quantity: item.quantity ?? 1,
-              price_each: item.price_each ?? 0,
-              line_total: item.line_total ?? 0,
-              sort_order: newSO,
-            }).catch(console.error);
-          }
-        });
-      }
+      setCustomItems(prev => prev.map(i => i.id === itemA.id ? { ...i, sort_order: sortB } : i));
+    }
+    if (itemB._isLib) {
+      setCheckedMap(prev => ({ ...prev, [itemB._libItemId]: { ...prev[itemB._libItemId], sort_order: sortA } }));
+    } else {
+      setCustomItems(prev => prev.map(i => i.id === itemB.id ? { ...i, sort_order: sortA } : i));
     }
 
-    setInsertAboveSort(null);
-    await addFromPicker(val, newSortOrder);
+    // Persist both
+    const save = (item, newSort) => item._isLib
+      ? BidderAPI.updateItem(item.id, { ...item, sort_order: newSort })
+      : BidderAPI.updateCustomItem(item.id, {
+          description: item.description || item._desc || '',
+          quantity: item.quantity ?? 1,
+          price_each: item.price_each ?? 0,
+          line_total: item.line_total ?? 0,
+          sort_order: newSort,
+        });
+    await Promise.all([save(itemA, sortB), save(itemB, sortA)]).catch(console.error);
   }
 
   async function handleDeleteLibItem(libItemId) {
@@ -547,7 +529,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         <section>
           <p className={sectionHd}>Items</p>
 
-          {/* Unified sorted list */}
           {(() => {
             const libEntries = Object.entries(checkedMap).map(([libItemId, pi]) => ({ ...pi, _type: 'library', _libItemId: libItemId }));
             const allItems = [...libEntries, ...customItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -558,44 +539,18 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               return above.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
             };
 
-            // Reusable inline "insert above" picker rendered at the top of each item
-            const renderInsertAbove = (thisSort) => !isLocked && (
-              <div className="flex justify-center mb-1">
-                {insertAboveSort === thisSort ? (
-                  <div className="w-full flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5">
-                    <select
-                      className="flex-1 text-sm border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
-                      defaultValue=""
-                      onChange={e => { if (!e.target.value) return; handlePickItemAbove(e.target.value); e.target.value = ''; }}
-                      autoFocus
-                    >
-                      <option value="" disabled>— Insert above: choose type —</option>
-                      <option value="__subtotal__">── Subtotal Line ──</option>
-                      <option value="__note__">── Note / Comment ──</option>
-                      <option value="__custom__">── Blank Line Item ──</option>
-                      {library.map(cat => (
-                        <optgroup key={cat.id} label={cat.name}>
-                          {(cat.items || []).filter(i => i.is_active !== false).map(i => (
-                            <option key={i.id} value={`${cat.id}::${i.id}`}>{i.name}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <button onClick={() => setInsertAboveSort(null)} className="text-xs text-gray-500 hover:text-gray-700 whitespace-nowrap">Cancel</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setInsertAboveSort(thisSort)}
-                    className="text-xs text-gray-300 hover:text-blue-500 py-0.5 transition-colors"
-                  >
-                    + add item above
-                  </button>
-                )}
-              </div>
+            // Small ↑ ↓ buttons used on every row
+            const mvBtns = (id, isLib) => !isLocked && (
+              <>
+                <button onClick={() => handleMoveItem(id, isLib, 'up')} title="Move up"
+                  className="text-gray-300 hover:text-blue-500 text-base leading-none px-0.5 flex-shrink-0">↑</button>
+                <button onClick={() => handleMoveItem(id, isLib, 'down')} title="Move down"
+                  className="text-gray-300 hover:text-blue-500 text-base leading-none px-0.5 flex-shrink-0">↓</button>
+              </>
             );
 
             return (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {allItems.map((item) => {
                   const thisSort = item.sort_order ?? 0;
 
@@ -604,22 +559,20 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     const idx = customItems.findIndex(i => i.id === item.id);
                     const total = runningTotal(thisSort);
                     return (
-                      <div key={`sub-${item.id}`}>
-                        {renderInsertAbove(thisSort)}
-                        <div className="flex items-center gap-2 border-t-2 border-gray-300 pt-2 pb-1">
-                          <input
-                            className="flex-1 text-xs font-bold text-gray-500 uppercase tracking-wide bg-transparent border-0 border-b border-transparent focus:border-gray-300 focus:outline-none min-w-0"
-                            value={item._desc}
-                            placeholder="SUBTOTAL"
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)}
-                          />
-                          <span className="text-sm font-bold text-gray-800 whitespace-nowrap">{fmt(total)}</span>
-                          {!isLocked && (
-                            <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none">×</button>
-                          )}
-                        </div>
+                      <div key={`sub-${item.id}`} className="flex items-center gap-2 border-t-2 border-gray-300 pt-2 pb-1">
+                        {mvBtns(item.id, false)}
+                        <input
+                          className="flex-1 text-sm font-semibold text-gray-700 text-center bg-transparent border-0 border-b border-transparent focus:border-gray-300 focus:outline-none min-w-0"
+                          value={item._desc}
+                          placeholder="Subtotal"
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)}
+                        />
+                        <span className="text-sm font-bold text-gray-800 whitespace-nowrap">{fmt(total)}</span>
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
+                        )}
                       </div>
                     );
                   }
@@ -628,24 +581,22 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   if (item.is_note) {
                     const idx = customItems.findIndex(i => i.id === item.id);
                     return (
-                      <div key={`note-${item.id}`}>
-                        {renderInsertAbove(thisSort)}
-                        <div className="flex items-center gap-2 border-l-4 border-yellow-300 bg-yellow-50 rounded-r-lg px-3 py-2">
-                          <svg className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h6m-6 4h8" />
-                          </svg>
-                          <input
-                            className="flex-1 text-sm text-gray-600 bg-transparent border-0 focus:outline-none italic min-w-0"
-                            value={item._desc}
-                            placeholder="Add a note or comment…"
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)}
-                          />
-                          {!isLocked && (
-                            <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
-                          )}
-                        </div>
+                      <div key={`note-${item.id}`} className="flex items-center gap-1 border-l-4 border-yellow-300 bg-yellow-50 rounded-r-lg pl-2 pr-3 py-2">
+                        {mvBtns(item.id, false)}
+                        <svg className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h6m-6 4h8" />
+                        </svg>
+                        <input
+                          className="flex-1 text-sm text-gray-600 bg-transparent border-0 focus:outline-none italic min-w-0 ml-1"
+                          value={item._desc}
+                          placeholder="Add a note or comment…"
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)}
+                        />
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-300 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
+                        )}
                       </div>
                     );
                   }
@@ -655,47 +606,45 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     const libItemId = item._libItemId;
                     const pi = checkedMap[libItemId];
                     return (
-                      <div key={`lib-${libItemId}`}>
-                        {renderInsertAbove(thisSort)}
-                        <div className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-gray-800">{pi.name}</span>
-                            {!isLocked && (
-                              <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input className={`w-14 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
-                              type="number" step="1" min="1" value={Math.round(pi._qty)}
-                              disabled={isLocked}
-                              onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _qty: e.target.value } }))}
-                              onBlur={() => handleItemQtyBlur(libItemId)} />
-                            <span className="text-gray-400 text-xs">× $</span>
-                            <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
-                              type="number" step="0.01" value={pi._price || ''}
-                              disabled={isLocked}
-                              onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
-                              onBlur={() => handleItemPriceBlur(libItemId)} />
-                            {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
-                            <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
-                          </div>
+                      <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
+                        <div className="flex items-center gap-1 mb-2">
+                          {mvBtns(libItemId, true)}
+                          <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{pi.name}</span>
                           {!isLocked && (
-                            <label className="mt-2 flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={!!pi.breakout_price}
-                                onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
-                                className="accent-blue-600 w-4 h-4" />
-                              <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
-                            </label>
+                            <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0">×</button>
                           )}
-                          {!!pi.breakout_price && isLocked && (
-                            <p className="mt-1 text-xs text-gray-400">Pricing broken out on proposal</p>
-                          )}
-                          <input className="mt-1 w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
-                            placeholder="Description (optional)" value={pi._desc}
-                            disabled={isLocked}
-                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _desc: e.target.value } }))}
-                            onBlur={() => handleItemDescBlur(libItemId)} />
                         </div>
+                        <div className="flex items-center gap-2">
+                          <input className={`w-14 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
+                            type="number" step="1" min="1" value={Math.round(pi._qty)}
+                            disabled={isLocked}
+                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _qty: e.target.value } }))}
+                            onBlur={() => handleItemQtyBlur(libItemId)} />
+                          <span className="text-gray-400 text-xs">× $</span>
+                          <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
+                            type="number" step="0.01" value={pi._price || ''}
+                            disabled={isLocked}
+                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
+                            onBlur={() => handleItemPriceBlur(libItemId)} />
+                          {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
+                          <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
+                        </div>
+                        {!isLocked && (
+                          <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={!!pi.breakout_price}
+                              onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
+                              className="accent-blue-600 w-4 h-4" />
+                            <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
+                          </label>
+                        )}
+                        {!!pi.breakout_price && isLocked && (
+                          <p className="mt-1 text-xs text-gray-400">Pricing broken out on proposal</p>
+                        )}
+                        <input className="mt-1 w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
+                          placeholder="Description (optional)" value={pi._desc}
+                          disabled={isLocked}
+                          onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _desc: e.target.value } }))}
+                          onBlur={() => handleItemDescBlur(libItemId)} />
                       </div>
                     );
                   }
@@ -703,32 +652,30 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   // ── Custom line item ──────────────────────────────────────
                   const idx = customItems.findIndex(i => i.id === item.id);
                   return (
-                    <div key={`ci-${item.id}`}>
-                      {renderInsertAbove(thisSort)}
-                      <div className="border border-gray-200 rounded-lg bg-white px-3 py-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <input className="flex-1 px-2 py-1 border rounded text-sm font-medium" value={item._desc} placeholder="Description"
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)} />
-                          {!isLocked && (
-                            <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none ml-2">×</button>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input className={`w-14 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="1"
-                            value={Math.round(item._qty)}
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _qty: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)} />
-                          <span className="text-gray-400 text-xs">× $</span>
-                          <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
-                            value={item._price || ''}
-                            disabled={isLocked}
-                            onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
-                            onBlur={() => handleCustomItemBlur(idx)} />
-                          <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
-                        </div>
+                    <div key={`ci-${item.id}`} className="border border-gray-200 rounded-lg bg-white px-3 py-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        {mvBtns(item.id, false)}
+                        <input className="flex-1 px-2 py-1 border rounded text-sm font-medium min-w-0 ml-1" value={item._desc} placeholder="Description"
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)} />
+                        {!isLocked && (
+                          <button onClick={() => handleDeleteCustomItem(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0">×</button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input className={`w-14 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="1"
+                          value={Math.round(item._qty)}
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _qty: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)} />
+                        <span className="text-gray-400 text-xs">× $</span>
+                        <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
+                          value={item._price || ''}
+                          disabled={isLocked}
+                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
+                          onBlur={() => handleCustomItemBlur(idx)} />
+                        <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
                       </div>
                     </div>
                   );
