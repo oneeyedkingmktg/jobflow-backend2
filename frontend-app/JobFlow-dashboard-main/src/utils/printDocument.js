@@ -276,7 +276,8 @@ function _printProposalStyled({
         <td style="${TD}font-size:10.5pt;font-weight:600;color:#222;border-top:2px solid #ccc;text-align:center;">${note}</td>
         <td colspan="2" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
         <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
-      </tr>`;
+      </tr>
+      <tr style="background:#fff;"><td colspan="4" style="padding:8px 0;"></td></tr>`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
@@ -845,7 +846,8 @@ export function printProposal({
         <td style="font-size:11pt;font-weight:bold;color:#222;border-top:2px solid #aaa;padding:8px 10px;text-align:center;">${note}</td>
         <td colspan="2" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
         <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
-      </tr>`;
+      </tr>
+      <tr><td colspan="4" style="padding:8px 0;"></td></tr>`;
     }
     if (item.is_note) {
       const txt = item._desc || item.description || '';
