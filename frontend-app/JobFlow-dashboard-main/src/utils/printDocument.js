@@ -255,7 +255,7 @@ function _printProposalStyled({
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const runningTotal = (upTo) =>
-    [...libEntries, ...customItems.filter(i => !i.is_subtotal)]
+    [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
       .filter(i => (i.sort_order ?? 0) < upTo)
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
 
@@ -265,9 +265,17 @@ function _printProposalStyled({
   const rows = allItems.map(item => {
     if (item.is_subtotal) {
       const t = runningTotal(item.sort_order ?? 0);
+      const lbl = item._desc || item.description || 'Subtotal';
       return `<tr style="background:#f0f2f5;">
-        <td colspan="3" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">Running Subtotal</td>
+        <td colspan="3" style="${TDR}font-size:9pt;color:#666;font-weight:700;border-top:2px solid #ccc;">${lbl}</td>
         <td style="${TDR}font-weight:700;border-top:2px solid #ccc;">${fmt(t)}</td>
+      </tr>`;
+    }
+    if (item.is_note) {
+      const txt = item._desc || item.description || '';
+      if (!txt) return '';
+      return `<tr>
+        <td colspan="4" style="${TD}font-style:italic;color:#888;font-size:9.5pt;">${txt}</td>
       </tr>`;
     }
     if (item._type === 'lib') {
@@ -816,9 +824,17 @@ export function printProposal({
   const allRows = allItems.map(item => {
     if (item.is_subtotal) {
       const total = runningTotal(item.sort_order ?? 0);
+      const lbl = item._desc || item.description || 'Subtotal';
       return `<tr>
-        <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">Running Subtotal</td>
+        <td colspan="3" style="text-align:right;font-weight:bold;font-size:10.5pt;border-top:2px solid #aaa;padding-top:8px;color:#444">${lbl}</td>
         <td class="r" style="font-weight:bold;border-top:2px solid #aaa;padding-top:8px">${fmt(total)}</td>
+      </tr>`;
+    }
+    if (item.is_note) {
+      const txt = item._desc || item.description || '';
+      if (!txt) return '';
+      return `<tr>
+        <td colspan="4" style="font-style:italic;color:#888;font-size:9.5pt;padding:6px 0;">${txt}</td>
       </tr>`;
     }
     if (item._type === 'lib') {

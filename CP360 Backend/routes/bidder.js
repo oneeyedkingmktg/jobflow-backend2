@@ -376,7 +376,7 @@ router.delete('/item/:id', async (req, res) => {
 router.post('/custom-item', async (req, res) => {
   try {
     const companyId = req.user.company_id;
-    const { proposal_id, description, quantity = 1, price_each = 0, line_total = 0, sort_order = 0, is_subtotal = false } = req.body;
+    const { proposal_id, description, quantity = 1, price_each = 0, line_total = 0, sort_order = 0, is_subtotal = false, is_note = false } = req.body;
 
     const check = await pool.query(
       'SELECT id FROM bidder_proposals WHERE id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)',
@@ -385,9 +385,9 @@ router.post('/custom-item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_custom_items (proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal]
+      `INSERT INTO bidder_custom_items (proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note]
     );
 
     res.status(201).json(result.rows[0]);

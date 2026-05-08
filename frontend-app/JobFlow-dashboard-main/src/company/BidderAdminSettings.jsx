@@ -364,21 +364,9 @@ export default function BidderAdminSettings({ companyId }) {
                             <input className={inputCls} type="number" step="0.01" value={editItemForm.default_unit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>Unit Label</label>
-                            <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
-                          </div>
-                          <div className="flex items-end gap-4 pb-1">
-                            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                              <input type="checkbox" checked={editItemForm.is_included} onChange={(e) => setEditItemForm((p) => ({ ...p, is_included: e.target.checked }))} className="w-4 h-4" />
-                              Included (no price shown)
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                              <input type="checkbox" checked={editItemForm.show_quantity} onChange={(e) => setEditItemForm((p) => ({ ...p, show_quantity: e.target.checked }))} className="w-4 h-4" />
-                              Show Qty
-                            </label>
-                          </div>
+                        <div>
+                          <label className={labelCls}>Unit Label</label>
+                          <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                         </div>
                         <div>
                           <label className={labelCls}>Description</label>
@@ -395,8 +383,6 @@ export default function BidderAdminSettings({ companyId }) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm text-gray-800">{item.name}</span>
-                            {item.is_included && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Included</span>}
-                            {item.show_quantity && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Qty</span>}
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
                           {item.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>}
@@ -424,21 +410,9 @@ export default function BidderAdminSettings({ companyId }) {
                         <input className={inputCls} type="number" step="0.01" value={newItemForm.default_unit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Unit Label</label>
-                        <input className={inputCls} value={newItemForm.default_unit_label} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
-                      </div>
-                      <div className="flex items-end gap-4 pb-1">
-                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                          <input type="checkbox" checked={newItemForm.is_included} onChange={(e) => setNewItemForm((p) => ({ ...p, is_included: e.target.checked }))} className="w-4 h-4" />
-                          Included
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                          <input type="checkbox" checked={newItemForm.show_quantity} onChange={(e) => setNewItemForm((p) => ({ ...p, show_quantity: e.target.checked }))} className="w-4 h-4" />
-                          Show Qty
-                        </label>
-                      </div>
+                    <div>
+                      <label className={labelCls}>Unit Label</label>
+                      <input className={inputCls} value={newItemForm.default_unit_label} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                     </div>
                     <div>
                       <label className={labelCls}>Description</label>
