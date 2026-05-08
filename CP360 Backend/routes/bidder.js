@@ -284,7 +284,7 @@ router.post('/item', async (req, res) => {
       proposal_id, library_item_id, category_name, name, description,
       unit_price = 0, unit_label, quantity, line_total = 0,
       is_included = false, is_optional = false, is_freeform = false,
-      breakout_price = false, sort_order = 0,
+      breakout_price = false, show_price = true, show_quantity = true, sort_order = 0,
     } = req.body;
 
     // Verify proposal belongs to this company
@@ -299,12 +299,12 @@ router.post('/item', async (req, res) => {
       `INSERT INTO bidder_proposal_items (
         proposal_id, library_item_id, category_name, name, description,
         unit_price, unit_label, quantity, line_total, is_included,
-        is_optional, is_freeform, breakout_price, sort_order
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        is_optional, is_freeform, breakout_price, show_price, show_quantity, sort_order
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [
         proposal_id, clean(library_item_id), clean(category_name), name, clean(description),
         unit_price, clean(unit_label), clean(quantity), line_total, is_included,
-        is_optional, is_freeform, breakout_price, sort_order,
+        is_optional, is_freeform, breakout_price, show_price, show_quantity, sort_order,
       ]
     );
 
@@ -322,21 +322,23 @@ router.put('/item/:id', async (req, res) => {
     const {
       category_name, name, description, unit_price, unit_label,
       quantity, line_total, is_included, is_optional, is_accepted,
-      breakout_price, sort_order,
+      breakout_price, show_price, show_quantity, sort_order,
     } = req.body;
 
     const result = await pool.query(
       `UPDATE bidder_proposal_items pi
        SET category_name = $1, name = $2, description = $3, unit_price = $4,
            unit_label = $5, quantity = $6, line_total = $7, is_included = $8,
-           is_optional = $9, is_accepted = $10, breakout_price = $11, sort_order = $12
+           is_optional = $9, is_accepted = $10, breakout_price = $11, sort_order = $12,
+           show_price = $13, show_quantity = $14
        FROM bidder_proposals p
-       WHERE pi.id = $13 AND pi.proposal_id = p.id AND ($14::integer IS NULL OR p.company_id = $14::integer)
+       WHERE pi.id = $15 AND pi.proposal_id = p.id AND ($16::integer IS NULL OR p.company_id = $16::integer)
        RETURNING pi.*`,
       [
         clean(category_name), name, clean(description), unit_price,
         clean(unit_label), clean(quantity), line_total, is_included,
         is_optional, clean(is_accepted), breakout_price ?? false, sort_order,
+        show_price ?? true, show_quantity ?? true,
         req.params.id, companyId,
       ]
     );
@@ -401,15 +403,16 @@ router.post('/custom-item', async (req, res) => {
 router.put('/custom-item/:id', async (req, res) => {
   try {
     const companyId = req.user.company_id;
-    const { description, quantity, price_each, line_total, sort_order } = req.body;
+    const { description, quantity, price_each, line_total, sort_order, show_price, show_quantity } = req.body;
 
     const result = await pool.query(
       `UPDATE bidder_custom_items ci
-       SET description = $1, quantity = $2, price_each = $3, line_total = $4, sort_order = $5
+       SET description = $1, quantity = $2, price_each = $3, line_total = $4, sort_order = $5,
+           show_price = $6, show_quantity = $7
        FROM bidder_proposals p
-       WHERE ci.id = $6 AND ci.proposal_id = p.id AND ($7::integer IS NULL OR p.company_id = $7::integer)
+       WHERE ci.id = $8 AND ci.proposal_id = p.id AND ($9::integer IS NULL OR p.company_id = $9::integer)
        RETURNING ci.*`,
-      [description, quantity, price_each, line_total, sort_order, req.params.id, companyId]
+      [description, quantity, price_each, line_total, sort_order, show_price ?? true, show_quantity ?? true, req.params.id, companyId]
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Custom item not found' });

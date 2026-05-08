@@ -249,6 +249,31 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     } catch (e) { console.error('Failed to update breakout', e); }
   }
 
+  async function handleItemToggle(libItemId, field, value) {
+    const item = checkedMap[libItemId];
+    if (!item) return;
+    const updated = { ...item, [field]: value };
+    setCheckedMap(prev => ({ ...prev, [libItemId]: updated }));
+    try {
+      await BidderAPI.updateItem(item.id, updated);
+    } catch (e) { console.error('Failed to update item field', e); }
+  }
+
+  async function handleCustomItemToggle(idx, field, value) {
+    setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
+    const item = customItems[idx];
+    const quantity   = parseFloat(item._qty)   || 1;
+    const price_each = parseFloat(item._price) || 0;
+    try {
+      await BidderAPI.updateCustomItem(item.id, {
+        description: item._desc, quantity, price_each, line_total: quantity * price_each,
+        sort_order: item.sort_order,
+        show_price:    field === 'show_price'    ? value : (item.show_price    ?? true),
+        show_quantity: field === 'show_quantity' ? value : (item.show_quantity ?? true),
+      });
+    } catch (e) { console.error('Failed to toggle custom item field', e); }
+  }
+
   // Update a checked library item's price
   async function handleItemPriceBlur(libItemId) {
     const item = checkedMap[libItemId];
@@ -316,7 +341,12 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const price_each = parseFloat(item._price) || 0;
     const line_total = quantity * price_each;
     try {
-      await BidderAPI.updateCustomItem(item.id, { description: item._desc, quantity, price_each, line_total, sort_order: item.sort_order });
+      await BidderAPI.updateCustomItem(item.id, {
+        description: item._desc, quantity, price_each, line_total,
+        sort_order: item.sort_order,
+        show_price:    item.show_price    ?? true,
+        show_quantity: item.show_quantity ?? true,
+      });
       setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity, price_each, line_total, description: item._desc } : it));
     } catch (e) { console.error('Custom item save error', e); }
   }
@@ -534,18 +564,23 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             const allItems = [...libEntries, ...customItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
             const runningTotal = (upToSortOrder) => {
-              const above = [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
-                .filter(i => (i.sort_order ?? 0) < upToSortOrder);
-              return above.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+              // Find the sort_order of the nearest preceding subtotal, if any
+              const prevSorts = customItems
+                .filter(i => i.is_subtotal && (i.sort_order ?? 0) < upToSortOrder)
+                .map(i => i.sort_order ?? 0);
+              const prevSort = prevSorts.length > 0 ? Math.max(...prevSorts) : -1;
+              const section = [...libEntries, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
+                .filter(i => { const so = i.sort_order ?? 0; return so > prevSort && so < upToSortOrder; });
+              return section.reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
             };
 
-            // Small ↑ ↓ buttons used on every row
+            // Small ▲ ▼ buttons used on every row
             const mvBtns = (id, isLib) => !isLocked && (
               <>
                 <button onClick={() => handleMoveItem(id, isLib, 'up')} title="Move up"
-                  className="text-gray-300 hover:text-blue-500 text-base leading-none px-0.5 flex-shrink-0">↑</button>
+                  className="text-gray-500 hover:text-blue-600 text-xs leading-none p-1 flex-shrink-0">▲</button>
                 <button onClick={() => handleMoveItem(id, isLib, 'down')} title="Move down"
-                  className="text-gray-300 hover:text-blue-500 text-base leading-none px-0.5 flex-shrink-0">↓</button>
+                  className="text-gray-500 hover:text-blue-600 text-xs leading-none p-1 flex-shrink-0">▼</button>
               </>
             );
 
@@ -630,15 +665,26 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
                         </div>
                         {!isLocked && (
-                          <label className="mt-2 flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={!!pi.breakout_price}
-                              onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
-                              className="accent-blue-600 w-4 h-4" />
-                            <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
-                          </label>
-                        )}
-                        {!!pi.breakout_price && isLocked && (
-                          <p className="mt-1 text-xs text-gray-400">Pricing broken out on proposal</p>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={!!pi.breakout_price}
+                                onChange={e => handleItemBreakout(String(libItemId), e.target.checked)}
+                                className="accent-blue-600 w-4 h-4" />
+                              <span className="text-xs text-gray-500">Breakout pricing on proposal</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={pi.show_price !== false}
+                                onChange={e => handleItemToggle(String(libItemId), 'show_price', e.target.checked)}
+                                className="accent-blue-600 w-4 h-4" />
+                              <span className="text-xs text-gray-500">Show price</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={pi.show_quantity !== false}
+                                onChange={e => handleItemToggle(String(libItemId), 'show_quantity', e.target.checked)}
+                                className="accent-blue-600 w-4 h-4" />
+                              <span className="text-xs text-gray-500">Show qty</span>
+                            </label>
+                          </div>
                         )}
                         <input className="mt-1 w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
                           placeholder="Description (optional)" value={pi._desc}
@@ -677,6 +723,22 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           onBlur={() => handleCustomItemBlur(idx)} />
                         <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
                       </div>
+                      {!isLocked && (
+                        <div className="mt-2 flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={item.show_price !== false}
+                              onChange={e => handleCustomItemToggle(idx, 'show_price', e.target.checked)}
+                              className="accent-blue-600 w-4 h-4" />
+                            <span className="text-xs text-gray-500">Show price</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={item.show_quantity !== false}
+                              onChange={e => handleCustomItemToggle(idx, 'show_quantity', e.target.checked)}
+                              className="accent-blue-600 w-4 h-4" />
+                            <span className="text-xs text-gray-500">Show qty</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
