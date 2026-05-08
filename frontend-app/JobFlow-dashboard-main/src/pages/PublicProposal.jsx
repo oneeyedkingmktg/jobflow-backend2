@@ -170,10 +170,15 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     ...customItems.map(i => ({ ...i, _type: 'custom' })),
   ].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-  const runningSubtotal = (upTo) =>
-    [...libItems, ...customItems.filter(i => !i.is_subtotal)]
-      .filter(i => (i.sort_order ?? 0) < upTo)
+  const runningSubtotal = (upTo) => {
+    const prevSubtotals = customItems
+      .filter(i => i.is_subtotal && (i.sort_order ?? 0) < upTo)
+      .map(i => i.sort_order ?? 0);
+    const prevSort = prevSubtotals.length > 0 ? Math.max(...prevSubtotals) : -1;
+    return [...libItems, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
+      .filter(i => (i.sort_order ?? 0) > prevSort && (i.sort_order ?? 0) < upTo)
       .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+  };
 
   // ── Pay button / paid badge (reused in both invoice designs) ────────────────
   const paidBadge = (
@@ -559,10 +564,25 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                   {allSortedItems.map((item, idx) => {
                     if (item.is_subtotal) {
                       const t = runningSubtotal(item.sort_order ?? 0);
+                      const lbl = item.description || 'Subtotal';
+                      const note = item.subtotal_note || '';
                       return (
-                        <tr key={`sub-${item.id}`} className="bg-gray-50">
-                          <td colSpan={3} className="px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-gray-500 border-t-2 border-gray-300">Running Subtotal</td>
-                          <td className="px-4 py-2 text-right font-bold text-gray-800 border-t-2 border-gray-300">{fmt(t)}</td>
+                        <React.Fragment key={`sub-${item.id}`}>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-center text-sm font-semibold text-gray-600 border-t-2 border-gray-300">{note}</td>
+                            <td colSpan={2} className="px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-gray-500 border-t-2 border-gray-300">{lbl}</td>
+                            <td className="px-4 py-2 text-right font-bold text-gray-800 border-t-2 border-gray-300">{fmt(t)}</td>
+                          </tr>
+                          <tr><td colSpan={4} className="py-2"></td></tr>
+                        </React.Fragment>
+                      );
+                    }
+                    if (item.is_note) {
+                      const txt = item.description || '';
+                      if (!txt) return null;
+                      return (
+                        <tr key={`note-${item.id}`}>
+                          <td colSpan={4} className="px-4 py-1.5 text-sm italic text-gray-400">{txt}</td>
                         </tr>
                       );
                     }
@@ -573,10 +593,10 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                             <div className="font-semibold text-gray-900">{item.name}</div>
                             {item.description && <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-600">{item.breakout_price ? item.quantity : ''}</td>
-                          <td className="px-4 py-2.5 text-right text-gray-600">{item.breakout_price ? fmt(item.unit_price) : ''}</td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">{item.show_quantity !== false ? item.quantity : ''}</td>
+                          <td className="px-4 py-2.5 text-right text-gray-600">{item.show_price !== false ? fmt(item.unit_price) : ''}</td>
                           <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
-                            {item.breakout_price ? fmt(item.line_total) : <span className="text-gray-400 italic font-normal text-xs">Included</span>}
+                            {item.show_price !== false ? fmt(item.line_total) : <span className="text-gray-400 italic font-normal text-xs">Included</span>}
                           </td>
                         </tr>
                       );
@@ -584,9 +604,11 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                     return (
                       <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-2.5 font-semibold text-gray-900">{item.description}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-600">{item.quantity}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-600">{fmt(item.price_each)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(item.line_total)}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-600">{item.show_quantity !== false ? item.quantity : ''}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-600">{item.show_price !== false ? fmt(item.price_each) : ''}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900">
+                          {item.show_price !== false ? fmt(item.line_total) : <span className="text-gray-400 italic font-normal text-xs">Included</span>}
+                        </td>
                       </tr>
                     );
                   })}
@@ -794,17 +816,39 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                 ...customItems.map(i => ({ ...i, _type: 'custom' })),
               ].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
-              const runningTotal = (upToSortOrder) =>
-                [...libItems, ...customItems.filter(i => !i.is_subtotal)]
-                  .filter(i => (i.sort_order ?? 0) < upToSortOrder)
+              const runningTotal = (upToSortOrder) => {
+                const prevSubtotals = customItems
+                  .filter(i => i.is_subtotal && (i.sort_order ?? 0) < upToSortOrder)
+                  .map(i => i.sort_order ?? 0);
+                const prevSort = prevSubtotals.length > 0 ? Math.max(...prevSubtotals) : -1;
+                return [...libItems, ...customItems.filter(i => !i.is_subtotal && !i.is_note)]
+                  .filter(i => (i.sort_order ?? 0) > prevSort && (i.sort_order ?? 0) < upToSortOrder)
                   .reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+              };
 
               return allItems.map(item => {
                 if (item.is_subtotal) {
+                  const note = item.subtotal_note || '';
+                  const lbl = item.description || 'Subtotal';
                   return (
-                    <div key={`sub-${item.id}`} className="py-2 flex items-center justify-between border-t-2 border-gray-300 mt-1">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Running Subtotal</span>
-                      <span className="text-sm font-bold text-gray-800">{fmt(runningTotal(item.sort_order ?? 0))}</span>
+                    <React.Fragment key={`sub-${item.id}`}>
+                      <div className="py-2 border-t-2 border-gray-300 mt-1">
+                        {note && <p className="text-sm font-semibold text-gray-600 text-center mb-1">{note}</p>}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{lbl}</span>
+                          <span className="text-sm font-bold text-gray-800">{fmt(runningTotal(item.sort_order ?? 0))}</span>
+                        </div>
+                      </div>
+                      <div className="py-2" />
+                    </React.Fragment>
+                  );
+                }
+                if (item.is_note) {
+                  const txt = item.description || '';
+                  if (!txt) return null;
+                  return (
+                    <div key={`note-${item.id}`} className="py-1.5">
+                      <p className="text-sm italic text-gray-400">{txt}</p>
                     </div>
                   );
                 }
@@ -816,7 +860,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                         {item.description && <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>}
                       </div>
                       <div className="text-right shrink-0">
-                        {item.breakout_price
+                        {item.show_price !== false
                           ? <p className="font-semibold text-gray-900 text-sm">{fmt(item.line_total)}</p>
                           : <p className="text-sm text-gray-400 italic">Included</p>}
                       </div>
@@ -826,7 +870,9 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                 return (
                   <div key={item.id} className="py-3 flex items-start justify-between gap-3">
                     <p className="font-semibold text-gray-900 text-sm flex-1">{item.description}</p>
-                    <p className="font-semibold text-gray-900 text-sm shrink-0">{fmt(item.line_total)}</p>
+                    {item.show_price !== false
+                      ? <p className="font-semibold text-gray-900 text-sm shrink-0">{fmt(item.line_total)}</p>
+                      : <p className="text-sm text-gray-400 italic shrink-0">Included</p>}
                   </div>
                 );
               });
