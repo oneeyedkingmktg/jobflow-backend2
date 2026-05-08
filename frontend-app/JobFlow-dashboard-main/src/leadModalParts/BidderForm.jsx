@@ -505,7 +505,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             <p className="text-blue-200 text-xs">{lead.name || lead.fullName}</p>
           </div>
         </div>
-        <button onClick={() => promptExit(onClose)} className="text-blue-200 hover:text-white">
+        <button onClick={() => promptExit(onBack)} className="text-blue-200 hover:text-white">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -616,7 +616,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       <div key={`sub-${item.id}`} className="flex items-center gap-2 border-t-2 border-gray-300 pt-2 pb-1">
                         {mvBtns(item.id, false)}
                         <input
-                          className="flex-1 text-sm text-gray-600 bg-transparent border-0 border-b border-transparent focus:border-gray-200 focus:outline-none min-w-0"
+                          className="flex-1 text-sm text-gray-600 bg-transparent border-0 border-b border-transparent focus:border-gray-200 focus:outline-none min-w-0 text-center"
                           value={item._note || ''}
                           placeholder="Note…"
                           disabled={isLocked}
@@ -934,13 +934,16 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
       {/* ── ACTION BAR ───────────────────────────────────────────────────── */}
       <div className="border-t px-5 py-4 bg-white rounded-b-2xl flex items-center gap-2 shrink-0">
-        <button onClick={() => handleSaveAndExit(onBack)} disabled={saving} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+        <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button onClick={() => handleSaveAndExit(onBack)} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
           {saving ? 'Saving…' : 'Save & Exit'}
         </button>
-        <button onClick={onBack} className="px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
+        <button onClick={onBack} className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
           Exit
         </button>
-        <button onClick={() => setShowDocsModal(true)} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
+        <button onClick={() => setShowDocsModal(true)} className="flex-1 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
           Create Documents
         </button>
         {saveMsg && (
@@ -948,8 +951,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             {saveMsg}
           </span>
         )}
-        <div className="flex-1" />
-        <span className="text-base font-bold text-gray-800">{fmt(bidTotal)}</span>
       </div>
 
       {/* ── DOCUMENTS MODAL ──────────────────────────────────────────────── */}
