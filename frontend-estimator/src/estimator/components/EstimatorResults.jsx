@@ -177,6 +177,7 @@ const cta2Link = config?.cta2_link || "";
   if (activeFinish === "custom") finishDescriptionText = customFinishDescription;
 
   const hasFinishDescription = Boolean(finishDescriptionText && String(finishDescriptionText).trim().length > 0);
+  console.log("[EstimatorResults] activeFinish:", activeFinish, "| desc:", finishDescriptionText, "| config.solid_finish_description:", config?.solid_finish_description);
 
   const phoneDisplay = formatPhoneDisplay(companyPhone);
   const phoneTel = companyPhone.replace(/\D/g, "");
