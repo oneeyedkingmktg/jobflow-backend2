@@ -313,30 +313,24 @@ const infoBoxClass = useCustomStyles
       <span className="text-sm align-super">*</span>
     </div>
 
-<div className="text-sm text-gray-600">
+    <div className="text-sm text-gray-600">
       Your floor's current condition:{" "}
       <strong>{conditionLabel}</strong>
     </div>
-  </div>
 
-
-        <div className="px-5 pb-5 space-y-3">
-          {/* NEW: finish-specific info box (uses same colors/stripe settings as standard info box) */}
-          {hasFinishDescription && (
-            <div className={infoBoxClass} style={infoBoxStyle}>
-              {renderTextWithInlineLinks(String(finishDescriptionText))}
-            </div>
-          )}
-
-{/* Standard info as footnote */}
-{infoText && (
-  <div className="text-xs text-gray-600 mt-2 italic">
-    {infoText}
-  </div>
-)}
-
-        </div>
+    {hasFinishDescription && (
+      <div className="text-sm text-gray-600 pt-1">
+        {renderTextWithInlineLinks(String(finishDescriptionText))}
       </div>
+    )}
+
+    {infoText && (
+      <div className="text-xs text-gray-500 italic pt-1">
+        * {infoText}
+      </div>
+    )}
+  </div>
+</div>
 
 {/* BOTTOM CTA BUTTONS */}
 <div className="mt-8 flex flex-col md:flex-row gap-4">
