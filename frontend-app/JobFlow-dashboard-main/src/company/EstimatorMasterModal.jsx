@@ -12,6 +12,8 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [outOfAreaLogs, setOutOfAreaLogs] = useState(null);
+  const [loadingLogs, setLoadingLogs] = useState(false);
   
   const [form, setForm] = useState({
   estimatorEnabled: false,
@@ -57,6 +59,11 @@ standardInfoText: "",
 largeProjectSfThreshold: "",
 largeProjectNote: "",
 combinedProjectMessage: "",
+outOfAreaEnabled: false,
+outOfAreaLargeJobThreshold: "",
+outOfAreaSorryMessage: "",
+outOfAreaLargeJobMessage: "",
+outOfAreaPriceDisclaimer: "",
 
 // Finish-specific descriptions (Results page)
 solidFinishDescription: "",
@@ -144,6 +151,11 @@ standardInfoText: data.standard_info_text ?? "",
 largeProjectSfThreshold: data.large_project_sf_threshold ?? "",
 largeProjectNote: data.large_project_note ?? "",
 combinedProjectMessage: data.combined_project_message ?? "",
+outOfAreaEnabled: data.out_of_area_enabled ?? false,
+outOfAreaLargeJobThreshold: data.out_of_area_large_job_threshold ?? "",
+outOfAreaSorryMessage: data.out_of_area_sorry_message ?? "",
+outOfAreaLargeJobMessage: data.out_of_area_large_job_message ?? "",
+outOfAreaPriceDisclaimer: data.out_of_area_price_disclaimer ?? "",
 // Finish-specific descriptions
 solidFinishDescription: data.solid_finish_description ?? "",
 flakeFinishDescription: data.flake_finish_description ?? "",
@@ -333,6 +345,11 @@ standard_info_text: form.standardInfoText || null,
 large_project_sf_threshold: form.largeProjectSfThreshold ? Number(form.largeProjectSfThreshold) : null,
 large_project_note: form.largeProjectNote || null,
 combined_project_message: form.combinedProjectMessage || null,
+out_of_area_enabled: form.outOfAreaEnabled,
+out_of_area_large_job_threshold: form.outOfAreaLargeJobThreshold ? Number(form.outOfAreaLargeJobThreshold) : null,
+out_of_area_sorry_message: form.outOfAreaSorryMessage || null,
+out_of_area_large_job_message: form.outOfAreaLargeJobMessage || null,
+out_of_area_price_disclaimer: form.outOfAreaPriceDisclaimer || null,
 
 // Finish-specific descriptions (Results page)
 solid_finish_description: form.solidFinishDescription || null,
@@ -594,6 +611,31 @@ navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n 
 
     <hr className="my-4" />
 
+    <h4 className="font-semibold text-gray-700 text-sm">Out of Area / Large Job</h4>
+    <p className="text-xs text-gray-500 mb-2">When enabled, ZIP codes outside the service area are still calculated. If the estimated value meets the threshold, the lead is accepted and tagged as out of area.</p>
+
+    {mode === "view"
+      ? <div className="text-xs text-gray-700"><span className="font-semibold">Out of Area Feature:</span> {form.outOfAreaEnabled ? "On" : "Off"}</div>
+      : (
+        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.outOfAreaEnabled}
+            onChange={(e) => handleChange("outOfAreaEnabled", e.target.checked)}
+            className="w-4 h-4"
+          />
+          Out of Area Feature On/Off
+        </label>
+      )
+    }
+
+    {textInput("Out of Area Large Job Threshold ($)", "outOfAreaLargeJobThreshold", "e.g. 5000 — min flake floor price to still accept the lead")}
+    {textArea("Sorry / Cannot Help Message", "outOfAreaSorryMessage", "Shown when job is below threshold", 2)}
+    {textArea("Out of Area Large Job Message", "outOfAreaLargeJobMessage", "Shown in the price reveal modal for large jobs", 2)}
+    {textArea("Out of Area Price Reveal Disclaimer", "outOfAreaPriceDisclaimer", "Fine print shown in the price reveal modal", 3)}
+
+    <hr className="my-4" />
+
     {textInput(
       "Custom Finish Tab Label",
       "customFinishLabel",
@@ -645,6 +687,65 @@ navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n 
 
 
 
+        </div>
+
+        {/* OUT OF AREA LOG */}
+        <div className="border-t px-6 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-bold text-gray-800 text-sm">Out of Area Log</h4>
+            <button
+              type="button"
+              onClick={async () => {
+                if (outOfAreaLogs) { setOutOfAreaLogs(null); return; }
+                setLoadingLogs(true);
+                try {
+                  const res = await fetch(`${API_BASE_URL}/estimator/out-of-area-log/${company.id}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` }
+                  });
+                  const data = await res.json();
+                  setOutOfAreaLogs(data.logs || []);
+                } catch {
+                  setOutOfAreaLogs([]);
+                } finally {
+                  setLoadingLogs(false);
+                }
+              }}
+              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200"
+            >
+              {outOfAreaLogs ? "Hide" : "View Log"}
+            </button>
+          </div>
+          {loadingLogs && <p className="text-xs text-gray-500">Loading...</p>}
+          {outOfAreaLogs && !loadingLogs && (
+            outOfAreaLogs.length === 0
+              ? <p className="text-xs text-gray-500">No out-of-area attempts logged.</p>
+              : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-600 text-left">
+                        <th className="px-2 py-1">Date</th>
+                        <th className="px-2 py-1">Name</th>
+                        <th className="px-2 py-1">ZIP</th>
+                        <th className="px-2 py-1">Est. Value</th>
+                        <th className="px-2 py-1">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {outOfAreaLogs.map((log) => (
+                        <tr key={log.id} className="border-t border-gray-100">
+                          <td className="px-2 py-1 whitespace-nowrap">{new Date(log.created_at).toLocaleDateString()}</td>
+                          <td className="px-2 py-1">{log.homeowner_name || "—"}</td>
+                          <td className="px-2 py-1">{log.zip_code || "—"}</td>
+                          <td className="px-2 py-1">{log.estimated_value ? `$${Number(log.estimated_value).toLocaleString()}` : "—"}</td>
+                          <td className="px-2 py-1">{log.status === "outside_area_large_job_submitted" ? "✅ Submitted" : "❌ Below threshold"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+          )}
         </div>
 
         {/* FOOTER */}

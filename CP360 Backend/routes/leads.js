@@ -105,6 +105,7 @@ const toCamel = (row) => ({
   proceedWithAutomation: row.proceed_with_automation,
 
   ghlContactId: row.ghl_contact_id,
+  outOfAreaLargeJob: row.out_of_area_large_job === true,
 });
 
 function parseName(full) {
@@ -472,7 +473,8 @@ const insertValues = [
       lead.utm_source || null,
       lead.utm_medium || null,
       lead.utm_campaign || null,
-      lead.proceed_with_automation ?? true
+      lead.proceed_with_automation ?? true,
+      lead.out_of_area_large_job || false,
     ];
 
     console.log("💾 INSERT LEAD VALUES:", insertValues);
@@ -489,11 +491,11 @@ const insertValues = [
         appointment_date, appointment_time,
         install_date, install_tentative,
         utm_source, utm_medium, utm_campaign,
-        proceed_with_automation
+        proceed_with_automation, out_of_area_large_job
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
         $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-        $27,$28,$29,$30
+        $27,$28,$29,$30,$31
       )
       RETURNING *`,
       insertValues
@@ -574,6 +576,15 @@ const insertValues = [
       }
     } else if (shouldBypassSync) {
       console.log('🔓 GHL sync bypassed for testing (master admin bypass enabled)');
+    }
+
+    // Tag out-of-area large job leads in GHL
+    if (lead.out_of_area_large_job && company.ghl_api_key && newLead.ghl_contact_id) {
+      try {
+        await applyStatusTags(newLead.ghl_contact_id, "Est out of area large job", company);
+      } catch (tagErr) {
+        console.error("❌ Failed to apply out-of-area tag:", tagErr.message);
+      }
     }
 
     // Fire push notification for estimator_only companies
@@ -1054,7 +1065,40 @@ router.post("/:id/reinstate", async (req, res) => {
   }
 });
 
-module.exports = router;
+// ============================================================================
+// ACCEPT OUT-OF-AREA LARGE JOB
+// ============================================================================
+router.put("/:id/accept-out-of-area", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const leadResult = await pool.query(
+      `SELECT * FROM leads WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [id]
+    );
+    if (leadResult.rows.length === 0) return res.status(404).json({ error: "Lead not found." });
+    const lead = leadResult.rows[0];
 
+    await pool.query(
+      `UPDATE leads SET out_of_area_large_job = false, updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // Remove the out-of-area tag in GHL
+    const company = (await pool.query(`SELECT * FROM companies WHERE id = $1`, [lead.company_id])).rows[0];
+    if (company?.ghl_api_key && lead.ghl_contact_id) {
+      try {
+        await removeStatusTags(lead.ghl_contact_id, "Est out of area large job", company);
+      } catch (tagErr) {
+        console.error("❌ Failed to remove out-of-area tag:", tagErr.message);
+      }
+    }
+
+    const updated = (await pool.query(`SELECT * FROM leads WHERE id = $1`, [id])).rows[0];
+    res.json({ success: true, lead: toCamel(updated) });
+  } catch (error) {
+    console.error("❌ Accept out-of-area error:", error);
+    res.status(500).json({ error: "Failed to accept out-of-area lead." });
+  }
+});
 
 module.exports = router;

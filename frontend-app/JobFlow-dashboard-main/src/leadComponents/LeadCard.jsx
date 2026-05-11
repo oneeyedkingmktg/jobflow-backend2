@@ -73,6 +73,9 @@ if (lead.status === "install_scheduled") {
           {lead.hasEstimate === true && (
             <span style={{ fontSize: "1em" }}>📐</span>
           )}
+          {lead.outOfAreaLargeJob === true && (
+            <span style={{ fontSize: "1em" }}>🧭</span>
+          )}
         </div>
       </div>
 

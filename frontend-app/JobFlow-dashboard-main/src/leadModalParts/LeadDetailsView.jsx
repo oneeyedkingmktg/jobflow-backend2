@@ -17,10 +17,12 @@ export default function LeadDetailsView({
   showConversations = false,
 }) {
 const hasEstimate = form?.hasEstimate === true;
+  const isOutOfAreaLargeJob = form?.outOfAreaLargeJob === true;
   const { user } = useAuth();
   const { currentCompany } = useCompany();
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
+  const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
   const [showConversationModal, setShowConversationModal] = useState(false);
@@ -35,6 +37,32 @@ const hasEstimate = form?.hasEstimate === true;
         .catch(() => {});
     }
   }, [form?.id]);
+
+  const handleAcceptOutOfArea = async () => {
+    try {
+      const { apiRequest } = await import("../api.js");
+      await apiRequest(`/leads/${form.id}/accept-out-of-area`, { method: "PUT" });
+      setOutOfAreaActionDone("accepted");
+    } catch (err) {
+      console.error("Failed to accept out-of-area lead:", err);
+      alert("Could not accept lead. Please try again.");
+    }
+  };
+
+  const handleDeclineOutOfArea = async () => {
+    if (!window.confirm("Mark this lead as junk? This cannot be undone easily.")) return;
+    try {
+      const { apiRequest } = await import("../api.js");
+      await apiRequest(`/leads/${form.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "status_junk" }),
+      });
+      setOutOfAreaActionDone("declined");
+    } catch (err) {
+      console.error("Failed to decline out-of-area lead:", err);
+      alert("Could not decline lead. Please try again.");
+    }
+  };
 
   const loadEstimate = async () => {
     try {
@@ -132,6 +160,42 @@ const hasEstimate = form?.hasEstimate === true;
           </span>
         </div>
       </div>
+
+{/* OUT OF AREA LARGE JOB SECTION */}
+      {isOutOfAreaLargeJob && !outOfAreaActionDone && (
+        <div className="mt-4 bg-amber-50 border border-amber-300 rounded-xl px-4 py-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🧭</span>
+            <span className="font-bold text-amber-900 text-sm">Contact is out of area but may be worth pursuing.</span>
+          </div>
+          <div className="flex gap-3 mt-3">
+            <button
+              type="button"
+              onClick={handleAcceptOutOfArea}
+              className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-semibold text-sm hover:bg-emerald-700 transition"
+            >
+              Accept Lead
+            </button>
+            <button
+              type="button"
+              onClick={handleDeclineOutOfArea}
+              className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition"
+            >
+              Decline Lead
+            </button>
+          </div>
+        </div>
+      )}
+      {outOfAreaActionDone === "accepted" && (
+        <div className="mt-4 bg-emerald-50 border border-emerald-300 rounded-xl px-4 py-3 text-sm text-emerald-800 font-semibold text-center">
+          Lead accepted. Out-of-area flag removed.
+        </div>
+      )}
+      {outOfAreaActionDone === "declined" && (
+        <div className="mt-4 bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-600 font-semibold text-center">
+          Lead declined and marked as junk.
+        </div>
+      )}
 
 {/* ACTION BUTTONS GRID */}
       <div className="mt-4 grid grid-cols-2 gap-3">

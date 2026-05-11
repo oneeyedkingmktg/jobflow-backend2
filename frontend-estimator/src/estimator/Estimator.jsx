@@ -393,6 +393,9 @@ export default function Estimator() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [outOfServiceArea, setOutOfServiceArea] = useState(false);
+  const [outOfAreaBelowThreshold, setOutOfAreaBelowThreshold] = useState(false);
+  const [showOutOfAreaDisclaimerModal, setShowOutOfAreaDisclaimerModal] = useState(false);
+  const [isOutOfAreaLargeJob, setIsOutOfAreaLargeJob] = useState(false);
   const [leadId, setLeadId] = useState(null);
 
   // Second estimate state
@@ -563,13 +566,18 @@ export default function Estimator() {
   // Form submission
 async function submitEstimate() {
     setOutOfServiceArea(false);
+    setOutOfAreaBelowThreshold(false);
+    setIsOutOfAreaLargeJob(false);
+
     const serviceZips = config?.service_area_zips;
-if (serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0) {
-      if (!serviceZips.map(String).includes(zip.trim())) {
-        setOutOfServiceArea(true);
-        return;
-      }
+    const isOutsideArea = serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0
+      && !serviceZips.map(String).includes(zip.trim());
+
+    if (isOutsideArea && !config?.out_of_area_enabled) {
+      setOutOfServiceArea(true);
+      return;
     }
+
     setSubmitting(true);
     setError("");
     try {
@@ -606,6 +614,32 @@ const previewRes = await fetch(`${API_BASE}/estimator/preview`, {
         setActiveFinish(previewData.estimate.selectedQuality);
       }
 
+      // Out-of-area threshold check (only when feature is enabled and ZIP is outside area)
+      let outOfAreaLargeJob = false;
+      if (isOutsideArea && config?.out_of_area_enabled) {
+        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min || 0;
+        const threshold = Number(config.out_of_area_large_job_threshold) || 0;
+        if (threshold > 0 && flakeMin < threshold) {
+          // Below threshold — log and show sorry message, no lead
+          setOutOfAreaBelowThreshold(true);
+          fetch(`${API_BASE}/estimator/out-of-area-log`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              company_id: companyId,
+              homeowner_name: name,
+              zip_code: zip,
+              estimated_value: flakeMin,
+              status: "outside_area_below_threshold"
+            })
+          }).catch(() => {});
+          return;
+        }
+        // Above threshold — mark as out-of-area large job
+        outOfAreaLargeJob = true;
+        setIsOutOfAreaLargeJob(true);
+      }
+
       // 🔍 DEBUG: Log what we're about to send
 const leadData = {
   company_id: companyId,
@@ -620,6 +654,7 @@ const leadData = {
   utm_source: utmSource,
   utm_medium: utmMedium,
   utm_campaign: utmCampaign,
+  out_of_area_large_job: outOfAreaLargeJob,
   // 🆕 ADD ESTIMATE DATA
   estimate: {
     project_type: projectType,
@@ -707,6 +742,23 @@ try {
 
       // 4️⃣ Handle response
       if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
+
+      // Log out-of-area large job submission
+      if (outOfAreaLargeJob) {
+        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min || 0;
+        fetch(`${API_BASE}/estimator/out-of-area-log`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: companyId,
+            homeowner_name: name,
+            zip_code: zip,
+            estimated_value: flakeMin,
+            status: "outside_area_large_job_submitted"
+          })
+        }).catch(() => {});
+        setShowOutOfAreaDisclaimerModal(true);
+      }
       setCompanyPhone(previewData.companyPhone || "");
 
       // Returning customer — 2 estimates already exist: show modal, don't proceed
@@ -875,11 +927,51 @@ try {
                 >
                   Close
                 </button>
-</div>
+              </div>
+            </div>
+          )}
+
+          {outOfAreaBelowThreshold && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+                <div className="text-4xl mb-4">📍</div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Outside Service Area</h2>
+                <p className="text-gray-600 mb-6">
+                  {config?.out_of_area_sorry_message || "Thank you for your interest. Based on the ZIP code entered, this project appears to be outside our normal service area."}
+                </p>
+                <button
+                  onClick={() => setOutOfAreaBelowThreshold(false)}
+                  className="px-6 py-2 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-700"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
           </>
         )}
+        {/* Out-of-area price reveal disclaimer modal */}
+        {showOutOfAreaDisclaimerModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
+              <div className="text-4xl mb-4">🧭</div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Outside Our Normal Service Area</h2>
+              <p className="text-gray-600 mb-4 text-sm">
+                {config?.out_of_area_large_job_message || "You are outside our normal service area, but this project may still be worth reviewing. Please complete the form and we'll take a look."}
+              </p>
+              <p className="text-gray-500 mb-6 text-xs italic">
+                {config?.out_of_area_price_disclaimer || "You are outside our normal service area, but we still may be able to help. Pricing may vary for projects outside our normal service area based on travel distance, project scope, and scheduling."}
+              </p>
+              <button
+                onClick={() => setShowOutOfAreaDisclaimerModal(false)}
+                className="px-6 py-2 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-700"
+              >
+                Got It — Show My Estimate
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Two estimates modal */}
         {showTwoEstimatesModal && (
           <TwoEstimatesModal

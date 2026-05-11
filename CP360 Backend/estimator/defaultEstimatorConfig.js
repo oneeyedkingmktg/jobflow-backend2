@@ -113,6 +113,15 @@ function defaultEstimatorConfig(companyId) {
     // Post-submit behavior
     // ------------------------------------------------------------------------
     ty_url_redirect: null,
+
+    // ------------------------------------------------------------------------
+    // Out of Area / Large Job
+    // ------------------------------------------------------------------------
+    out_of_area_enabled: false,
+    out_of_area_large_job_threshold: null,
+    out_of_area_sorry_message: "Thank you for your interest. Based on the ZIP code entered, this project appears to be outside our normal service area.",
+    out_of_area_large_job_message: "You are outside our normal service area, but this project may still be worth reviewing. Please complete the form and we'll take a look.",
+    out_of_area_price_disclaimer: "You are outside our normal service area, but we still may be able to help. Pricing may vary for projects outside our normal service area based on travel distance, project scope, and scheduling.",
   };
 }
 

@@ -241,7 +241,12 @@ next_steps_button_text,
         cta2_link,
         combined_project_message,
         large_project_sf_threshold,
-        large_project_note
+        large_project_note,
+        out_of_area_enabled,
+        out_of_area_large_job_threshold,
+        out_of_area_sorry_message,
+        out_of_area_large_job_message,
+        out_of_area_price_disclaimer
       )
 VALUES (
   $1,$2,
@@ -257,7 +262,7 @@ VALUES (
   $53,$54,$55,
 $56,$57,$58,$59,$60,$61,$62,$63,$64,
   $65,$66,$67,$68,$69,$70,$71,$72,$73,$74,
-  $75,$76
+  $75,$76,$77,$78,$79,$80,$81
   )
       ON CONFLICT (company_id) DO UPDATE SET
         is_active = COALESCE(EXCLUDED.is_active, estimator_configs.is_active),
@@ -346,6 +351,11 @@ cta2_link = COALESCE(EXCLUDED.cta2_link, estimator_configs.cta2_link),
         combined_project_message = COALESCE(EXCLUDED.combined_project_message, estimator_configs.combined_project_message),
         large_project_sf_threshold = COALESCE(EXCLUDED.large_project_sf_threshold, estimator_configs.large_project_sf_threshold),
         large_project_note = COALESCE(EXCLUDED.large_project_note, estimator_configs.large_project_note),
+        out_of_area_enabled = COALESCE(EXCLUDED.out_of_area_enabled, estimator_configs.out_of_area_enabled),
+        out_of_area_large_job_threshold = COALESCE(EXCLUDED.out_of_area_large_job_threshold, estimator_configs.out_of_area_large_job_threshold),
+        out_of_area_sorry_message = COALESCE(EXCLUDED.out_of_area_sorry_message, estimator_configs.out_of_area_sorry_message),
+        out_of_area_large_job_message = COALESCE(EXCLUDED.out_of_area_large_job_message, estimator_configs.out_of_area_large_job_message),
+        out_of_area_price_disclaimer = COALESCE(EXCLUDED.out_of_area_price_disclaimer, estimator_configs.out_of_area_price_disclaimer),
         updated_at = now()
     `;
 
@@ -426,6 +436,11 @@ b.next_steps_button_text,
       b.combined_project_message,
       b.large_project_sf_threshold || null,
       b.large_project_note || null,
+      b.out_of_area_enabled ?? null,
+      b.out_of_area_large_job_threshold ? Number(b.out_of_area_large_job_threshold) : null,
+      b.out_of_area_sorry_message || null,
+      b.out_of_area_large_job_message || null,
+      b.out_of_area_price_disclaimer || null,
     ];
 
     console.log("SQL placeholders:", (sql.match(/\$/g) || []).length);
@@ -564,6 +579,60 @@ const companyPhone = companyResult.rows[0]?.phone || null;
   } catch (err) {
     console.error("Estimator preview error:", err);
     res.status(500).json({ error: "Estimator preview failed" });
+  }
+});
+
+// ============================================================================
+// POST /estimator/out-of-area-log  (public — called from estimator widget)
+// ============================================================================
+router.post("/out-of-area-log", async (req, res) => {
+  try {
+    const { company_id, homeowner_name, zip_code, estimated_value, status } = req.body;
+    if (!company_id) return res.status(400).json({ error: "company_id required" });
+
+    let companyId = company_id;
+    if (isNaN(companyId)) {
+      const r = await query(
+        `SELECT id FROM companies WHERE estimator_code = $1 AND deleted_at IS NULL LIMIT 1`,
+        [companyId]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ error: "Company not found" });
+      companyId = r.rows[0].id;
+    }
+
+    await query(
+      `INSERT INTO out_of_area_logs (company_id, homeowner_name, zip_code, estimated_value, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [companyId, homeowner_name || null, zip_code || null, estimated_value || null, status || null]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Out-of-area log error:", err);
+    res.status(500).json({ error: "Failed to log out-of-area attempt" });
+  }
+});
+
+// ============================================================================
+// GET /estimator/out-of-area-log/:companyId  (master admin)
+// ============================================================================
+router.get("/out-of-area-log/:companyId", async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const result = await query(
+      `SELECT l.id, l.created_at, l.homeowner_name, l.zip_code, l.estimated_value, l.status,
+              c.name AS company_name
+       FROM out_of_area_logs l
+       LEFT JOIN companies c ON c.id = l.company_id
+       WHERE l.company_id = $1
+       ORDER BY l.created_at DESC
+       LIMIT 200`,
+      [companyId]
+    );
+    res.json({ logs: result.rows });
+  } catch (err) {
+    console.error("Out-of-area log fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch out-of-area logs" });
   }
 });
 
