@@ -617,7 +617,9 @@ const previewRes = await fetch(`${API_BASE}/estimator/preview`, {
       // Out-of-area threshold check (only when feature is enabled and ZIP is outside area)
       let outOfAreaLargeJob = false;
       if (isOutsideArea && config?.out_of_area_enabled) {
-        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min || 0;
+        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min
+          || previewData.estimate?.displayPriceMin
+          || 0;
         const threshold = Number(config.out_of_area_large_job_threshold) || 0;
         if (threshold > 0 && flakeMin < threshold) {
           // Below threshold — log and show sorry message, no lead
@@ -745,7 +747,9 @@ try {
 
       // Log out-of-area large job submission
       if (outOfAreaLargeJob) {
-        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min || 0;
+        const flakeMin = previewData.estimate?.allPriceRanges?.flake?.min
+          || previewData.estimate?.displayPriceMin
+          || 0;
         fetch(`${API_BASE}/estimator/out-of-area-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
