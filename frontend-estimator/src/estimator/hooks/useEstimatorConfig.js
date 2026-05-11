@@ -118,12 +118,9 @@ export default function useEstimatorConfig() {
       // ignore corrupt cache
     }
 
-    const configUrl = `${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`;
-    console.log("[useEstimatorConfig] fetching from:", configUrl);
-    fetch(configUrl)
+    fetch(`${import.meta.env.VITE_API_URL || "https://api.coatingpro360.com"}/estimator/config?company=${companyId}`)
       .then(res => res.json())
       .then(data => {
-        console.log("[useEstimatorConfig] received solid_finish_description:", JSON.stringify(data.solid_finish_description));
         applyConfig(data, setConfig, setCustomStyles);
         try {
           localStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() }));
