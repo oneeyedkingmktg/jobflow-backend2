@@ -960,11 +960,8 @@ try {
             <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center">
               <div className="text-4xl mb-4">🧭</div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Outside Our Normal Service Area</h2>
-              <p className="text-gray-600 mb-4 text-sm">
+              <p className="text-gray-600 mb-6 text-sm">
                 {config?.out_of_area_large_job_message || "You are outside our normal service area, but this project may still be worth reviewing. Please complete the form and we'll take a look."}
-              </p>
-              <p className="text-gray-500 mb-6 text-xs italic">
-                {config?.out_of_area_price_disclaimer || "You are outside our normal service area, but we still may be able to help. Pricing may vary for projects outside our normal service area based on travel distance, project scope, and scheduling."}
               </p>
               <button
                 onClick={() => setShowOutOfAreaDisclaimerModal(false)}
