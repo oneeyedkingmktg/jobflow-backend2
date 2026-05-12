@@ -575,6 +575,17 @@ async function submitEstimate() {
 
     if (isOutsideArea && !config?.out_of_area_enabled) {
       setOutOfServiceArea(true);
+      fetch(`${API_BASE}/estimator/out-of-area-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          homeowner_name: name,
+          zip_code: zip,
+          estimated_value: null,
+          status: "outside_area_blocked"
+        })
+      }).catch(() => {});
       return;
     }
 
