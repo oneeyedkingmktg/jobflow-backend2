@@ -693,6 +693,7 @@ const result = await pool.query(
     pause_notes = $30,
     proceed_with_automation = COALESCE($31, proceed_with_automation),
     sold_at = CASE WHEN $17 = 'sold' AND sold_at IS NULL THEN CURRENT_TIMESTAMP ELSE sold_at END,
+    appt_set_at = CASE WHEN $17 = 'appt_booked' AND appt_set_at IS NULL THEN CURRENT_TIMESTAMP ELSE appt_set_at END,
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,

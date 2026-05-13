@@ -152,6 +152,20 @@ async function runMigrations() {
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS estimator_code VARCHAR(10)`,
     // leads
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS sold_at TIMESTAMP`,
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS appt_set_at TIMESTAMP`,
+    // report definitions
+    `CREATE TABLE IF NOT EXISTS report_definitions (
+      id SERIAL PRIMARY KEY,
+      key VARCHAR(50) UNIQUE NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`,
+    `INSERT INTO report_definitions (key, name, description) VALUES
+      ('recent_activity', 'Recent Activity', 'Count of new leads, appointments set, and jobs sold in the last 30 days'),
+      ('conversions', 'Conversions', 'Lead-to-appointment-to-sold conversion rates for leads created 30–60 days ago')
+    ON CONFLICT (key) DO NOTHING`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_name TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_email TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_top_text TEXT`,
