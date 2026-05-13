@@ -453,6 +453,11 @@ billing_status,
       combined_project_message
     ].some((v) => v !== undefined);
 
+    // Ensure reports_enabled column exists (lazy migration — safe to run every time)
+    try {
+      await db.pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reports_enabled BOOLEAN DEFAULT false`);
+    } catch(e) { /* already exists */ }
+
     await client.query('BEGIN');
 
     // -----------------------------
