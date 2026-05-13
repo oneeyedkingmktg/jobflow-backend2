@@ -1200,16 +1200,17 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 className={`${inputCls} h-40 resize-y`}
                 value={hdr.warranty}
                 onChange={e => setHdr(p => ({ ...p, warranty: e.target.value }))}
-                disabled={isLocked}
                 placeholder="Enter warranty terms…"
+                autoFocus
               />
             </div>
             <div className="px-6 pb-5 pt-3 border-t shrink-0">
               <button
-                onClick={() => setShowWarrantyModal(false)}
-                className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm"
+                onClick={async () => { setShowWarrantyModal(false); await handleSave(); }}
+                disabled={saving}
+                className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 text-sm"
               >
-                Done
+                {saving ? 'Saving…' : 'Save & Close'}
               </button>
             </div>
           </div>
