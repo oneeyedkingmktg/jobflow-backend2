@@ -453,11 +453,6 @@ billing_status,
       combined_project_message
     ].some((v) => v !== undefined);
 
-    // Ensure reports_enabled column exists (lazy migration — safe to run every time)
-    try {
-      await db.pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reports_enabled BOOLEAN DEFAULT false`);
-    } catch(e) { /* already exists */ }
-
     await client.query('BEGIN');
 
     // -----------------------------
@@ -484,7 +479,6 @@ const companyResult = await client.query(
   ghl_install_assigned_user = COALESCE($17, ghl_install_assigned_user),
   ghl_sc_calendar = COALESCE($37, ghl_sc_calendar),
   ghl_sc_assigned_user = COALESCE($38, ghl_sc_assigned_user),
-  reports_enabled = COALESCE($39, reports_enabled),
   ghl_appt_title_template = COALESCE($18, ghl_appt_title_template),
   ghl_install_title_template = COALESCE($19, ghl_install_title_template),
   ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
@@ -546,7 +540,6 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   sanitizedBody.microsoft_conversion_event ?? null,            // $36
   ghl_sc_calendar || null,                                     // $37
   ghl_sc_assigned_user || null,                                // $38
-  reports_enabled ?? null,                                     // $39
 ]
 
 );
@@ -677,6 +670,17 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
 
     const company = companyResult.rows[0];
     company.ghl_api_key = company.ghl_api_key ? '***hidden***' : null;
+
+    // Handle reports_enabled separately so it can never break the main save
+    if (reports_enabled !== undefined) {
+      try {
+        await db.pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS reports_enabled BOOLEAN DEFAULT false`);
+        await db.pool.query(`UPDATE companies SET reports_enabled = $1 WHERE id = $2`, [reports_enabled, companyId]);
+        company.reports_enabled = reports_enabled;
+      } catch (e) {
+        console.error('reports_enabled update failed:', e.message);
+      }
+    }
 
     console.log('✅ Transaction committed, sending response');
     console.log('═══════════════════════════════════════');
