@@ -694,7 +694,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
     }
     console.error('❌ Update company error:', error);
     console.log('═══════════════════════════════════════');
-    res.status(500).json({ error: error.message || 'Failed to update company' });
+    res.status(500).json({ error: 'Failed to update company' });
   } finally {
     client.release();
   }
