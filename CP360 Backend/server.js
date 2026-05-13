@@ -138,7 +138,12 @@ async function runMigrations() {
     `ALTER TABLE conversation_updates RENAME COLUMN conversation_id TO contact_id`,
   ];
   for (const sql of migrations) {
-    try { await pool.query(sql); } catch (e) { console.warn('Migration skipped:', e.message); }
+    try {
+      await pool.query(sql);
+      console.log('Migration OK:', sql.slice(0, 80));
+    } catch (e) {
+      console.warn('Migration skipped:', e.message, '|', sql.slice(0, 80));
+    }
   }
   console.log('Migrations complete');
 }

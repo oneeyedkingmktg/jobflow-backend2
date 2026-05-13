@@ -85,15 +85,16 @@ const handleSaveCompany = async (form) => {
       setSelectedCompany(null);
       setModalMode("view");
     } else if (selectedCompany) {
-      // ✅ Save and get the updated company directly from API response
       const result = await updateCompany(selectedCompany.id, payload);
-      
-      // ✅ Use the fresh data from the API response immediately
+
+      if (result?.success === false) {
+        throw new Error(result.error || 'Failed to save company');
+      }
+
       if (result?.company) {
         setSelectedCompany(result.company);
       }
-      
-      // Reload the companies list in the background
+
       await loadCompanies();
     }
   } catch (err) {
