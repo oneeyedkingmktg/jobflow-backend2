@@ -96,7 +96,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         include_payment_button: p.include_payment_button ?? true,
         salesman:               p.salesman || p.created_by_name || user?.name || '',
         site_conditions:        p.site_conditions   || {},
-        warranty:               p.warranty          || '',
+        warranty:               p.warranty          || settingsRes?.default_warranty || '',
       });
 
       // Library items (non-freeform only)

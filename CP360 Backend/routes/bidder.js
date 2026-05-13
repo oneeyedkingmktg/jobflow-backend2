@@ -805,7 +805,7 @@ router.put('/company-settings', async (req, res) => {
       include_payment_button, down_payment_default_percent, convenience_fee_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
-      proposal_domain, logo_url,
+      proposal_domain, logo_url, default_warranty,
     } = req.body;
 
     const result = await pool.query(
@@ -813,8 +813,9 @@ router.put('/company-settings', async (req, res) => {
          (company_id, stripe_publishable_key, stripe_secret_key, include_payment_button,
           down_payment_default_percent, convenience_fee_percent, preferred_proposal_design_id,
           terms_and_conditions, system_notes, email_from_name, email_from_email,
-          proposal_top_text, invoice_top_text, proposal_domain, logo_url, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
+          proposal_top_text, invoice_top_text, proposal_domain, logo_url,
+          default_warranty, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          stripe_publishable_key = EXCLUDED.stripe_publishable_key,
          stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
@@ -830,6 +831,7 @@ router.put('/company-settings', async (req, res) => {
          invoice_top_text = EXCLUDED.invoice_top_text,
          proposal_domain = EXCLUDED.proposal_domain,
          logo_url = EXCLUDED.logo_url,
+         default_warranty = EXCLUDED.default_warranty,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -843,6 +845,7 @@ router.put('/company-settings', async (req, res) => {
         clean(email_from_name), clean(email_from_email),
         clean(proposal_top_text), clean(invoice_top_text),
         clean(proposal_domain), clean(logo_url),
+        clean(default_warranty),
       ]
     );
 

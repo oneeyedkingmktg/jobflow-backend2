@@ -106,6 +106,7 @@ export default function BidderAdminSettings({ companyId }) {
         down_payment_default_percent: data.down_payment_default_percent ?? 50,
         preferred_proposal_design_id: data.preferred_proposal_design_id || '',
         system_notes: data.system_notes || '',
+        default_warranty: data.default_warranty || '',
         terms_and_conditions: data.terms_and_conditions || '',
         email_from_name: data.email_from_name || '',
         email_from_email: data.email_from_email || '',
@@ -654,6 +655,18 @@ export default function BidderAdminSettings({ companyId }) {
             value={settingsForm.system_notes}
             onChange={(e) => setSettingsForm((p) => ({ ...p, system_notes: e.target.value }))}
             placeholder="e.g. All work includes a 1-year labor warranty…"
+          />
+        </div>
+
+        {/* Default Warranty */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Default Warranty</h3>
+          <p className="text-xs text-gray-500 mb-2">Pre-fills the Warranty field on every new bid. Can be edited per-bid.</p>
+          <textarea
+            className={`${inputCls} h-24 resize-y`}
+            value={settingsForm.default_warranty}
+            onChange={(e) => setSettingsForm((p) => ({ ...p, default_warranty: e.target.value }))}
+            placeholder="e.g. This installation is warranted against peeling and delamination for 1 year from the date of installation…"
           />
         </div>
 
