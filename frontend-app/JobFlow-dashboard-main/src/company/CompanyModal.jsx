@@ -403,7 +403,7 @@ const handleSaveTracking = async () => {
             </>
           ) : (
             <>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Leads in cohort</span><span className="text-sm font-semibold">{d.totalLeads}</span></div>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Leads in this report</span><span className="text-sm font-semibold">{d.totalLeads}</span></div>
               <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Lead → Appointment</span><span className="text-sm font-semibold">{d.leadsToAppt} ({d.leadToApptPct}%)</span></div>
               <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Appointment → Sold</span><span className="text-sm font-semibold">{d.apptToSold} ({d.apptToSoldPct}%)</span></div>
               <div className="flex justify-between py-2"><span className="text-sm text-gray-600">Lead → Sold (total)</span><span className="text-sm font-semibold">{d.leadsToSold} ({d.leadToSoldPct}%)</span></div>
@@ -413,8 +413,8 @@ const handleSaveTracking = async () => {
       );
 
       return (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
-          <div className="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl max-h-[75vh] flex flex-col">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-16 px-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <div>
                 <h3 className="text-base font-bold text-gray-900">{openReport.name}</h3>

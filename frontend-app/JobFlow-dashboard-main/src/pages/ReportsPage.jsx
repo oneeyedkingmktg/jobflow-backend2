@@ -90,7 +90,7 @@ function ConversionsContent({ companyId }) {
     <SectionCard title={title}>
       {!data || data.totalLeads === 0 ? <NoData /> : (
         <>
-          <MetricRow label="Leads in cohort" value={data.totalLeads} sub="created 30–60 days ago" />
+          <MetricRow label="Leads in this report" value={data.totalLeads} sub="created 30–60 days ago" />
           <MetricRow
             label="Lead → Appointment"
             value={`${data.leadsToAppt} (${data.leadToApptPct}%)`}
@@ -131,8 +131,8 @@ function ReportModal({ report, companyId, onClose }) {
   const Content = REPORT_CONTENT[report.key];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-0">
-      <div className="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
           <div>
