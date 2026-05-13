@@ -220,7 +220,7 @@ router.put('/proposal/:id', async (req, res) => {
       customer_notes, internal_notes, bid_total, down_payment_type = 'percent',
       down_payment_value = 50, down_payment_amount = 0, balance_due,
       payment_url, include_payment_button, proposal_design_id, salesman,
-      site_conditions,
+      site_conditions, warranty,
     } = req.body;
 
     // Auto-set accepted_date when status transitions to accepted and no date was provided
@@ -236,8 +236,8 @@ router.put('/proposal/:id', async (req, res) => {
         down_payment_amount = $15, balance_due = $16,
         payment_url = $17, include_payment_button = $18,
         proposal_design_id = $19, salesman = $20,
-        site_conditions = $21, updated_at = NOW()
-       WHERE id = $22 AND ($23::integer IS NULL OR company_id = $23::integer)
+        site_conditions = $21, warranty = $22, updated_at = NOW()
+       WHERE id = $23 AND ($24::integer IS NULL OR company_id = $24::integer)
        RETURNING *`,
       [
         bid_name, clean(bid_description), status,
@@ -249,6 +249,7 @@ router.put('/proposal/:id', async (req, res) => {
         clean(payment_url), include_payment_button,
         clean(proposal_design_id), salesman ?? null,
         site_conditions ? JSON.stringify(site_conditions) : '{}',
+        clean(warranty),
         id, companyId,
       ]
     );

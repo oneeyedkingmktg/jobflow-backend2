@@ -43,9 +43,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     presented_date: '', accepted_date: '',
     customer_notes: '', internal_notes: '',
     payment_url: '', include_payment_button: true,
-    site_conditions: {},
+    site_conditions: {}, warranty: '',
   });
-  const [showSiteCondModal, setShowSiteCondModal] = useState(false);
+  const [showSiteCondModal,  setShowSiteCondModal]  = useState(false);
+  const [showWarrantyModal,  setShowWarrantyModal]  = useState(false);
 
   // ── Items ─────────────────────────────────────────────────────────────────
   const [checkedMap, setCheckedMap]         = useState({}); // library_item_id → proposal_item row
@@ -95,6 +96,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         include_payment_button: p.include_payment_button ?? true,
         salesman:               p.salesman || p.created_by_name || user?.name || '',
         site_conditions:        p.site_conditions   || {},
+        warranty:               p.warranty          || '',
       });
 
       // Library items (non-freeform only)
@@ -934,6 +936,20 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     <span className="text-sm font-semibold text-gray-700">Site Conditions</span>
                     {hasConditions && <span className="text-xs text-blue-600 font-medium">— {Object.values(sc).filter(v => v && String(v).trim()).length} field{Object.values(sc).filter(v => v && String(v).trim()).length !== 1 ? 's' : ''} filled</span>}
                   </label>
+                </div>
+              );
+            })()}
+
+            {/* Warranty checkbox */}
+            {(() => {
+              const hasWarranty = !!(hdr.warranty && hdr.warranty.trim());
+              return (
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setShowWarrantyModal(true)}>
+                    <input type="checkbox" readOnly checked={hasWarranty} className="w-4 h-4 cursor-pointer" />
+                    <span className="text-sm font-semibold text-gray-700">Warranty</span>
+                    {hasWarranty && <span className="text-xs text-blue-600 font-medium">— filled</span>}
+                  </label>
                   <hr className="mt-2 border-gray-200" />
                 </div>
               );
@@ -1122,16 +1138,16 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       {/* ── SITE CONDITIONS MODAL ────────────────────────────────────────── */}
       {showSiteCondModal && (() => {
         const SC_FIELDS = [
-          { key: 'color_selected',          label: 'Color Selected' },
-          { key: 'anti_skid',               label: 'Anti Skid' },
-          { key: 'joints',                  label: 'Joints' },
-          { key: 'moisture_reading',        label: 'Moisture Reading' },
-          { key: 'stop_coating_at_door',    label: 'Stop Coating at Door' },
-          { key: 'walk_doors',              label: 'Walk Doors' },
-          { key: 'overhead_doors',          label: 'Overhead Doors' },
-          { key: 'stem_walls_included',     label: 'Stem Walls Included' },
+          { key: 'color_selected',            label: 'Color Selected' },
+          { key: 'slip_resistance',           label: 'Slip Resistance' },
+          { key: 'joints',                    label: 'Joints' },
+          { key: 'moisture_reading',          label: 'Moisture Reading' },
+          { key: 'stop_coating_at_door',      label: 'Stop Coating at Door' },
+          { key: 'man_door',                  label: 'Man Door' },
+          { key: 'overhead_doors',            label: 'Overhead Doors' },
+          { key: 'stem_walls_included',       label: 'Stem Walls Included' },
           { key: 'existing_flooring_removal', label: 'Existing Flooring Removal' },
-          { key: 'floor_prep',              label: 'Floor Prep' },
+          { key: 'floor_prep',                label: 'Floor Prep' },
         ];
         const sc = hdr.site_conditions || {};
         const handleScChange = (key, val) => setHdr(p => ({ ...p, site_conditions: { ...(p.site_conditions || {}), [key]: val } }));
@@ -1169,6 +1185,36 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           </div>
         );
       })()}
+
+      {/* ── WARRANTY MODAL ───────────────────────────────────────────────── */}
+      {showWarrantyModal && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowWarrantyModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 flex flex-col max-h-[70vh]">
+            <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-gray-800">Warranty</h3>
+              <button onClick={() => setShowWarrantyModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              <textarea
+                className={`${inputCls} h-40 resize-y`}
+                value={hdr.warranty}
+                onChange={e => setHdr(p => ({ ...p, warranty: e.target.value }))}
+                disabled={isLocked}
+                placeholder="Enter warranty terms…"
+              />
+            </div>
+            <div className="px-6 pb-5 pt-3 border-t shrink-0">
+              <button
+                onClick={() => setShowWarrantyModal(false)}
+                className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── EXIT CONFIRMATION MODAL ──────────────────────────────────────── */}
       {showExitModal && (
