@@ -7,7 +7,9 @@ const { pool } = require('../config/database');
 // Excludes junk leads and soft-deleted leads.
 router.get('/lifecycle', async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = (req.user.role === 'master' && req.query.company_id)
+      ? parseInt(req.query.company_id)
+      : req.user.company_id;
 
     const result = await pool.query(
       `SELECT

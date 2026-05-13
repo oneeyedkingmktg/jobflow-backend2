@@ -113,7 +113,7 @@ function AppContent() {
   const [totalUnread, setTotalUnread] = useState(0);
 
   const isEstimatorOnly = user?.planType === 'estimator_only';
-  const reportsEnabled = user?.reportsEnabled === true;
+  const reportsEnabled = currentCompany?.reports_enabled === true || currentCompany?.reportsEnabled === true;
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {

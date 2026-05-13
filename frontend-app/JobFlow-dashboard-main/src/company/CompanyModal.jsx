@@ -7,6 +7,7 @@ console.log("📂 CompanyModal.jsx file loaded");
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
+import { apiRequest } from "../api";
 import UsersHome from "../users/UsersHome";
 import EstimatorPricingModal from "./EstimatorPricingModal";
 import EstimatorMasterModal from "./EstimatorMasterModal";
@@ -65,6 +66,11 @@ export default function CompanyModal({
 
   // Track checkbox interaction
   const [suspendedTouched, setSuspendedTouched] = useState(false);
+
+  // REPORTS STATE
+  const [reportMetrics, setReportMetrics] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState(null);
 
   // ------------------------------------------------------------
   // INIT FORM
@@ -193,6 +199,15 @@ setTrackingForm({
     setPrevCompanyId(company.id);
   }
 }, [isCreate, company, company?.id, company?.updatedAt, company?.updated_at]);
+
+useEffect(() => {
+  if (activeSection !== "reports" || !company?.id) return;
+  setReportLoading(true);
+  setReportError(null);
+  apiRequest(`/api/reports/lifecycle?company_id=${company.id}`)
+    .then((res) => { setReportMetrics(res.metrics); setReportLoading(false); })
+    .catch((err) => { setReportError(err.message); setReportLoading(false); });
+}, [activeSection, company?.id]);
 
 if (!form) return null;
   // ------------------------------------------------------------
@@ -352,6 +367,55 @@ const handleSaveTracking = async () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const renderReports = () => {
+    const fmtDays = (val) => (val != null ? `${val} days` : "—");
+    const fmtPct = (val) => `${val}%`;
+
+    const MetricRow = ({ label, value }) => (
+      <div className="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
+        <span className="text-sm text-gray-600">{label}</span>
+        <span className="text-sm font-semibold text-gray-900">{value}</span>
+      </div>
+    );
+
+    const CategoryCard = ({ title, data }) => (
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+        <h4 className="text-sm font-bold text-gray-800 mb-2">{title}</h4>
+        {!data ? (
+          <p className="text-sm text-gray-400 italic">No data yet</p>
+        ) : (
+          <>
+            <MetricRow label="Total Leads" value={data.totalLeads} />
+            <MetricRow label="Appointments Booked" value={`${data.leadsWithAppt} (${fmtPct(data.leadToApptRate)})`} />
+            <MetricRow label="Avg Days: Lead to Appointment" value={fmtDays(data.avgLeadToApptDays)} />
+            <MetricRow label="Jobs Sold from Appointments" value={`${data.soldLeads} (${fmtPct(data.apptToSoldRate)})`} />
+            <MetricRow label="Avg Days: Appointment to Sold" value={fmtDays(data.avgApptToSoldDays)} />
+          </>
+        )}
+      </div>
+    );
+
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-gray-500 mb-3">Junk leads excluded. Sold timing tracked from first status change to &quot;Sold&quot;.</p>
+        {reportLoading && (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" />
+          </div>
+        )}
+        {reportError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{reportError}</div>
+        )}
+        {!reportLoading && !reportError && (
+          <>
+            <CategoryCard title="Estimator Leads" data={reportMetrics?.estimator} />
+            <CategoryCard title="Non-Estimator Leads" data={reportMetrics?.non_estimator} />
+          </>
+        )}
+      </div>
+    );
   };
 
   const renderTracking = () => (
@@ -1069,8 +1133,17 @@ setTrackingForm({
               </button>
             )}
 
-
-
+            {isMasterUser && !isCreate && (
+              <button
+                className={sectionBtn(activeSection === "reports")}
+                onClick={() => {
+                  setActiveSection("reports");
+                  setSectionMode("view");
+                }}
+              >
+                Reports
+              </button>
+            )}
 
             {(isMasterUser || isAdminUser) && !isCreate && (
               <button
@@ -1111,6 +1184,8 @@ setTrackingForm({
 {activeSection === "bidder" && (
   <BidderAdminSettings companyId={company?.id} />
 )}
+
+{activeSection === "reports" && renderReports()}
 
 
           </div>
