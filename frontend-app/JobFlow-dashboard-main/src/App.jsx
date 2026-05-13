@@ -10,6 +10,7 @@ import ResetPassword from "./ResetPassword";
 import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
+import ReportsPage from "./pages/ReportsPage.jsx";
 import PublicProposal from "./pages/PublicProposal.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import "./index.css";
@@ -112,6 +113,7 @@ function AppContent() {
   const [totalUnread, setTotalUnread] = useState(0);
 
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const reportsEnabled = user?.reportsEnabled === true;
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
@@ -217,6 +219,8 @@ function AppContent() {
         ) : (
           <MessagesPage onUnreadCount={setTotalUnread} />
         )
+      ) : activeScreen === "reports" ? (
+        <ReportsPage />
       ) : (
         <LeadsHome currentUser={user} />
       )}
@@ -277,6 +281,31 @@ function AppContent() {
           </div>
           Messages
         </button>
+
+        {reportsEnabled && (
+          <button
+            onClick={() => setActiveScreen("reports")}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors ${
+              activeScreen === "reports" ? "text-blue-600" : "text-gray-500"
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={activeScreen === "reports" ? 2.5 : 1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 17v-6m3 6v-4m3 4v-8M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"
+              />
+            </svg>
+            Reports
+          </button>
+        )}
       </nav>
     </div>
   );

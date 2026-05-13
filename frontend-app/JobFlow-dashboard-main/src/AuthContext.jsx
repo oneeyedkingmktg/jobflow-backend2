@@ -35,6 +35,7 @@ const normalizeUser = (u) => {
     
     // Feature flags
     serviceCallsEnabled: u.service_calls_enabled ?? u.serviceCallsEnabled ?? false,
+    reportsEnabled: u.reports_enabled ?? u.reportsEnabled ?? false,
 
     // Meta fields
     created_at: u.created_at,

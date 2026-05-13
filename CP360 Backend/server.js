@@ -56,6 +56,7 @@ const messagesRoutes = require("./routes/messages");
 const sipRoutes = require("./routes/sip");
 const bidderRoutes = require("./routes/bidder");
 const serviceCallsRoutes = require("./routes/serviceCalls");
+const reportsRoutes = require("./routes/reports");
 
 
 
@@ -102,6 +103,7 @@ app.use("/api/sip", sipRoutes);
 app.use("/google-drive", googleDriveRoutes);
 app.use("/api/bidder", bidderRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
+app.use("/api/reports", authenticateToken, reportsRoutes);
 
 
 
@@ -121,6 +123,8 @@ app.get("/", (req, res) => {
 const { pool } = require('./config/database');
 async function runMigrations() {
   const migrations = [
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS sold_at TIMESTAMP`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS reports_enabled BOOLEAN DEFAULT false`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_name TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS email_from_email TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_top_text TEXT`,

@@ -96,6 +96,7 @@ router.post('/login', async (req, res) => {
         c.company_name,
         c.suspended,
         c.plan_type,
+        c.reports_enabled,
         u.role,
         c.ghl_location_id,
         u.service_calls_enabled
@@ -139,6 +140,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         ghlLocationId: user.ghl_location_id,
         planType: user.plan_type || 'pro',
+        reportsEnabled: user.reports_enabled ?? false,
         service_calls_enabled: user.service_calls_enabled ?? false
       }
     });
@@ -169,6 +171,7 @@ router.get('/verify', async (req, res) => {
         u.role,
         c.ghl_location_id,
         c.plan_type,
+        c.reports_enabled,
         u.service_calls_enabled
       FROM users u
       LEFT JOIN companies c ON u.company_id = c.id

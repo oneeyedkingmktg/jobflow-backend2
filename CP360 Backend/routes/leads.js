@@ -692,6 +692,7 @@ const result = await pool.query(
     resume_action = $29,
     pause_notes = $30,
     proceed_with_automation = COALESCE($31, proceed_with_automation),
+    sold_at = CASE WHEN $17 = 'sold' AND sold_at IS NULL THEN CURRENT_TIMESTAMP ELSE sold_at END,
 
     -- 🔒 PRESERVE GHL EVENT IDS (DO NOT CLEAR HERE)
     appointment_calendar_event_id = appointment_calendar_event_id,

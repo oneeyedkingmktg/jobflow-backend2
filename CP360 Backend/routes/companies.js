@@ -371,6 +371,7 @@ const {
 billing_status,
       service_area_zips,
       sip_domain,
+      reports_enabled,
     } = sanitizedBody;
 
     const companyId = req.params.id;
@@ -478,6 +479,7 @@ const companyResult = await client.query(
   ghl_install_assigned_user = COALESCE($17, ghl_install_assigned_user),
   ghl_sc_calendar = COALESCE($37, ghl_sc_calendar),
   ghl_sc_assigned_user = COALESCE($38, ghl_sc_assigned_user),
+  reports_enabled = COALESCE($39, reports_enabled),
   ghl_appt_title_template = COALESCE($18, ghl_appt_title_template),
   ghl_install_title_template = COALESCE($19, ghl_install_title_template),
   ghl_appt_description_template = COALESCE($20, ghl_appt_description_template),
@@ -539,6 +541,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   sanitizedBody.microsoft_conversion_event ?? null,            // $36
   ghl_sc_calendar || null,                                     // $37
   ghl_sc_assigned_user || null,                                // $38
+  reports_enabled ?? null,                                     // $39
 ]
 
 );

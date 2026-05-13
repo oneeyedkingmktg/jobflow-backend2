@@ -92,6 +92,7 @@ setForm({
   timezone: "America/New_York",
   suspended: false,
   plan_type: "pro",
+  reports_enabled: false,
   service_area_zips: "",
   est_push_title: "",
   est_push_body: "",
@@ -141,6 +142,7 @@ zip: company.zip || "",
   timezone: company.timezone || "America/New_York",
   suspended: company.suspended === true,
   plan_type: company.plan_type || company.planType || "pro",
+  reports_enabled: company.reports_enabled === true || company.reportsEnabled === true,
   est_push_title: company.est_push_title || company.estPushTitle || "",
   est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
@@ -238,6 +240,7 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         zip: form.zip || null,
         suspended: form.suspended,
         plan_type: form.plan_type,
+        reports_enabled: form.reports_enabled,
         est_push_title: form.est_push_title || null,
         est_push_body: form.est_push_body || null,
         timezone: form.timezone,
@@ -715,6 +718,19 @@ const handleSaveTracking = async () => {
                 <option value="suspended">Suspended</option>
               </select>
             </div>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.reports_enabled}
+                onChange={(e) => handleChange("reports_enabled", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Reports Tab</div>
+                <div className="text-sm text-gray-600">Show lifecycle timing and close-rate reports for this company</div>
+              </div>
+            </label>
 
             {form.plan_type === "estimator_only" && (
               <div className="pt-2 space-y-3">
