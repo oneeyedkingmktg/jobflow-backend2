@@ -43,7 +43,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     presented_date: '', accepted_date: '',
     customer_notes: '', internal_notes: '',
     payment_url: '', include_payment_button: true,
+    site_conditions: {},
   });
+  const [showSiteCondModal, setShowSiteCondModal] = useState(false);
 
   // ── Items ─────────────────────────────────────────────────────────────────
   const [checkedMap, setCheckedMap]         = useState({}); // library_item_id → proposal_item row
@@ -92,6 +94,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         payment_url:            p.payment_url       || '',
         include_payment_button: p.include_payment_button ?? true,
         salesman:               p.salesman || p.created_by_name || user?.name || '',
+        site_conditions:        p.site_conditions   || {},
       });
 
       // Library items (non-freeform only)
@@ -919,6 +922,23 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         <section>
           <p className={sectionHd}>Notes</p>
           <div className="space-y-3">
+
+            {/* Site Conditions checkbox */}
+            {(() => {
+              const sc = hdr.site_conditions || {};
+              const hasConditions = Object.values(sc).some(v => v && String(v).trim());
+              return (
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setShowSiteCondModal(true)}>
+                    <input type="checkbox" readOnly checked={hasConditions} className="w-4 h-4 cursor-pointer" />
+                    <span className="text-sm font-semibold text-gray-700">Site Conditions</span>
+                    {hasConditions && <span className="text-xs text-blue-600 font-medium">— {Object.values(sc).filter(v => v && String(v).trim()).length} field{Object.values(sc).filter(v => v && String(v).trim()).length !== 1 ? 's' : ''} filled</span>}
+                  </label>
+                  <hr className="mt-2 border-gray-200" />
+                </div>
+              );
+            })()}
+
             <div>
               <label className={labelCls}>Customer Notes <span className="normal-case text-gray-400 font-normal">— appears on proposal</span></label>
               <textarea className={`${inputCls} h-20 resize-y`} value={hdr.customer_notes} disabled={isLocked} onChange={e => setHdr(p => ({ ...p, customer_notes: e.target.value }))} />
@@ -1098,6 +1118,57 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           </div>
         </div>
       )}
+
+      {/* ── SITE CONDITIONS MODAL ────────────────────────────────────────── */}
+      {showSiteCondModal && (() => {
+        const SC_FIELDS = [
+          { key: 'color_selected',          label: 'Color Selected' },
+          { key: 'anti_skid',               label: 'Anti Skid' },
+          { key: 'joints',                  label: 'Joints' },
+          { key: 'moisture_reading',        label: 'Moisture Reading' },
+          { key: 'stop_coating_at_door',    label: 'Stop Coating at Door' },
+          { key: 'walk_doors',              label: 'Walk Doors' },
+          { key: 'overhead_doors',          label: 'Overhead Doors' },
+          { key: 'stem_walls_included',     label: 'Stem Walls Included' },
+          { key: 'existing_flooring_removal', label: 'Existing Flooring Removal' },
+          { key: 'floor_prep',              label: 'Floor Prep' },
+        ];
+        const sc = hdr.site_conditions || {};
+        const handleScChange = (key, val) => setHdr(p => ({ ...p, site_conditions: { ...(p.site_conditions || {}), [key]: val } }));
+        return (
+          <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowSiteCondModal(false)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 flex flex-col max-h-[85vh]">
+              <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
+                <h3 className="font-bold text-gray-800">Site Conditions</h3>
+                <button onClick={() => setShowSiteCondModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <div className="px-6 py-4 overflow-y-auto space-y-3">
+                {SC_FIELDS.map(({ key, label }) => (
+                  <div key={key}>
+                    <label className={labelCls}>{label}</label>
+                    <input
+                      type="text"
+                      className={inputCls}
+                      value={sc[key] || ''}
+                      onChange={e => handleScChange(key, e.target.value)}
+                      disabled={isLocked}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="px-6 pb-5 pt-3 border-t shrink-0">
+                <button
+                  onClick={() => setShowSiteCondModal(false)}
+                  className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── EXIT CONFIRMATION MODAL ──────────────────────────────────────── */}
       {showExitModal && (

@@ -162,6 +162,18 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   const invoiceUrl   = `${window.location.origin}/invoice/${proposalId}`;
   const termsText    = proposal.terms_and_conditions || '';
   const systemNotes  = proposal.system_notes || '';
+
+  const SC_LABELS = {
+    color_selected: 'Color Selected', anti_skid: 'Anti Skid', joints: 'Joints',
+    moisture_reading: 'Moisture Reading', stop_coating_at_door: 'Stop Coating at Door',
+    walk_doors: 'Walk Doors', overhead_doors: 'Overhead Doors',
+    stem_walls_included: 'Stem Walls Included',
+    existing_flooring_removal: 'Existing Flooring Removal', floor_prep: 'Floor Prep',
+  };
+  const siteConditions = proposal.site_conditions && typeof proposal.site_conditions === 'object'
+    ? Object.entries(proposal.site_conditions).filter(([, v]) => v && String(v).trim())
+    : [];
+  const hasSiteConditions = siteConditions.length > 0;
   const designId     = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
 
   // Pre-sort items for proposal view
@@ -677,6 +689,24 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             </div>
           )}
 
+          {/* Site Conditions */}
+          {hasSiteConditions && (
+            <div className="bg-white rounded-xl shadow-sm px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Site Conditions</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {siteConditions.map(([key, val]) => (
+                  <div key={key}>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{SC_LABELS[key] || key}</p>
+                    <p className="text-sm text-gray-700">{String(val)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Terms & Conditions */}
           {termsText && (
             <div className="bg-white rounded-xl shadow-sm px-5 py-4">
@@ -929,6 +959,21 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Notes</p>
             <p className="text-sm text-gray-700 whitespace-pre-line">{systemNotes}</p>
+          </div>
+        )}
+
+        {/* Site Conditions */}
+        {hasSiteConditions && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Site Conditions</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {siteConditions.map(([key, val]) => (
+                <div key={key}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{SC_LABELS[key] || key}</p>
+                  <p className="text-sm text-gray-700">{String(val)}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
