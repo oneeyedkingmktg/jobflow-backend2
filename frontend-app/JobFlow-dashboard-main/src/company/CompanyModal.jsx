@@ -54,6 +54,12 @@ export default function CompanyModal({
   const [showEstimatorPricing, setShowEstimatorPricing] = useState(false);
   const [showEstimatorMaster, setShowEstimatorMaster] = useState(false);
 
+  // REPORTS STATE
+  const [reportDefs, setReportDefs] = useState(null);
+  const [openReport, setOpenReport] = useState(null);
+  const [reportData, setReportData] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
   // TRACKING FORM STATE
   const [trackingForm, setTrackingForm] = useState({
     google_base_tag: "",
@@ -353,6 +359,102 @@ const handleSaveTracking = async () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const openReportModal = async (def) => {
+    setOpenReport(def);
+    setReportData(null);
+    setReportLoading(true);
+    const endpoint = def.key === "recent_activity" ? "activity" : def.key === "conversions" ? "conversions" : def.key;
+    try {
+      const res = await apiRequest(`/api/reports/${endpoint}?company_id=${company.id}`);
+      setReportData(res.metrics);
+    } catch (e) {
+      setReportData(null);
+    }
+    setReportLoading(false);
+  };
+
+  const renderReports = () => {
+    if (!reportDefs) {
+      apiRequest("/api/reports/definitions")
+        .then((r) => setReportDefs(r.reports))
+        .catch(() => setReportDefs([]));
+      return (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" />
+        </div>
+      );
+    }
+
+    const ReportPopup = () => {
+      if (!openReport) return null;
+      const data = reportData;
+      const SectionCard = ({ title, d }) => (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</div>
+          {!d || (d.totalLeads === 0 && d.newLeads === undefined) ? (
+            <p className="text-sm text-gray-400 italic">No data yet</p>
+          ) : openReport.key === "recent_activity" ? (
+            <>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">New Leads</span><span className="text-sm font-semibold">{d.newLeads}</span></div>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Appointments Set</span><span className="text-sm font-semibold">{d.apptsSet}</span></div>
+              <div className="flex justify-between py-2"><span className="text-sm text-gray-600">Jobs Sold</span><span className="text-sm font-semibold">{d.jobsSold}</span></div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Leads in cohort</span><span className="text-sm font-semibold">{d.totalLeads}</span></div>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Lead → Appointment</span><span className="text-sm font-semibold">{d.leadsToAppt} ({d.leadToApptPct}%)</span></div>
+              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Appointment → Sold</span><span className="text-sm font-semibold">{d.apptToSold} ({d.apptToSoldPct}%)</span></div>
+              <div className="flex justify-between py-2"><span className="text-sm text-gray-600">Lead → Sold (total)</span><span className="text-sm font-semibold">{d.leadsToSold} ({d.leadToSoldPct}%)</span></div>
+            </>
+          )}
+        </div>
+      );
+
+      return (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl max-h-[75vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">{openReport.name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{openReport.description}</p>
+              </div>
+              <button onClick={() => setOpenReport(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 flex-1">
+              {reportLoading ? (
+                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" /></div>
+              ) : (
+                <>
+                  <SectionCard title="Regular Leads" d={data?.non_estimator} />
+                  <SectionCard title="Estimator Leads" d={data?.estimator} />
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-gray-500">Select a report to view data for this company.</p>
+        {reportDefs.length === 0 && <p className="text-sm text-gray-400 italic">No reports available.</p>}
+        {reportDefs.map((def) => (
+          <button
+            key={def.key}
+            onClick={() => openReportModal(def)}
+            className="w-full text-left bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 active:bg-gray-50"
+          >
+            <div className="text-sm font-semibold text-gray-900">{def.name}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{def.description}</div>
+            <div className="text-xs text-blue-600 mt-2 font-medium">View →</div>
+          </button>
+        ))}
+        <ReportPopup />
+      </div>
+    );
   };
 
   const renderTracking = () => (
@@ -1083,6 +1185,18 @@ setTrackingForm({
               </button>
             )}
 
+            {isMasterUser && !isCreate && (
+              <button
+                className={sectionBtn(activeSection === "reports")}
+                onClick={() => {
+                  setActiveSection("reports");
+                  setSectionMode("view");
+                }}
+              >
+                Reports
+              </button>
+            )}
+
             {(isMasterUser || isAdminUser) && !isCreate && (
               <button
                 className={sectionBtn(activeSection === "users")}
@@ -1122,6 +1236,8 @@ setTrackingForm({
 {activeSection === "bidder" && (
   <BidderAdminSettings companyId={company?.id} />
 )}
+
+{activeSection === "reports" && renderReports()}
 
           </div>
 
