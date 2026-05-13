@@ -1075,7 +1075,7 @@ router.get('/public/:id', async (req, res) => {
 });
 
 // POST /api/bidder/proposal/:id/send-email — send proposal link to customer
-router.post('/proposal/:id/send-email', authenticateToken, async (req, res) => {
+router.post('/proposal/:id/send-email', async (req, res) => {
   try {
     const companyId = req.user.company_id;
     const result = await pool.query(
