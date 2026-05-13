@@ -787,7 +787,20 @@ const handleSaveTracking = async () => {
               <input
                 type="checkbox"
                 checked={form.reports_enabled}
-                onChange={(e) => handleChange("reports_enabled", e.target.checked)}
+                onChange={async (e) => {
+                  const val = e.target.checked;
+                  handleChange("reports_enabled", val);
+                  if (company?.id) {
+                    try {
+                      await apiRequest(`/companies/${company.id}/reports-enabled`, {
+                        method: "PUT",
+                        body: JSON.stringify({ reports_enabled: val }),
+                      });
+                    } catch (err) {
+                      console.error("reports-enabled save failed:", err);
+                    }
+                  }
+                }}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600"
               />
               <div>

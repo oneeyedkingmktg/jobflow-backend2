@@ -701,6 +701,29 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
 });
 
 // ============================================================================
+// TOGGLE REPORTS ENABLED (dedicated — bypasses main update query)
+// ============================================================================
+router.put('/:id/reports-enabled', requireRole('master'), async (req, res) => {
+  const companyId = parseInt(req.params.id, 10);
+  const { reports_enabled } = req.body;
+
+  if (typeof reports_enabled !== 'boolean') {
+    return res.status(400).json({ error: 'reports_enabled must be a boolean' });
+  }
+
+  try {
+    await db.pool.query(
+      `UPDATE companies SET reports_enabled = $1 WHERE id = $2`,
+      [reports_enabled, companyId]
+    );
+    res.json({ success: true, reports_enabled });
+  } catch (error) {
+    console.error('reports-enabled update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // SOFT DELETE COMPANY
 // ============================================================================
 router.delete('/:id', requireRole('master'), async (req, res) => {
