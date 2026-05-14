@@ -29,6 +29,31 @@ function calcAmt(ps, bidTotal) {
   return ps.amount_type === 'dollar' ? val : bidTotal * (val / 100);
 }
 
+const PRINT_STYLES = `
+  @media print {
+    .no-print { display: none !important; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { margin: 1.2cm; }
+  }
+`;
+
+function PrintButton() {
+  return (
+    <>
+      <style>{PRINT_STYLES}</style>
+      <button
+        onClick={() => window.print()}
+        className="no-print fixed top-3 right-3 z-[9999] flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-md text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-95 transition"
+      >
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+        Print / Save PDF
+      </button>
+    </>
+  );
+}
+
 export default function PublicProposal({ proposalId, forceView, invoiceNum = '1' }) {
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -262,6 +287,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
       return (
         <div className="min-h-screen bg-gray-100">
 
+          <PrintButton />
+
           {/* Header */}
           <div style={{ background: HBG }}>
             <div className="max-w-3xl mx-auto flex justify-between items-center px-4 py-5">
@@ -357,7 +384,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
               </div>
             </div>
 
-            {payBtnStyled}
+            <div className="no-print">{payBtnStyled}</div>
 
           </div>
 
@@ -377,6 +404,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     // ── Classic invoice ──────────────────────────────────────
     return (
       <div className="min-h-screen bg-gray-100">
+
+        <PrintButton />
 
         <div className="bg-blue-700 text-white">
           <div className="max-w-2xl mx-auto px-4 py-6">
@@ -457,7 +486,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             <span className="text-2xl font-black text-gray-900">{fmt(basePayAmount)}</span>
           </div>
 
-          {payBlock}
+          <div className="no-print">{payBlock}</div>
 
           <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
             <p>{companyName}</p>
@@ -485,6 +514,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
 
     return (
       <div className="min-h-screen bg-gray-100">
+
+        <PrintButton />
 
         {/* Header */}
         <div style={{ background: HBG }}>
@@ -734,7 +765,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
 
           {/* Accept / Invoice Link */}
           {alreadySigned ? (
-            <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm px-5 py-5 text-center">
+            <div className="no-print bg-green-50 border border-green-200 rounded-xl shadow-sm px-5 py-5 text-center">
               <p className="font-bold text-green-700 text-base mb-1">✓ Proposal Accepted</p>
               <p className="text-sm text-green-600 mb-4">Thank you! Your proposal has been accepted.</p>
               <a
@@ -746,7 +777,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
               </a>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm px-5 py-5">
+            <div className="no-print bg-white rounded-xl shadow-sm px-5 py-5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
                 <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Accept This Proposal</span>
@@ -790,6 +821,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   // ── Classic proposal ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100">
+
+      <PrintButton />
 
       <div className="bg-blue-700 text-white">
         <div className="max-w-2xl mx-auto px-4 py-6">
@@ -1009,7 +1042,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
 
         {/* Accept / Invoice Link */}
         {alreadySigned ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl shadow-sm px-5 py-5 text-center">
+          <div className="no-print bg-green-50 border border-green-200 rounded-2xl shadow-sm px-5 py-5 text-center">
             <p className="font-bold text-green-700 text-base mb-1">✓ Proposal Accepted</p>
             <p className="text-sm text-green-600 mb-4">Thank you! Your proposal has been accepted.</p>
             <a
@@ -1020,7 +1053,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             </a>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
+          <div className="no-print bg-white rounded-2xl shadow-sm px-5 py-5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Accept This Proposal</p>
             <p className="text-sm text-gray-500 mb-3">
               By typing your name below and clicking "Accept Proposal," you agree to the terms and conditions outlined above.
