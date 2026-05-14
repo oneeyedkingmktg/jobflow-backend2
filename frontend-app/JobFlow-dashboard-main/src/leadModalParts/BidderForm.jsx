@@ -1013,7 +1013,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Proposal row */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => window.open(`/proposal/${proposalId}`, '_blank')}
+                    onClick={() => window.open(`/proposal/${docId(proposalId)}`, '_blank')}
                     className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm text-left"
                   >
                     📄 View / Print Proposal
@@ -1039,7 +1039,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   return (
                     <div key={ps.id} className="flex gap-2">
                       <button
-                        onClick={() => window.open(`/invoice/${proposalId}/${invSuffix}`, '_blank')}
+                        onClick={() => window.open(`/invoice/${docId(proposalId)}/${invSuffix}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {invLabel} — {ps._desc || `Payment ${invNum}`} ({fmt(calcPayAmt(ps))})
@@ -1061,7 +1061,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   return (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => window.open(`/invoice/${proposalId}/${finalNum}`, '_blank')}
+                        onClick={() => window.open(`/invoice/${docId(proposalId)}/${finalNum}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {finalLabel} — Balance Due ({fmt(balanceDue)})

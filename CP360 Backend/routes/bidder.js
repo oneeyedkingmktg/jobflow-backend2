@@ -10,6 +10,11 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail } = require('../services/email');
 const Stripe = require('stripe');
 
+// Same scramble as docId() in the frontend — converts sequential DB id → 6-digit doc number
+function docNum(id) {
+  return ((id * 982451 + 123457) % 900000) + 100000;
+}
+
 // Default library items seeded for new companies
 const DEFAULT_LIBRARY = [
   {
@@ -201,6 +206,11 @@ router.post('/proposal', async (req, res) => {
         req.user.id || null,
       ]
     );
+
+    const newId = result.rows[0].id;
+    const dn = docNum(newId);
+    await pool.query('UPDATE bidder_proposals SET doc_number = $1 WHERE id = $2', [dn, newId]);
+    result.rows[0].doc_number = dn;
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -1040,8 +1050,8 @@ router.get('/public/:id', async (req, res) => {
        LEFT JOIN users u ON bp.created_by_user_id = u.id
        LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
        LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
-       WHERE bp.id = $1`,
-      [req.params.id]
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
     );
 
     if (!proposalResult.rows.length) {
@@ -1083,7 +1093,7 @@ router.post('/proposal/:id/send-email', async (req, res) => {
     const companyId = req.user.company_id;
     const result = await pool.query(
       `SELECT bp.bid_name, bp.bid_total, bp.company_id,
-              bp.proposal_design_id,
+              bp.proposal_design_id, bp.doc_number,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
               bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
@@ -1112,9 +1122,10 @@ router.post('/proposal/:id/send-email', async (req, res) => {
     const baseUrl      = row.proposal_domain
       ? `https://${row.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
       : process.env.APP_URL;
+    const dn           = row.doc_number || docNum(parseInt(req.params.id, 10));
     const proposalUrl  = emailType === 'invoice'
-      ? `${baseUrl}/invoice/${req.params.id}${invoiceNum ? `/${invoiceNum}` : ''}`
-      : `${baseUrl}/proposal/${req.params.id}`;
+      ? `${baseUrl}/invoice/${dn}${invoiceNum ? `/${invoiceNum}` : ''}`
+      : `${baseUrl}/proposal/${dn}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
     const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
@@ -1150,7 +1161,7 @@ router.post('/proposal/:id/send-email', async (req, res) => {
         }, 0);
         payAmt = Math.max(0, bidTotal - payTotal);
       }
-      invoiceLabel   = `INV-${String(parseInt(req.params.id, 10) + 121).padStart(4, '0')}-${suffix}`;
+      invoiceLabel   = `INV-${dn}-${suffix}`;
       payDescription = entry?.description || (idx >= total ? 'Balance Due' : null);
       payAmountStr   = `$${payAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
@@ -1192,8 +1203,8 @@ router.post('/public/:id/accept', async (req, res) => {
 
     // Check proposal exists and isn't already signed
     const existing = await pool.query(
-      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.id = $1',
-      [req.params.id]
+      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.doc_number = $1',
+      [parseInt(req.params.id, 10)]
     );
     if (!existing.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
@@ -1205,7 +1216,7 @@ router.post('/public/:id/accept', async (req, res) => {
     // Save signature
     await pool.query(
       'UPDATE bidder_proposals SET signature_name = $1, signed_at = $2, signature_ip = $3 WHERE id = $4',
-      [signature_name.trim(), signedAt, ip, req.params.id]
+      [signature_name.trim(), signedAt, ip, proposal.id]
     );
 
     // Fetch contractor email (company admin/owner)
@@ -1261,8 +1272,8 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
        FROM bidder_proposals bp
        JOIN bidder_company_settings bcs ON bcs.company_id = bp.company_id
        JOIN companies c ON c.id = bp.company_id
-       WHERE bp.id = $1`,
-      [req.params.id]
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
@@ -1325,7 +1336,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
     const amountStr = `$${(amount_cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const result = await pool.query(
-      `SELECT bp.bid_name, bp.company_id, bp.proposal_design_id,
+      `SELECT bp.id, bp.bid_name, bp.company_id, bp.proposal_design_id,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               COALESCE(c.company_name, c.name) as company_db_name,
               c.ghl_company_from_name,
@@ -1339,8 +1350,8 @@ router.post('/public/:id/payment-received', async (req, res) => {
        LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
        LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
        LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
-       WHERE bp.id = $1`,
-      [req.params.id]
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
@@ -1355,7 +1366,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
              ELSE paid_invoice_nums
            END
        WHERE id = $1`,
-      [req.params.id, String(invoice_num)]
+      [result.rows[0].id, String(invoice_num)]
     );
 
     const row = result.rows[0];
