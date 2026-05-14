@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { BidderAPI, CompaniesAPI } from '../api';
 import { useAuth } from '../AuthContext';
-import { printProposal, printPaymentInvoice, printFinalInvoice } from '../utils/printDocument';
+import { docId } from '../utils/printDocument';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1013,10 +1013,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Proposal row */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => printProposal(printData)}
+                    onClick={() => window.open(`/proposal/${proposalId}`, '_blank')}
                     className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm text-left"
                   >
-                    🖨 Print Bid / Proposal
+                    📄 View / Print Proposal
                   </button>
                   <button
                     onClick={() => openEmailModal('proposal')}
@@ -1035,11 +1035,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {paySchedule.map((ps, idx) => {
                   const invNum = idx + 1;
                   const invSuffix = String(invNum);
-                  const invLabel = `INV-${String(proposalId + 121).padStart(4, '0')}-${invSuffix}`;
+                  const invLabel = `INV-${docId(proposalId)}-${invSuffix}`;
                   return (
                     <div key={ps.id} className="flex gap-2">
                       <button
-                        onClick={() => printPaymentInvoice({ ...printData, payEntry: ps, payIdx: idx })}
+                        onClick={() => window.open(`/invoice/${proposalId}/${invSuffix}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {invLabel} — {ps._desc || `Payment ${invNum}`} ({fmt(calcPayAmt(ps))})
@@ -1057,11 +1057,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Final invoice row — balance not covered by schedule */}
                 {balanceDue > 0.009 && (() => {
                   const finalNum = String(paySchedule.length + 1);
-                  const finalLabel = `INV-${String(proposalId + 121).padStart(4, '0')}-${finalNum}`;
+                  const finalLabel = `INV-${docId(proposalId)}-${finalNum}`;
                   return (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => printFinalInvoice(printData)}
+                        onClick={() => window.open(`/invoice/${proposalId}/${finalNum}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {finalLabel} — Balance Due ({fmt(balanceDue)})
@@ -1079,7 +1079,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 )}
               </div>
               <div className="px-6 pb-4 border-t pt-3">
-                <p className="text-xs text-gray-400 text-center">Print opens a preview — use Print → Save as PDF</p>
+                <p className="text-xs text-gray-400 text-center">Opens in a new tab — use browser Print → Save as PDF</p>
               </div>
             </div>
           </div>
@@ -1093,7 +1093,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-gray-800">
                 {emailModal.type === 'invoice'
-                  ? `Email Invoice${emailModal.invoiceNum ? ` (INV-${String(proposalId + 121).padStart(4, '0')}-${emailModal.invoiceNum})` : ''}`
+                  ? `Email Invoice${emailModal.invoiceNum ? ` (INV-${docId(proposalId)}-${emailModal.invoiceNum})` : ''}`
                   : 'Email Proposal'}
               </h3>
               <button onClick={() => setEmailModal(prev => ({ ...prev, show: false }))} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>

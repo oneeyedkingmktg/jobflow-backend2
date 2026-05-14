@@ -19,6 +19,10 @@ function calcAmt(ps, bidTotal) {
   return type === 'dollar' ? val : bidTotal * (val / 100);
 }
 
+export function docId(id) {
+  return String(((id * 982451 + 123457) % 900000) + 100000);
+}
+
 import { Capacitor } from '@capacitor/core';
 
 // ── Shared CSS ──────────────────────────────────────────────────────────────
@@ -230,7 +234,7 @@ function _printProposalStyled({
   lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
   logoUrl = '', userName = '', AC, HBG,
 }) {
-  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+  const docNum  = `PRO-${docId(proposal.id)}`;
   const docDate = fmtDate(proposal.presented_date);
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
@@ -490,7 +494,7 @@ function _printPaymentInvoiceStyled({ proposal, payEntry, payIdx, lead, company,
   const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
   const label  = payEntry._desc || payEntry.description || `Payment ${payIdx + 1}`;
   const detail = type === 'percent' ? `${val}% of ${fmt(bidTotal)}` : '';
-  const docNum = `INV-${String(proposal.id + 121).padStart(4, '0')}-${payIdx + 1}`;
+  const docNum = `INV-${docId(proposal.id)}-${payIdx + 1}`;
   const docDate = fmtDate(null);
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
@@ -637,7 +641,7 @@ function printFinalInvoiceV3(args) {
 }
 
 function _printFinalInvoiceStyled({ proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl = '', userName = '', AC, HBG }) {
-  const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
+  const docNum  = `INV-${docId(proposal.id)}-F`;
   const docDate = fmtDate(null);
 
   const coName    = company?.companyName || company?.name || company?.ghlCompanyFromName || '';
@@ -819,7 +823,7 @@ export function printProposal({
       lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue, logoUrl, userName };
     return _printProposalStyled({ ...args, AC, HBG });
   }
-  const docNum  = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+  const docNum  = `PRO-${docId(proposal.id)}`;
   const docDate = `Date: ${fmtDate(proposal.presented_date)}`;
   const extra   = proposal.salesman ? `<br>Prepared by: ${proposal.salesman}` : '';
 
@@ -963,7 +967,7 @@ export function printPaymentInvoice({ proposal, payEntry, payIdx, lead, company,
   const val    = parseFloat(payEntry._val ?? payEntry.amount_value) || 0;
   const label  = payEntry._desc || payEntry.description || `Payment ${payIdx + 1}`;
   const detail = type === 'percent' ? `${val}% of ${fmt(bidTotal)}` : '';
-  const docNum = `INV-${String(proposal.id + 121).padStart(4, '0')}-${payIdx + 1}`;
+  const docNum = `INV-${docId(proposal.id)}-${payIdx + 1}`;
   const docDate = `Date: ${fmtDate(null)}`;
 
   const rawPayUrl = (proposal.payment_url || '').trim();
@@ -1015,7 +1019,7 @@ export function printFinalInvoice({ proposal, paySchedule, lead, company, bidTot
     const args = { proposal, paySchedule, lead, company, bidTotal, balanceDue, logoUrl, userName };
     return _printFinalInvoiceStyled({ ...args, AC, HBG });
   }
-  const docNum  = `INV-${String(proposal.id + 121).padStart(4, '0')}-F`;
+  const docNum  = `INV-${docId(proposal.id)}-F`;
   const docDate = `Date: ${fmtDate(null)}`;
   const rawPayUrlF = (proposal.payment_url || '').trim();
   const payUrl  = rawPayUrlF && !rawPayUrlF.startsWith('http') ? `https://${rawPayUrlF}` : rawPayUrlF;

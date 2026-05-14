@@ -6,6 +6,7 @@
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
+import { docId } from '../utils/printDocument';
 
 function fmt(n) {
   const v = parseFloat(n) || 0;
@@ -132,7 +133,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   const totalWithFee  = basePayAmount + feeAmount;
 
   // Invoice metadata
-  const invNum    = `INV-${String(proposal.id + 121).padStart(4, '0')}-${invSuffix}`;
+  const invNum    = `INV-${docId(proposal.id)}-${invSuffix}`;
   const invDate   = fmtDate(proposal.signed_at) || todayStr();
   const payLabel  = payEntry?.description || (isBalanceInvoice ? 'Balance Due' : 'Full Payment');
   const payDetail = payEntry?.amount_type === 'percent'
@@ -509,7 +510,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   if (designId) {
     const AC  = proposal.design_accent_color  || '#f97316';
     const HBG = proposal.design_primary_color || '#1c2333';
-    const docNum = `PRO-${String(proposal.id + 121).padStart(4, '0')}`;
+    const docNum = `PRO-${docId(proposal.id)}`;
     const logoSrc = proposal.logo_url || null;
 
     return (
