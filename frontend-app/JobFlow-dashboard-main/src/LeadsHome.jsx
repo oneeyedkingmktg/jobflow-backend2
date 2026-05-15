@@ -341,8 +341,7 @@ const matchesSearch =
         onRefresh={loadLeads}
         isMasterAdmin={isMasterAdmin}
 onAddLead={() => {
-
-  alert("Add Lead clicked! Company ID: " + currentCompany?.id);
+  if (isMasterAdmin) alert("Add Lead clicked! Company ID: " + currentCompany?.id);
   console.log("🆕 Add Lead clicked - Current company:", currentCompany);
   setSelectedLead(null);
   setIsNewLead(true);
