@@ -177,6 +177,10 @@ async function runMigrations() {
       last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
     `ALTER TABLE conversation_updates RENAME COLUMN conversation_id TO contact_id`,
+    // bidder_proposals — non-sequential 6-digit public URL identifier
+    `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS doc_number INTEGER`,
+    `UPDATE bidder_proposals SET doc_number = ((id * 982451 + 123457) % 900000) + 100000 WHERE doc_number IS NULL`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS bidder_proposals_doc_number_idx ON bidder_proposals (doc_number)`,
   ];
   for (const sql of migrations) {
     try {
