@@ -51,6 +51,8 @@ export default function PaymentSuccess({ proposalId }) {
     </svg>
   );
 
+  if (!data) return <div className="min-h-screen bg-gray-100" />;
+
   // ── Styled (theme colors) ───────────────────────────────────────────────────
   if (HBG && AC) {
     return (
