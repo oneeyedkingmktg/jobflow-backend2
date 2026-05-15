@@ -1203,7 +1203,7 @@ router.post('/public/:id/accept', async (req, res) => {
 
     // Check proposal exists and isn't already signed
     const existing = await pool.query(
-      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.doc_number = $1',
+      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.doc_number = $1',
       [parseInt(req.params.id, 10)]
     );
     if (!existing.rows.length) return res.status(404).json({ error: 'Proposal not found' });
@@ -1228,7 +1228,10 @@ router.post('/public/:id/accept', async (req, res) => {
     const companyName = proposal.ghl_company_from_name || proposal.company_db_name || '';
     const customerEmail = proposal.lead_email || null;
     const customerName = proposal.lead_name || proposal.lead_name_short || '';
-    const proposalUrl = `${process.env.APP_URL}/proposal/${req.params.id}`;
+    const _signBaseUrl = proposal.proposal_domain
+      ? `https://${proposal.proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+      : process.env.APP_URL;
+    const proposalUrl = `${_signBaseUrl}/proposal/${req.params.id}`;
 
     // Send emails (non-blocking — don't fail the request if email fails)
     sendProposalAcceptedEmails({
@@ -1261,7 +1264,7 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT bcs.stripe_secret_key,
+      `SELECT bcs.stripe_secret_key, bcs.proposal_domain,
               bp.bid_name,
               COALESCE(c.company_name, c.name) AS company_name,
               c.address AS company_address,
@@ -1277,8 +1280,12 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
-    const { stripe_secret_key, bid_name, company_name, company_address, company_city, company_state, company_zip, company_phone } = result.rows[0];
+    const { stripe_secret_key, proposal_domain, bid_name, company_name, company_address, company_city, company_state, company_zip, company_phone } = result.rows[0];
     if (!stripe_secret_key) return res.status(400).json({ error: 'Stripe is not configured for this account' });
+
+    const _stripeBaseUrl = proposal_domain
+      ? `https://${proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+      : process.env.APP_URL;
 
     const feePercent = parseFloat(convenience_fee_percent) || 0;
     const feeCents   = Math.round(base_amount_cents * feePercent / 100);
@@ -1318,8 +1325,8 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: success_url || `${process.env.APP_URL}/proposal/${req.params.id}?payment=success`,
-      cancel_url:  cancel_url  || `${process.env.APP_URL}/proposal/${req.params.id}`,
+      success_url: success_url || `${_stripeBaseUrl}/proposal/${req.params.id}?payment=success`,
+      cancel_url:  cancel_url  || `${_stripeBaseUrl}/proposal/${req.params.id}`,
     });
 
     res.json({ url: session.url });

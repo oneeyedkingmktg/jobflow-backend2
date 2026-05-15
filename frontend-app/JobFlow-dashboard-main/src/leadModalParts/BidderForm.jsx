@@ -59,6 +59,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [exitFn,           setExitFn]           = useState(null);
   const [company,          setCompany]          = useState(null);
   const [companySettings,  setCompanySettings]  = useState(null);
+
+  const _pd = companySettings?.proposal_domain;
+  const docBaseUrl = _pd
+    ? `https://${_pd.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+    : window.location.origin;
+  const dn = docId(proposalId);
+
   const [emailSending,     setEmailSending]     = useState(false);
   const [emailMsg,         setEmailMsg]         = useState('');
   const [emailModal,       setEmailModal]       = useState({ show: false, addr: '', type: 'proposal', invoiceNum: null });
@@ -1013,7 +1020,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Proposal row */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => window.open(`/proposal/${docId(proposalId)}`, '_blank')}
+                    onClick={() => window.open(`${docBaseUrl}/proposal/${dn}`, '_blank')}
                     className="flex-1 px-4 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 text-sm text-left"
                   >
                     📄 View / Print Proposal
@@ -1035,11 +1042,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {paySchedule.map((ps, idx) => {
                   const invNum = idx + 1;
                   const invSuffix = String(invNum);
-                  const invLabel = `INV-${docId(proposalId)}-${invSuffix}`;
+                  const invLabel = `INV-${dn}-${invSuffix}`;
                   return (
                     <div key={ps.id} className="flex gap-2">
                       <button
-                        onClick={() => window.open(`/invoice/${docId(proposalId)}/${invSuffix}`, '_blank')}
+                        onClick={() => window.open(`${docBaseUrl}/invoice/${dn}/${invSuffix}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {invLabel} — {ps._desc || `Payment ${invNum}`} ({fmt(calcPayAmt(ps))})
@@ -1057,11 +1064,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 {/* Final invoice row — balance not covered by schedule */}
                 {balanceDue > 0.009 && (() => {
                   const finalNum = String(paySchedule.length + 1);
-                  const finalLabel = `INV-${docId(proposalId)}-${finalNum}`;
+                  const finalLabel = `INV-${dn}-${finalNum}`;
                   return (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => window.open(`/invoice/${docId(proposalId)}/${finalNum}`, '_blank')}
+                        onClick={() => window.open(`${docBaseUrl}/invoice/${dn}/${finalNum}`, '_blank')}
                         className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm text-left"
                       >
                         🧾 {finalLabel} — Balance Due ({fmt(balanceDue)})
