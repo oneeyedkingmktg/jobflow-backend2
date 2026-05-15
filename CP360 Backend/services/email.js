@@ -40,13 +40,14 @@ async function sendPasswordResetEmail(email, resetToken) {
 async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, signedAt, customerEmail, customerName, contractorEmail, companyName, proposalUrl, fromName, fromEmail }) {
   const dateStr = new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   const displayName = fromName || companyName || 'CoatingPro360';
-  const senderAddr = fromEmail || process.env.SMTP_USER;
-  const fromHeader = `"${displayName}" <${senderAddr}>`;
+  const fromHeader = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo = fromEmail || undefined;
 
   // Email to contractor
   if (contractorEmail) {
     await transporter.sendMail({
       from: fromHeader,
+      ...(replyTo && { replyTo }),
       to: contractorEmail,
       subject: `Proposal Accepted — ${bidName}`,
       html: `
@@ -73,6 +74,7 @@ async function sendProposalAcceptedEmails({ proposalId, bidName, signatureName, 
   if (customerEmail) {
     await transporter.sendMail({
       from: fromHeader,
+      ...(replyTo && { replyTo }),
       to: customerEmail,
       subject: `Your Proposal Has Been Accepted — ${companyName || 'CoatingPro360'}`,
       html: `
@@ -101,8 +103,8 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
   const totalStr = payAmountStr || `$${(parseFloat(bidTotal) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const displayName = fromName || companyName || 'CoatingPro360';
-  const senderEmail = fromEmail || process.env.SMTP_USER || process.env.EMAIL_FROM;
-  const fromHeader  = `"${displayName}" <${senderEmail}>`;
+  const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo     = fromEmail || undefined;
 
   const isInvoice   = emailType === 'invoice';
   const docLabel    = isInvoice ? (invoiceLabel || 'Invoice') : 'Proposal';
@@ -199,13 +201,13 @@ async function sendProposalLinkEmail({ toEmail, customerName, companyName, bidNa
     ].join('');
   }
 
-  await transporter.sendMail({ from: fromHeader, to: toEmail, subject, html });
+  await transporter.sendMail({ from: fromHeader, ...(replyTo && { replyTo }), to: toEmail, subject, html });
 }
 
 async function sendPaymentReceivedEmail({ contractorEmail, customerEmail, customerName, companyName, bidName, amountStr, payLabel, invoiceUrl, fromName, fromEmail, primaryColor = null, accentColor = null }) {
   const displayName = fromName || companyName || 'CoatingPro360';
-  const senderEmail = fromEmail || process.env.SMTP_USER || process.env.EMAIL_FROM;
-  const fromHeader  = `"${displayName}" <${senderEmail}>`;
+  const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo     = fromEmail || undefined;
   const dateStr     = new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const greeting   = customerName ? `Hi ${customerName},` : 'Hi there,';
@@ -254,10 +256,10 @@ async function sendPaymentReceivedEmail({ contractorEmail, customerEmail, custom
 
   const sends = [];
   if (contractorEmail) {
-    sends.push(transporter.sendMail({ from: fromHeader, to: contractorEmail, subject: `Payment Received — ${bidName}`, html }));
+    sends.push(transporter.sendMail({ from: fromHeader, ...(replyTo && { replyTo }), to: contractorEmail, subject: `Payment Received — ${bidName}`, html }));
   }
   if (customerEmail) {
-    sends.push(transporter.sendMail({ from: fromHeader, to: customerEmail, subject: `Payment Confirmation — ${companyName || 'CoatingPro360'}`, html }));
+    sends.push(transporter.sendMail({ from: fromHeader, ...(replyTo && { replyTo }), to: customerEmail, subject: `Payment Confirmation — ${companyName || 'CoatingPro360'}`, html }));
   }
   await Promise.all(sends);
 }
