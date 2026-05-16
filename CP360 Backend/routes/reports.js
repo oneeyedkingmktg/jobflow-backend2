@@ -147,16 +147,12 @@ router.get('/automation-recovery', async (req, res) => {
       [companyId, from, to]
     );
 
-    // Total sold in range (distinct leads) + total revenue
+    // Total sold in range (distinct leads)
     const totalSoldRes = await pool.query(
-      `SELECT COUNT(*)::int AS total, COALESCE(SUM(contract_price), 0) AS total_revenue
-       FROM (
-         SELECT DISTINCT ON (se.lead_id) l.contract_price
-         FROM status_events se
-         JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
-         WHERE se.to_status = 'sold' AND se.created_at >= $2 AND se.created_at <= $3
-         ORDER BY se.lead_id
-       ) t`,
+      `SELECT COUNT(DISTINCT se.lead_id)::int AS total
+       FROM status_events se
+       JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
+       WHERE se.to_status = 'sold' AND se.created_at >= $2 AND se.created_at <= $3`,
       [companyId, from, to]
     );
 
