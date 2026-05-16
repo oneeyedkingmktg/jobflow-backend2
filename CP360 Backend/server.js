@@ -210,10 +210,15 @@ async function runMigrations() {
           SELECT 1 FROM status_events se
           WHERE se.lead_id = leads.id AND se.to_status = 'sold' AND se.created_at = leads.sold_at
         )`,
-    // automation_recovery report definition
+    // automation_recovery report definition (upsert so name/description are always correct)
     `INSERT INTO report_definitions (key, name, description) VALUES
       ('automation_recovery', 'Automation Recovery', 'See how many appointments and sold jobs came back after manual follow-up had stalled.')
-      ON CONFLICT (key) DO NOTHING`,
+      ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
+    // Restore recent_activity row in case its name was accidentally overwritten
+    `UPDATE report_definitions
+      SET name = 'Recent Activity',
+          description = 'Count of new leads, appointments set, and jobs sold in the last 30 days'
+      WHERE key = 'recent_activity'`,
   ];
   for (const sql of migrations) {
     try {
