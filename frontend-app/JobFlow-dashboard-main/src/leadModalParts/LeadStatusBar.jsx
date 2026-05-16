@@ -16,11 +16,31 @@ export default function LeadStatusBar({
 
   const [pauseBlockAction, setPauseBlockAction] = React.useState(null);
   const [showCompleteModal, setShowCompleteModal] = React.useState(false);
+  const [showContractModal, setShowContractModal] = React.useState(false);
+  const [contractInput, setContractInput] = React.useState('');
+  const [pendingInstallModal, setPendingInstallModal] = React.useState(false);
 
   const currentStatus = form.status || "lead";
 
   const setStatus = (status) => {
     setForm((prev) => ({ ...prev, status }));
+  };
+
+  const openContractModal = (shouldOpenInstall) => {
+    setPendingInstallModal(shouldOpenInstall);
+    setContractInput(form.contractPrice || '');
+    setShowContractModal(true);
+  };
+
+  const handleContractConfirm = () => {
+    setForm((prev) => ({
+      ...prev,
+      status: "sold",
+      notSoldReason: "",
+      ...(contractInput.trim() ? { contractPrice: contractInput.trim() } : {}),
+    }));
+    setShowContractModal(false);
+    if (pendingInstallModal && onOpenInstallModal) onOpenInstallModal();
   };
 
   const guardedSetStatus = (status) => {
@@ -32,6 +52,11 @@ export default function LeadStatusBar({
     // 🔒 Intercept move to Complete
     if (status === "complete") {
       setShowCompleteModal(true);
+      return;
+    }
+
+    if (status === "sold") {
+      openContractModal(false);
       return;
     }
 
@@ -78,8 +103,7 @@ export default function LeadStatusBar({
     if (form.pauseStatus === "Paused") {
       setPauseBlockAction(() => () => {
         if (currentStatus === "appointment_set" && next === "sold") {
-          setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
-          if (onOpenInstallModal) onOpenInstallModal();
+          openContractModal(true);
           return;
         }
         guardedSetStatus(next);
@@ -88,8 +112,7 @@ export default function LeadStatusBar({
     }
 
     if (currentStatus === "appointment_set" && next === "sold") {
-      setForm((prev) => ({ ...prev, status: "sold", notSoldReason: "" }));
-      if (onOpenInstallModal) onOpenInstallModal();
+      openContractModal(true);
       return;
     }
 
@@ -204,6 +227,31 @@ export default function LeadStatusBar({
                 No
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showContractModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Contract Amount</h3>
+            <p className="text-sm text-gray-500 mb-4">Enter the contract amount for this job (optional).</p>
+            <input
+              type="text"
+              value={contractInput}
+              onChange={(e) => setContractInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleContractConfirm(); }}
+              placeholder="e.g. 4500"
+              autoFocus
+              className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={handleContractConfirm}
+              className="w-full py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
+            >
+              Save and Continue
+            </button>
           </div>
         </div>
       )}
