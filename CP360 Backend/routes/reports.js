@@ -112,114 +112,104 @@ router.get('/conversions', async (req, res) => {
 });
 
 // ─── GET /api/reports/automation-recovery ────────────────────────────────────
-// Cards + detail rows showing appointments and sales recovered by automation
-// after manual follow-up stalled.
-// Query params: range=30|90|ytd (default 30), OR start=YYYY-MM-DD&end=YYYY-MM-DD
 router.get('/automation-recovery', async (req, res) => {
   try {
     const companyId = companyIdFor(req);
     const { range, start, end } = req.query;
 
     const now = new Date();
-    let from;
-    let to = now;
-
+    let from, to = now;
     if (start && end) {
       from = new Date(start);
-      to = new Date(end);
-      to.setHours(23, 59, 59, 999);
+      to = new Date(end); to.setHours(23, 59, 59, 999);
     } else if (range === 'ytd') {
       from = new Date(now.getFullYear(), 0, 1);
     } else if (range === '90') {
-      from = new Date(now);
-      from.setDate(from.getDate() - 90);
+      from = new Date(now); from.setDate(from.getDate() - 90);
     } else {
-      from = new Date(now);
-      from.setDate(from.getDate() - 30);
+      from = new Date(now); from.setDate(from.getDate() - 30);
     }
 
-    // Total appointments set in range (distinct leads)
-    const totalApptsRes = await pool.query(
-      `SELECT COUNT(DISTINCT se.lead_id)::int AS total
-       FROM status_events se
-       JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
-       WHERE se.to_status = 'appt_booked' AND se.created_at >= $2 AND se.created_at <= $3`,
-      [companyId, from, to]
+    // Check table exists before querying
+    const tableRes = await pool.query(
+      `SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_schema='public' AND table_name='status_events') AS ok`
     );
+    if (!tableRes.rows[0].ok) {
+      console.warn('[automation-recovery] status_events table does not exist yet');
+      return res.json({ success: true, metrics: { totalAppts: 0, totalSold: 0, recoveredAppts: 0, recoveredSales: 0, recoveredSalesRevenue: 0, apptRecoveryPct: 0, salesRecoveryPct: 0, avgDaysAppt: null, avgDaysSale: null }, recoveredAppts: [], recoveredSales: [] });
+    }
 
-    // Total sold in range (distinct leads)
-    const totalSoldRes = await pool.query(
-      `SELECT COUNT(DISTINCT se.lead_id)::int AS total
-       FROM status_events se
-       JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
-       WHERE se.to_status = 'sold' AND se.created_at >= $2 AND se.created_at <= $3`,
-      [companyId, from, to]
-    );
+    let totalAppts = 0, totalSold = 0, recoveredAppts = [], recoveredSales = [];
 
-    // Recovered appointments: lead entered 'lead' status, then appt_booked in range
-    const recoveredApptsRes = await pool.query(
-      `SELECT DISTINCT ON (se_appt.lead_id)
-         l.full_name,
-         l.lead_source,
-         se_lead.created_at AS entered_lead_at,
-         se_appt.created_at AS appt_set_at,
-         GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_appt.created_at - se_lead.created_at)) / 86400))::int AS days_to_recovery
-       FROM status_events se_appt
-       JOIN leads l ON l.id = se_appt.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
-       JOIN LATERAL (
-         SELECT created_at FROM status_events
-         WHERE lead_id = se_appt.lead_id
-           AND to_status = 'lead'
-           AND created_at < se_appt.created_at
-         ORDER BY created_at DESC
-         LIMIT 1
-       ) se_lead ON true
-       WHERE se_appt.to_status = 'appt_booked'
-         AND se_appt.created_at >= $2 AND se_appt.created_at <= $3
-       ORDER BY se_appt.lead_id, se_appt.created_at DESC`,
-      [companyId, from, to]
-    );
+    try {
+      const r = await pool.query(
+        `SELECT COUNT(DISTINCT se.lead_id)::int AS total
+         FROM status_events se
+         JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
+         WHERE se.to_status = 'appt_booked' AND se.created_at >= $2 AND se.created_at <= $3`,
+        [companyId, from, to]
+      );
+      totalAppts = r.rows[0].total;
+    } catch (e) { console.error('[automation-recovery] totalAppts:', e.message); }
 
-    // Recovered sales: lead entered 'lost' status, then sold in range
-    const recoveredSalesRes = await pool.query(
-      `SELECT DISTINCT ON (se_sold.lead_id)
-         l.full_name,
-         l.lead_source,
-         l.contract_price,
-         se_lost.created_at AS entered_lost_at,
-         se_sold.created_at AS sold_at,
-         GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_sold.created_at - se_lost.created_at)) / 86400))::int AS days_to_recovery
-       FROM status_events se_sold
-       JOIN leads l ON l.id = se_sold.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
-       JOIN LATERAL (
-         SELECT created_at FROM status_events
-         WHERE lead_id = se_sold.lead_id
-           AND to_status = 'lost'
-           AND created_at < se_sold.created_at
-         ORDER BY created_at DESC
-         LIMIT 1
-       ) se_lost ON true
-       WHERE se_sold.to_status = 'sold'
-         AND se_sold.created_at >= $2 AND se_sold.created_at <= $3
-       ORDER BY se_sold.lead_id, se_sold.created_at DESC`,
-      [companyId, from, to]
-    );
+    try {
+      const r = await pool.query(
+        `SELECT COUNT(DISTINCT se.lead_id)::int AS total
+         FROM status_events se
+         JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
+         WHERE se.to_status = 'sold' AND se.created_at >= $2 AND se.created_at <= $3`,
+        [companyId, from, to]
+      );
+      totalSold = r.rows[0].total;
+    } catch (e) { console.error('[automation-recovery] totalSold:', e.message); }
 
-    const recoveredAppts = recoveredApptsRes.rows;
-    const recoveredSales = recoveredSalesRes.rows;
+    try {
+      const r = await pool.query(
+        `SELECT DISTINCT ON (se_appt.lead_id)
+           l.full_name, l.lead_source,
+           se_lead.created_at AS entered_lead_at,
+           se_appt.created_at AS appt_set_at,
+           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_appt.created_at - se_lead.created_at)) / 86400))::int AS days_to_recovery
+         FROM status_events se_appt
+         JOIN leads l ON l.id = se_appt.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
+         JOIN LATERAL (
+           SELECT created_at FROM status_events
+           WHERE lead_id = se_appt.lead_id AND to_status = 'lead' AND created_at < se_appt.created_at
+           ORDER BY created_at DESC LIMIT 1
+         ) se_lead ON true
+         WHERE se_appt.to_status = 'appt_booked'
+           AND se_appt.created_at >= $2 AND se_appt.created_at <= $3
+         ORDER BY se_appt.lead_id, se_appt.created_at DESC`,
+        [companyId, from, to]
+      );
+      recoveredAppts = r.rows;
+    } catch (e) { console.error('[automation-recovery] recoveredAppts:', e.message); }
 
-    const totalAppts = totalApptsRes.rows[0].total;
-    const totalSold = totalSoldRes.rows[0].total;
+    try {
+      const r = await pool.query(
+        `SELECT DISTINCT ON (se_sold.lead_id)
+           l.full_name, l.lead_source, l.contract_price,
+           se_lost.created_at AS entered_lost_at,
+           se_sold.created_at AS sold_at,
+           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_sold.created_at - se_lost.created_at)) / 86400))::int AS days_to_recovery
+         FROM status_events se_sold
+         JOIN leads l ON l.id = se_sold.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL
+         JOIN LATERAL (
+           SELECT created_at FROM status_events
+           WHERE lead_id = se_sold.lead_id AND to_status = 'lost' AND created_at < se_sold.created_at
+           ORDER BY created_at DESC LIMIT 1
+         ) se_lost ON true
+         WHERE se_sold.to_status = 'sold'
+           AND se_sold.created_at >= $2 AND se_sold.created_at <= $3
+         ORDER BY se_sold.lead_id, se_sold.created_at DESC`,
+        [companyId, from, to]
+      );
+      recoveredSales = r.rows;
+    } catch (e) { console.error('[automation-recovery] recoveredSales:', e.message); }
 
-    const recoveredSalesRevenue = recoveredSales.reduce(
-      (sum, r) => sum + (parseFloat(r.contract_price) || 0), 0
-    );
-    const avgDaysAppt = recoveredAppts.length
-      ? Math.round(recoveredAppts.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredAppts.length)
-      : null;
-    const avgDaysSale = recoveredSales.length
-      ? Math.round(recoveredSales.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredSales.length)
-      : null;
+    const recoveredSalesRevenue = recoveredSales.reduce((sum, r) => sum + (parseFloat(r.contract_price) || 0), 0);
+    const avgDaysAppt = recoveredAppts.length ? Math.round(recoveredAppts.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredAppts.length) : null;
+    const avgDaysSale = recoveredSales.length ? Math.round(recoveredSales.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredSales.length) : null;
 
     res.json({
       success: true,
