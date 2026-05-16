@@ -365,7 +365,8 @@ const handleSaveTracking = async () => {
     setOpenReport(def);
     setReportData(null);
     setReportLoading(true);
-    const endpoint = def.key === "recent_activity" ? "activity" : def.key === "conversions" ? "conversions" : def.key;
+    const ENDPOINT_MAP = { recent_activity: "activity", conversions: "conversions", automation_recovery: "automation-recovery" };
+    const endpoint = ENDPOINT_MAP[def.key] ?? def.key;
     try {
       const res = await apiRequest(`/api/reports/${endpoint}?company_id=${company.id}`);
       setReportData(res.metrics);
