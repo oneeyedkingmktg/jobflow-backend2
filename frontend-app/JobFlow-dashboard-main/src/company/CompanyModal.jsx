@@ -390,6 +390,63 @@ const handleSaveTracking = async () => {
     const ReportPopup = () => {
       if (!openReport) return null;
       const data = reportData;
+
+      const ModalShell = ({ children }) => (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-16 px-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">{openReport.name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{openReport.description}</p>
+              </div>
+              <button onClick={() => setOpenReport(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 flex-1">
+              {reportLoading ? (
+                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" /></div>
+              ) : children}
+            </div>
+          </div>
+        </div>
+      );
+
+      if (openReport.key === "automation_recovery") {
+        const m = data;
+        const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        const Row = ({ label, value, green }) => (
+          <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+            <span className="text-sm text-gray-600">{label}</span>
+            <span className={`text-sm font-semibold ${green ? "text-green-700" : ""}`}>{value}</span>
+          </div>
+        );
+        return (
+          <ModalShell>
+            {!m ? (
+              <p className="text-sm text-gray-400 italic py-2">No data available.</p>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 mb-3">Last 30 days.</p>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Appointments</div>
+                  <Row label="Total Appointments Set" value={m.totalAppts} />
+                  <Row label="Recovered Appointments" value={m.recoveredAppts} />
+                  <Row label="Appointment Recovery Rate" value={`${m.apptRecoveryPct}%`} />
+                  {m.avgDaysAppt != null && <Row label="Avg Days to Recovery" value={`${m.avgDaysAppt} days`} />}
+                </div>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Sales</div>
+                  <Row label="Total Jobs Sold" value={m.totalSold} />
+                  <Row label="Recovered Sales" value={m.recoveredSales} />
+                  <Row label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} green />
+                  <Row label="Sales Recovery Rate" value={`${m.salesRecoveryPct}%`} />
+                  {m.avgDaysSale != null && <Row label="Avg Days to Recovery" value={`${m.avgDaysSale} days`} />}
+                </div>
+              </>
+            )}
+          </ModalShell>
+        );
+      }
+
       const SectionCard = ({ title, d }) => (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
           <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</div>
@@ -413,27 +470,10 @@ const handleSaveTracking = async () => {
       );
 
       return (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-16 px-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-              <div>
-                <h3 className="text-base font-bold text-gray-900">{openReport.name}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">{openReport.description}</p>
-              </div>
-              <button onClick={() => setOpenReport(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
-            </div>
-            <div className="overflow-y-auto px-5 py-4 flex-1">
-              {reportLoading ? (
-                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" /></div>
-              ) : (
-                <>
-                  <SectionCard title="Regular Leads" d={data?.non_estimator} />
-                  <SectionCard title="Estimator Leads" d={data?.estimator} />
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <ModalShell>
+          <SectionCard title="Regular Leads" d={data?.non_estimator} />
+          <SectionCard title="Estimator Leads" d={data?.estimator} />
+        </ModalShell>
       );
     };
 
