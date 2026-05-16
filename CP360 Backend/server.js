@@ -181,6 +181,39 @@ async function runMigrations() {
     `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS doc_number INTEGER`,
     `UPDATE bidder_proposals SET doc_number = ((id * 982451 + 123457) % 900000) + 100000 WHERE doc_number IS NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS bidder_proposals_doc_number_idx ON bidder_proposals (doc_number)`,
+    // status_events — persistent log of every lead status change (source of truth for recovery report)
+    `CREATE TABLE IF NOT EXISTS status_events (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER NOT NULL,
+      company_id INTEGER NOT NULL,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS status_events_lead_id_idx ON status_events (lead_id)`,
+    `CREATE INDEX IF NOT EXISTS status_events_company_status_created_idx ON status_events (company_id, to_status, created_at)`,
+    // Backfill appt_booked events from existing appt_set_at timestamps (idempotent)
+    `INSERT INTO status_events (lead_id, company_id, to_status, created_at)
+      SELECT id, company_id, 'appt_booked', appt_set_at
+      FROM leads
+      WHERE appt_set_at IS NOT NULL AND deleted_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM status_events se
+          WHERE se.lead_id = leads.id AND se.to_status = 'appt_booked' AND se.created_at = leads.appt_set_at
+        )`,
+    // Backfill sold events from existing sold_at timestamps (idempotent)
+    `INSERT INTO status_events (lead_id, company_id, to_status, created_at)
+      SELECT id, company_id, 'sold', sold_at
+      FROM leads
+      WHERE sold_at IS NOT NULL AND deleted_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM status_events se
+          WHERE se.lead_id = leads.id AND se.to_status = 'sold' AND se.created_at = leads.sold_at
+        )`,
+    // automation_recovery report definition
+    `INSERT INTO report_definitions (key, name, description) VALUES
+      ('automation_recovery', 'Automation Recovery', 'See how many appointments and sold jobs came back after manual follow-up had stalled.')
+      ON CONFLICT (key) DO NOTHING`,
   ];
   for (const sql of migrations) {
     try {

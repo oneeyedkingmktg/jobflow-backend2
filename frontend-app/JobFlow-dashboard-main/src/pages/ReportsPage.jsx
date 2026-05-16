@@ -120,11 +120,193 @@ function ConversionsContent({ companyId }) {
   );
 }
 
+function AutomationRecoveryContent({ companyId }) {
+  const [range, setRange] = useState("30");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  function load(r, start, end) {
+    setLoading(true);
+    setError(null);
+    let url = `/api/reports/automation-recovery?range=${r}`;
+    if (companyId) url += `&company_id=${companyId}`;
+    if (r === "custom" && start && end) url += `&start=${start}&end=${end}`;
+    apiRequest(url)
+      .then((r) => { setData(r); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
+  }
+
+  useEffect(() => { load("30"); }, [companyId]);
+
+  function handleRangeClick(r) {
+    setRange(r);
+    if (r !== "custom") load(r);
+  }
+
+  function handleCustomApply() {
+    if (customStart && customEnd) load("custom", customStart, customEnd);
+  }
+
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : "—";
+  const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  const RANGES = [
+    { key: "30", label: "30 Days" },
+    { key: "90", label: "90 Days" },
+    { key: "ytd", label: "YTD" },
+    { key: "custom", label: "Custom" },
+  ];
+
+  const m = data?.metrics;
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-3">
+        Recovered appointments are contacts that were moved into Lead status after manual follow-up stalled, then later booked an appointment. Recovered sales are contacts that were moved into Not Sold after the sales process stalled, then later became sold jobs.
+      </p>
+
+      {/* Range selector */}
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {RANGES.map((r) => (
+          <button
+            key={r.key}
+            onClick={() => handleRangeClick(r.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              range === r.key
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {range === "custom" && (
+        <div className="flex gap-2 items-center mb-3 flex-wrap">
+          <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <span className="text-xs text-gray-500">to</span>
+          <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <button onClick={handleCustomApply}
+            className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium">
+            Apply
+          </button>
+        </div>
+      )}
+
+      {loading && <Spinner />}
+      {error && <ErrorMsg msg={error} />}
+
+      {!loading && !error && m && (
+        <>
+          {/* Appointment cards */}
+          <SectionCard title="Appointments">
+            <MetricRow label="Total Appointments Set" value={m.totalAppts} />
+            <MetricRow label="Recovered Appointments" value={m.recoveredAppts} />
+            <MetricRow
+              label="Appointment Recovery Rate"
+              value={`${m.apptRecoveryPct}%`}
+              sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : undefined}
+            />
+          </SectionCard>
+
+          {/* Sales cards */}
+          <SectionCard title="Sales">
+            <MetricRow label="Total Jobs Sold" value={m.totalSold} />
+            <MetricRow label="Recovered Sales" value={m.recoveredSales} />
+            <MetricRow label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} />
+            <MetricRow
+              label="Sales Recovery Rate"
+              value={`${m.salesRecoveryPct}%`}
+              sub={m.avgDaysSale != null ? `Avg ${m.avgDaysSale} days to recovery` : undefined}
+            />
+          </SectionCard>
+
+          {/* Recovered appointments table */}
+          <div className="mb-3">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Appointments Detail</div>
+            {data.recoveredAppts.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No recovered appointments in this range.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                      <th className="text-left px-3 py-2 font-semibold">Source</th>
+                      <th className="text-left px-3 py-2 font-semibold">Entered Lead</th>
+                      <th className="text-left px-3 py-2 font-semibold">Appt Set</th>
+                      <th className="text-right px-3 py-2 font-semibold">Days</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {data.recoveredAppts.map((r, i) => (
+                      <tr key={i} className="bg-white">
+                        <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLeadAt)}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.apptSetAt)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Recovered sales table */}
+          <div className="mb-3">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Sales Detail</div>
+            {data.recoveredSales.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No recovered sales in this range.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                      <th className="text-left px-3 py-2 font-semibold">Source</th>
+                      <th className="text-left px-3 py-2 font-semibold">Entered Not Sold</th>
+                      <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
+                      <th className="text-right px-3 py-2 font-semibold">Days</th>
+                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {data.recoveredSales.map((r, i) => (
+                      <tr key={i} className="bg-white">
+                        <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLostAt)}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                        <td className="px-3 py-2 text-right font-medium text-green-700">
+                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">Missing</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── report modal wrapper ────────────────────────────────────────────────────
 
 const REPORT_CONTENT = {
   recent_activity: ActivityContent,
   conversions: ConversionsContent,
+  automation_recovery: AutomationRecoveryContent,
 };
 
 function ReportModal({ report, companyId, onClose }) {

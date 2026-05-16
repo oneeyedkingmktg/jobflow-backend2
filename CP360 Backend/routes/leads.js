@@ -741,6 +741,14 @@ const result = await pool.query(
 
 let updatedLead = result.rows[0];
 
+// Record status change in event log (drives automation recovery report)
+if (lead.status && lead.status !== previousLead.status) {
+  pool.query(
+    `INSERT INTO status_events (lead_id, company_id, from_status, to_status) VALUES ($1, $2, $3, $4)`,
+    [updatedLead.id, updatedLead.company_id, previousLead.status, updatedLead.status]
+  ).catch(e => console.error('[status_events insert]', e.message));
+}
+
 if (updatedLead.project_type) {
   await pool.query(
     `UPDATE estimator_leads
