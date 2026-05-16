@@ -59,6 +59,7 @@ export default function CompanyModal({
   const [openReport, setOpenReport] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [reportRange, setReportRange] = useState('30');
 
   // TRACKING FORM STATE
   const [trackingForm, setTrackingForm] = useState({
@@ -361,19 +362,27 @@ const handleSaveTracking = async () => {
     }
   };
 
-  const openReportModal = async (def) => {
-    setOpenReport(def);
-    setReportData(null);
+  const ENDPOINT_MAP = { recent_activity: "activity", conversions: "conversions", automation_recovery: "automation-recovery" };
+
+  const fetchReportData = async (def, range) => {
     setReportLoading(true);
-    const ENDPOINT_MAP = { recent_activity: "activity", conversions: "conversions", automation_recovery: "automation-recovery" };
+    setReportData(null);
     const endpoint = ENDPOINT_MAP[def.key] ?? def.key;
+    let url = `/api/reports/${endpoint}?company_id=${company.id}`;
+    if (range && range !== '30') url += `&range=${range}`;
     try {
-      const res = await apiRequest(`/api/reports/${endpoint}?company_id=${company.id}`);
-      setReportData(res.metrics);
+      const res = await apiRequest(url);
+      setReportData(def.key === 'automation_recovery' ? res.metrics : res.metrics);
     } catch (e) {
       setReportData(null);
     }
     setReportLoading(false);
+  };
+
+  const openReportModal = (def) => {
+    setOpenReport(def);
+    setReportRange('30');
+    fetchReportData(def, '30');
   };
 
   const renderReports = () => {
@@ -420,13 +429,24 @@ const handleSaveTracking = async () => {
             <span className={`text-sm font-semibold ${green ? "text-green-700" : ""}`}>{value}</span>
           </div>
         );
+        const RANGES = [{ key: "30", label: "30 Days" }, { key: "90", label: "90 Days" }, { key: "ytd", label: "YTD" }];
         return (
           <ModalShell>
+            <div className="flex gap-1.5 mb-4">
+              {RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
             {!m ? (
               <p className="text-sm text-gray-400 italic py-2">No data available.</p>
             ) : (
               <>
-                <p className="text-xs text-gray-500 mb-3">Last 30 days.</p>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
                   <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Appointments</div>
                   <Row label="Total Appointments Set" value={m.totalAppts} />
