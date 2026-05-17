@@ -700,7 +700,8 @@ const configResult = await db.query(
     estimatorConfig = {};
   }
   const phone = normalizePhone(lead.phone);
-  const email = lead.email;
+  // GHL silently orphans contacts when email contains + subaddress — strip it for GHL only
+  const email = lead.email ? lead.email.replace(/\+[^@]*(?=@)/, '') : null;
 
   const customFields = [];
 
