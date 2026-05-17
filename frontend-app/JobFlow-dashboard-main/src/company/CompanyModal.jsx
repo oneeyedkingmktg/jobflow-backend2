@@ -65,6 +65,7 @@ export default function CompanyModal({
   const [orphanLoading, setOrphanLoading] = useState(false);
   const [orphanResults, setOrphanResults] = useState(null);
   const [orphanResyncStatus, setOrphanResyncStatus] = useState({});
+  const [orphanJunkStatus, setOrphanJunkStatus] = useState({});
 
   // TRACKING FORM STATE
   const [trackingForm, setTrackingForm] = useState({
@@ -394,6 +395,7 @@ const handleSaveTracking = async () => {
     setOrphanLoading(true);
     setOrphanResults(null);
     setOrphanResyncStatus({});
+    setOrphanJunkStatus({});
     try {
       const res = await apiRequest(`/api/reports/orphan-contacts?company_id=${company.id}`);
       setOrphanResults(res.orphans || []);
@@ -413,6 +415,19 @@ const handleSaveTracking = async () => {
       setOrphanResyncStatus(prev => ({ ...prev, [leadId]: 'done' }));
     } catch (e) {
       setOrphanResyncStatus(prev => ({ ...prev, [leadId]: 'error' }));
+    }
+  };
+
+  const markLeadJunk = async (leadId) => {
+    setOrphanJunkStatus(prev => ({ ...prev, [leadId]: 'marking' }));
+    try {
+      await apiRequest('/api/reports/mark-junk', {
+        method: 'POST',
+        body: JSON.stringify({ lead_id: leadId, company_id: company.id }),
+      });
+      setOrphanJunkStatus(prev => ({ ...prev, [leadId]: 'done' }));
+    } catch (e) {
+      setOrphanJunkStatus(prev => ({ ...prev, [leadId]: 'error' }));
     }
   };
 
@@ -556,8 +571,10 @@ const handleSaveTracking = async () => {
                   </p>
                   {orphanResults.map((lead) => {
                     const syncStatus = orphanResyncStatus[lead.id];
+                    const junkStatus = orphanJunkStatus[lead.id];
                     const hasPlus = lead.email && lead.email.includes('+');
                     const createdDate = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '—';
+                    const actionTaken = syncStatus === 'done' || junkStatus === 'done';
                     return (
                       <div key={lead.id} className="bg-red-50 rounded-lg px-3 py-2 space-y-1">
                         <div className="flex items-start justify-between gap-2">
@@ -571,19 +588,28 @@ const handleSaveTracking = async () => {
                             )}
                             <div className="text-xs text-gray-400">Source: {lead.leadSource || '—'} · Added: {createdDate}</div>
                           </div>
-                          <div className="shrink-0">
+                          <div className="shrink-0 flex flex-col items-end gap-1">
                             {syncStatus === 'done' ? (
                               <span className="text-xs text-green-700 font-semibold">Synced ✓</span>
-                            ) : syncStatus === 'error' ? (
-                              <span className="text-xs text-red-600 font-semibold">Failed</span>
+                            ) : junkStatus === 'done' ? (
+                              <span className="text-xs text-gray-500 font-semibold">Marked Junk</span>
                             ) : (
-                              <button
-                                onClick={() => resyncLead(lead.id)}
-                                disabled={syncStatus === 'syncing'}
-                                className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-                              >
-                                {syncStatus === 'syncing' ? 'Syncing…' : 'Resync with GHL'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => resyncLead(lead.id)}
+                                  disabled={!!syncStatus || !!junkStatus}
+                                  className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+                                >
+                                  {syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Sync Failed' : 'Resync with GHL'}
+                                </button>
+                                <button
+                                  onClick={() => markLeadJunk(lead.id)}
+                                  disabled={!!syncStatus || !!junkStatus}
+                                  className="px-3 py-1 bg-gray-400 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+                                >
+                                  {junkStatus === 'marking' ? 'Marking…' : junkStatus === 'error' ? 'Failed' : 'Move to Junk'}
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>

@@ -345,4 +345,24 @@ router.post('/orphan-resync', async (req, res) => {
   }
 });
 
+// ─── POST /api/reports/mark-junk ─────────────────────────────────────────────
+// Sets a lead's status to status_junk, excluding it from future orphan checks.
+router.post('/mark-junk', async (req, res) => {
+  try {
+    if (req.user.role !== 'master') return res.status(403).json({ error: 'Master only' });
+
+    const { lead_id, company_id } = req.body;
+    if (!lead_id || !company_id) return res.status(400).json({ error: 'lead_id and company_id required' });
+
+    await pool.query(
+      `UPDATE leads SET status = 'status_junk' WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [lead_id, company_id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[POST /api/reports/mark-junk]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
