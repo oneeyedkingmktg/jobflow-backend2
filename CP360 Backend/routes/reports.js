@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
+const ghl = require('../controllers/ghlAPI');
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,21 @@ function companyIdFor(req) {
 
 function pct(num, den) {
   return den > 0 ? Math.round(num * 100 / den) : 0;
+}
+
+async function loadCompanyWithGHL(companyId) {
+  const result = await pool.query(
+    `SELECT id, name, ghl_api_key, ghl_location_id,
+            ghl_appt_calendar, ghl_install_calendar,
+            ghl_appt_assigned_user, ghl_install_assigned_user,
+            ghl_sc_calendar, ghl_sc_assigned_user,
+            ghl_appt_title_template, ghl_install_title_template,
+            ghl_appt_description_template, ghl_install_description_template,
+            timezone
+     FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+    [companyId]
+  );
+  return result.rows[0] || null;
 }
 
 // ─── GET /api/reports/definitions ───────────────────────────────────────────
@@ -242,6 +258,84 @@ router.get('/automation-recovery', async (req, res) => {
     });
   } catch (error) {
     console.error('[GET /api/reports/automation-recovery]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── GET /api/reports/orphan-contacts ────────────────────────────────────────
+// Checks every active lead with a ghl_contact_id against GHL.
+// Returns leads where GHL says the contact doesn't exist.
+router.get('/orphan-contacts', async (req, res) => {
+  try {
+    if (req.user.role !== 'master') return res.status(403).json({ error: 'Master only' });
+
+    const companyId = parseInt(req.query.company_id);
+    if (!companyId) return res.status(400).json({ error: 'company_id required' });
+
+    const company = await loadCompanyWithGHL(companyId);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+    if (!company.ghl_api_key) return res.status(400).json({ error: 'No GHL API key configured for this company' });
+
+    const leadsResult = await pool.query(
+      `SELECT id, name, phone, email, status, ghl_contact_id
+       FROM leads
+       WHERE company_id = $1
+         AND ghl_contact_id IS NOT NULL
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [companyId]
+    );
+
+    const orphans = [];
+    for (const lead of leadsResult.rows) {
+      try {
+        await ghl.fetchGHLContact(lead.ghl_contact_id, company);
+        // No throw = contact exists, not an orphan
+      } catch (err) {
+        if (err.status === 400 || err.status === 404) {
+          orphans.push({
+            id: lead.id,
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            status: lead.status,
+            ghlContactId: lead.ghl_contact_id,
+          });
+        }
+        // Other errors (network, rate limit) = skip, don't flag
+      }
+    }
+
+    res.json({ success: true, checked: leadsResult.rows.length, orphans });
+  } catch (error) {
+    console.error('[GET /api/reports/orphan-contacts]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── POST /api/reports/orphan-resync ─────────────────────────────────────────
+// Re-runs syncLeadToGHL for a single lead, recreating the GHL contact.
+router.post('/orphan-resync', async (req, res) => {
+  try {
+    if (req.user.role !== 'master') return res.status(403).json({ error: 'Master only' });
+
+    const { lead_id, company_id } = req.body;
+    if (!lead_id || !company_id) return res.status(400).json({ error: 'lead_id and company_id required' });
+
+    const company = await loadCompanyWithGHL(company_id);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+
+    const leadResult = await pool.query(
+      `SELECT * FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [lead_id, company_id]
+    );
+    if (leadResult.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
+
+    const contact = await ghl.syncLeadToGHL(leadResult.rows[0], company);
+    res.json({ success: true, contactId: contact?.id || contact?.contact?.id || null });
+  } catch (error) {
+    console.error('[POST /api/reports/orphan-resync]', error);
     res.status(500).json({ error: error.message });
   }
 });

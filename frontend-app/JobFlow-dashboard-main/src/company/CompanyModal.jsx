@@ -61,6 +61,11 @@ export default function CompanyModal({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportRange, setReportRange] = useState('30');
 
+  // ORPHAN CHECK STATE
+  const [orphanLoading, setOrphanLoading] = useState(false);
+  const [orphanResults, setOrphanResults] = useState(null);
+  const [orphanResyncStatus, setOrphanResyncStatus] = useState({});
+
   // TRACKING FORM STATE
   const [trackingForm, setTrackingForm] = useState({
     google_base_tag: "",
@@ -385,6 +390,32 @@ const handleSaveTracking = async () => {
     fetchReportData(def, '30');
   };
 
+  const runOrphanCheck = async () => {
+    setOrphanLoading(true);
+    setOrphanResults(null);
+    setOrphanResyncStatus({});
+    try {
+      const res = await apiRequest(`/api/reports/orphan-contacts?company_id=${company.id}`);
+      setOrphanResults(res.orphans || []);
+    } catch (e) {
+      setOrphanResults([]);
+    }
+    setOrphanLoading(false);
+  };
+
+  const resyncLead = async (leadId) => {
+    setOrphanResyncStatus(prev => ({ ...prev, [leadId]: 'syncing' }));
+    try {
+      await apiRequest('/api/reports/orphan-resync', {
+        method: 'POST',
+        body: JSON.stringify({ lead_id: leadId, company_id: company.id }),
+      });
+      setOrphanResyncStatus(prev => ({ ...prev, [leadId]: 'done' }));
+    } catch (e) {
+      setOrphanResyncStatus(prev => ({ ...prev, [leadId]: 'error' }));
+    }
+  };
+
   const renderReports = () => {
     if (!reportDefs) {
       apiRequest("/api/reports/definitions")
@@ -501,6 +532,58 @@ const handleSaveTracking = async () => {
     return (
       <div className="space-y-3">
         <p className="text-xs text-gray-500">Select a report to view data for this company.</p>
+
+        {/* Orphan CP Contacts — master only */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
+          <div className="text-sm font-semibold text-gray-900">Orphan CP Contacts</div>
+          <div className="text-xs text-gray-500 mt-0.5">Find leads whose GHL contact ID no longer exists in GoHighLevel</div>
+          <button
+            onClick={runOrphanCheck}
+            disabled={orphanLoading}
+            className="mt-3 px-4 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+          >
+            {orphanLoading ? 'Checking…' : 'Run Check'}
+          </button>
+
+          {orphanResults !== null && (
+            <div className="mt-3">
+              {orphanResults.length === 0 ? (
+                <p className="text-xs text-green-700 font-semibold">All contacts verified — no orphans found.</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-600 font-semibold">
+                    {orphanResults.length} orphaned contact{orphanResults.length !== 1 ? 's' : ''} found:
+                  </p>
+                  {orphanResults.map((lead) => {
+                    const syncStatus = orphanResyncStatus[lead.id];
+                    return (
+                      <div key={lead.id} className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
+                        <div>
+                          <div className="text-xs font-semibold text-gray-900">{lead.name || '(no name)'}</div>
+                          <div className="text-xs text-gray-500">{lead.phone || lead.email || ''} · {lead.status}</div>
+                        </div>
+                        {syncStatus === 'done' ? (
+                          <span className="text-xs text-green-700 font-semibold">Synced ✓</span>
+                        ) : syncStatus === 'error' ? (
+                          <span className="text-xs text-red-600 font-semibold">Failed</span>
+                        ) : (
+                          <button
+                            onClick={() => resyncLead(lead.id)}
+                            disabled={syncStatus === 'syncing'}
+                            className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+                          >
+                            {syncStatus === 'syncing' ? 'Syncing…' : 'Resync with GHL'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {reportDefs.length === 0 && <p className="text-sm text-gray-400 italic">No reports available.</p>}
         {reportDefs.map((def) => (
           <button
