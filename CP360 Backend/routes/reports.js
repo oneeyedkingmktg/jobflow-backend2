@@ -284,10 +284,11 @@ router.get('/orphan-contacts', async (req, res) => {
          AND deleted_at IS NULL
          AND status != 'status_junk'
        ORDER BY created_at DESC
-       LIMIT 200`,
+       LIMIT 100`,
       [companyId]
     );
 
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const orphans = [];
     for (const lead of leadsResult.rows) {
       try {
@@ -304,8 +305,9 @@ router.get('/orphan-contacts', async (req, res) => {
             ghlContactId: lead.ghl_contact_id,
           });
         }
-        // Other errors (network, rate limit) = skip, don't flag
+        // 429 or other errors = skip, don't flag as orphan
       }
+      await sleep(200); // stay under GHL rate limit
     }
 
     res.json({ success: true, checked: leadsResult.rows.length, orphans });
