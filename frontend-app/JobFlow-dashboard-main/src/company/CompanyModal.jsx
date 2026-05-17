@@ -556,25 +556,37 @@ const handleSaveTracking = async () => {
                   </p>
                   {orphanResults.map((lead) => {
                     const syncStatus = orphanResyncStatus[lead.id];
+                    const hasPlus = lead.email && lead.email.includes('+');
+                    const createdDate = lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '—';
                     return (
-                      <div key={lead.id} className="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2">
-                        <div>
-                          <div className="text-xs font-semibold text-gray-900">{lead.name || '(no name)'}</div>
-                          <div className="text-xs text-gray-500">{lead.phone || lead.email || ''} · {lead.status}</div>
+                      <div key={lead.id} className="bg-red-50 rounded-lg px-3 py-2 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-gray-900">{lead.name || '(no name)'}</div>
+                            <div className="text-xs text-gray-500">{lead.phone || '—'} · {lead.status}</div>
+                            {lead.email && (
+                              <div className={`text-xs ${hasPlus ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
+                                {lead.email}{hasPlus ? ' ⚠ + in email' : ''}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-400">Source: {lead.leadSource || '—'} · Added: {createdDate}</div>
+                          </div>
+                          <div className="shrink-0">
+                            {syncStatus === 'done' ? (
+                              <span className="text-xs text-green-700 font-semibold">Synced ✓</span>
+                            ) : syncStatus === 'error' ? (
+                              <span className="text-xs text-red-600 font-semibold">Failed</span>
+                            ) : (
+                              <button
+                                onClick={() => resyncLead(lead.id)}
+                                disabled={syncStatus === 'syncing'}
+                                className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+                              >
+                                {syncStatus === 'syncing' ? 'Syncing…' : 'Resync with GHL'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        {syncStatus === 'done' ? (
-                          <span className="text-xs text-green-700 font-semibold">Synced ✓</span>
-                        ) : syncStatus === 'error' ? (
-                          <span className="text-xs text-red-600 font-semibold">Failed</span>
-                        ) : (
-                          <button
-                            onClick={() => resyncLead(lead.id)}
-                            disabled={syncStatus === 'syncing'}
-                            className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-                          >
-                            {syncStatus === 'syncing' ? 'Syncing…' : 'Resync with GHL'}
-                          </button>
-                        )}
                       </div>
                     );
                   })}

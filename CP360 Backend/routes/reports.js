@@ -277,7 +277,7 @@ router.get('/orphan-contacts', async (req, res) => {
     if (!company.ghl_api_key) return res.status(400).json({ error: 'No GHL API key configured for this company' });
 
     const leadsResult = await pool.query(
-      `SELECT id, name, phone, email, status, ghl_contact_id
+      `SELECT id, name, phone, email, status, lead_source, ghl_contact_id, created_at
        FROM leads
        WHERE company_id = $1
          AND ghl_contact_id IS NOT NULL
@@ -302,6 +302,8 @@ router.get('/orphan-contacts', async (req, res) => {
             phone: lead.phone,
             email: lead.email,
             status: lead.status,
+            leadSource: lead.lead_source,
+            createdAt: lead.created_at,
             ghlContactId: lead.ghl_contact_id,
           });
         }
