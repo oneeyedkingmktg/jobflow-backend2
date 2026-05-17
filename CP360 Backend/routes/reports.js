@@ -282,6 +282,7 @@ router.get('/orphan-contacts', async (req, res) => {
        WHERE company_id = $1
          AND ghl_contact_id IS NOT NULL
          AND deleted_at IS NULL
+         AND status != 'status_junk'
        ORDER BY created_at DESC
        LIMIT 200`,
       [companyId]
