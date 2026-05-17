@@ -1907,14 +1907,22 @@ getConversationMessages: async function (contactId, company, limit = 20) {
     if (!contactId || !company) {
       throw new Error("Contact ID and company required");
     }
-    
+
     // Step 1: Get conversations for this contact
-    const convResponse = await ghlRequest(
-      company,
-      `/conversations/search?contactId=${contactId}&limit=5`,
-      { method: "GET" }
-    );
-    
+    let convResponse;
+    try {
+      convResponse = await ghlRequest(
+        company,
+        `/conversations/search?contactId=${contactId}&limit=5`,
+        { method: "GET" }
+      );
+    } catch (err) {
+      if (err.status === 400 || err.status === 404) {
+        return { messages: [], conversationId: null };
+      }
+      throw err;
+    }
+
     const conversations = convResponse?.conversations || [];
     
     if (conversations.length === 0) {
