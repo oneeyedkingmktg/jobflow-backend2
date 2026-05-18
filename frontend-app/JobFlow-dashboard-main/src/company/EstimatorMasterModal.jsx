@@ -14,6 +14,7 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [error, setError] = useState("");
   const [outOfAreaLogs, setOutOfAreaLogs] = useState(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   
   const [form, setForm] = useState({
   estimatorEnabled: false,
@@ -485,15 +486,25 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                   readOnly
                   rows={3}
                   className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
-                 value={`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  id="cp360-estimator"\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>\n<script>\n(function(){\nvar u=['utm_source','utm_medium','utm_campaign','utm_content','gclid','msclkid','fbclid'];\nvar p=new URLSearchParams(window.location.search);\nvar f=document.getElementById('cp360-estimator');\nvar s=new URL(f.src);\nu.forEach(function(k){if(p.get(k))s.searchParams.set(k,p.get(k));});\nf.src=s.toString();\n})();\nwindow.addEventListener('message',function(e){\nif(!e.data||e.data.event!=='estimator_conversion')return;\nif(e.data.microsoftEventCode){try{new Function(e.data.microsoftEventCode)();}catch(err){}}\n});\n<\/script>`}
+                 value={`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  id="cp360-estimator"\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>\n<script>\n(function(){\nvar u=['utm_source','utm_medium','utm_campaign'];\nvar p=new URLSearchParams(window.location.search);\nvar f=document.getElementById('cp360-estimator');\nvar s=new URL(f.src);\nu.forEach(function(k){if(p.get(k))s.searchParams.set(k,p.get(k));});\nf.src=s.toString();\n})();\nwindow.addEventListener('message',function(e){\nif(!e.data||e.data.event!=='estimator_conversion')return;\nif(e.data.microsoftEventCode){try{new Function(e.data.microsoftEventCode)();}catch(err){}}\n});\n<\/script>\n<!-- / CoatingPro360 Estimator Form -->`}
                 />
-                <button
-                  onClick={() => {
-navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  id="cp360-estimator"\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>\n<script>\n(function(){\nvar u=['utm_source','utm_medium','utm_campaign','utm_content','gclid','msclkid','fbclid'];\nvar p=new URLSearchParams(window.location.search);\nvar f=document.getElementById('cp360-estimator');\nvar s=new URL(f.src);\nu.forEach(function(k){if(p.get(k))s.searchParams.set(k,p.get(k));});\nf.src=s.toString();\n})();\nwindow.addEventListener('message',function(e){\nif(!e.data||e.data.event!=='estimator_conversion')return;\nif(e.data.microsoftEventCode){try{new Function(e.data.microsoftEventCode)();}catch(err){}}\n});\n<\/script>`);                  }}
-                  className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
-                >
-                  Copy
-                </button>
+                <div className="relative inline-block">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`<!-- CoatingPro360 Estimator Form -->\n<iframe\n  id="cp360-estimator"\n  src="https://estimate.coatingpro360.com/?company=${company.estimatorCode}"\n  width="100%"\n  height="900"\n  style="border:0; border-radius:14px;"\n  loading="lazy"\n  referrerpolicy="no-referrer-when-downgrade">\n</iframe>\n<script>\n(function(){\nvar u=['utm_source','utm_medium','utm_campaign'];\nvar p=new URLSearchParams(window.location.search);\nvar f=document.getElementById('cp360-estimator');\nvar s=new URL(f.src);\nu.forEach(function(k){if(p.get(k))s.searchParams.set(k,p.get(k));});\nf.src=s.toString();\n})();\nwindow.addEventListener('message',function(e){\nif(!e.data||e.data.event!=='estimator_conversion')return;\nif(e.data.microsoftEventCode){try{new Function(e.data.microsoftEventCode)();}catch(err){}}\n});\n<\/script>\n<!-- / CoatingPro360 Estimator Form -->`);
+                      setEmbedCopied(true);
+                      setTimeout(() => setEmbedCopied(false), 2000);
+                    }}
+                    className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
+                  >
+                    Copy
+                  </button>
+                  {embedCopied && (
+                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                      Copied!
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}
