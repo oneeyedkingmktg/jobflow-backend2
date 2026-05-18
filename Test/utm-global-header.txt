@@ -1,0 +1,29 @@
+GLOBAL HEADER SCRIPT — paste into Marketing360 > Settings > Header Code
+Fires on every page. Saves UTM params the moment a visitor lands from an ad.
+The estimator embed script will read these automatically as a fallback.
+
+----------------------------------------------------------------------
+
+<script>
+(function(){
+  var u=['utm_source','utm_medium','utm_campaign'];
+  var p=new URLSearchParams(window.location.search);
+  u.forEach(function(k){
+    var v=p.get(k);
+    if(v)sessionStorage.setItem('cp360_'+k,v);
+  });
+})();
+</script>
+
+----------------------------------------------------------------------
+
+HOW IT WORKS:
+- Visitor clicks Google Ad → lands on any page with ?utm_source=google&utm_medium=cpc&utm_campaign=...
+- This script runs immediately and saves those 3 values to sessionStorage
+- Visitor browses 1-2 more pages (UTMs disappear from the URL — that's fine)
+- Visitor reaches the estimator page and fills out the form
+- The embed script checks the URL first, finds nothing, then reads from sessionStorage
+- UTMs are passed to the iframe and saved with the lead
+
+sessionStorage clears automatically when the browser tab is closed.
+No risk of one visit's UTMs bleeding into the next visit.
