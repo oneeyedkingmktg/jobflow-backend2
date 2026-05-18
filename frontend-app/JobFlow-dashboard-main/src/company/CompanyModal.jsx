@@ -67,6 +67,8 @@ export default function CompanyModal({
   const [orphanResyncStatus, setOrphanResyncStatus] = useState({});
   const [orphanJunkStatus, setOrphanJunkStatus] = useState({});
 
+  const [utmCopied, setUtmCopied] = useState(false);
+
   // TRACKING FORM STATE
   const [trackingForm, setTrackingForm] = useState({
     google_base_tag: "",
@@ -650,6 +652,44 @@ const handleSaveTracking = async () => {
       <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 text-yellow-800 text-sm">
         <strong>Conversion Tracking</strong>
         <p className="mt-1">Paste tracking codes here. Base tags inject into the estimator &lt;head&gt;. Conversion events fire on form submit success.</p>
+      </div>
+
+      <div>
+        <div className={viewLabel}>UTM SESSION TRACKING — GLOBAL HEADER SCRIPT</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Paste this once into your website's global header code.</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>In <strong>Marketing360</strong> go to <strong>Settings → Header Code</strong></li>
+            <li>Paste the script below — it fires on every page</li>
+            <li>When a visitor arrives from an ad, their UTM params are saved for the entire browser session</li>
+            <li>The estimator form will pick them up even if the visitor browses other pages first</li>
+          </ol>
+        </div>
+        <div className="relative">
+          <textarea
+            readOnly
+            rows={6}
+            className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+            value={`<script>\n(function(){\n  var u=['utm_source','utm_medium','utm_campaign'];\n  var p=new URLSearchParams(window.location.search);\n  u.forEach(function(k){\n    var v=p.get(k);\n    if(v)sessionStorage.setItem('cp360_'+k,v);\n  });\n})();\n<\/script>`}
+          />
+          <div className="relative inline-block">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`<script>\n(function(){\n  var u=['utm_source','utm_medium','utm_campaign'];\n  var p=new URLSearchParams(window.location.search);\n  u.forEach(function(k){\n    var v=p.get(k);\n    if(v)sessionStorage.setItem('cp360_'+k,v);\n  });\n})();\n<\/script>`);
+                setUtmCopied(true);
+                setTimeout(() => setUtmCopied(false), 2000);
+              }}
+              className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
+            >
+              Copy
+            </button>
+            {utmCopied && (
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                Copied!
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div>
