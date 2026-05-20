@@ -147,7 +147,7 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error.message);
-    res.status(500).json({ message: 'Server error. Please try again.' });
+    res.status(500).json({ message: 'Server error. Please try again in a few minutes.' });
   }
 });
 
