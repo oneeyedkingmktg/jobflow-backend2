@@ -647,14 +647,6 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
 
     <hr className="my-4" />
 
-    {textInput(
-      "Custom Finish Tab Label",
-      "customFinishLabel",
-      "e.g. Faux Polish"
-    )}
-    
-    <hr className="my-4" />
-    
     <h4 className="font-semibold text-gray-700 text-sm">Call-to-Action Buttons</h4>
     <p className="text-xs text-gray-600 mb-2">These buttons appear below the price on the results page</p>
     
@@ -663,6 +655,16 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
     
     {textInput("CTA Button 2 Text", "cta2Button", "e.g. View Our Gallery")}
     {textInput("CTA Button 2 Link", "cta2Link", "https://...")}
+
+    <hr className="my-4" />
+
+    <h4 className="font-semibold text-gray-700 text-sm">Finish Descriptions on Results Page</h4>
+    <p className="text-xs text-gray-500 mb-2">
+      To add a clickable link inside a description, use this format:{" "}
+      <code className="bg-gray-100 px-1 rounded">(url,text)</code>
+      {" "}— example:{" "}
+      <code className="bg-gray-100 px-1 rounded">(https://coatingpro360.com,learn more)</code>
+    </p>
 
 {textArea(
   "Solid Finish Description (Results Page)",
@@ -686,7 +688,7 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
 )}
 
 {textArea(
-  "Custom Finish Description (Results Page)",
+  `${form.customFinishLabel || "Custom"} Finish Description (Results Page)`,
   "customFinishDescription",
   "Shown when Custom tab is selected",
   4

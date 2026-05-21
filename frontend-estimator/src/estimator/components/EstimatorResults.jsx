@@ -37,6 +37,7 @@ function renderTextWithInlineLinks(text) {
       <a
         key={`inline-link-${linkIndex++}`}
         href={url}
+        target="_top"
         className="underline"
       >
         {linkText}
