@@ -114,9 +114,12 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   const payTotal   = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
   const balanceDue = bidTotal - payTotal;
 
-  // Stripe / payment
+  // Payment processor
+  const processor        = proposal.company_payment_processor || 'stripe';
   const stripeConfigured = !!(proposal.company_stripe_publishable_key);
-  const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && stripeConfigured;
+  const paypalConfigured = !!(proposal.company_paypal_client_id);
+  const processorReady   = processor === 'paypal' ? paypalConfigured : stripeConfigured;
+  const showPayButton    = (proposal.include_payment_button ?? proposal.company_include_payment_button) && processorReady;
 
   // Resolve which payment schedule entry this invoice is for
   const totalInvoices   = paymentSchedules.length;
@@ -157,6 +160,30 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
       });
       const json = await resp.json();
       if (!resp.ok) throw new Error(json.error || 'Payment setup failed');
+      window.location.href = json.url;
+    } catch (e) {
+      setPayError(e.message || 'Unable to start payment. Please try again.');
+      setPaying(false);
+    }
+  }
+
+  async function handlePaypalPayment() {
+    setPayError('');
+    setPaying(true);
+    try {
+      const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
+      const resp = await fetch(`${apiBase}/api/bidder/public/${proposalId}/paypal-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base_amount_cents: Math.round(basePayAmount * 100),
+          convenience_fee_percent: feePercent,
+          success_url: `${window.location.origin}/payment-success/${proposalId}?amount=${Math.round(totalWithFee * 100)}&label=${encodeURIComponent(payLabel)}&inv=${invSuffix}`,
+          cancel_url: window.location.href,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || 'PayPal setup failed');
       window.location.href = json.url;
     } catch (e) {
       setPayError(e.message || 'Unable to start payment. Please try again.');
@@ -238,11 +265,11 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
       )}
       {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
       <button
-        onClick={handleStripePayment}
+        onClick={processor === 'paypal' ? handlePaypalPayment : handleStripePayment}
         disabled={paying}
         className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60 bg-blue-600 hover:bg-blue-700"
       >
-        {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+        {paying ? `Redirecting to ${processor === 'paypal' ? 'PayPal' : 'Stripe'}…` : 'Make Your Payment'}
       </button>
     </div>
   ) : null);
@@ -275,12 +302,12 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
           )}
           {payError && <p className="text-red-600 text-sm mb-2 text-center">{payError}</p>}
           <button
-            onClick={handleStripePayment}
+            onClick={processor === 'paypal' ? handlePaypalPayment : handleStripePayment}
             disabled={paying}
             className="block w-full py-4 text-white font-bold text-base rounded-2xl text-center shadow transition disabled:opacity-60"
             style={{ background: AC }}
           >
-            {paying ? 'Redirecting to Stripe…' : 'Make Your Payment'}
+            {paying ? `Redirecting to ${processor === 'paypal' ? 'PayPal' : 'Stripe'}…` : 'Make Your Payment'}
           </button>
         </div>
       ) : null);

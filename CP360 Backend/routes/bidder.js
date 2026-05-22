@@ -9,6 +9,21 @@ const pool = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail } = require('../services/email');
 const Stripe = require('stripe');
+const axios = require('axios');
+
+const PAYPAL_BASE = 'https://api-m.paypal.com';
+
+async function getPayPalAccessToken(clientId, secret) {
+  const res = await axios.post(
+    `${PAYPAL_BASE}/v1/oauth2/token`,
+    'grant_type=client_credentials',
+    {
+      auth: { username: clientId, password: secret },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }
+  );
+  return res.data.access_token;
+}
 
 // Same scramble as docId() in the frontend — converts sequential DB id → 6-digit doc number
 function docNum(id) {
@@ -796,9 +811,10 @@ router.get('/company-settings', async (req, res) => {
     }
 
     const row = result.rows[0];
-    // Never expose the secret key — send a boolean so the UI knows if one is saved
-    const { stripe_secret_key, ...safeRow } = row;
+    // Never expose secret keys — send booleans so the UI knows if one is saved
+    const { stripe_secret_key, paypal_secret_key, ...safeRow } = row;
     safeRow.stripe_secret_key_saved = !!stripe_secret_key;
+    safeRow.paypal_secret_key_saved = !!paypal_secret_key;
     res.json(safeRow);
   } catch (err) {
     console.error('GET /bidder/company-settings error:', err);
@@ -812,6 +828,7 @@ router.put('/company-settings', async (req, res) => {
     const companyId = req.user.company_id;
     const {
       stripe_publishable_key, stripe_secret_key,
+      paypal_client_id, paypal_secret_key, payment_processor,
       include_payment_button, down_payment_default_percent, convenience_fee_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
@@ -820,15 +837,20 @@ router.put('/company-settings', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO bidder_company_settings
-         (company_id, stripe_publishable_key, stripe_secret_key, include_payment_button,
+         (company_id, stripe_publishable_key, stripe_secret_key,
+          paypal_client_id, paypal_secret_key, payment_processor,
+          include_payment_button,
           down_payment_default_percent, convenience_fee_percent, preferred_proposal_design_id,
           terms_and_conditions, system_notes, email_from_name, email_from_email,
           proposal_top_text, invoice_top_text, proposal_domain, logo_url,
           default_warranty, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          stripe_publishable_key = EXCLUDED.stripe_publishable_key,
          stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
+         paypal_client_id = EXCLUDED.paypal_client_id,
+         paypal_secret_key = COALESCE(EXCLUDED.paypal_secret_key, bidder_company_settings.paypal_secret_key),
+         payment_processor = EXCLUDED.payment_processor,
          include_payment_button = EXCLUDED.include_payment_button,
          down_payment_default_percent = EXCLUDED.down_payment_default_percent,
          convenience_fee_percent = EXCLUDED.convenience_fee_percent,
@@ -847,6 +869,9 @@ router.put('/company-settings', async (req, res) => {
       [
         companyId, clean(stripe_publishable_key),
         stripe_secret_key ? stripe_secret_key.trim() : null,
+        clean(paypal_client_id),
+        paypal_secret_key ? paypal_secret_key.trim() : null,
+        payment_processor || 'stripe',
         include_payment_button,
         down_payment_default_percent,
         parseFloat(convenience_fee_percent) || 0,
@@ -1039,6 +1064,8 @@ router.get('/public/:id', async (req, res) => {
               bcs.terms_and_conditions, bcs.system_notes,
               bcs.include_payment_button as company_include_payment_button,
               bcs.stripe_publishable_key as company_stripe_publishable_key,
+              bcs.paypal_client_id as company_paypal_client_id,
+              bcs.payment_processor as company_payment_processor,
               bcs.convenience_fee_percent as company_convenience_fee_percent,
               bcs.preferred_proposal_design_id, bcs.logo_url,
               u.name AS created_by_name,
@@ -1333,6 +1360,118 @@ router.post('/public/:id/stripe-checkout', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/stripe-checkout error:', err);
     res.status(500).json({ error: err.message || 'Failed to create checkout session' });
+  }
+});
+
+// POST /api/bidder/public/:id/paypal-checkout — create PayPal order for a proposal
+router.post('/public/:id/paypal-checkout', async (req, res) => {
+  try {
+    const { base_amount_cents, convenience_fee_percent = 0, success_url, cancel_url } = req.body;
+    if (!base_amount_cents || base_amount_cents <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const result = await pool.query(
+      `SELECT bcs.paypal_client_id, bcs.paypal_secret_key, bcs.proposal_domain,
+              bp.bid_name,
+              COALESCE(c.company_name, c.name) AS company_name
+       FROM bidder_proposals bp
+       JOIN bidder_company_settings bcs ON bcs.company_id = bp.company_id
+       JOIN companies c ON c.id = bp.company_id
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+    const { paypal_client_id, paypal_secret_key, proposal_domain, bid_name, company_name } = result.rows[0];
+    if (!paypal_client_id || !paypal_secret_key) {
+      return res.status(400).json({ error: 'PayPal is not configured for this account' });
+    }
+
+    const _baseUrl = proposal_domain
+      ? `https://${proposal_domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+      : process.env.APP_URL;
+
+    const feePercent = parseFloat(convenience_fee_percent) || 0;
+    const feeCents   = Math.round(base_amount_cents * feePercent / 100);
+    const totalCents = Math.round(base_amount_cents) + feeCents;
+    const totalDollars = (totalCents / 100).toFixed(2);
+
+    const accessToken = await getPayPalAccessToken(paypal_client_id, paypal_secret_key);
+
+    const orderBody = {
+      intent: 'CAPTURE',
+      purchase_units: [
+        {
+          description: bid_name || 'Proposal Payment',
+          amount: {
+            currency_code: 'USD',
+            value: totalDollars,
+          },
+        },
+      ],
+      application_context: {
+        brand_name: company_name || 'Payment',
+        landing_page: 'NO_PREFERENCE',
+        user_action: 'PAY_NOW',
+        return_url: success_url || `${_baseUrl}/proposal/${req.params.id}?payment=success`,
+        cancel_url: cancel_url || `${_baseUrl}/proposal/${req.params.id}`,
+      },
+    };
+
+    const orderRes = await axios.post(
+      `${PAYPAL_BASE}/v2/checkout/orders`,
+      orderBody,
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+    );
+
+    const approvalLink = orderRes.data.links.find(l => l.rel === 'approve');
+    if (!approvalLink) return res.status(500).json({ error: 'PayPal did not return an approval URL' });
+
+    res.json({ url: approvalLink.href });
+  } catch (err) {
+    console.error('POST /bidder/public/:id/paypal-checkout error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.message || err.message || 'Failed to create PayPal order' });
+  }
+});
+
+// POST /api/bidder/public/:id/paypal-capture — capture a PayPal order after customer approval
+router.post('/public/:id/paypal-capture', async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    if (!order_id) return res.status(400).json({ error: 'Missing order_id' });
+
+    const result = await pool.query(
+      `SELECT bcs.paypal_client_id, bcs.paypal_secret_key
+       FROM bidder_proposals bp
+       JOIN bidder_company_settings bcs ON bcs.company_id = bp.company_id
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+    const { paypal_client_id, paypal_secret_key } = result.rows[0];
+    if (!paypal_client_id || !paypal_secret_key) {
+      return res.status(400).json({ error: 'PayPal is not configured for this account' });
+    }
+
+    const accessToken = await getPayPalAccessToken(paypal_client_id, paypal_secret_key);
+
+    const captureRes = await axios.post(
+      `${PAYPAL_BASE}/v2/checkout/orders/${order_id}/capture`,
+      {},
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+    );
+
+    res.json({ success: true, status: captureRes.data.status });
+  } catch (err) {
+    // INSTRUMENT_DECLINED or ORDER_ALREADY_CAPTURED are not server errors
+    const ppCode = err.response?.data?.details?.[0]?.issue;
+    if (ppCode === 'ORDER_ALREADY_CAPTURED') {
+      return res.json({ success: true, status: 'COMPLETED' });
+    }
+    console.error('POST /bidder/public/:id/paypal-capture error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.message || err.message || 'Failed to capture PayPal order' });
   }
 });
 

@@ -12,6 +12,9 @@ export default function PaymentSuccess({ proposalId }) {
   const amountCents = params.get('amount') || '0';
   const payLabel    = params.get('label') || 'Payment';
   const invoiceNum  = params.get('inv') || '1';
+  // PayPal appends token (order ID) and PayerID after redirect
+  const paypalToken   = params.get('token');
+  const paypalPayerId = params.get('PayerID');
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
@@ -24,13 +27,24 @@ export default function PaymentSuccess({ proposalId }) {
     // Send confirmation emails once per session per invoice
     const emailKey = `pay_email_${proposalId}_${invoiceNum}`;
     if (!sessionStorage.getItem(emailKey)) {
-      fetch(`${apiBase}/api/bidder/public/${proposalId}/payment-received`, {
+      const recordPayment = () => fetch(`${apiBase}/api/bidder/public/${proposalId}/payment-received`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount_cents: parseInt(amountCents, 10), pay_label: payLabel, invoice_num: invoiceNum }),
-      })
-        .then(() => sessionStorage.setItem(emailKey, '1'))
-        .catch(() => {});
+      }).then(() => sessionStorage.setItem(emailKey, '1')).catch(() => {});
+
+      if (paypalToken && paypalPayerId) {
+        // Capture PayPal order first, then record
+        fetch(`${apiBase}/api/bidder/public/${proposalId}/paypal-capture`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: paypalToken }),
+        })
+          .catch(() => {})
+          .finally(() => recordPayment());
+      } else {
+        recordPayment();
+      }
     }
   }, [proposalId]);
 

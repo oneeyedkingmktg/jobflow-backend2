@@ -98,9 +98,13 @@ export default function BidderAdminSettings({ companyId }) {
       const data = await BidderAPI.getCompanySettings(companyId);
       setSettings(data);
       setSettingsForm({
+        payment_processor: data.payment_processor || 'stripe',
         stripe_publishable_key: data.stripe_publishable_key || '',
         stripe_secret_key: '',
         stripe_secret_key_saved: data.stripe_secret_key_saved || false,
+        paypal_client_id: data.paypal_client_id || '',
+        paypal_secret_key: '',
+        paypal_secret_key_saved: data.paypal_secret_key_saved || false,
         convenience_fee_percent: data.convenience_fee_percent ?? 0,
         include_payment_button: data.include_payment_button ?? true,
         down_payment_default_percent: data.down_payment_default_percent ?? 50,
@@ -277,9 +281,11 @@ export default function BidderAdminSettings({ companyId }) {
         preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
         proposal_domain: settingsForm.proposal_domain.trim() || null,
       };
-      // Don't overwrite a saved secret key if the field was left blank
+      // Don't overwrite saved secret keys if the fields were left blank
       if (!payload.stripe_secret_key) delete payload.stripe_secret_key;
       delete payload.stripe_secret_key_saved;
+      if (!payload.paypal_secret_key) delete payload.paypal_secret_key;
+      delete payload.paypal_secret_key_saved;
       await BidderAPI.updateCompanySettings(payload, companyId);
       setSettingsMsg('Saved');
       setTimeout(() => setSettingsMsg(''), 3000);
@@ -497,27 +503,75 @@ export default function BidderAdminSettings({ companyId }) {
         <div>
           <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Payment</h3>
           <div className="space-y-3">
-            <div>
-              <label className={labelCls}>Stripe Publishable Key</label>
-              <input
+
+            {/* Processor selector */}
+            <div className="w-64">
+              <label className={labelCls}>Credit Card Processor</label>
+              <select
                 className={inputCls}
-                value={settingsForm.stripe_publishable_key}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_publishable_key: e.target.value.trim() }))}
-                placeholder="pk_live_..."
-              />
-              <p className="text-xs text-gray-400 mt-1">Your Stripe publishable key — starts with <code>pk_live_</code> or <code>pk_test_</code>.</p>
+                value={settingsForm.payment_processor}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, payment_processor: e.target.value }))}
+              >
+                <option value="stripe">Stripe</option>
+                <option value="paypal">PayPal</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Choose one processor. Only the selected processor's button appears on proposals.</p>
             </div>
-            <div>
-              <label className={labelCls}>Stripe Secret Key</label>
-              <input
-                className={inputCls}
-                type="password"
-                value={settingsForm.stripe_secret_key}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_secret_key: e.target.value.trim() }))}
-                placeholder={settingsForm.stripe_secret_key_saved ? '••••••••  (saved — paste new key to replace)' : 'sk_live_...'}
-              />
-              <p className="text-xs text-gray-400 mt-1">Your Stripe secret key — stored securely. Never shared with customers.</p>
-            </div>
+
+            {/* Stripe fields */}
+            {settingsForm.payment_processor === 'stripe' && (
+              <>
+                <div>
+                  <label className={labelCls}>Stripe Publishable Key</label>
+                  <input
+                    className={inputCls}
+                    value={settingsForm.stripe_publishable_key}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_publishable_key: e.target.value.trim() }))}
+                    placeholder="pk_live_..."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Your Stripe publishable key — starts with <code>pk_live_</code> or <code>pk_test_</code>.</p>
+                </div>
+                <div>
+                  <label className={labelCls}>Stripe Secret Key</label>
+                  <input
+                    className={inputCls}
+                    type="password"
+                    value={settingsForm.stripe_secret_key}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, stripe_secret_key: e.target.value.trim() }))}
+                    placeholder={settingsForm.stripe_secret_key_saved ? '••••••••  (saved — paste new key to replace)' : 'sk_live_...'}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Your Stripe secret key — stored securely. Never shared with customers.</p>
+                </div>
+              </>
+            )}
+
+            {/* PayPal fields */}
+            {settingsForm.payment_processor === 'paypal' && (
+              <>
+                <div>
+                  <label className={labelCls}>PayPal Client ID</label>
+                  <input
+                    className={inputCls}
+                    value={settingsForm.paypal_client_id}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, paypal_client_id: e.target.value.trim() }))}
+                    placeholder="AaBbCc..."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Found in your PayPal Developer dashboard under My Apps &amp; Credentials.</p>
+                </div>
+                <div>
+                  <label className={labelCls}>PayPal Secret Key</label>
+                  <input
+                    className={inputCls}
+                    type="password"
+                    value={settingsForm.paypal_secret_key}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, paypal_secret_key: e.target.value.trim() }))}
+                    placeholder={settingsForm.paypal_secret_key_saved ? '••••••••  (saved — paste new key to replace)' : 'PayPal secret...'}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Your PayPal app secret — stored securely. Never shared with customers.</p>
+                </div>
+              </>
+            )}
+
             <div className="w-48">
               <label className={labelCls}>Online Payment Convenience Fee %</label>
               <div className="flex items-center gap-2">
