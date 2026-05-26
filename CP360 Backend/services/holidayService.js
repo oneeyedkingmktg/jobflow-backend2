@@ -1,22 +1,25 @@
 const axios = require('axios');
 const pool  = require('../config/database');
 
-// Holidays to skip entirely
+// Holidays to skip entirely — matched case-insensitively, substring match on "indigenous"
 const EXCLUDE = [
   "Lincoln's Birthday",
   "Lincoln Birthday",
   "Truman Day",
   "Juneteenth",
   "Juneteenth National Independence Day",
-  "Indigenous Peoples Day",
-  "Indigenous People's Day",
   "Martin Luther King, Jr. Day",
   "Martin Luther King Jr. Day",
 ];
 
+// Any holiday whose name contains these substrings is also excluded
+const EXCLUDE_CONTAINS = ["indigenous"];
+
 function transformHoliday(h, year) {
   // Skip excluded holidays
-  if (EXCLUDE.some((ex) => h.name.toLowerCase() === ex.toLowerCase())) return null;
+  const nameLower = h.name.toLowerCase();
+  if (EXCLUDE.some((ex) => nameLower === ex.toLowerCase())) return null;
+  if (EXCLUDE_CONTAINS.some((sub) => nameLower.includes(sub))) return null;
 
   let { date, name } = h;
 
