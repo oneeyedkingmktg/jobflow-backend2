@@ -1,10 +1,41 @@
 const axios = require('axios');
 const pool  = require('../config/database');
 
+// Holidays to skip entirely
+const EXCLUDE = [
+  "Lincoln's Birthday",
+  "Lincoln Birthday",
+  "Truman Day",
+  "Juneteenth",
+  "Juneteenth National Independence Day",
+  "Indigenous Peoples Day",
+  "Indigenous People's Day",
+  "Martin Luther King, Jr. Day",
+  "Martin Luther King Jr. Day",
+];
+
+function transformHoliday(h, year) {
+  // Skip excluded holidays
+  if (EXCLUDE.some((ex) => h.name.toLowerCase() === ex.toLowerCase())) return null;
+
+  let { date, name } = h;
+
+  // American spelling
+  if (name === 'Labour Day') name = 'Labor Day';
+
+  // Always pin Independence Day to July 4, regardless of observed shift
+  if (name === 'Independence Day') date = `${year}-07-04`;
+
+  return { date, name };
+}
+
 // Nager.Date — free, no API key, US federal holidays
 async function fetchAndStoreYear(year) {
   const res = await axios.get(`https://date.nager.at/api/v3/PublicHolidays/${year}/US`, { timeout: 10000 });
-  const holidays = res.data; // [{ date, name, ... }]
+
+  const holidays = res.data
+    .map((h) => transformHoliday(h, year))
+    .filter(Boolean);
 
   for (const h of holidays) {
     await pool.query(
