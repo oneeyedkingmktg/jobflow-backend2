@@ -221,6 +221,17 @@ async function runMigrations() {
       SET name = 'Recent Activity',
           description = 'Count of new leads, appointments set, and jobs sold in the last 30 days'
       WHERE key = 'recent_activity'`,
+    // holidays table
+    `CREATE TABLE IF NOT EXISTS holidays (
+      id   SERIAL PRIMARY KEY,
+      date DATE NOT NULL,
+      name TEXT NOT NULL,
+      UNIQUE(date)
+    )`,
+    // PayPal payment processor columns
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS paypal_client_id TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS paypal_secret_key TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS payment_processor VARCHAR(20) DEFAULT 'stripe'`,
   ];
   for (const sql of migrations) {
     try {
@@ -231,6 +242,18 @@ async function runMigrations() {
     }
   }
   console.log('Migrations complete');
+
+  // Auto-seed holidays if the table is empty
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*) FROM holidays');
+    if (parseInt(rows[0].count, 10) === 0) {
+      console.log('📅 Holidays table empty — seeding now...');
+      const { seedInitial } = require('./services/holidayService');
+      await seedInitial();
+    }
+  } catch (e) {
+    console.warn('Holiday auto-seed skipped:', e.message);
+  }
 }
 runMigrations();
 
