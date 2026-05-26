@@ -21,7 +21,7 @@ function barWidthCalc(colSpan) {
   return `calc(${colSpan} * (100% - ${TOTAL_GAP_PX}px) / ${COLS} + ${Math.max(colSpan - 1, 0)} * ${GAP_PX}px)`;
 }
 
-export default function CalendarView({ leads, serviceCalls = [], onSelectLead }) {
+export default function CalendarView({ leads, serviceCalls = [], holidays = [], onSelectLead }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -225,6 +225,13 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
     return bars;
   };
 
+  // Build { "2026-07-04": "Independence Day", ... } for O(1) lookup
+  const holidayMap = useMemo(() => {
+    const map = {};
+    holidays.forEach((h) => { map[h.date] = h.name; });
+    return map;
+  }, [holidays]);
+
   const futureLeads = useMemo(() => {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -320,16 +327,22 @@ export default function CalendarView({ leads, serviceCalls = [], onSelectLead })
                 const isToday = key === formatDateKey(today);
                 // Only show single-day SCs inline in the cell; multi-day ones render as bars below
                 const singleDayScs = data.sc.filter((sc) => !sc._multiDay);
+                const holidayName = holidayMap[key];
 
                 return (
                   <div
                     key={key}
                     onClick={() => handleDayClick(key)}
                     className={`border rounded-md p-1 min-h-[60px] cursor-pointer hover:bg-blue-50 flex flex-col items-center ${
-                      isToday ? "border-blue-500 bg-blue-100" : "border-gray-300"
+                      isToday ? "border-blue-500 bg-blue-100" : holidayName ? "border-amber-300 bg-amber-50" : "border-gray-300"
                     }`}
                   >
                     <div className="font-semibold text-xs sm:text-sm">{day.getDate()}</div>
+                    {holidayName && (
+                      <div className="text-xs text-amber-700 font-medium truncate w-full text-center leading-tight mt-0.5" title={holidayName}>
+                        {holidayName}
+                      </div>
+                    )}
                     {data.appt.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-1">
                         {data.appt.map((apptLead, i) => (

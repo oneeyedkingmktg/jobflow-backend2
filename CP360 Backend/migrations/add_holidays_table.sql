@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS holidays (
+  id   SERIAL PRIMARY KEY,
+  date DATE NOT NULL,
+  name TEXT NOT NULL,
+  UNIQUE(date)
+);

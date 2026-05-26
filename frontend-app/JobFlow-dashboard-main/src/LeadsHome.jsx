@@ -155,6 +155,7 @@ export default function LeadsHome() {
   const [loading, setLoading] = useState(true);
   const [showPhoneLookup, setShowPhoneLookup] = useState(false);
   const [serviceCalls, setServiceCalls] = useState([]);
+  const [holidays, setHolidays] = useState([]);
 
   // --------------------------------------------------
   // Load leads
@@ -188,6 +189,12 @@ const loadLeads = async () => {
       .catch(() => {});
   };
 
+  const loadHolidays = () => {
+    apiRequest('/api/holidays')
+      .then((data) => setHolidays(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+
   // Keep a ref so the event listener always calls the latest version
   const refreshServiceCallsRef = useRef(refreshServiceCalls);
   refreshServiceCallsRef.current = refreshServiceCalls;
@@ -204,6 +211,7 @@ const loadLeads = async () => {
     if (!currentCompany?.id) return;
     loadLeads();
     refreshServiceCalls();
+    loadHolidays();
   }, [currentCompany?.id]);
 
   // Open a specific lead when navigating from Messages → Go to Lead
@@ -363,6 +371,7 @@ onAddLead={() => {
     <CalendarView
       leads={leads}
       serviceCalls={serviceCalls}
+      holidays={holidays}
       onSelectLead={(lead) => {
         setSelectedLead(lead);
         setIsNewLead(false);

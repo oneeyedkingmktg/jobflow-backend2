@@ -57,6 +57,7 @@ const sipRoutes = require("./routes/sip");
 const bidderRoutes = require("./routes/bidder");
 const serviceCallsRoutes = require("./routes/serviceCalls");
 const reportsRoutes = require("./routes/reports");
+const holidaysRoutes = require("./routes/holidays");
 
 
 
@@ -104,6 +105,7 @@ app.use("/google-drive", googleDriveRoutes);
 app.use("/api/bidder", bidderRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
 app.use("/api/reports", authenticateToken, reportsRoutes);
+app.use("/api/holidays", holidaysRoutes);
 
 
 
