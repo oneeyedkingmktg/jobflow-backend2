@@ -8,17 +8,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <Estimator />
   </React.StrictMode>
 );
-// ============================================================
-// CP360 iframe auto-height support
-// ============================================================
+// Send scroll height to parent whenever content changes (for iframe auto-sizing)
 function sendCp360Height() {
-  const height = document.documentElement.scrollHeight;
-  window.parent.postMessage({ cp360Height: height }, "*");
+  window.parent.postMessage({ cp360Height: document.documentElement.scrollHeight }, "*");
 }
 
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(sendCp360Height).observe(document.documentElement);
+} else {
+  window.addEventListener("resize", sendCp360Height);
+  setInterval(sendCp360Height, 500);
+}
 window.addEventListener("load", sendCp360Height);
-window.addEventListener("resize", sendCp360Height);
-
-// Re-fire for dynamic UI changes (steps, validation, results)
-setInterval(sendCp360Height, 500);
 
