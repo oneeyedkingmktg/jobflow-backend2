@@ -174,7 +174,6 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
   const combinedProjectMessage = config?.combined_project_message || "";
   const minJobInfoText = config?.min_job_info_text || "Minimum job pricing applied.";
   const standardInfoText = config?.standard_info_text || "This is an estimate based on the information provided.";
-  const minimumJobPrice = Number(config?.minimum_job_price) || 0;
   const cta1Button = config?.cta1_button || "";
   const cta1Link = config?.cta1_link || "";
   const cta2Button = config?.cta2_button || "";
@@ -277,18 +276,13 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
     return `$${r.min.toLocaleString()} – $${r.max.toLocaleString()}`;
   }
 
-  // Combined total
+  // Combined total — per-finish minimums already applied per estimate
   const totalMin = (r1?.min || 0) + (r2?.min || 0);
   const totalMax = (r1?.max || 0) + (r2?.max || 0);
-
-  // Combined min job check: if the combined total is below the minimum job price
-  const combinedBelowMin = minimumJobPrice > 0 && totalMin < minimumJobPrice;
-  const effectiveTotalMin = combinedBelowMin ? minimumJobPrice : totalMin;
-  const effectiveTotalMax = combinedBelowMin ? minimumJobPrice : totalMax;
-  const totalDisplay = effectiveTotalMin === effectiveTotalMax
-    ? `$${effectiveTotalMin.toLocaleString()}`
-    : `$${effectiveTotalMin.toLocaleString()} – $${effectiveTotalMax.toLocaleString()}`;
-  const showCombinedMinNotice = combinedBelowMin || (space1MinApplied && space2MinApplied);
+  const totalDisplay = totalMin === totalMax
+    ? `$${totalMin.toLocaleString()}`
+    : `$${totalMin.toLocaleString()} – $${totalMax.toLocaleString()}`;
+  const showCombinedMinNotice = space1MinApplied || space2MinApplied;
 
   return (
     <div className={cardClass}>

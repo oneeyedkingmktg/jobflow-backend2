@@ -117,11 +117,15 @@ function calculateEstimate(config, input, pricingByFinish = {}) {
   }
 
   // ---------------------------------------------------------------------------
-  // Minimum job enforcement - APPLIED PER FINISH TYPE with smart display logic
+  // Minimum job enforcement - PER FINISH TYPE with smart display logic
   // ---------------------------------------------------------------------------
-  const minimumJob = Number(config.minimum_job_price || 0);
+  const finishMinimums = {
+    solid:    Number(config.min_price_solid    || 0),
+    flake:    Number(config.min_price_flake    || 0),
+    metallic: Number(config.min_price_metallic || 0),
+    custom:   Number(config.min_price_custom   || 0),
+  };
 
-  // Apply minimum to each finish type independently
   const adjustedPriceRanges = {};
   let selectedMinimumApplied = false;
 
@@ -132,15 +136,13 @@ function calculateEstimate(config, input, pricingByFinish = {}) {
     let max = priceRanges[finish].max;
     let minimumApplied = false;
 
-    // Only apply minimum if the calculated min is below the minimum job price
-    if (minimumJob && min < minimumJob) {
-      min = minimumJob;
+    const finishMin = finishMinimums[finish] || 0;
+    if (finishMin && min < finishMin) {
+      min = finishMin;
       minimumApplied = true;
 
-      // If max is also below minimum, set it to minimum
-      // Otherwise keep the calculated max (creates range like "$1,000 - $1,200")
-      if (max < minimumJob) {
-        max = minimumJob;
+      if (max < finishMin) {
+        max = finishMin;
       }
     }
 

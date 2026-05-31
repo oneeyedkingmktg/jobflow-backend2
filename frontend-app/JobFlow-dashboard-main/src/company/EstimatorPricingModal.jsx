@@ -21,7 +21,10 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
     avgSf3Car: null,
     avgSf4Car: null,
 
-    minimumJobPrice: null,
+    minPriceSolid: null,
+    minPriceFlake: null,
+    minPriceMetallic: null,
+    minPriceCustom: null,
 
     conditionGoodMultiplier: 1.0,
     conditionMinorMultiplier: null,
@@ -65,7 +68,10 @@ export default function EstimatorPricingModal({ company, onSave, onClose }) {
             avgSf3Car: d.avg_sf_3_car ?? null,
             avgSf4Car: d.avg_sf_4_car ?? null,
 
-            minimumJobPrice: d.minimum_job_price ?? null,
+            minPriceSolid: d.min_price_solid ?? null,
+            minPriceFlake: d.min_price_flake ?? null,
+            minPriceMetallic: d.min_price_metallic ?? null,
+            minPriceCustom: d.min_price_custom ?? null,
 
             conditionGoodMultiplier: d.condition_good_multiplier ?? 1.0,
             conditionMinorMultiplier: d.condition_minor_multiplier ?? null,
@@ -199,7 +205,10 @@ solid_finish_description: settingsForm.solidFinishDescription || undefined,
         avg_sf_3_car: toNumOrNull(settingsForm.avgSf3Car),
         avg_sf_4_car: toNumOrNull(settingsForm.avgSf4Car),
 
-        minimum_job_price: toNumOrNull(settingsForm.minimumJobPrice),
+        min_price_solid: toNumOrNull(settingsForm.minPriceSolid),
+        min_price_flake: toNumOrNull(settingsForm.minPriceFlake),
+        min_price_metallic: toNumOrNull(settingsForm.minPriceMetallic),
+        min_price_custom: toNumOrNull(settingsForm.minPriceCustom),
 
         condition_good_multiplier: toNumOrNull(settingsForm.conditionGoodMultiplier),
         condition_minor_multiplier: toNumOrNull(settingsForm.conditionMinorMultiplier),
@@ -452,10 +461,15 @@ solid_finish_description: settingsForm.solidFinishDescription || undefined,
             </div>
           </div>
 
-          {/* MINIMUM JOB PRICE */}
+          {/* MINIMUM JOB PRICE (per finish) */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-bold text-gray-900 mb-3">Minimum Job Price</h3>
-            {numberInput("Minimum Price", "minimumJobPrice", "$")}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {numberInput("Solid", "minPriceSolid", "$")}
+              {numberInput("Flake", "minPriceFlake", "$")}
+              {numberInput("Metallic", "minPriceMetallic", "$")}
+              {numberInput(settingsForm.customFinishLabel || "Custom", "minPriceCustom", "$")}
+            </div>
           </div>
 
           {/* CUSTOM LABELS */}

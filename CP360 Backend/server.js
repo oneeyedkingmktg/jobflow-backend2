@@ -232,6 +232,18 @@ async function runMigrations() {
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS paypal_client_id TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS paypal_secret_key TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS payment_processor VARCHAR(20) DEFAULT 'stripe'`,
+    // Per-finish minimum job prices (replaces global minimum_job_price)
+    `ALTER TABLE estimator_configs ADD COLUMN IF NOT EXISTS min_price_solid NUMERIC DEFAULT 0`,
+    `ALTER TABLE estimator_configs ADD COLUMN IF NOT EXISTS min_price_flake NUMERIC DEFAULT 0`,
+    `ALTER TABLE estimator_configs ADD COLUMN IF NOT EXISTS min_price_metallic NUMERIC DEFAULT 0`,
+    `ALTER TABLE estimator_configs ADD COLUMN IF NOT EXISTS min_price_custom NUMERIC DEFAULT 0`,
+    `UPDATE estimator_configs SET
+      min_price_solid = COALESCE(NULLIF(min_price_solid, 0), minimum_job_price, 0),
+      min_price_flake = COALESCE(NULLIF(min_price_flake, 0), minimum_job_price, 0),
+      min_price_metallic = COALESCE(NULLIF(min_price_metallic, 0), minimum_job_price, 0),
+      min_price_custom = COALESCE(NULLIF(min_price_custom, 0), minimum_job_price, 0)
+    WHERE minimum_job_price IS NOT NULL AND minimum_job_price > 0`,
+    `ALTER TABLE estimator_configs DROP COLUMN IF EXISTS minimum_job_price`,
   ];
   for (const sql of migrations) {
     try {

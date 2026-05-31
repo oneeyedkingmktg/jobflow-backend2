@@ -40,7 +40,10 @@ function defaultEstimatorConfig(companyId) {
     // ------------------------------------------------------------------------
     // Pricing (NO fallbacks — 0 means intentionally unset)
     // ------------------------------------------------------------------------
-    minimum_job_price: 0,
+    min_price_solid: 0,
+    min_price_flake: 0,
+    min_price_metallic: 0,
+    min_price_custom: 0,
 
     solid_price_per_sf_min: 0,
     solid_price_per_sf_max: 0,
