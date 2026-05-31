@@ -770,7 +770,15 @@ try {
       if (leadResData?.hasExistingEstimate && leadResData?.estimates?.length === 2) {
         const dbEst1 = leadResData.estimates[0];
         const pr1 = typeof dbEst1.all_price_ranges === "string" ? JSON.parse(dbEst1.all_price_ranges) : dbEst1.all_price_ranges;
-        setEstimate1FromDB({ allPriceRanges: pr1, minimumJobApplied: dbEst1.minimum_job_applied });
+        setEstimate1FromDB({
+          allPriceRanges: pr1,
+          minimumJobApplied: dbEst1.minimum_job_applied,
+          projectType: dbEst1.project_type,
+          condition: dbEst1.condition,
+          lengthFt: dbEst1.length_ft,
+          widthFt: dbEst1.width_ft,
+          calculatedSf: dbEst1.calculated_sf,
+        });
         setEstimate(previewData.estimate); // new submission = estimate 2 visually
         setProjectType2(projectType);
         setCondition2(condition);
@@ -1023,11 +1031,11 @@ try {
             config={config}
             useCustomStyles={useCustomStyles}
             estimate={estimate1FromDB || estimate}
-            projectType={estimate1FromDB ? (existingEstimatesForModal[0]?.project_type || "") : projectType}
-            condition={estimate1FromDB ? (existingEstimatesForModal[0]?.condition || "") : condition}
-            length={""}
-            width={""}
-            squareFeet={""}
+            projectType={estimate1FromDB ? (estimate1FromDB.projectType || "") : projectType}
+            condition={estimate1FromDB ? (estimate1FromDB.condition || "") : condition}
+            length={estimate1FromDB ? String(estimate1FromDB.lengthFt || "") : length}
+            width={estimate1FromDB ? String(estimate1FromDB.widthFt || "") : width}
+            squareFeet={estimate1FromDB ? String(estimate1FromDB.calculatedSf || "") : squareFeet}
             estimate2={estimate2}
             projectType2={projectType2}
             condition2={condition2}
