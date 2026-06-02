@@ -342,16 +342,22 @@ export default function LeadStatusBar({
 
         {currentStatus === "complete" ? (
           form.hasLeftReview ? (
-            <div className="flex-1 py-3 rounded-lg bg-green-100 border border-green-400 flex items-center justify-center gap-2">
-              <span className="text-green-700 text-sm font-semibold">★ Has Left Review</span>
-            </div>
+            <button
+              onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: false }))}
+              className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
+              style={{ backgroundColor: "#16a34a" }}
+            >
+              <span className="text-[10px] uppercase opacity-80">tap to undo</span>
+              <span className="text-sm font-semibold">✓ Has Left Review</span>
+            </button>
           ) : (
             <button
               onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: true }))}
-              className="flex-1 py-3 rounded-lg text-white shadow flex items-center justify-center gap-2"
+              className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
               style={{ backgroundColor: "#f59e0b" }}
             >
-              <span className="text-sm font-semibold">★ Has Left Review</span>
+              <span className="text-[10px] uppercase opacity-80">save to apply tag</span>
+              <span className="text-sm font-semibold">Mark Has Left Review</span>
             </button>
           )
         ) : (
