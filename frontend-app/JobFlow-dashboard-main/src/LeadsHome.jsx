@@ -88,6 +88,8 @@ const convertLeadFromBackend = (lead) => ({
 
   proceedWithAutomation:
     lead.proceedWithAutomation ?? lead.proceed_with_automation ?? true,
+
+  hasLeftReview: lead.hasLeftReview ?? lead.has_left_review ?? false,
 });
 
 const convertLeadToBackend = (lead) => ({
@@ -135,6 +137,7 @@ const convertLeadToBackend = (lead) => ({
   pause_notes: lead.pauseNotes || null,
 
   proceed_with_automation: lead.proceedWithAutomation ?? null,
+  has_left_review: lead.hasLeftReview ?? false,
 });
 
 

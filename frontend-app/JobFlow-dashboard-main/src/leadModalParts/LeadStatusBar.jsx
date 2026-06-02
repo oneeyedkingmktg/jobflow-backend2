@@ -340,7 +340,23 @@ export default function LeadStatusBar({
           </div>
         </div>
 
-        {renderProgressButton()}
+        {currentStatus === "complete" ? (
+          form.hasLeftReview ? (
+            <div className="flex-1 py-3 rounded-lg bg-green-100 border border-green-400 flex items-center justify-center gap-2">
+              <span className="text-green-700 text-sm font-semibold">★ Has Left Review</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: true }))}
+              className="flex-1 py-3 rounded-lg text-white shadow flex items-center justify-center gap-2"
+              style={{ backgroundColor: "#f59e0b" }}
+            >
+              <span className="text-sm font-semibold">★ Has Left Review</span>
+            </button>
+          )
+        ) : (
+          renderProgressButton()
+        )}
       </div>
       )}
     </>

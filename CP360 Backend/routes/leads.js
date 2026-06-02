@@ -692,6 +692,7 @@ const result = await pool.query(
     resume_action = $29,
     pause_notes = $30,
     proceed_with_automation = COALESCE($31, proceed_with_automation),
+    has_left_review = COALESCE($32, has_left_review),
     sold_at = CASE WHEN $17 = 'sold' AND sold_at IS NULL THEN CURRENT_TIMESTAMP ELSE sold_at END,
     appt_set_at = CASE WHEN $17 = 'appt_booked' AND appt_set_at IS NULL THEN CURRENT_TIMESTAMP ELSE appt_set_at END,
 
@@ -700,7 +701,7 @@ const result = await pool.query(
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $32
+  WHERE id = $33
   RETURNING *`,
 
       [
@@ -735,6 +736,7 @@ const result = await pool.query(
         clean(lead.resume_action),
         clean(lead.pause_notes),
         lead.proceed_with_automation ?? null,
+        lead.has_left_review ?? null,
         id,
       ]
     );
@@ -799,6 +801,15 @@ await syncLeadToGhl({
           await removeStatusTags(updatedLead.ghl_contact_id, 'status - junk', company);
         } catch (err) {
           console.error('Failed to remove GHL junk tag:', err.message);
+        }
+      }
+
+      // Apply "has left google review" tag when newly set
+      if (lead.has_left_review === true && !previousLead.has_left_review && updatedLead.ghl_contact_id) {
+        try {
+          await applyStatusTags(updatedLead.ghl_contact_id, 'has left google review', company);
+        } catch (err) {
+          console.error('Failed to apply has-left-review GHL tag:', err.message);
         }
       }
     }
