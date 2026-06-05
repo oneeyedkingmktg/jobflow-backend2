@@ -59,17 +59,16 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
   function openModal() {
     setOpen(true);
     setError(null);
-    // Focus textarea after paint
-    setTimeout(() => textareaRef.current?.focus(), 80);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      autoResize(textareaRef.current);
+    }, 80);
   }
 
   function closeModal() {
     setOpen(false);
-    setMessage("");
-    setSchedDate("");
-    setSchedTime("");
     setError(null);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    // message, schedDate, schedTime intentionally kept so text persists on reopen
   }
 
   function autoResize(el) {
@@ -106,6 +105,10 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
         body: JSON.stringify(body),
       });
 
+      setMessage("");
+      setSchedDate("");
+      setSchedTime("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
       closeModal();
       if (typeof onSent === "function") onSent();
     } catch (err) {
