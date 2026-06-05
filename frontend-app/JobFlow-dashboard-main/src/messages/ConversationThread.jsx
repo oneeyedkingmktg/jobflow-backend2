@@ -178,7 +178,7 @@ export default function ConversationThread({ conversation, onBack, onGoToLead, o
   }
 
   return (
-    <div className="fixed inset-0 bg-white z-[100] flex flex-col" style={{ bottom: keyboardOffset }}>
+    <div className="fixed inset-0 bg-white z-[100] flex flex-col" style={{ bottom: Math.max(keyboardOffset, 64) }}>
       {/* Softphone overlay — shown during active/incoming calls */}
       <SoftphoneWidget
         callState={softphone.callState}
