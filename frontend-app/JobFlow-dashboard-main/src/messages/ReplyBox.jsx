@@ -3,7 +3,7 @@
 // Phase 3 — Reply input bar for ConversationThread
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { apiRequest } from "../api";
 import { useCompany } from "../CompanyContext";
 
@@ -53,6 +53,13 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
   const [schedTime,   setSchedTime]   = useState("");
   const [sending,     setSending]     = useState(false);
   const [error,       setError]       = useState(null);
+  const textareaRef = useRef(null);
+
+  function autoResize(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }
 
   const isScheduled = type === "SCHEDULE_SMS";
 
@@ -86,6 +93,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
       });
 
       setMessage("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
       setSchedDate("");
       setSchedTime("");
       if (typeof onSent === "function") onSent();
@@ -135,7 +143,7 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
         </div>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-end gap-2">
         <select
           value={type}
           onChange={(e) => { setType(e.target.value); setError(null); }}
@@ -147,12 +155,13 @@ export default function ReplyBox({ conversationId, contactId, channelType, avail
         </select>
 
         <textarea
+          ref={textareaRef}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => { setMessage(e.target.value); autoResize(e.target); }}
           placeholder={isScheduled ? "Type a message to schedule…" : "Type a message…"}
-          rows={1}
+          rows={3}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-          style={{ minHeight: "40px", maxHeight: "120px", fontSize: "16px" }}
+          style={{ minHeight: "72px", maxHeight: "200px", fontSize: "16px", overflowY: "auto" }}
         />
 
         <button
