@@ -637,8 +637,11 @@ export default function EstimatorV2() {
                   const serviceZips = config?.service_area_zips;
                   const isOutside = serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0
                     && !serviceZips.map(String).includes(zip.trim());
-                  if (isOutside && !config?.out_of_area_enabled) {
-                    setZipError(`Sorry, we don't currently service ZIP code ${zip}. Please contact us to learn more.`);
+                  if (isOutside) {
+                    setZipError(
+                      config?.out_of_area_sorry_message ||
+                      `Sorry, we don't currently service ZIP code ${zip}. Please contact us to learn more.`
+                    );
                     return;
                   }
                   setStep(5);
