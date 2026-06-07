@@ -631,17 +631,16 @@ export default function EstimatorV2() {
                 placeholder="e.g. 30301" value={zip}
                 onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setZipError(""); }}
               />
-              {zipError && <div className="mt-3 bg-red-50 border-l-4 border-red-400 rounded-md px-4 py-3 text-sm text-red-700">{zipError}</div>}
+              {zipError && <div className="mt-3 bg-amber-50 border-l-4 border-amber-400 rounded-md px-4 py-3 text-sm text-amber-900">{zipError}</div>}
               <button type="button" disabled={zip.length < 5}
                 onClick={() => {
                   const serviceZips = config?.service_area_zips;
                   const isOutside = serviceZips && Array.isArray(serviceZips) && serviceZips.length > 0
                     && !serviceZips.map(String).includes(zip.trim());
                   if (isOutside) {
-                    setZipError(
-                      config?.out_of_area_sorry_message ||
-                      `Sorry, we don't currently service ZIP code ${zip}. Please contact us to learn more.`
-                    );
+                    const raw = config?.out_of_area_sorry_message ||
+                      `Sorry, we don't currently service ZIP code {zip}. Please contact us to learn more.`;
+                    setZipError(raw.replace(/\{+zip\}+/gi, zip));
                     return;
                   }
                   setStep(5);
