@@ -15,6 +15,7 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [outOfAreaLogs, setOutOfAreaLogs] = useState(null);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedV2Copied, setEmbedV2Copied] = useState(false);
   
   const [form, setForm] = useState({
   estimatorEnabled: false,
@@ -478,32 +479,66 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
 
           {/* EMBED CODE */}
           {company?.estimatorCode && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="font-bold text-gray-900 mb-2">Estimator Embed Code</h3>
-              <p className="text-xs text-gray-500 mb-2">Copy and paste this single line into any website or page to embed your estimator.</p>
-              <div className="relative">
-                <textarea
-                  readOnly
-                  rows={3}
-                  className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
-                  value={`<!-- --- Start CoatingPro360 Estimator --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}"><\/script>\n<!-- --- End CoatingPro360 Estimator --- -->`}
-                />
-                <div className="relative inline-block">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`<!-- --- Start CoatingPro360 Estimator --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}"><\/script>\n<!-- --- End CoatingPro360 Estimator --- -->`);
-                      setEmbedCopied(true);
-                      setTimeout(() => setEmbedCopied(false), 2000);
-                    }}
-                    className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
-                  >
-                    Copy
-                  </button>
-                  {embedCopied && (
-                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                      Copied!
-                    </span>
-                  )}
+            <div className="space-y-4">
+              {/* Single Page Estimator (v1) */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-2">Single Page Estimator (v1)</h3>
+                <p className="text-xs text-gray-500 mb-2">Copy and paste this single line into any website or page to embed your estimator.</p>
+                <div className="relative">
+                  <textarea
+                    readOnly
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+                    value={`<!-- --- Start CoatingPro360 Estimator v1 --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}"><\/script>\n<!-- --- End CoatingPro360 Estimator v1 --- -->`}
+                  />
+                  <div className="relative inline-block">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`<!-- --- Start CoatingPro360 Estimator v1 --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}"><\/script>\n<!-- --- End CoatingPro360 Estimator v1 --- -->`);
+                        setEmbedCopied(true);
+                        setTimeout(() => setEmbedCopied(false), 2000);
+                      }}
+                      className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
+                    >
+                      Copy
+                    </button>
+                    {embedCopied && (
+                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        Copied!
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step-by-Step Estimator (v2) */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-2">Step-by-Step Estimator (v2)</h3>
+                <p className="text-xs text-gray-500 mb-2">Copy and paste this single line into any website or page to embed the step-by-step estimator.</p>
+                <div className="relative">
+                  <textarea
+                    readOnly
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+                    value={`<!-- --- Start CoatingPro360 Estimator v2 --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}&v=2"><\/script>\n<!-- --- End CoatingPro360 Estimator v2 --- -->`}
+                  />
+                  <div className="relative inline-block">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`<!-- --- Start CoatingPro360 Estimator v2 --- -->\n<script src="https://estimate.coatingpro360.com/embed.js?company=${company.estimatorCode}&v=2"><\/script>\n<!-- --- End CoatingPro360 Estimator v2 --- -->`);
+                        setEmbedV2Copied(true);
+                        setTimeout(() => setEmbedV2Copied(false), 2000);
+                      }}
+                      className="mt-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-lg"
+                    >
+                      Copy
+                    </button>
+                    {embedV2Copied && (
+                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        Copied!
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

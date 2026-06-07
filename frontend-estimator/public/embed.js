@@ -10,6 +10,7 @@
   var scriptUrl = new URL(script.src);
   var BASE_URL = scriptUrl.origin;
   var company = scriptUrl.searchParams.get('company');
+  var version = scriptUrl.searchParams.get('v');
 
   if (!company) return;
 
@@ -17,6 +18,7 @@
     // Build iframe src with UTM passthrough from the host page
     var src = new URL(BASE_URL);
     src.searchParams.set('company', company);
+    if (version) src.searchParams.set('v', version);
 
     var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
     var pageParams = new URLSearchParams(window.location.search);
