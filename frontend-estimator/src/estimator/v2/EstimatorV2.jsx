@@ -124,7 +124,7 @@ function IconOther({ color }) {
 function ProgressBar({ current, total, primaryColor }) {
   const pct = Math.round((current / total) * 100);
   return (
-    <div className="mb-8">
+    <div className="mb-4">
       <div className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">
         Step {current} of {total}
       </div>
@@ -243,8 +243,8 @@ export default function EstimatorV2() {
   const unselectedBtnTextColor = config?.unselected_button_text_color || "#4b5563";
 
   // ---- Style helpers ----
-  const cardClass      = useCustomStyles ? "estimator-card p-6"              : "bg-white rounded-2xl shadow-md p-6";
-  const containerClass = useCustomStyles ? "estimator-container mx-auto p-4" : "max-w-lg mx-auto p-4";
+  const cardClass      = useCustomStyles ? "estimator-card px-6 pb-6 pt-3"              : "bg-white rounded-2xl shadow-md px-6 pb-6 pt-3";
+  const containerClass = useCustomStyles ? "estimator-container mx-auto px-4 pb-4 pt-2" : "max-w-lg mx-auto px-4 pb-4 pt-2";
   const inputClass     = "w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-orange-400 transition-colors";
   const primaryBtnStyle  = { backgroundColor: primaryColor, color: primaryTextColor, cursor: "pointer" };
   const disabledBtnStyle = { backgroundColor: "#e5e7eb", color: "#9ca3af", cursor: "not-allowed" };
@@ -496,8 +496,7 @@ export default function EstimatorV2() {
           {step === 1 && (
             <div>
               <ProgressBar current={1} total={TOTAL_STEPS} primaryColor={primaryColor} />
-              <h2 className="text-2xl font-bold text-center mb-1">What type of space?</h2>
-              <p className="text-gray-400 text-sm text-center mb-8">Select the area you'd like to have coated</p>
+              <h2 className="text-2xl font-bold text-center mb-5">What type of space?</h2>
               <div className="grid grid-cols-2 gap-4">
                 {step1Types.map(({ key, label, Icon }, index) => {
                   const spanFull = index === step1Types.length - 1 && step1Types.length % 2 !== 0;
