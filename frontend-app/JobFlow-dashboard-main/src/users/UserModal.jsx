@@ -258,12 +258,12 @@ export default function UserModal({
             )}
           </div>
 
-          {/* LAST LOGIN - master only */}
-          {currentUser?.role === "master" && viewMode === "view" && user?.last_login && (
+          {/* LAST ACTIVITY - master only */}
+          {currentUser?.role === "master" && viewMode === "view" && user?.last_activity && (
             <div className="flex items-center justify-between pt-2">
-              <span className="text-sm font-semibold text-gray-700">Last Login</span>
+              <span className="text-sm font-semibold text-gray-700">Last Activity</span>
               <span className="font-medium text-gray-700 text-sm">
-                {new Date(user.last_login).toLocaleString("en-US", {
+                {new Date(user.last_activity).toLocaleString("en-US", {
                   month: "short", day: "numeric", year: "numeric",
                   hour: "numeric", minute: "2-digit", hour12: true,
                 })}

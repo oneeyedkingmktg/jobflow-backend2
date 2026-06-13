@@ -40,7 +40,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     if (req.user.role === "master") {
       if (req.query.company_id) {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                  sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
@@ -49,7 +49,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
         params = [req.query.company_id];
       } else {
         query = `
-          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+          SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                  sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
           FROM users
           WHERE deleted_at IS NULL
@@ -58,7 +58,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       }
     } else {
       query = `
-        SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
+        SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                service_calls_enabled, permissions
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL

@@ -122,8 +122,6 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
-
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, company_id: user.company_id },
       JWT_SECRET,

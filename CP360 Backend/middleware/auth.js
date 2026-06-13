@@ -7,6 +7,10 @@
 const jwt = require("jsonwebtoken");
 const db = require("../config/database");
 
+// Throttle: only write last_activity once per 5 minutes per user per process
+const activityCache = new Map();
+const ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
+
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-this-in-production";
 
@@ -91,6 +95,13 @@ const authenticateToken = async (req, res, next) => {
       role: user.role,
       company_id: user.company_id,
     };
+
+    // Fire-and-forget: update last_activity at most once per 5 min per user
+    const now = Date.now();
+    if (now - (activityCache.get(user.id) || 0) > ACTIVITY_THROTTLE_MS) {
+      activityCache.set(user.id, now);
+      db.query("UPDATE users SET last_activity = NOW() WHERE id = $1", [user.id]).catch(() => {});
+    }
 
     return next();
   } catch (error) {
