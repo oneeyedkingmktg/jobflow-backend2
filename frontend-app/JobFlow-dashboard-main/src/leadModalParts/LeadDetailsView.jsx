@@ -155,6 +155,15 @@ const hasEstimate = form?.hasEstimate === true;
           </span>
         </div>
 
+        {(user?.role === "master" || user?.role === "admin") && (form.utmSource || form.utmMedium) && (
+          <div>
+            <span className="text-gray-500 block">Traffic Source</span>
+            <span className="font-semibold break-words">
+              {[form.utmSource, form.utmMedium].filter(Boolean).join(" - ")}
+            </span>
+          </div>
+        )}
+
         <div>
           <span className="text-gray-500 block">Date Added</span>
           <span className="font-semibold break-words">
