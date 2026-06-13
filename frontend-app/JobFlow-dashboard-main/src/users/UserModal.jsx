@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useCompany } from "../CompanyContext";
+import UserPermissionsModal from "./UserPermissionsModal";
 
 const formatPhoneNumber = (value) => {
   if (!value) return "";
@@ -40,6 +41,8 @@ export default function UserModal({
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
+  const [localPermissions, setLocalPermissions] = useState(user?.permissions || {});
 
   useEffect(() => {
     if (mode === "create") {
@@ -127,6 +130,8 @@ export default function UserModal({
   const isCreate = mode === "create";
   const isSelf = user && currentUser && user.id === currentUser.id;
   const isMaster = currentUser?.role === "master";
+  const isAdminOrMaster = currentUser?.role === "master" || currentUser?.role === "admin";
+  const canManagePermissions = isAdminOrMaster && !isCreate && !isSelf;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1000] p-4">
@@ -377,6 +382,15 @@ export default function UserModal({
               </button>
             )}
 
+            {canManagePermissions && viewMode === "view" && (
+              <button
+                onClick={() => setShowPermissions(true)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"
+              >
+                Permissions
+              </button>
+            )}
+
             {viewMode === "view" && !isCreate ? (
               <button
                 onClick={handleEdit}
@@ -396,6 +410,14 @@ export default function UserModal({
           </div>
         </div>
       </div>
+
+      {showPermissions && user && (
+        <UserPermissionsModal
+          user={{ ...user, permissions: localPermissions }}
+          onClose={() => setShowPermissions(false)}
+          onSaved={(perms) => setLocalPermissions(perms)}
+        />
+      )}
     </div>
   );
 }

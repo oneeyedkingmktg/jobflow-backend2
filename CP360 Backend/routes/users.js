@@ -41,7 +41,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       if (req.query.company_id) {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -50,7 +50,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       } else {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -59,7 +59,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     } else {
       query = `
         SELECT id, company_id, email, name, phone, role, is_active, created_at, last_login,
-               service_calls_enabled
+               service_calls_enabled, permissions
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -272,7 +272,7 @@ router.put("/:id", async (req, res) => {
       `
       UPDATE users SET ${updates.join(", ")}, updated_at = NOW()
       WHERE id = $${i}
-      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled
+      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled, permissions
       `,
       values
     );
@@ -367,6 +367,43 @@ router.put("/:id/set-password", async (req, res) => {
   } catch (err) {
     console.error("Set password error:", err);
     res.status(500).json({ error: "Failed to set password" });
+  }
+});
+
+// ============================================================================
+// PUT /api/users/:id/permissions – Update user permissions (Admin/Master only)
+// ============================================================================
+router.put("/:id/permissions", requireRole("admin", "master"), async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { permissions } = req.body;
+
+    if (!permissions || typeof permissions !== "object") {
+      return res.status(400).json({ error: "permissions must be an object" });
+    }
+
+    const existing = await db.query(
+      "SELECT company_id FROM users WHERE id = $1 AND deleted_at IS NULL",
+      [userId]
+    );
+
+    if (!existing.rows.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (req.user.role !== "master" && existing.rows[0].company_id !== req.user.company_id) {
+      return res.status(403).json({ error: "Cannot update users from other companies" });
+    }
+
+    const result = await db.query(
+      "UPDATE users SET permissions = $1, updated_at = NOW() WHERE id = $2 RETURNING id, permissions",
+      [permissions, userId]
+    );
+
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    console.error("Update permissions error:", err);
+    res.status(500).json({ error: "Failed to update permissions" });
   }
 });
 

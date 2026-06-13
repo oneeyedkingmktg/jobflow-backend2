@@ -372,6 +372,7 @@ billing_status,
       service_area_zips,
       sip_domain,
       reports_enabled,
+      service_calls_enabled,
     } = sanitizedBody;
 
     const companyId = req.params.id;
@@ -497,6 +498,7 @@ show_conversations = COALESCE($22, show_conversations),
   bidder_enabled = COALESCE($34, bidder_enabled),
   microsoft_base_tag = CASE WHEN $35::text IS NULL THEN microsoft_base_tag WHEN $35::text = '' THEN NULL ELSE $35::text END,
   microsoft_conversion_event = CASE WHEN $36::text IS NULL THEN microsoft_conversion_event WHEN $36::text = '' THEN NULL ELSE $36::text END,
+  service_calls_enabled = COALESCE($39, service_calls_enabled),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -540,6 +542,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   sanitizedBody.microsoft_conversion_event ?? null,            // $36
   ghl_sc_calendar || null,                                     // $37
   ghl_sc_assigned_user || null,                                // $38
+  service_calls_enabled ?? null,                               // $39
 ]
 
 );

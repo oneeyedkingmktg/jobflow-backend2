@@ -10,6 +10,7 @@ import BidderPanel from "./BidderPanel.jsx";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import { BidderAPI } from "../api";
+import { usePermission } from "../utils/usePermission";
 
 export default function LeadDetailsView({
   form,
@@ -21,6 +22,7 @@ const hasEstimate = form?.hasEstimate === true;
   const { user } = useAuth();
   const { currentCompany } = useCompany();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const financialPermission = usePermission('financial_information');
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
   const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
   const [showEstimateModal, setShowEstimateModal] = useState(false);
@@ -128,14 +130,16 @@ const hasEstimate = form?.hasEstimate === true;
           </span>
         </div>
 
-        <div>
-          <span className="text-gray-500 block">Contract Price</span>
-          <span className="font-semibold break-words">
-            {form.contractPrice
-              ? `$${Number(form.contractPrice).toLocaleString()}`
-              : "Not Set"}
-          </span>
-        </div>
+        {financialPermission !== 'hide' && (
+          <div>
+            <span className="text-gray-500 block">Contract Price</span>
+            <span className="font-semibold break-words">
+              {form.contractPrice
+                ? `$${Number(form.contractPrice).toLocaleString()}`
+                : "Not Set"}
+            </span>
+          </div>
+        )}
 
         <div>
           <span className="text-gray-500 block">Notes</span>
@@ -218,7 +222,7 @@ const hasEstimate = form?.hasEstimate === true;
         )}
 
         {/* Online Estimate */}
-        {hasEstimate && (
+        {hasEstimate && financialPermission !== 'hide' && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); loadEstimate(); }}

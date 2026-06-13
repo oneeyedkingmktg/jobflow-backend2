@@ -244,6 +244,9 @@ async function runMigrations() {
       min_price_custom = COALESCE(NULLIF(min_price_custom, 0), minimum_job_price, 0)
     WHERE minimum_job_price IS NOT NULL AND minimum_job_price > 0`,
     `ALTER TABLE estimator_configs DROP COLUMN IF EXISTS minimum_job_price`,
+    // permissions system
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{}'`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS service_calls_enabled BOOLEAN DEFAULT false`,
   ];
   for (const sql of migrations) {
     try {

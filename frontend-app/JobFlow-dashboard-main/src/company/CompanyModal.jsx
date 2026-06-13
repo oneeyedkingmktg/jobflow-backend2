@@ -109,6 +109,10 @@ setForm({
   suspended: false,
   plan_type: "pro",
   reports_enabled: false,
+  show_conversations: false,
+  bidder_enabled: false,
+  service_calls_enabled: false,
+  estimator_enabled: false,
   service_area_zips: "",
   est_push_title: "",
   est_push_body: "",
@@ -127,7 +131,6 @@ setGhlForm({
   ghlInstallTitleTemplate: "",
   ghlApptDescriptionTemplate: "",
   ghlInstallDescriptionTemplate: "",
-  showConversations: false,
 });
 
     setSuspendedTouched(false);
@@ -159,6 +162,10 @@ zip: company.zip || "",
   suspended: company.suspended === true,
   plan_type: company.plan_type || company.planType || "pro",
   reports_enabled: company.reports_enabled === true || company.reportsEnabled === true,
+  show_conversations: company.showConversations || company.show_conversations || false,
+  bidder_enabled: company.bidderEnabled ?? company.bidder_enabled ?? false,
+  service_calls_enabled: company.serviceCallsEnabled ?? company.service_calls_enabled ?? false,
+  estimator_enabled: company.estimatorEnabled ?? company.estimator_enabled ?? false,
   est_push_title: company.est_push_title || company.estPushTitle || "",
   est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
@@ -190,7 +197,6 @@ setGhlForm({
     ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
-    showConversations: company.showConversations || false,
     sipDomain: company.sipDomain || company.sip_domain || "",
   });
     
@@ -257,6 +263,10 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         suspended: form.suspended,
         plan_type: form.plan_type,
         reports_enabled: form.reports_enabled,
+        show_conversations: form.show_conversations,
+        bidder_enabled: form.bidder_enabled,
+        service_calls_enabled: form.service_calls_enabled,
+        estimator_enabled: form.estimator_enabled,
         est_push_title: form.est_push_title || null,
         est_push_body: form.est_push_body || null,
         timezone: form.timezone,
@@ -331,8 +341,6 @@ if (ghlForm.ghlInstallDescriptionTemplate) {
       payload.ghl_install_description_template = ghlForm.ghlInstallDescriptionTemplate;
     }
     
-    // Always include showConversations (boolean)
-    payload.show_conversations = ghlForm.showConversations || false;
     payload.sip_domain = ghlForm.sipDomain || null;
 
     await onSave(payload);
@@ -1070,6 +1078,58 @@ const handleSaveTracking = async () => {
               </div>
             </label>
 
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.show_conversations}
+                onChange={(e) => handleChange("show_conversations", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Conversation Log</div>
+                <div className="text-sm text-gray-600">Show message history button on lead cards</div>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.bidder_enabled}
+                onChange={(e) => handleChange("bidder_enabled", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Bidder</div>
+                <div className="text-sm text-gray-600">Enable the bid builder for this company</div>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.service_calls_enabled}
+                onChange={(e) => handleChange("service_calls_enabled", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Service Calls</div>
+                <div className="text-sm text-gray-600">Enable service calls for this company</div>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.estimator_enabled}
+                onChange={(e) => handleChange("estimator_enabled", e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Online Estimator</div>
+                <div className="text-sm text-gray-600">Enable the embeddable estimator widget for this company</div>
+              </div>
+            </label>
+
             {form.plan_type === "estimator_only" && (
               <div className="pt-2 space-y-3">
                 <div className="text-xs font-semibold text-blue-700 uppercase">New Lead Push Notification</div>
@@ -1298,21 +1358,6 @@ const renderGHLKeys = () => {
           </div>
         </div>
 
-        {/* Conversations Feature Toggle */}
-        <div className="border-t pt-4 mt-4">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={ghlForm.showConversations}
-              onChange={(e) => handleGhlChange("showConversations", e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded"
-            />
-            <div>
-              <div className="font-semibold text-gray-700">Show Conversations Feature</div>
-              <div className="text-sm text-gray-500">Display message history button on lead cards</div>
-            </div>
-          </label>
-        </div>
       </div>
     );
   };
@@ -1359,7 +1404,6 @@ setGhlForm({
     ghlInstallTitleTemplate: company.ghlInstallTitleTemplate ?? "",
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
-    showConversations: company.showConversations || false,
     sipDomain: company.sipDomain || company.sip_domain || "",
   });
 }}

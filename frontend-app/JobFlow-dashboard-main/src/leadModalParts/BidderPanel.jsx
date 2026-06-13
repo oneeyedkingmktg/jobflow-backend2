@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { BidderAPI } from '../api';
 import BidderForm from './BidderForm';
 import { useAuth } from '../AuthContext';
+import { usePermission } from '../utils/usePermission';
 
 const STATUS_COLORS = {
   pending:  { bg: 'bg-yellow-50', border: 'border-yellow-300', badge: 'bg-yellow-100 text-yellow-800' },
@@ -30,6 +31,7 @@ function fmtDate(d) {
 
 export default function BidderPanel({ lead, onClose }) {
   const { user } = useAuth();
+  const financialPermission = usePermission('financial_information');
   const [bids, setBids]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [creating, setCreating]   = useState(false);
@@ -160,7 +162,9 @@ export default function BidderPanel({ lead, onClose }) {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xl font-bold text-gray-900">{fmt(bid.bid_total)}</p>
+                      {financialPermission !== 'hide' && (
+                        <p className="text-xl font-bold text-gray-900">{fmt(bid.bid_total)}</p>
+                      )}
                     </div>
                   </div>
                 </button>

@@ -6,6 +6,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { BidderAPI, CompaniesAPI } from '../api';
 import { useAuth } from '../AuthContext';
+import { usePermission } from '../utils/usePermission';
 import { docId } from '../utils/printDocument';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -29,6 +30,9 @@ const STATUS_OPTIONS = [
 
 export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const { user } = useAuth();
+  const financialPermission = usePermission('financial_information');
+  const canViewFinancials = financialPermission !== 'hide';
+  const canEditFinancials = financialPermission === 'edit';
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [proposal,      setProposal]      = useState(null);
@@ -694,14 +698,18 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                             disabled={isLocked}
                             onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _qty: e.target.value } }))}
                             onBlur={() => handleItemQtyBlur(libItemId)} />
-                          <span className="text-gray-400 text-xs">× $</span>
-                          <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
-                            type="number" step="0.01" value={pi._price || ''}
-                            disabled={isLocked}
-                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
-                            onBlur={() => handleItemPriceBlur(libItemId)} />
-                          {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
-                          <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
+                          {canViewFinancials && (
+                            <>
+                              <span className="text-gray-400 text-xs">× $</span>
+                              <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
+                                type="number" step="0.01" value={pi._price || ''}
+                                disabled={isLocked || !canEditFinancials}
+                                onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
+                                onBlur={() => handleItemPriceBlur(libItemId)} />
+                              {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
+                              <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(pi.line_total)}</span>
+                            </>
+                          )}
                         </div>
                         {!isLocked && (
                           <div className="mt-2 flex gap-4">
@@ -748,13 +756,17 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           disabled={isLocked}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _qty: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)} />
-                        <span className="text-gray-400 text-xs">× $</span>
-                        <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
-                          value={item._price || ''}
-                          disabled={isLocked}
-                          onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
-                          onBlur={() => handleCustomItemBlur(idx)} />
-                        <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
+                        {canViewFinancials && (
+                          <>
+                            <span className="text-gray-400 text-xs">× $</span>
+                            <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
+                              value={item._price || ''}
+                              disabled={isLocked || !canEditFinancials}
+                              onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
+                              onBlur={() => handleCustomItemBlur(idx)} />
+                            <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
+                          </>
+                        )}
                       </div>
                       {!isLocked && (
                         <div className="mt-2 flex gap-4">
@@ -810,7 +822,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         </section>
 
         {/* ── DISCOUNTS ────────────────────────────────────────────────── */}
-        <section>
+        {canViewFinancials && <section>
           <p className={sectionHd}>Discounts</p>
           <div className="space-y-2">
             {discounts.map((d, idx) => (
@@ -851,14 +863,14 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 )}
               </div>
             ))}
-            {!isLocked && (
+            {!isLocked && canEditFinancials && (
               <button onClick={handleAddDiscount} className="text-sm text-blue-600 hover:underline">+ Add Discount</button>
             )}
           </div>
-        </section>
+        </section>}
 
         {/* ── TOTALS ───────────────────────────────────────────────────── */}
-        <section>
+        {canViewFinancials && <section>
           <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-2 text-sm">
             <div className="flex justify-between text-gray-600">
               <span>Items Total</span><span className="font-semibold">{fmt(itemsTotal)}</span>
@@ -877,22 +889,26 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               <span>Bid Total</span><span>{fmt(bidTotal)}</span>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* ── PAYMENT SCHEDULE — always editable ───────────────────────── */}
-        <section>
+        {canViewFinancials && <section>
           <p className={sectionHd}>Payment Schedule</p>
           <div className="space-y-2">
             {paySchedule.map((ps, idx) => (
               <div key={ps.id} className="border border-gray-200 rounded-lg px-3 py-3 bg-white">
                 <div className="flex items-center gap-2 mb-2">
                   <input className={`${inputCls} flex-1`} value={ps._desc} placeholder="Payment name"
+                    disabled={!canEditFinancials}
                     onChange={e => setPaySchedule(prev => prev.map((it, i) => i === idx ? { ...it, _desc: e.target.value } : it))}
                     onBlur={() => handlePaymentBlur(idx)} />
-                  <button onClick={() => handleDeletePayment(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none">×</button>
+                  {canEditFinancials && (
+                    <button onClick={() => handleDeletePayment(idx)} className="text-red-400 hover:text-red-600 text-xl leading-none">×</button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <select className={`${inputCls} w-16`} value={ps._type}
+                    disabled={!canEditFinancials}
                     onChange={e => setPaySchedule(prev => prev.map((it, i) => i === idx ? { ...it, _type: e.target.value } : it))}
                     onBlur={() => handlePaymentBlur(idx)}>
                     <option value="percent">%</option>
@@ -900,13 +916,16 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   </select>
                   <input className={`w-24 px-2 py-2 border border-gray-300 rounded-lg text-sm text-right ${noSpin}`} type="number" step="0.01"
                     value={ps._val || ''}
+                    disabled={!canEditFinancials}
                     onChange={e => setPaySchedule(prev => prev.map((it, i) => i === idx ? { ...it, _val: e.target.value } : it))}
                     onBlur={() => handlePaymentBlur(idx)} />
                   <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(calcPayAmt(ps))}</span>
                 </div>
               </div>
             ))}
-            <button onClick={handleAddPayment} className="text-sm text-blue-600 hover:underline">+ Add Payment</button>
+            {canEditFinancials && (
+              <button onClick={handleAddPayment} className="text-sm text-blue-600 hover:underline">+ Add Payment</button>
+            )}
           </div>
           <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 space-y-1 text-sm">
             {paySchedule.map((ps, idx) => (
@@ -925,7 +944,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               <span className="text-sm text-gray-700">Show payment button on web proposal</span>
             </label>
           </div>
-        </section>
+        </section>}
 
         {/* ── NOTES ────────────────────────────────────────────────────── */}
         <section>
@@ -986,9 +1005,11 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         <button onClick={onBack} className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
           Exit
         </button>
-        <button onClick={() => setShowDocsModal(true)} className="flex-1 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
-          Create Documents
-        </button>
+        {canViewFinancials && (
+          <button onClick={() => setShowDocsModal(true)} className="flex-1 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
+            Create Documents
+          </button>
+        )}
         {saveMsg && (
           <span className={`text-sm font-medium ${saveMsg.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>
             {saveMsg}

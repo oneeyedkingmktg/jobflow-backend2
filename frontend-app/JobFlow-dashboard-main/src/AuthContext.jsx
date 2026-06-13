@@ -37,6 +37,9 @@ const normalizeUser = (u) => {
     serviceCallsEnabled: u.service_calls_enabled ?? u.serviceCallsEnabled ?? false,
     reportsEnabled: u.reports_enabled ?? u.reportsEnabled ?? false,
 
+    // Per-user permissions
+    permissions: u.permissions ?? {},
+
     // Meta fields
     created_at: u.created_at,
     updated_at: u.updated_at,

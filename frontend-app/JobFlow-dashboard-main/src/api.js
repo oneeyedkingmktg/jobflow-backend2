@@ -130,6 +130,12 @@ export const UsersAPI = {
       body: JSON.stringify(data), // Don't use toSnake - backend expects camelCase
     }),
 
+  updatePermissions: (id, permissions) =>
+    apiRequest(`/users/${id}/permissions`, {
+      method: "PUT",
+      body: JSON.stringify({ permissions }),
+    }),
+
   setPassword: (id, password) =>
     apiRequest(`/users/${id}/set-password`, {
       method: "PUT",

@@ -1,6 +1,8 @@
 import React from "react";
+import { usePermission } from "../utils/usePermission";
 
 export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
+  const financialPermission = usePermission('financial_information');
   return (
     <div className="bg-white rounded-2xl border border-gray-200 px-5 py-5 shadow-sm space-y-4 text-sm text-gray-800">
 
@@ -121,15 +123,23 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
       </div>
 
       {/* CONTRACT PRICE */}
-      <div>
-        <label className="text-gray-500">Contract Price</label>
-<input
-          type="number"
-          value={form.contractPrice}
-          onChange={(e) => onChange("contractPrice", e.target.value)}
-          className="w-full mt-1 px-3 py-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        />
-      </div>
+      {financialPermission !== 'hide' && (
+        <div>
+          <label className="text-gray-500">Contract Price</label>
+          {financialPermission === 'view' ? (
+            <div className="w-full mt-1 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg border border-gray-200">
+              {form.contractPrice ? `$${Number(form.contractPrice).toLocaleString()}` : 'Not Set'}
+            </div>
+          ) : (
+            <input
+              type="number"
+              value={form.contractPrice}
+              onChange={(e) => onChange("contractPrice", e.target.value)}
+              className="w-full mt-1 px-3 py-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          )}
+        </div>
+      )}
 
       {/* NOTES */}
       <div>
