@@ -99,7 +99,8 @@ router.post('/login', async (req, res) => {
         c.reports_enabled,
         u.role,
         c.ghl_location_id,
-        u.service_calls_enabled
+        u.service_calls_enabled,
+        u.permissions
       FROM users u
       LEFT JOIN companies c ON u.company_id = c.id
       WHERE u.email = $1 AND u.is_active = true`,
@@ -141,7 +142,8 @@ router.post('/login', async (req, res) => {
         ghlLocationId: user.ghl_location_id,
         planType: user.plan_type || 'pro',
         reportsEnabled: user.reports_enabled ?? false,
-        service_calls_enabled: user.service_calls_enabled ?? false
+        service_calls_enabled: user.service_calls_enabled ?? false,
+        permissions: user.permissions ?? {}
       }
     });
 
@@ -173,7 +175,8 @@ router.get('/verify', async (req, res) => {
         c.ghl_location_id,
         c.plan_type,
         c.reports_enabled,
-        u.service_calls_enabled
+        u.service_calls_enabled,
+        u.permissions
       FROM users u
       LEFT JOIN companies c ON u.company_id = c.id
       WHERE u.id = $1 AND u.is_active = true`,
