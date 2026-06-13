@@ -77,6 +77,7 @@ export default function CompanyModal({
     meta_conversion_event: "",
     microsoft_base_tag: "",
     microsoft_conversion_event: "",
+    clarity_project_id: "",
   });
 
   // Track checkbox interaction
@@ -209,6 +210,7 @@ setTrackingForm({
       meta_conversion_event: company.metaConversionEvent || company.meta_conversion_event || "",
       microsoft_base_tag: company.microsoftBaseTag || company.microsoft_base_tag || "",
       microsoft_conversion_event: company.microsoftConversionEvent || company.microsoft_conversion_event || "",
+      clarity_project_id: company.clarityProjectId || company.clarity_project_id || "",
     });
 
     setSuspendedTouched(false);
@@ -367,6 +369,7 @@ const handleSaveTracking = async () => {
         meta_conversion_event: trackingForm.meta_conversion_event ?? "",
         microsoft_base_tag: trackingForm.microsoft_base_tag ?? "",
         microsoft_conversion_event: trackingForm.microsoft_conversion_event ?? "",
+        clarity_project_id: trackingForm.clarity_project_id ?? "",
       };
       await onSave(payload);
       setError("");
@@ -816,6 +819,27 @@ const handleSaveTracking = async () => {
           value={trackingForm.microsoft_conversion_event}
           onChange={(e) => setTrackingForm((p) => ({ ...p, microsoft_conversion_event: e.target.value }))}
           placeholder={"window.uetq = window.uetq || []; window.uetq.push('event', 'submit_lead', {});"}
+        />
+      </div>
+
+      <div>
+        <div className={viewLabel}>MICROSOFT CLARITY — PROJECT ID</div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1 mb-2">
+          <p className="font-semibold">Where to find your Project ID:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to <strong>clarity.microsoft.com</strong> and open your project</li>
+            <li>Click the <strong>Settings</strong> button at the top</li>
+            <li>Click <strong>Overview</strong> on the left sidebar</li>
+            <li>Find your <strong>Project ID</strong> — it looks like: <code>abc123xyz</code></li>
+            <li>Paste just the ID here — no script tags</li>
+          </ol>
+          <p className="text-blue-700 mt-1">Clarity fires <code>estimator_interaction_v1/v2</code> on first form touch and <code>estimator_completed_v1/v2</code> on successful submission.</p>
+        </div>
+        <input
+          className={editBox}
+          value={trackingForm.clarity_project_id}
+          onChange={(e) => setTrackingForm((p) => ({ ...p, clarity_project_id: e.target.value }))}
+          placeholder="e.g. abc123xyz"
         />
       </div>
     </div>

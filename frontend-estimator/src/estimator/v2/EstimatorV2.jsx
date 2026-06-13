@@ -4,7 +4,7 @@
 // Build: All 5 steps + results + second estimate flow + combined results
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import useEstimatorConfig from "../hooks/useEstimatorConfig";
 import { validEmail, validPhone, formatPhoneNumber } from "../utils/validators";
 
@@ -198,6 +198,21 @@ export default function EstimatorV2() {
   const [submitting2, setSubmitting2]           = useState(false);
   const [submitError2, setSubmitError2]         = useState("");
 
+  const clarityInteractionFired = useRef(false);
+  function fireClarityInteraction() {
+    if (!clarityInteractionFired.current) {
+      clarityInteractionFired.current = true;
+      try { if (typeof clarity === "function") clarity("event", "estimator_interaction_v2"); } catch {}
+    }
+  }
+
+  useEffect(() => {
+    if (!config?.clarity_project_id) return;
+    const s = document.createElement("script");
+    s.textContent = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${config.clarity_project_id}");`;
+    document.head.appendChild(s);
+  }, [config?.clarity_project_id]);
+
   // ---- Guards ----
   if (!config) return <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>;
   if (config.plan_type === "suspended") {
@@ -382,6 +397,7 @@ export default function EstimatorV2() {
       try { if (config.meta_conversion_event && typeof fbq === "function") new Function(config.meta_conversion_event)(); } catch {}
       try { if (typeof gtag === "function") gtag("event", "estimate_submitted"); } catch {}
       try { window.parent.postMessage({ event: "estimator_conversion", type: "estimate_submitted", microsoftEventCode: config.microsoft_conversion_event || null }, "*"); } catch {}
+      try { if (typeof clarity === "function") clarity("event", "estimator_completed_v2"); } catch {}
 
       if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
       setCompanyPhone(previewData.companyPhone || "");
@@ -502,7 +518,7 @@ export default function EstimatorV2() {
                   const spanFull = index === step1Types.length - 1 && step1Types.length % 2 !== 0;
                   return (
                     <button key={key} type="button"
-                      onClick={() => { setProjectCategory(key); setStep(2); }}
+                      onClick={() => { fireClarityInteraction(); setProjectCategory(key); setStep(2); }}
                       className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 py-5 px-3 font-semibold text-xs transition-all duration-150 cursor-pointer${spanFull ? " col-span-2" : ""}`}
                       style={{ borderColor: "#e5e7eb", backgroundColor: "#ffffff", color: "#374151" }}
                       onMouseEnter={hoverOn} onMouseLeave={hoverOff}
@@ -628,7 +644,7 @@ export default function EstimatorV2() {
               <input type="text" inputMode="numeric" maxLength={5}
                 className={`w-full border-2 rounded-xl px-4 py-3 text-lg font-semibold text-center tracking-widest focus:outline-none transition-colors ${zipError ? "border-red-400" : "border-gray-200 focus:border-orange-400"}`}
                 placeholder="e.g. 30301" value={zip}
-                onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setZipError(""); }}
+                onChange={(e) => { fireClarityInteraction(); setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setZipError(""); }}
               />
               {zipError && <div className="mt-3 bg-amber-50 border-l-4 border-amber-400 rounded-md px-4 py-3 text-sm text-amber-900">{zipError}</div>}
               <button type="button" disabled={zip.length < 5}
@@ -661,15 +677,15 @@ export default function EstimatorV2() {
               <div className="flex flex-col gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
-                  <input type="text" className={inputClass} placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} />
+                  <input type="text" className={inputClass} placeholder="Jane Smith" value={name} onChange={(e) => { fireClarityInteraction(); setName(e.target.value); }} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Email Address</label>
-                  <input type="email" className={inputClass} placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <input type="email" className={inputClass} placeholder="jane@example.com" value={email} onChange={(e) => { fireClarityInteraction(); setEmail(e.target.value); }} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Phone Number</label>
-                  <input type="tel" className={inputClass} placeholder="(555) 555-5555" value={phone} onChange={(e) => setPhone(formatPhoneNumber(e.target.value))} />
+                  <input type="tel" className={inputClass} placeholder="(555) 555-5555" value={phone} onChange={(e) => { fireClarityInteraction(); setPhone(formatPhoneNumber(e.target.value)); }} />
                 </div>
               </div>
               {submitError && <div className="mt-4 bg-red-50 border-l-4 border-red-400 rounded-md px-4 py-3 text-sm text-red-700">{submitError}</div>}

@@ -4,7 +4,7 @@
 // Version: v2.1.0 - FIXED: Now saves estimate to estimator_leads table
 // ============================================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useEstimatorConfig from "./hooks/useEstimatorConfig";
 import SizeModal from "./components/SizeModal";
 import EstimatorForm from "./components/EstimatorForm";
@@ -408,6 +408,14 @@ export default function Estimator() {
   const [modalSf, setModalSf] = useState("");
   const [sizeError, setSizeError] = useState("");
 
+  const clarityInteractionFired = useRef(false);
+  function fireClarityInteraction() {
+    if (!clarityInteractionFired.current) {
+      clarityInteractionFired.current = true;
+      try { if (typeof clarity === "function") clarity("event", "estimator_interaction_v1"); } catch {}
+    }
+  }
+
 // Inject base tracking tags into <head> once config loads
   useEffect(() => {
     if (!config) return;
@@ -440,6 +448,12 @@ export default function Estimator() {
         }
         document.head.appendChild(newScript);
       });
+    }
+
+    if (config.clarity_project_id) {
+      const s = document.createElement("script");
+      s.textContent = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${config.clarity_project_id}");`;
+      document.head.appendChild(s);
     }
   }, [config]);
 
@@ -736,6 +750,8 @@ try {
         console.warn("postMessage error:", e);
       }
 
+      try { if (typeof clarity === "function") clarity("event", "estimator_completed_v1"); } catch {}
+
       // 4️⃣ Handle response
       if (leadResData?.lead?.id) setLeadId(leadResData.lead.id);
 
@@ -897,17 +913,17 @@ try {
             config={config}
             useCustomStyles={useCustomStyles}
             projectType={projectType}
-            setProjectType={setProjectType}
+            setProjectType={(v) => { fireClarityInteraction(); setProjectType(v); }}
             condition={condition}
-            setCondition={setCondition}
+            setCondition={(v) => { fireClarityInteraction(); setCondition(v); }}
             name={name}
-            setName={setName}
+            setName={(v) => { fireClarityInteraction(); setName(v); }}
             email={email}
-            setEmail={setEmail}
+            setEmail={(v) => { fireClarityInteraction(); setEmail(v); }}
             phone={phone}
-            setPhone={setPhone}
+            setPhone={(v) => { fireClarityInteraction(); setPhone(v); }}
             zip={zip}
-            setZip={setZip}
+            setZip={(v) => { fireClarityInteraction(); setZip(v); }}
             error={error}
             submitting={submitting}
             openSizeModal={openSizeModal}
