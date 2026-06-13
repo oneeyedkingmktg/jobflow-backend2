@@ -270,6 +270,13 @@ export default function LeadDetails({
             </p>
           )}
 
+          {(user?.role === "master" || user?.role === "admin") && (form.utmSource || form.utmMedium) && (
+            <p>
+              <span className="font-semibold">Traffic Source:</span>{" "}
+              {[form.utmSource, form.utmMedium].filter(Boolean).join(" - ")}
+            </p>
+          )}
+
           {form.referralSource && (
             <p>
               <span className="font-semibold">Referral Source:</span>{" "}

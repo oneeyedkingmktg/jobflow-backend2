@@ -62,6 +62,8 @@ const convertLeadFromBackend = (lead) => ({
 
   leadSource: lead.leadSource,
   referralSource: lead.referralSource,
+  utmSource: lead.utmSource || lead.utm_source || null,
+  utmMedium: lead.utmMedium || lead.utm_medium || null,
 
   status: normalizeStatus(lead.status),
   notSoldReason: lead.notSoldReason,
