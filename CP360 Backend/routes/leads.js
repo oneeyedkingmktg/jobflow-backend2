@@ -76,6 +76,9 @@ const toCamel = (row) => ({
 
   leadSource: row.lead_source,
   referralSource: row.referral_source,
+  utmSource: row.utm_source || null,
+  utmMedium: row.utm_medium || null,
+  utmCampaign: row.utm_campaign || null,
 
   status: row.status,
   notSoldReason: row.not_sold_reason,
