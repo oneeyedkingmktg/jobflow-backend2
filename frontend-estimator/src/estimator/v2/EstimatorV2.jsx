@@ -4,7 +4,7 @@
 // Build: All 5 steps + results + second estimate flow + combined results
 // ============================================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import useEstimatorConfig from "../hooks/useEstimatorConfig";
 import { validEmail, validPhone, formatPhoneNumber } from "../utils/validators";
 
@@ -205,13 +205,6 @@ export default function EstimatorV2() {
       try { if (typeof clarity === "function") clarity("event", "estimator_interaction_v2"); } catch {}
     }
   }
-
-  useEffect(() => {
-    if (!config?.clarity_project_id) return;
-    const s = document.createElement("script");
-    s.textContent = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${config.clarity_project_id}");`;
-    document.head.appendChild(s);
-  }, [config?.clarity_project_id]);
 
   // ---- Guards ----
   if (!config) return <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>;

@@ -84,6 +84,7 @@ function injectTrackingTag(html) {
 }
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
+const CACHE_VERSION = "v3"; // bump to bust old caches
 
 function applyConfig(data, setConfig, setCustomStyles) {
   setConfig(data);
@@ -92,6 +93,11 @@ function applyConfig(data, setConfig, setCustomStyles) {
   // Microsoft UET must NOT be injected into the iframe — it lives on the parent page only.
   // Injecting it here causes UET to auto-track the form submission from inside the iframe,
   // doubling the conversion when the postMessage also fires it on the parent page.
+  if (data.clarity_project_id) {
+    const s = document.createElement("script");
+    s.textContent = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","${data.clarity_project_id}");`;
+    document.head.appendChild(s);
+  }
   setCustomStyles(generateCustomStyles(data));
 }
 
@@ -102,7 +108,7 @@ export default function useEstimatorConfig() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const companyId = params.get("company") || "1";
-    const cacheKey = `estimator-config-${companyId}`;
+    const cacheKey = `estimator-config-${CACHE_VERSION}-${companyId}`;
 
     // Try cache first
     try {
