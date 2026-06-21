@@ -1909,7 +1909,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
       throw new Error("Contact ID and company required");
     }
 
-    // Step 1: Get conversations for this contact
+    // Step 1: GHL search does not support contactId filter — fetch recent and match client-side
     let convResponse;
     try {
       convResponse = await ghlRequest(
@@ -1917,7 +1917,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
         "/conversations/search",
         {
           method: "GET",
-          params: { contactId, locationId: company.ghl_location_id, limit: 5 },
+          params: { locationId: company.ghl_location_id, limit: 100 },
         }
       );
     } catch (err) {
@@ -1925,8 +1925,8 @@ getConversationMessages: async function (contactId, company, limit = 20) {
       return { messages: [], conversationId: null };
     }
 
-    console.log("[getConversationMessages] GHL search response keys:", Object.keys(convResponse || {}), "| conversations count:", convResponse?.conversations?.length, "| raw:", JSON.stringify(convResponse)?.slice(0, 300));
-    const conversations = convResponse?.conversations || [];
+    const allConversations = convResponse?.conversations || [];
+    const conversations = allConversations.filter(c => c.contactId === contactId);
 
     if (conversations.length === 0) {
       return { messages: [], conversationId: null };
