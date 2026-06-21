@@ -247,6 +247,9 @@ async function runMigrations() {
     // permissions system
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB DEFAULT '{}'`,
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS service_calls_enabled BOOLEAN DEFAULT false`,
+    // estimator_leads — add 'custom' to selected_quality check constraint
+    `ALTER TABLE estimator_leads DROP CONSTRAINT IF EXISTS estimator_leads_selected_quality_check`,
+    `ALTER TABLE estimator_leads ADD CONSTRAINT estimator_leads_selected_quality_check CHECK (selected_quality IN ('solid', 'flake', 'metallic', 'custom'))`,
   ];
   for (const sql of migrations) {
     try {
