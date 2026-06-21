@@ -204,6 +204,24 @@ router.post('/estimate', async (req, res) => {
     const estimate = calculateEstimate(config, engineInput, pricingByFinish);
     console.log('📐 estimate webhook calculated:', estimate);
 
+    // ── Service area zip check (mirrors iframe logic) ─────────────────────────
+    if (zip && Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
+      const isOutsideArea = !company.service_area_zips.map(String).includes(zip.trim());
+      if (isOutsideArea) {
+        if (!config.out_of_area_enabled) {
+          console.log('📐 estimate webhook: zip', zip, 'outside service area — manual_review_required');
+          return res.json({ status: 'manual_review_required', message: 'Manual review required' });
+        }
+        const threshold = Number(config.out_of_area_large_job_threshold) || 0;
+        const flakeMin = estimate.allPriceRanges?.flake?.min || estimate.displayPriceMin || 0;
+        if (threshold > 0 && flakeMin < threshold) {
+          console.log('📐 estimate webhook: zip', zip, 'outside area, below threshold — manual_review_required');
+          return res.json({ status: 'manual_review_required', message: 'Manual review required' });
+        }
+        console.log('📐 estimate webhook: zip', zip, 'outside area but large job — proceeding');
+      }
+    }
+
     // ── Find or create CP lead ────────────────────────────────────────────────
     let cpLead = null;
 
