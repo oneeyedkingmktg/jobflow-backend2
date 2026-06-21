@@ -487,10 +487,6 @@ async function ghlRequest(company, endpoint, options = {}) {
   }
 
   try {
-    console.log("GHL REQUEST DEBUG", {
-      url: url.toString(),
-      method: fetchOptions.method,
-    });
 
     const res = await fetch(url.toString(), fetchOptions);
     const raw = await res.text();
