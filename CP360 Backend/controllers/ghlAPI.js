@@ -1925,6 +1925,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
       return { messages: [], conversationId: null };
     }
 
+    console.log("[getConversationMessages] GHL search response keys:", Object.keys(convResponse || {}), "| conversations count:", convResponse?.conversations?.length, "| raw:", JSON.stringify(convResponse)?.slice(0, 300));
     const conversations = convResponse?.conversations || [];
 
     if (conversations.length === 0) {
