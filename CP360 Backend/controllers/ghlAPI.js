@@ -1921,10 +1921,8 @@ getConversationMessages: async function (contactId, company, limit = 20) {
         }
       );
     } catch (err) {
-      if (err.status === 400 || err.status === 404) {
-        return { messages: [], conversationId: null };
-      }
-      throw err;
+      console.error("[getConversationMessages] search failed:", err.message);
+      return { messages: [], conversationId: null };
     }
 
     const conversations = convResponse?.conversations || [];
