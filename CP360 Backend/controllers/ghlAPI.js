@@ -469,13 +469,14 @@ async function ghlRequest(company, endpoint, options = {}) {
   const timeoutMs = 15000; // HARD STOP – 15s
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
+  const method = options.method || "GET";
   const fetchOptions = {
-    method: options.method || "GET",
+    method,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       Version: String(GHL_API_VERSION).trim(),
-      "Content-Type": "application/json",
-      Accept: "application/json"
+      Accept: "application/json",
+      ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
     },
     signal: controller.signal
   };
