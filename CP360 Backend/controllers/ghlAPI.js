@@ -1914,8 +1914,11 @@ getConversationMessages: async function (contactId, company, limit = 20) {
     try {
       convResponse = await ghlRequest(
         company,
-        `/conversations/search?contactId=${contactId}&limit=5`,
-        { method: "GET" }
+        "/conversations/search",
+        {
+          method: "GET",
+          params: { contactId, locationId: company.ghl_location_id, limit: 5 },
+        }
       );
     } catch (err) {
       if (err.status === 400 || err.status === 404) {
@@ -1925,18 +1928,24 @@ getConversationMessages: async function (contactId, company, limit = 20) {
     }
 
     const conversations = convResponse?.conversations || [];
-    
+
     if (conversations.length === 0) {
-      return [];
+      return { messages: [], conversationId: null };
     }
-    
+
     // Step 2: Get messages from the first conversation
-const conversationId = conversations[0].id;
-    const msgResponse = await ghlRequest(
-      company,
-      `/conversations/${conversationId}/messages?limit=${limit}`,
-      { method: "GET" }
-    );
+    const conversationId = conversations[0].id;
+    let msgResponse;
+    try {
+      msgResponse = await ghlRequest(
+        company,
+        `/conversations/${conversationId}/messages?limit=${limit}`,
+        { method: "GET" }
+      );
+    } catch (err) {
+      console.error("[getConversationMessages] messages fetch failed:", err.message);
+      return { messages: [], conversationId };
+    }
     return { messages: msgResponse?.messages || [], conversationId };
   },
   
