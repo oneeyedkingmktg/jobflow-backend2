@@ -472,6 +472,7 @@ async function ghlRequest(company, endpoint, options = {}) {
   const method = options.method || "GET";
   const fetchOptions = {
     method,
+    compress: false, // node-fetch v2 bug: gzip decompression causes "Premature close" on some GHL endpoints
     headers: {
       Authorization: `Bearer ${apiKey}`,
       Version: String(GHL_API_VERSION).trim(),
@@ -1910,7 +1911,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
       throw new Error("Contact ID and company required");
     }
 
-    // Step 1: GHL search does not support contactId filter — fetch recent and match client-side
+    // Step 1: Search conversations for this contact
     let convResponse;
     try {
       convResponse = await ghlRequest(
@@ -1918,7 +1919,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
         "/conversations/search",
         {
           method: "GET",
-          params: { locationId: company.ghl_location_id, limit: 100 },
+          params: { contactId, locationId: company.ghl_location_id, limit: 5 },
         }
       );
     } catch (err) {
@@ -1926,8 +1927,7 @@ getConversationMessages: async function (contactId, company, limit = 20) {
       return { messages: [], conversationId: null };
     }
 
-    const allConversations = convResponse?.conversations || [];
-    const conversations = allConversations.filter(c => c.contactId === contactId);
+    const conversations = convResponse?.conversations || [];
 
     if (conversations.length === 0) {
       return { messages: [], conversationId: null };
