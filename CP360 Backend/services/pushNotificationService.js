@@ -131,7 +131,15 @@ async function cleanupFailedTokens(responses, tokens) {
   responses.forEach((resp, idx) => {
     if (!resp.success) {
       console.error(`❌ FCM error for token ${tokens[idx].substring(0, 20)}...: ${resp.error?.code} - ${resp.error?.message}`);
-      failedTokens.push(tokens[idx]);
+      // Only delete tokens explicitly rejected as invalid — not credential/network errors
+      const invalidTokenCodes = [
+        'messaging/registration-token-not-registered',
+        'messaging/invalid-registration-token',
+        'messaging/invalid-argument',
+      ];
+      if (invalidTokenCodes.includes(resp.error?.code)) {
+        failedTokens.push(tokens[idx]);
+      }
     }
   });
 
