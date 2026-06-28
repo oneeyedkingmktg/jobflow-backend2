@@ -19,6 +19,7 @@ export default function LeadStatusBar({
   const [showContractModal, setShowContractModal] = React.useState(false);
   const [contractInput, setContractInput] = React.useState('');
   const [pendingInstallModal, setPendingInstallModal] = React.useState(false);
+  const [completedDate, setCompletedDate] = React.useState('');
 
   const currentStatus = form.status || "lead";
 
@@ -51,6 +52,7 @@ export default function LeadStatusBar({
 
     // 🔒 Intercept move to Complete
     if (status === "complete") {
+      setCompletedDate(new Date().toISOString().split('T')[0]);
       setShowCompleteModal(true);
       return;
     }
@@ -77,7 +79,8 @@ export default function LeadStatusBar({
     setForm((prev) => ({
       ...prev,
       status: "complete",
-      proceedWithAutomation: proceed
+      proceedWithAutomation: proceed,
+      date_completed: completedDate || new Date().toISOString().split('T')[0],
     }));
     setShowCompleteModal(false);
   };
@@ -207,24 +210,33 @@ export default function LeadStatusBar({
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Send Follow-Up?
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Job Complete
             </h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Do you want to send review and follow-up messages?
+            <div className="mb-4">
+              <label className="block text-sm text-gray-500 mb-1">Completion date</label>
+              <input
+                type="date"
+                value={completedDate}
+                onChange={(e) => setCompletedDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Send review and follow-up messages to this customer?
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleCompleteDecision(true)}
                 className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
               >
-                Yes
+                Yes, Send
               </button>
               <button
                 onClick={() => handleCompleteDecision(false)}
                 className="flex-1 py-2 rounded-xl bg-gray-200 text-gray-800 font-semibold text-sm hover:bg-gray-300"
               >
-                No
+                No Thanks
               </button>
             </div>
           </div>

@@ -172,6 +172,20 @@ const hasEstimate = form?.hasEstimate === true;
               : "Not Set"}
           </span>
         </div>
+
+        {(form.dateCompleted || form.date_completed) && (
+          <div>
+            <span className="text-gray-500 block">Install Completed</span>
+            <span className="font-semibold break-words">
+              {(() => {
+                const d = form.dateCompleted || form.date_completed;
+                const [y, m, day] = d.slice(0, 10).split("-");
+                return new Date(parseInt(y), parseInt(m) - 1, parseInt(day))
+                  .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              })()}
+            </span>
+          </div>
+        )}
       </div>
 
 {/* OUT OF AREA LARGE JOB SECTION */}

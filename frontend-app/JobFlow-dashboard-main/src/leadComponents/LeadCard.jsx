@@ -54,6 +54,13 @@ if (lead.status === "install_scheduled") {
   }
 }
 
+if (lead.status === "complete") {
+  const dc = lead.dateCompleted || lead.date_completed;
+  if (dc) {
+    statusText = `Completed  •  ${formatShortDate(dc)}`;
+  }
+}
+
 
   return (
     <div

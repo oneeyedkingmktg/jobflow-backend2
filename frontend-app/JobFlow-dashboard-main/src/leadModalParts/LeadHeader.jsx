@@ -7,6 +7,13 @@ function formatPauseDate(dateStr) {
   return `${parseInt(m)}-${parseInt(d)}-${y.slice(2)}`;
 }
 
+function formatCompletedDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.slice(0, 10).split("-");
+  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function LeadHeader({
   name,
   status,
@@ -18,6 +25,7 @@ export default function LeadHeader({
   isPaused,
   pauseUntil,
   proceedWithAutomation,
+  dateCompleted,
 }) {
   const bgColor = STATUS_COLORS[status] || "#59687d";
 
@@ -38,6 +46,12 @@ export default function LeadHeader({
         {isPaused && (
           <span className="flex items-center gap-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">
             ⏸ {pauseUntil ? `PAUSED Until ${formatPauseDate(pauseUntil)}` : "PAUSED"}
+          </span>
+        )}
+
+        {status === "complete" && dateCompleted && (
+          <span className="flex items-center gap-1 bg-black/30 text-white text-xs font-bold px-2 py-1 rounded-full">
+            Completed {formatCompletedDate(dateCompleted)}
           </span>
         )}
 

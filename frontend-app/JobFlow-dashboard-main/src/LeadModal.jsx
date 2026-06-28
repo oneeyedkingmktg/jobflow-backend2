@@ -219,6 +219,7 @@ const handlePauseSave = (pauseFields) => {
   isPaused={form.pauseStatus === "Paused"}
   pauseUntil={form.pauseUntil || null}
   proceedWithAutomation={form.proceedWithAutomation}
+  dateCompleted={form.dateCompleted || form.date_completed || null}
 />
 
 

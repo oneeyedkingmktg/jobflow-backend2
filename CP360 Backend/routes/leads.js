@@ -106,6 +106,7 @@ const toCamel = (row) => ({
   pauseNotes: row.pause_notes,
 
   proceedWithAutomation: row.proceed_with_automation,
+  dateCompleted: row.date_completed ? row.date_completed.toISOString().split('T')[0] : null,
 
   ghlContactId: row.ghl_contact_id,
   outOfAreaLargeJob: row.out_of_area_large_job === true,
@@ -696,6 +697,7 @@ const result = await pool.query(
     pause_notes = $30,
     proceed_with_automation = COALESCE($31, proceed_with_automation),
     has_left_review = COALESCE($32, has_left_review),
+    date_completed = COALESCE($33, date_completed),
     sold_at = CASE WHEN $17 = 'sold' AND sold_at IS NULL THEN CURRENT_TIMESTAMP ELSE sold_at END,
     appt_set_at = CASE WHEN $17 = 'appt_booked' AND appt_set_at IS NULL THEN CURRENT_TIMESTAMP ELSE appt_set_at END,
 
@@ -704,7 +706,7 @@ const result = await pool.query(
     install_calendar_event_id = install_calendar_event_id,
 
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $33
+  WHERE id = $34
   RETURNING *`,
 
       [
@@ -740,6 +742,7 @@ const result = await pool.query(
         clean(lead.pause_notes),
         lead.proceed_with_automation ?? null,
         lead.has_left_review ?? null,
+        lead.date_completed || null,
         id,
       ]
     );
