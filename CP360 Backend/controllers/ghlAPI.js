@@ -1734,14 +1734,21 @@ if (
             lead.last_synced_install_end_date
           );
 
-          if (changeType !== "none" && changeType !== "unchanged") {
-            const result = await syncLeadCalendarEvent(lead, company, changeType, "install", contactId);
+          // If dates are unchanged but no event ID is stored and it was previously synced,
+          // the GHL event was likely deleted — force a fresh create to recover it
+          const isReaddedInstall = (changeType === "unchanged" || changeType === "none")
+            && !lead.install_calendar_event_id
+            && !!lead.last_synced_install_date;
+          const effectiveChangeType = isReaddedInstall ? "create" : changeType;
+
+          if (effectiveChangeType !== "none" && effectiveChangeType !== "unchanged") {
+            const result = await syncLeadCalendarEvent(lead, company, effectiveChangeType, "install", contactId);
 
             if (result) {
               markCalendarSynced(lead, "install");
 
               if (result.action === "created") {
-                await applyStatusTags(contactId, "install_date_set", company);
+                await applyStatusTags(contactId, isReaddedInstall ? "install_date_readded" : "install_date_set", company);
                 if (lead.install_tentative) {
                   await applyStatusTags(contactId, "install_tentative", company);
                 }
@@ -1801,9 +1808,24 @@ if (
               install_tentative: lead.install_tentative,
             }
           );
-          // DO NOT clear install data from CP — CP is source of truth.
-          console.warn(`⚠️ [INSTALL SYNC FAIL] GHL rejected install event for lead ${lead.id} — keeping CP data intact, continuing sync (GHL error: ${calendarErr.message})`);
-          installConflict = { type: 'install', message: calendarErr.message };
+          console.warn(`⚠️ [INSTALL SYNC FAIL] GHL rejected install event for lead ${lead.id} — attempting fresh create (GHL error: ${calendarErr.message})`);
+          // Recovery: if the update failed because the GHL event no longer exists, try a fresh create
+          try {
+            const recovered = await syncLeadCalendarEvent(lead, company, "create", "install", contactId);
+            if (recovered?.calendarEventId) {
+              await db.query(
+                `UPDATE leads SET install_calendar_event_id = $1, last_synced_install_date = $2, last_synced_install_end_date = $3 WHERE id = $4`,
+                [recovered.calendarEventId, lead.install_date, lead.install_end_date || null, lead.id]
+              );
+              await applyStatusTags(contactId, "install_date_readded", company);
+              console.log(`[INSTALL RECOVERY] Successfully recreated install event for lead ${lead.id}`);
+            } else {
+              installConflict = { type: 'install', message: calendarErr.message };
+            }
+          } catch (recoveryErr) {
+            console.warn(`[INSTALL RECOVERY] Fallback create also failed: ${recoveryErr.message}`);
+            installConflict = { type: 'install', message: calendarErr.message };
+          }
         }
       } else if (lead.install_calendar_event_id) {
         try {
