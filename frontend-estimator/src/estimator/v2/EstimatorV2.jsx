@@ -260,7 +260,7 @@ export default function EstimatorV2() {
   const hoverOff = (e) => { e.currentTarget.style.borderColor = "#e5e7eb";   e.currentTarget.style.backgroundColor = "#ffffff"; };
 
   // ---- Step data ----
-  const anyGarage = [1,2,3,4].some(n => config[`allow_garage_${n}`] !== false);
+  const anyGarage = [2,3,4].some(n => config[`allow_garage_${n}`] !== false);
   const step1Types = [
     anyGarage                         && { key: "garage",      label: "Garage",          Icon: IconGarage },
     config.allow_basement !== false   && { key: "basement",    label: "Basement",        Icon: IconBasement },
@@ -542,7 +542,7 @@ export default function EstimatorV2() {
                       <button key={key} type="button"
                         onClick={() => { setProjectType(key); setLength(""); setWidth(""); setSquareFeet(""); setStep(3); }}
                         className="flex items-center justify-center rounded-2xl border-2 py-6 px-4 font-semibold text-base w-full transition-all duration-150"
-                        style={{ borderColor: "#e5e7eb", backgroundColor: "#ffffff", color: "#374151" }}
+                        style={{ borderColor: "#e5e7eb", backgroundColor: "#ffffff", color: "#374151", touchAction: "manipulation" }}
                         onMouseEnter={hoverOn} onMouseLeave={hoverOff}
                       >{label}</button>
                     ))}
@@ -771,7 +771,7 @@ export default function EstimatorV2() {
                       <button key={key} type="button"
                         onClick={() => { setProjectType2(key); setLength2(""); setWidth2(""); setSquareFeet2(""); setStep(9); }}
                         className="flex items-center justify-center rounded-2xl border-2 py-6 px-4 font-semibold text-base w-full transition-all duration-150"
-                        style={{ borderColor: "#e5e7eb", backgroundColor: "#ffffff", color: "#374151" }}
+                        style={{ borderColor: "#e5e7eb", backgroundColor: "#ffffff", color: "#374151", touchAction: "manipulation" }}
                         onMouseEnter={hoverOn} onMouseLeave={hoverOff}
                       >{label}</button>
                     ))}
