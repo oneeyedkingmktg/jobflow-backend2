@@ -20,6 +20,7 @@ export default function LeadStatusBar({
   const [contractInput, setContractInput] = React.useState('');
   const [pendingInstallModal, setPendingInstallModal] = React.useState(false);
   const [completedDate, setCompletedDate] = React.useState('');
+  const [sendFollowUp, setSendFollowUp] = React.useState(true);
 
   const currentStatus = form.status || "lead";
 
@@ -53,6 +54,7 @@ export default function LeadStatusBar({
     // 🔒 Intercept move to Complete
     if (status === "complete") {
       setCompletedDate(new Date().toISOString().split('T')[0]);
+      setSendFollowUp(true);
       setShowCompleteModal(true);
       return;
     }
@@ -75,11 +77,11 @@ export default function LeadStatusBar({
     setPauseBlockAction(null);
   };
 
-  const handleCompleteDecision = (proceed) => {
+  const handleCompleteDecision = () => {
     setForm((prev) => ({
       ...prev,
       status: "complete",
-      proceedWithAutomation: proceed,
+      proceedWithAutomation: sendFollowUp,
       date_completed: completedDate || new Date().toISOString().split('T')[0],
     }));
     setShowCompleteModal(false);
@@ -222,21 +224,28 @@ export default function LeadStatusBar({
                 className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Send review and follow-up messages to this customer?
-            </p>
+            <div className="flex items-center justify-between py-3 border-t border-b border-gray-100 mb-4">
+              <span className="text-sm text-gray-700 font-medium">Send review &amp; follow-up messages</span>
+              <button
+                type="button"
+                onClick={() => setSendFollowUp((v) => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${sendFollowUp ? 'bg-green-500' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${sendFollowUp ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
             <div className="flex gap-3">
               <button
-                onClick={() => handleCompleteDecision(true)}
+                onClick={handleCompleteDecision}
                 className="flex-1 py-2 rounded-xl bg-green-600 text-white font-semibold text-sm hover:bg-green-700"
               >
-                Yes, Send
+                Save
               </button>
               <button
-                onClick={() => handleCompleteDecision(false)}
+                onClick={() => setShowCompleteModal(false)}
                 className="flex-1 py-2 rounded-xl bg-gray-200 text-gray-800 font-semibold text-sm hover:bg-gray-300"
               >
-                No Thanks
+                Exit
               </button>
             </div>
           </div>
