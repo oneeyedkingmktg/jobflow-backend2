@@ -377,8 +377,8 @@ export default function LeadStatusBar({
               className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
               style={{ backgroundColor: "#f59e0b" }}
             >
-              <span className="text-[10px] uppercase opacity-80">save to apply tag</span>
-              <span className="text-sm font-semibold">Mark Has Left Review</span>
+              <span className="text-[10px] uppercase opacity-80">Click here if</span>
+              <span className="text-sm font-semibold">Customer Left a Review</span>
             </button>
           )
         ) : (
