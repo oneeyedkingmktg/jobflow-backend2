@@ -32,7 +32,7 @@ async function syncLeadToGhl({
   if (!lead || !company) return;
 
   try {
-    await withTimeout(
+    return await withTimeout(
       syncLeadToGHL(lead, company, previousInstallTentative),
       GHL_SYNC_TIMEOUT_MS
     );

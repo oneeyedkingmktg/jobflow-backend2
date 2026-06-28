@@ -777,23 +777,24 @@ let ghlSynced = false;
     let calendarConflict = null;
     if (company.ghl_api_key) {
       try {
-await syncLeadToGhl({
-  lead: updatedLead,
-  previousLead,
-  company,
-  previousInstallTentative,
-});
+        const syncResult = await syncLeadToGhl({
+          lead: updatedLead,
+          previousLead,
+          company,
+          previousInstallTentative,
+        });
         ghlSynced = true;
-      } catch (syncError) {
-        console.log('GHL sync failed for updated lead:', syncError.message);
-        if (syncError.calendarConflict) {
+        if (syncResult?.calendarConflicts?.length > 0) {
+          const conflict = syncResult.calendarConflicts[0];
           calendarConflict = {
-            type: syncError.calendarType,
-            message: syncError.calendarType === 'install'
+            type: conflict.type,
+            message: conflict.type === 'install'
               ? 'Install date saved in CP but could not sync to GHL calendar. Check GHL calendar availability.'
               : 'Appointment saved in CP but could not sync to GHL calendar. Check GHL calendar availability.',
           };
         }
+      } catch (syncError) {
+        console.log('GHL sync failed for updated lead:', syncError.message);
       }
 
       // Always re-fetch so response reflects current appointment_calendar_event_id

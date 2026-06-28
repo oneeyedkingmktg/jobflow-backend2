@@ -1483,6 +1483,9 @@ module.exports = {
     }
 
     try {
+      let appointmentConflict = null;
+      let installConflict = null;
+
       // ==========================================
       // 1️⃣ FETCH LEAD WITH ESTIMATOR DATA
       // ==========================================
@@ -1668,13 +1671,8 @@ if (
             }
           );
           // DO NOT clear appointment data from CP — CP is source of truth.
-          // GHL "slot not available" often means the event was already created
-          // on a prior attempt but the event ID was never saved back. Preserve
-          // the date/time so the user can see and manage it.
-          console.warn(`⚠️ [APPT SYNC FAIL] GHL rejected appointment for lead ${lead.id} — keeping CP data intact (GHL error: ${calendarErr.message})`);
-          calendarErr.calendarConflict = true;
-          calendarErr.calendarType = 'appointment';
-          throw calendarErr;
+          console.warn(`⚠️ [APPT SYNC FAIL] GHL rejected appointment for lead ${lead.id} — keeping CP data intact, continuing sync (GHL error: ${calendarErr.message})`);
+          appointmentConflict = { type: 'appointment', message: calendarErr.message };
         }
       } else if (lead.appointment_calendar_event_id || lead.last_synced_appointment_date) {
         // Appointment was removed in JF — delete the GHL event
@@ -1803,19 +1801,9 @@ if (
               install_tentative: lead.install_tentative,
             }
           );
-          console.warn(`⚠️ [INSTALL SYNC FAIL] Clearing install_date from lead ${lead.id} (GHL error: ${calendarErr.message})`);
-          await db.query(
-            `UPDATE leads
-             SET install_date = NULL,
-                 install_calendar_event_id = NULL,
-                 last_synced_install_date = NULL,
-                 last_synced_install_end_date = NULL
-             WHERE id = $1`,
-            [lead.id]
-          );
-          calendarErr.calendarConflict = true;
-          calendarErr.calendarType = 'install';
-          throw calendarErr;
+          // DO NOT clear install data from CP — CP is source of truth.
+          console.warn(`⚠️ [INSTALL SYNC FAIL] GHL rejected install event for lead ${lead.id} — keeping CP data intact, continuing sync (GHL error: ${calendarErr.message})`);
+          installConflict = { type: 'install', message: calendarErr.message };
         }
       } else if (lead.install_calendar_event_id) {
         try {
@@ -1842,7 +1830,7 @@ if (
         [lead.id]
       );
 
-      return contact;
+      return { contact, calendarConflicts: [appointmentConflict, installConflict].filter(Boolean) };
     } catch (err) {
       console.error("❌ [SYNC ERROR]", err.message);
 
