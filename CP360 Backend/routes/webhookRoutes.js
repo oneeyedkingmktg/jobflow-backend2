@@ -175,6 +175,22 @@ router.post('/estimate', async (req, res) => {
     const company = companyResult.rows[0];
     const companyId = company.id;
 
+    // ── Service area zip check — first gate before any processing ────────────
+    if (zip && Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
+      const isOutsideArea = !company.service_area_zips.map(String).includes(zip.trim());
+      if (isOutsideArea) {
+        console.log('📐 estimate webhook: zip', zip, 'outside service area — tagging and stopping');
+        if (company.ghl_api_key && ghlContactId) {
+          try {
+            await applyStatusTags(ghlContactId, 'Outside Service Area', company);
+          } catch (e) {
+            console.error('📐 estimate webhook: outside-area tag error:', e.message);
+          }
+        }
+        return res.json({ status: 'outside_service_area', message: 'Outside service area' });
+      }
+    }
+
     // ── Load estimator config + pricing ───────────────────────────────────────
     const configResult = await query('SELECT * FROM estimator_configs WHERE company_id = $1 LIMIT 1', [companyId]);
     if (configResult.rows.length === 0) {
@@ -206,24 +222,6 @@ router.post('/estimate', async (req, res) => {
 
     const estimate = calculateEstimate(config, engineInput, pricingByFinish);
     console.log('📐 estimate webhook calculated:', estimate);
-
-    // ── Service area zip check (mirrors iframe logic) ─────────────────────────
-    if (zip && Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
-      const isOutsideArea = !company.service_area_zips.map(String).includes(zip.trim());
-      if (isOutsideArea) {
-        if (!config.out_of_area_enabled) {
-          console.log('📐 estimate webhook: zip', zip, 'outside service area — manual_review_required');
-          return res.json({ status: 'manual_review_required', message: 'Manual review required' });
-        }
-        const threshold = Number(config.out_of_area_large_job_threshold) || 0;
-        const flakeMin = estimate.allPriceRanges?.flake?.min || estimate.displayPriceMin || 0;
-        if (threshold > 0 && flakeMin < threshold) {
-          console.log('📐 estimate webhook: zip', zip, 'outside area, below threshold — manual_review_required');
-          return res.json({ status: 'manual_review_required', message: 'Manual review required' });
-        }
-        console.log('📐 estimate webhook: zip', zip, 'outside area but large job — proceeding');
-      }
-    }
 
     // ── Find or create CP lead ────────────────────────────────────────────────
     let cpLead = null;
