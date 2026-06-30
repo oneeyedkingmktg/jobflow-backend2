@@ -143,8 +143,11 @@ router.post('/estimate', async (req, res) => {
     const state = payload.state;
     const zip = payload.zip || payload.postal_code || payload.postalCode;
     const leadSource = payload.lead_source || 'facebook';
+    const utmSource = payload.utm_source || payload.utmSource || null;
+    const utmMedium = payload.utm_medium || payload.utmMedium || null;
+    const referralSource = payload.referral_source || payload.referralSource || null;
 
-    console.log('📐 estimate webhook:', { locationId, floor_type, garage_size, condition, square_feet, ghlContactId, phone, email });
+    console.log('📐 estimate webhook:', { locationId, floor_type, garage_size, condition, square_feet, ghlContactId, phone, email, utmSource, utmMedium, referralSource });
 
     // ── Validate required fields ──────────────────────────────────────────────
     const isGarage = floor_type === 'garage';
@@ -262,13 +265,15 @@ router.post('/estimate', async (req, res) => {
         `INSERT INTO leads (
           company_id, name, full_name, first_name, last_name,
           phone, email, address, city, state, zip,
-          lead_source, status, ghl_contact_id, project_type, proceed_with_automation
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          lead_source, referral_source, utm_source, utm_medium,
+          status, ghl_contact_id, project_type, proceed_with_automation
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
         [
           companyId, full, full, first, last,
           phone || null, email || null,
           address || null, city || null, state || null, zip || null,
-          leadSource, 'status_pre_lead', ghlContactId || null, projectType, true,
+          leadSource, referralSource, utmSource, utmMedium,
+          'status_pre_lead', ghlContactId || null, projectType, true,
         ]
       );
       cpLead = ins.rows[0];
@@ -279,6 +284,18 @@ router.post('/estimate', async (req, res) => {
       if (!cpLead.ghl_contact_id && ghlContactId) {
         await pool.query(`UPDATE leads SET ghl_contact_id = $1 WHERE id = $2`, [ghlContactId, cpLead.id]);
         cpLead.ghl_contact_id = ghlContactId;
+      }
+      // Write-once: only fill in source fields if currently blank
+      const sourceUpdates = [];
+      const sourceValues = [];
+      let p = 1;
+      if (!cpLead.lead_source && leadSource) { sourceUpdates.push(`lead_source = $${p++}`); sourceValues.push(leadSource); }
+      if (!cpLead.referral_source && referralSource) { sourceUpdates.push(`referral_source = $${p++}`); sourceValues.push(referralSource); }
+      if (!cpLead.utm_source && utmSource) { sourceUpdates.push(`utm_source = $${p++}`); sourceValues.push(utmSource); }
+      if (!cpLead.utm_medium && utmMedium) { sourceUpdates.push(`utm_medium = $${p++}`); sourceValues.push(utmMedium); }
+      if (sourceUpdates.length) {
+        sourceValues.push(cpLead.id);
+        await pool.query(`UPDATE leads SET ${sourceUpdates.join(', ')} WHERE id = $${p}`, sourceValues);
       }
       console.log('📐 estimate webhook: found existing CP lead', cpLead.id);
     }
