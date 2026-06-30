@@ -342,11 +342,19 @@ router.post('/estimate', async (req, res) => {
         const fmtRange = (r) => r ? (r.min === r.max ? `$${r.min.toLocaleString()}` : `$${r.min.toLocaleString()} – $${r.max.toLocaleString()}`) : '';
         const conditionLabel = condition === 'minor' ? 'A Few Cracks' : condition === 'major' ? 'A Lot of Cracks' : 'Good';
 
+        const projectTypeLabels = {
+          garage_1: '1 Car Garage', garage_2: '2 Car Garage',
+          garage_3: '3 Car Garage', garage_4: '4 Car Garage',
+          patio: 'Patio', basement: 'Basement', commercial: 'Commercial',
+        };
+        const projectTypeLabel = projectTypeLabels[projectType]
+          || (projectType === 'custom' && company.estimator_custom_project_label ? company.estimator_custom_project_label : projectType);
+
         let fields;
         if (estimateCount === 0) {
           // EST1 fields — same keys as iframe first estimate
           fields = {
-            est_project_type: projectType,
+            est_project_type: projectTypeLabel,
             est_square_footage: estimate.calculatedSf ? `${Number(estimate.calculatedSf).toLocaleString()} sq ft` : '',
             est_floor_condition: conditionLabel,
             est_solid_price_range: fmtRange(ranges.solid),
