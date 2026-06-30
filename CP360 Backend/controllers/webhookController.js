@@ -84,17 +84,21 @@ const webhookController = {
         city: webhookData.city || null,
         state: webhookData.state || null,
         zip: webhookData.postal_code || webhookData.postalCode || null,
-        lead_source: webhookData.contactSource || webhookData.source || webhookData.contact?.source || null,
-
-        project_type: webhookData['EST Project Type'] || null,
+        lead_source: webhookData.customField?.find(f => f.id === 'jf_lead_source')?.value ||
+                    webhookData.customFields?.find(f => f.id === 'jf_lead_source')?.value ||
+                    webhookData.contactSource || webhookData.source || webhookData.contact?.source || null,
+        referral_source: webhookData.customField?.find(f => f.id === 'jf_referral_source')?.value ||
+                         webhookData.customFields?.find(f => f.id === 'jf_referral_source')?.value || null,
+        utm_source: webhookData.utm_source || webhookData.utmSource ||
+                    webhookData.customField?.find(f => f.id === 'utm_source')?.value ||
+                    webhookData.customFields?.find(f => f.id === 'utm_source')?.value || null,
+        utm_medium: webhookData.utm_medium || webhookData.utmMedium ||
+                    webhookData.customField?.find(f => f.id === 'utm_medium')?.value ||
+                    webhookData.customFields?.find(f => f.id === 'utm_medium')?.value || null,
         project_type: webhookData['EST Project Type'] || null,
         // DEBUG: Log custom fields structure
         _debug_custom_fields: webhookData.customField || webhookData.customFields || 'none',
-        notes: webhookData['JF Notes'] || 
-               webhookData.customField?.find(f => f.id === 'jf_notes')?.value ||
-               webhookData.customFields?.find(f => f.id === 'jf_notes')?.value ||
-               null,
-        notes: webhookData['JF Notes'] || 
+        notes: webhookData['JF Notes'] ||
                webhookData.customField?.find(f => f.id === 'jf_notes')?.value ||
                webhookData.customFields?.find(f => f.id === 'jf_notes')?.value ||
                null,
@@ -203,6 +207,8 @@ const now = new Date();
           state: contactData.state,
           zip: contactData.zip,
           project_type: contactData.project_type,
+          utm_source: contactData.utm_source,
+          utm_medium: contactData.utm_medium,
           // Only update notes if GHL actually sent a value — never overwrite JF-authored notes with null
           ...(contactData.notes ? { notes: contactData.notes } : {}),
           sync_source: 'GHL',
@@ -221,6 +227,14 @@ const now = new Date();
           console.log('✍️ Setting lead_source (was empty):', contactData.lead_source);
         } else if (existingLead.lead_source) {
           console.log('🔒 Skipping lead_source (already set):', existingLead.lead_source);
+        }
+
+        // WRITE-ONCE RULE: Only update referral_source if it's currently empty
+        if (!existingLead.referral_source && contactData.referral_source) {
+          fieldsToUpdate.referral_source = contactData.referral_source;
+          console.log('✍️ Setting referral_source (was empty):', contactData.referral_source);
+        } else if (existingLead.referral_source) {
+          console.log('🔒 Skipping referral_source (already set):', existingLead.referral_source);
         }
         
         // Build SQL UPDATE statement
