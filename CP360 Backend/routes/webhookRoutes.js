@@ -182,7 +182,7 @@ router.post('/estimate', async (req, res) => {
         console.log('📐 estimate webhook: zip', zip, 'outside service area — tagging and stopping');
         if (company.ghl_api_key && ghlContactId) {
           try {
-            await applyStatusTags(ghlContactId, 'Outside Service Area', company);
+            await applyStatusTags(ghlContactId, 'outside service area', company);
           } catch (e) {
             console.error('📐 estimate webhook: outside-area tag error:', e.message);
           }
