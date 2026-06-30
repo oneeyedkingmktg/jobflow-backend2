@@ -175,11 +175,11 @@ router.post('/estimate', async (req, res) => {
     const company = companyResult.rows[0];
     const companyId = company.id;
 
-    // ── Service area zip check — first gate before any processing ────────────
-    if (zip && Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
-      const isOutsideArea = !company.service_area_zips.map(String).includes(zip.trim());
-      if (isOutsideArea) {
-        console.log('📐 estimate webhook: zip', zip, 'outside service area — tagging and stopping');
+    // ── Service area zip check — only continue if zip explicitly appears in list
+    if (Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
+      const isInServiceArea = zip && company.service_area_zips.map(String).includes(zip.trim());
+      if (!isInServiceArea) {
+        console.log('📐 estimate webhook: zip', zip || '(none)', 'not in service area — tagging and stopping');
         if (company.ghl_api_key && ghlContactId) {
           try {
             await applyStatusTags(ghlContactId, 'outside service area', company);
