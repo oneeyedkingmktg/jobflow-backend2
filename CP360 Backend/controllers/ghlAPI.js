@@ -737,6 +737,8 @@ const FIELD_IDS = {
     utm_source: "utm_source",
     utm_medium: "utm_medium",
     utm_campaign: "utm_campaign",
+    utm_audience: "utm_audience",
+    utm_creative: "utm_creative",
 
     pause_status: "pause_status",
     pause_until: "pause_until",
@@ -828,6 +830,8 @@ customFields.push({ id: FIELD_IDS.install_date, field_value: formatDateMMDDYYYY(
 pushField("utm_source", lead.utm_source);
   pushField("utm_medium", lead.utm_medium);
   pushField("utm_campaign", lead.utm_campaign);
+  pushField("utm_audience", lead.utm_audience);
+  pushField("utm_creative", lead.utm_creative);
 
   pushField("pause_status", lead.pause_status);
   pushField("pause_until", lead.pause_until);

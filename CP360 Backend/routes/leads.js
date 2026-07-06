@@ -79,6 +79,8 @@ const toCamel = (row) => ({
   utmSource: row.utm_source || null,
   utmMedium: row.utm_medium || null,
   utmCampaign: row.utm_campaign || null,
+  utmAudience: row.utm_audience || null,
+  utmCreative: row.utm_creative || null,
 
   status: row.status,
   notSoldReason: row.not_sold_reason,
@@ -477,6 +479,8 @@ const insertValues = [
       lead.utm_source || null,
       lead.utm_medium || null,
       lead.utm_campaign || null,
+      lead.utm_audience || null,
+      lead.utm_creative || null,
       lead.proceed_with_automation ?? true,
       lead.out_of_area_large_job || false,
     ];
@@ -494,12 +498,12 @@ const insertValues = [
         status, not_sold_reason, notes, contract_price,
         appointment_date, appointment_time,
         install_date, install_tentative,
-        utm_source, utm_medium, utm_campaign,
+        utm_source, utm_medium, utm_campaign, utm_audience, utm_creative,
         proceed_with_automation, out_of_area_large_job
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
         $14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,
-        $27,$28,$29,$30,$31
+        $27,$28,$29,$30,$31,$32,$33
       )
       RETURNING *`,
       insertValues

@@ -15,6 +15,8 @@ const companyId = params.get("company");
 let utmSource = params.get("utm_source") || null;
 let utmMedium = params.get("utm_medium") || null;
 let utmCampaign = params.get("utm_campaign") || null;
+let utmAudience = params.get("utm_audience") || null;
+let utmCreative = params.get("utm_creative") || null;
 
 // ============================================================================
 // Modal shown when a returning customer already has 2 estimates on file
@@ -658,6 +660,8 @@ const leadData = {
   utm_source: utmSource,
   utm_medium: utmMedium,
   utm_campaign: utmCampaign,
+  utm_audience: utmAudience,
+  utm_creative: utmCreative,
   out_of_area_large_job: outOfAreaLargeJob,
   // 🆕 ADD ESTIMATE DATA
   estimate: {

@@ -95,6 +95,12 @@ const webhookController = {
         utm_medium: webhookData.utm_medium || webhookData.utmMedium ||
                     webhookData.customField?.find(f => f.id === 'utm_medium')?.value ||
                     webhookData.customFields?.find(f => f.id === 'utm_medium')?.value || null,
+        utm_audience: webhookData.utm_audience || webhookData.utmAudience ||
+                      webhookData.customField?.find(f => f.id === 'utm_audience')?.value ||
+                      webhookData.customFields?.find(f => f.id === 'utm_audience')?.value || null,
+        utm_creative: webhookData.utm_creative || webhookData.utmCreative ||
+                      webhookData.customField?.find(f => f.id === 'utm_creative')?.value ||
+                      webhookData.customFields?.find(f => f.id === 'utm_creative')?.value || null,
         project_type: webhookData['EST Project Type'] || null,
         // DEBUG: Log custom fields structure
         _debug_custom_fields: webhookData.customField || webhookData.customFields || 'none',
@@ -209,6 +215,8 @@ const now = new Date();
           project_type: contactData.project_type,
           ...(contactData.utm_source ? { utm_source: contactData.utm_source } : {}),
           ...(contactData.utm_medium ? { utm_medium: contactData.utm_medium } : {}),
+          ...(contactData.utm_audience ? { utm_audience: contactData.utm_audience } : {}),
+          ...(contactData.utm_creative ? { utm_creative: contactData.utm_creative } : {}),
           // Only update notes if GHL actually sent a value — never overwrite JF-authored notes with null
           ...(contactData.notes ? { notes: contactData.notes } : {}),
           sync_source: 'GHL',
@@ -262,8 +270,9 @@ const now = new Date();
           `INSERT INTO leads (
             company_id, ghl_contact_id, name, phone, email,
             address, city, state, zip, referral_source, lead_source, project_type,
-            notes, status, sync_source, ghl_last_synced, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            notes, status, sync_source, ghl_last_synced, created_at,
+            utm_audience, utm_creative
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
           RETURNING *`,
           [
             company.id,
@@ -278,11 +287,13 @@ const now = new Date();
             contactData.referral_source,
             contactData.lead_source,
             contactData.project_type,
-contactData.notes,
-            status, // Use mapped status from GHL tags
-            'GHL', // sync_source
+            contactData.notes,
+            status,
+            'GHL',
             now,
-            now
+            now,
+            contactData.utm_audience,
+            contactData.utm_creative,
           ]
         );
         

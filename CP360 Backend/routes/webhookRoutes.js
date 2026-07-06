@@ -145,6 +145,8 @@ router.post('/estimate', async (req, res) => {
     const leadSource = payload.lead_source || 'facebook';
     const utmSource = payload.utm_source || payload.utmSource || null;
     const utmMedium = payload.utm_medium || payload.utmMedium || null;
+    const utmAudience = payload.utm_audience || payload.utmAudience || null;
+    const utmCreative = payload.utm_creative || payload.utmCreative || null;
     const referralSource = payload.referral_source || payload.referralSource || null;
 
     console.log('📐 estimate webhook:', { locationId, floor_type, garage_size, condition, square_feet, ghlContactId, phone, email, utmSource, utmMedium, referralSource });
@@ -263,14 +265,14 @@ router.post('/estimate', async (req, res) => {
         `INSERT INTO leads (
           company_id, name, full_name, first_name, last_name,
           phone, email, address, city, state, zip,
-          lead_source, referral_source, utm_source, utm_medium,
+          lead_source, referral_source, utm_source, utm_medium, utm_audience, utm_creative,
           status, ghl_contact_id, project_type, proceed_with_automation
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
         [
           companyId, full, full, first, last,
           phone || null, email || null,
           address || null, city || null, state || null, zip || null,
-          leadSource, referralSource, utmSource, utmMedium,
+          leadSource, referralSource, utmSource, utmMedium, utmAudience || null, utmCreative || null,
           'status_pre_lead', ghlContactId || null, projectType, true,
         ]
       );
@@ -291,6 +293,8 @@ router.post('/estimate', async (req, res) => {
       if (!cpLead.referral_source && referralSource) { sourceUpdates.push(`referral_source = $${p++}`); sourceValues.push(referralSource); }
       if (!cpLead.utm_source && utmSource) { sourceUpdates.push(`utm_source = $${p++}`); sourceValues.push(utmSource); }
       if (!cpLead.utm_medium && utmMedium) { sourceUpdates.push(`utm_medium = $${p++}`); sourceValues.push(utmMedium); }
+      if (!cpLead.utm_audience && utmAudience) { sourceUpdates.push(`utm_audience = $${p++}`); sourceValues.push(utmAudience); }
+      if (!cpLead.utm_creative && utmCreative) { sourceUpdates.push(`utm_creative = $${p++}`); sourceValues.push(utmCreative); }
       if (sourceUpdates.length) {
         sourceValues.push(cpLead.id);
         await pool.query(`UPDATE leads SET ${sourceUpdates.join(', ')} WHERE id = $${p}`, sourceValues);
