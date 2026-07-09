@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const { id: userId, role, company_id } = req.user;
 
     let query = `
-      SELECT bt.*, u.first_name || ' ' || u.last_name AS user_name
+      SELECT bt.*, u.name AS user_name
       FROM blocked_times bt
       LEFT JOIN users u ON u.id = bt.user_id
       WHERE bt.company_id = $1
