@@ -161,6 +161,7 @@ export default function LeadsHome() {
   const [showPhoneLookup, setShowPhoneLookup] = useState(false);
   const [serviceCalls, setServiceCalls] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [blockedTimes, setBlockedTimes] = useState([]);
 
   // --------------------------------------------------
   // Load leads
@@ -200,6 +201,32 @@ const loadLeads = async () => {
       .catch(() => {});
   };
 
+  const loadBlockedTimes = () => {
+    apiRequest('/api/blocked-times')
+      .then((data) => setBlockedTimes(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+
+  const handleBlockSave = async (data, id) => {
+    if (id) {
+      await apiRequest(`/api/blocked-times/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    } else {
+      await apiRequest('/api/blocked-times', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    }
+    loadBlockedTimes();
+  };
+
+  const handleBlockDelete = async (id) => {
+    await apiRequest(`/api/blocked-times/${id}`, { method: 'DELETE' });
+    loadBlockedTimes();
+  };
+
   // Keep a ref so the event listener always calls the latest version
   const refreshServiceCallsRef = useRef(refreshServiceCalls);
   refreshServiceCallsRef.current = refreshServiceCalls;
@@ -217,6 +244,7 @@ const loadLeads = async () => {
     loadLeads();
     refreshServiceCalls();
     loadHolidays();
+    loadBlockedTimes();
   }, [currentCompany?.id]);
 
   // Open a specific lead when navigating from Messages → Go to Lead
@@ -381,6 +409,10 @@ onAddLead={() => {
         setSelectedLead(lead);
         setIsNewLead(false);
       }}
+      blockedTimes={blockedTimes}
+      currentUser={user}
+      onBlockSave={handleBlockSave}
+      onBlockDelete={handleBlockDelete}
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>

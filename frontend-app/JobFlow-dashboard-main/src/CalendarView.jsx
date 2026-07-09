@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
+import BlockTimeModal from "./BlockTimeModal.jsx";
 
 const GAP_PX = 8; // gap-x-2 = 0.5rem = 8px
 const COLS = 7;
@@ -21,9 +22,10 @@ function barWidthCalc(colSpan) {
   return `calc(${colSpan} * (100% - ${TOTAL_GAP_PX}px) / ${COLS} + ${Math.max(colSpan - 1, 0)} * ${GAP_PX}px)`;
 }
 
-export default function CalendarView({ leads, serviceCalls = [], holidays = [], onSelectLead }) {
+export default function CalendarView({ leads, serviceCalls = [], holidays = [], onSelectLead, blockedTimes = [], currentUser, onBlockSave, onBlockDelete }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
+  const [blockModal, setBlockModal] = useState({ open: false, date: null, block: null });
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -119,6 +121,16 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     });
     return map;
   }, [leads, serviceCalls]);
+
+  const blocksByDate = useMemo(() => {
+    const map = {};
+    blockedTimes.forEach((b) => {
+      const key = String(b.date).split("T")[0];
+      if (!map[key]) map[key] = [];
+      map[key].push(b);
+    });
+    return map;
+  }, [blockedTimes]);
 
   // Group monthDays into weeks (arrays of 7, nulls for padding)
   const weeks = useMemo(() => {
@@ -363,6 +375,15 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                         ))}
                       </div>
                     )}
+                    {(blocksByDate[key] || []).length > 0 && (
+                      <div className="flex flex-col gap-0.5 w-full mt-0.5">
+                        {(blocksByDate[key] || []).map((blk, i) => (
+                          <div key={`blk-${i}`} className="w-full h-6 bg-slate-400 rounded-sm overflow-hidden flex items-center px-1">
+                            <span className="text-white text-xs font-semibold truncate leading-none">🔒 {blk.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -511,7 +532,8 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
   // ========= Day View =========
   const DayView = () => {
     const data = groupedByDate[selectedDate] || { appt: [], install: [], sc: [] };
-    const hasAny = data.appt.length + data.install.length + data.sc.length > 0;
+    const dayBlocks = blocksByDate[selectedDate] || [];
+    const hasAny = data.appt.length + data.install.length + data.sc.length + dayBlocks.length > 0;
 
     // Deduplicate installs (same lead may appear multiple times if multi-day)
     const uniqueInstalls = [];
@@ -532,14 +554,50 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
           >
             ← Back
           </button>
-          <div className="text-lg font-semibold">
+          <div className="text-lg font-semibold flex-1">
             {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </div>
+          <button
+            onClick={() => setBlockModal({ open: true, date: selectedDate, block: null })}
+            className="px-3 py-1 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 whitespace-nowrap"
+          >
+            + Block Time
+          </button>
         </div>
 
         {!hasAny && <p className="text-gray-500 italic">No events for this day.</p>}
 
         <div className="space-y-3">
+          {dayBlocks.map((blk, i) => {
+            const appliesToLabel =
+              blk.applies_to === "appointment" ? "Appointment Calendar"
+              : blk.applies_to === "install" ? "Install Calendar"
+              : "All Calendars";
+            return (
+              <div
+                key={`blk-${i}`}
+                onClick={() => setBlockModal({ open: true, date: selectedDate, block: blk })}
+                className="border rounded-md hover:bg-gray-50 cursor-pointer overflow-hidden"
+              >
+                <div className="bg-slate-500 text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md gap-1">
+                  🔒 Blocked — {appliesToLabel}
+                </div>
+                <div className="px-3 pb-3 pt-2 text-sm">
+                  <span className="font-semibold">{blk.name}</span>
+                  {currentUser?.role !== "user" && blk.user_name && (
+                    <div className="text-xs text-gray-500 mt-0.5">{blk.user_name}</div>
+                  )}
+                  {blk.all_day && <div className="text-xs text-gray-400 mt-0.5">All day</div>}
+                  {!blk.all_day && blk.start_time && (
+                    <div className="text-xs text-gray-600 mt-0.5">
+                      {formatTime12h(blk.start_time)}{blk.end_time ? ` – ${formatTime12h(blk.end_time)}` : ""}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
           {[...uniqueInstalls, ...data.appt].map((lead, i) => {
             const isInstall = uniqueInstalls.includes(lead);
             const isAppt = !isInstall;
@@ -609,7 +667,17 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     );
   };
 
-  if (viewMode === "day") return <DayView />;
-  if (viewMode === "list") return <ListView />;
-  return <MonthView />;
+  return (
+    <>
+      {viewMode === "day" ? <DayView /> : viewMode === "list" ? <ListView /> : <MonthView />}
+      <BlockTimeModal
+        isOpen={blockModal.open}
+        onClose={() => setBlockModal({ open: false, date: null, block: null })}
+        onSave={async (data, id) => { await onBlockSave(data, id); }}
+        onDelete={async (id) => { await onBlockDelete(id); }}
+        initialDate={blockModal.date}
+        initialBlock={blockModal.block}
+      />
+    </>
+  );
 }

@@ -58,6 +58,7 @@ const bidderRoutes = require("./routes/bidder");
 const serviceCallsRoutes = require("./routes/serviceCalls");
 const reportsRoutes = require("./routes/reports");
 const holidaysRoutes = require("./routes/holidays");
+const blockedTimesRoutes = require("./routes/blockedTimes");
 
 
 
@@ -106,6 +107,7 @@ app.use("/api/bidder", bidderRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
 app.use("/api/reports", authenticateToken, reportsRoutes);
 app.use("/api/holidays", holidaysRoutes);
+app.use("/api/blocked-times", blockedTimesRoutes);
 
 
 
@@ -250,6 +252,20 @@ async function runMigrations() {
     // estimator_leads — add 'custom' to selected_quality check constraint
     `ALTER TABLE estimator_leads DROP CONSTRAINT IF EXISTS estimator_leads_selected_quality_check`,
     `ALTER TABLE estimator_leads ADD CONSTRAINT estimator_leads_selected_quality_check CHECK (selected_quality IN ('solid', 'flake', 'metallic', 'custom'))`,
+    // blocked_times — per-user calendar blocks
+    `CREATE TABLE IF NOT EXISTS blocked_times (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id),
+      user_id INTEGER REFERENCES users(id),
+      name TEXT NOT NULL,
+      applies_to VARCHAR(20) NOT NULL CHECK (applies_to IN ('appointment', 'install', 'both')),
+      date DATE NOT NULL,
+      all_day BOOLEAN DEFAULT false,
+      start_time TIME,
+      end_time TIME,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS blocked_times_company_date_idx ON blocked_times (company_id, date)`,
   ];
   for (const sql of migrations) {
     try {
