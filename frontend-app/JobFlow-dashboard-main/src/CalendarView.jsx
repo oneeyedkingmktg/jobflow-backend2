@@ -636,6 +636,11 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                     <strong>Time:</strong> {formatTime12h(lead.appointmentTime)}
                   </div>
                 )}
+                {lead.driveTimeMinutes != null && (
+                  <div className="text-xs text-gray-500 px-3 pb-3">
+                    Approx {lead.driveTimeMinutes} min away
+                  </div>
+                )}
               </div>
             );
           })}

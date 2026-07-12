@@ -10,6 +10,7 @@ const { authenticateToken } = require("../middleware/auth");
 const { syncLeadToGhl } = require("../sync/dbToGhlSync");
 const { deleteGhlContact, applyStatusTags, removeStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
 const { sendPushToCompany } = require("../services/pushNotificationService");
+const { getDriveTime } = require("../services/distanceService");
 
 function formatProjectTypeForPush(type) {
   if (!type) return 'Unknown';
@@ -1130,6 +1131,42 @@ router.put("/:id/accept-out-of-area", async (req, res) => {
   } catch (error) {
     console.error("❌ Accept out-of-area error:", error);
     res.status(500).json({ error: "Failed to accept out-of-area lead." });
+  }
+});
+
+// GET /leads/:id/drive-time — calculate drive time from company address to lead zip
+router.get("/:id/drive-time", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const leadResult = await pool.query(
+      `SELECT l.*, c.address AS c_address, c.city AS c_city, c.state AS c_state, c.zip AS c_zip
+       FROM leads l
+       JOIN companies c ON c.id = l.company_id
+       WHERE l.id = $1 AND l.deleted_at IS NULL LIMIT 1`,
+      [id]
+    );
+    if (leadResult.rows.length === 0) return res.status(404).json({ error: "Lead not found." });
+    const lead = leadResult.rows[0];
+
+    // Return cached value if already calculated
+    if (lead.drive_time_minutes != null) {
+      return res.json({ driveTimeMinutes: lead.drive_time_minutes });
+    }
+
+    const destinationZip = lead.zip;
+    if (!destinationZip) return res.json({ driveTimeMinutes: null });
+
+    const originAddress = [lead.c_address, lead.c_city, lead.c_state, lead.c_zip].filter(Boolean).join(', ');
+    const minutes = await getDriveTime(originAddress, destinationZip);
+
+    if (minutes != null) {
+      await pool.query(`UPDATE leads SET drive_time_minutes = $1 WHERE id = $2`, [minutes, id]);
+    }
+
+    res.json({ driveTimeMinutes: minutes });
+  } catch (error) {
+    console.error("❌ Drive time error:", error);
+    res.status(500).json({ error: "Failed to calculate drive time." });
   }
 });
 

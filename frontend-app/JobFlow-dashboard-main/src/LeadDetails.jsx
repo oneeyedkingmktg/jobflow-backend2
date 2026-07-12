@@ -17,6 +17,19 @@ export default function LeadDetails({
   const [estimateError, setEstimateError] = useState("");
   const [estimate, setEstimate] = useState(null);
 
+  const [driveTimeMinutes, setDriveTimeMinutes] = useState(form?.driveTimeMinutes ?? null);
+
+  useEffect(() => {
+    if (!form?.id || !form?.zip) return;
+    if (form.driveTimeMinutes != null) {
+      setDriveTimeMinutes(form.driveTimeMinutes);
+      return;
+    }
+    apiRequest(`/leads/${form.id}/drive-time`)
+      .then((data) => setDriveTimeMinutes(data?.driveTimeMinutes ?? null))
+      .catch(() => {});
+  }, [form?.id, form?.zip]);
+
   const { user } = useAuth();
   const serviceCallsEnabled = user?.serviceCallsEnabled === true;
 
@@ -232,6 +245,18 @@ export default function LeadDetails({
               {form.city}, {form.state} {form.zip}
             </p>
           </a>
+        )}
+
+        {!form.address && form.zip && (
+          <div className="mt-4 bg-gray-50 border rounded-lg p-3 shadow-sm">
+            <p className="text-gray-700 text-sm">{form.zip}</p>
+          </div>
+        )}
+
+        {driveTimeMinutes != null && (
+          <p className="mt-2 text-sm text-gray-600">
+            Jobsite is approximately <span className="font-semibold">{driveTimeMinutes} minutes</span> away
+          </p>
         )}
       </div>
 

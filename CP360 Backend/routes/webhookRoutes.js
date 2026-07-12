@@ -7,6 +7,7 @@ const { sendPushToCompany } = require('../services/pushNotificationService');
 const verifyGHLWebhook = require('../middleware/verifyGHLWebhook');
 const { calculateEstimate } = require('../estimator/calculateEstimate');
 const { applyStatusTags, updateContactCustomFields } = require('../controllers/ghlAPI');
+const { getDriveTime } = require('../services/distanceService');
 
 function formatProjectTypeForPush(type) {
   if (!type) return 'Unknown';
@@ -181,14 +182,84 @@ router.post('/estimate', async (req, res) => {
     if (Array.isArray(company.service_area_zips) && company.service_area_zips.length > 0) {
       const isInServiceArea = zip && company.service_area_zips.map(String).includes(zip.trim());
       if (!isInServiceArea) {
-        console.log('📐 estimate webhook: zip', zip || '(none)', 'not in service area — tagging and stopping');
+        console.log('📐 estimate webhook: zip', zip || '(none)', 'not in service area — tagging and saving lead');
+
+        // Apply GHL tag
         if (company.ghl_api_key && ghlContactId) {
           try {
-            await applyStatusTags(ghlContactId, 'outside service area', company);
+            await applyStatusTags(ghlContactId, 'estimate - out of service area', company);
           } catch (e) {
             console.error('📐 estimate webhook: outside-area tag error:', e.message);
           }
         }
+
+        // Save out-of-area contact to our DB so we can display them
+        try {
+          const first = firstName || (fullName ? fullName.trim().split(' ')[0] : '');
+          const last = lastName || (fullName ? fullName.trim().split(' ').slice(1).join(' ') : '');
+          const full = fullName || [first, last].filter(Boolean).join(' ') || 'Unknown';
+
+          // Check if lead already exists by ghl_contact_id / phone / email
+          let oaLead = null;
+          if (ghlContactId) {
+            const r = await pool.query(
+              `SELECT id FROM leads WHERE company_id = $1 AND ghl_contact_id = $2 AND deleted_at IS NULL LIMIT 1`,
+              [companyId, ghlContactId]
+            );
+            oaLead = r.rows[0] || null;
+          }
+          if (!oaLead && phone) {
+            const norm = phone.replace(/\D/g, '');
+            const r = await pool.query(
+              `SELECT id FROM leads WHERE company_id = $1
+               AND replace(replace(replace(replace(phone,'(',''),')',''),'-',''),' ','') = $2
+               AND deleted_at IS NULL LIMIT 1`,
+              [companyId, norm]
+            );
+            oaLead = r.rows[0] || null;
+          }
+          if (!oaLead && email) {
+            const r = await pool.query(
+              `SELECT id FROM leads WHERE company_id = $1 AND email = $2 AND deleted_at IS NULL LIMIT 1`,
+              [companyId, email]
+            );
+            oaLead = r.rows[0] || null;
+          }
+
+          if (!oaLead) {
+            // Calculate drive time
+            const companyOrigin = [company.address, company.city, company.state, company.zip].filter(Boolean).join(', ');
+            const driveMinutes = zip ? await getDriveTime(companyOrigin, zip) : null;
+
+            await pool.query(
+              `INSERT INTO leads (
+                company_id, name, full_name, first_name, last_name,
+                phone, email, address, city, state, zip,
+                lead_source, referral_source, utm_source, utm_medium, utm_audience, utm_creative,
+                status, ghl_contact_id, project_type, proceed_with_automation,
+                out_of_area, drive_time_minutes
+              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+              [
+                companyId, full, full, first, last,
+                phone || null, email || null,
+                address || null, city || null, state || null, zip || null,
+                leadSource, referralSource, utmSource, utmMedium, utmAudience || null, utmCreative || null,
+                'status_pre_lead', ghlContactId || null, projectType || null, false,
+                true, driveMinutes,
+              ]
+            );
+            console.log('📐 estimate webhook: saved out-of-area lead for', full, 'zip:', zip);
+          } else {
+            // Mark existing lead as out of area
+            await pool.query(
+              `UPDATE leads SET out_of_area = true WHERE id = $1`,
+              [oaLead.id]
+            );
+          }
+        } catch (e) {
+          console.error('📐 estimate webhook: out-of-area lead save error:', e.message);
+        }
+
         return res.json({ status: 'outside_service_area', message: 'Outside service area' });
       }
     }

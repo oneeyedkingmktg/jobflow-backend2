@@ -24,6 +24,7 @@ export default function LeadHeader({
   onUploadPhotos,
   isPaused,
   pauseUntil,
+  isOutOfArea,
   proceedWithAutomation,
   dateCompleted,
 }) {
@@ -46,6 +47,12 @@ export default function LeadHeader({
         {isPaused && (
           <span className="flex items-center gap-1 bg-yellow-400 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">
             ⏸ {pauseUntil ? `PAUSED Until ${formatPauseDate(pauseUntil)}` : "PAUSED"}
+          </span>
+        )}
+
+        {isOutOfArea && (
+          <span className="flex items-center gap-1 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+            OUT OF SERVICE AREA
           </span>
         )}
 
