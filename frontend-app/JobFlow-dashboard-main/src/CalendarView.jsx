@@ -628,17 +628,18 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                     {lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
                       <div className="text-xs text-gray-700 font-semibold mt-0.5">{lead.companyName}</div>
                     )}
+                    {isInstall && lead.driveTimeMinutes != null && (
+                      <div className="text-xs text-gray-500 mt-0.5">Approx {lead.driveTimeMinutes} min away</div>
+                    )}
                   </div>
                   <span className="text-gray-600">{lead.city}, {lead.state}</span>
                 </div>
-                {isAppt && lead.appointmentTime && (
+                {isAppt && (lead.appointmentTime || lead.driveTimeMinutes != null) && (
                   <div className="text-xs text-gray-700 px-3 pb-3">
-                    <strong>Time:</strong> {formatTime12h(lead.appointmentTime)}
-                  </div>
-                )}
-                {lead.driveTimeMinutes != null && (
-                  <div className="text-xs text-gray-500 px-3 pb-3">
-                    Approx {lead.driveTimeMinutes} min away
+                    {lead.appointmentTime && <div><strong>Time:</strong> {formatTime12h(lead.appointmentTime)}</div>}
+                    {lead.driveTimeMinutes != null && (
+                      <div className="text-gray-500 mt-0.5">Approx {lead.driveTimeMinutes} min away</div>
+                    )}
                   </div>
                 )}
               </div>
