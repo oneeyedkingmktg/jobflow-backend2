@@ -92,6 +92,9 @@ const convertLeadFromBackend = (lead) => ({
     lead.proceedWithAutomation ?? lead.proceed_with_automation ?? true,
 
   hasLeftReview: lead.hasLeftReview ?? lead.has_left_review ?? false,
+
+  driveTimeMinutes: lead.driveTimeMinutes ?? lead.drive_time_minutes ?? null,
+  outOfArea: lead.outOfArea ?? lead.out_of_area ?? false,
 });
 
 const convertLeadToBackend = (lead) => ({
