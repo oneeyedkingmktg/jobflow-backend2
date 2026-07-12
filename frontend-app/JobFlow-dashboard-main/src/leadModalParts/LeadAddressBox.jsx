@@ -3,10 +3,25 @@
 // Version: v1.1 – Removed duplicate Call/Text buttons
 // ============================================================================
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { apiRequest } from "../api";
 
 export default function LeadAddressBox({ form, onOpenMaps }) {
   const line2 = [form.city, form.state, form.zip].filter(Boolean).join(", ");
+
+  const [driveTimeMinutes, setDriveTimeMinutes] = useState(form?.driveTimeMinutes ?? null);
+
+  useEffect(() => {
+    if (!form?.id || !form?.zip) return;
+    if (form.driveTimeMinutes != null) {
+      setDriveTimeMinutes(form.driveTimeMinutes);
+      return;
+    }
+    apiRequest(`/leads/${form.id}/drive-time`)
+      .then((data) => setDriveTimeMinutes(data?.driveTimeMinutes ?? null))
+      .catch(() => {});
+  }, [form?.id, form?.zip]);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 px-4 py-4 shadow-sm space-y-3">
       {/* Address section - clickable */}
@@ -24,6 +39,12 @@ export default function LeadAddressBox({ form, onOpenMaps }) {
           {line2 || "City, State ZIP"}
         </div>
       </div>
+
+      {driveTimeMinutes != null && (
+        <div className="text-sm text-gray-600 px-2">
+          Jobsite is approximately <span className="font-semibold">{driveTimeMinutes} minutes</span> away
+        </div>
+      )}
 
       {/* Phone display */}
       <div className="pt-2 border-t">
