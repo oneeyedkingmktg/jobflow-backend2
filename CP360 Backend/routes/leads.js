@@ -113,6 +113,9 @@ const toCamel = (row) => ({
 
   ghlContactId: row.ghl_contact_id,
   outOfAreaLargeJob: row.out_of_area_large_job === true,
+
+  outOfArea: row.out_of_area === true,
+  driveTimeMinutes: row.drive_time_minutes ?? null,
 });
 
 function parseName(full) {
