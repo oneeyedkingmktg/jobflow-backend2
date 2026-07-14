@@ -10,7 +10,7 @@
 const { syncLeadToGHL, fetchGHLContact } = require("../controllers/ghlAPI");
 const pool = require("../config/database");
 
-const GHL_SYNC_TIMEOUT_MS = 15000; // 15 seconds hard stop
+const GHL_SYNC_TIMEOUT_MS = 90000; // 90s — covers 3 retry attempts with backoff delays
 
 function withTimeout(promise, timeoutMs) {
   return Promise.race([

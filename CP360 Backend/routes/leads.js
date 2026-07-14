@@ -578,25 +578,8 @@ const insertValues = [
       }
     }
 
-    let ghlSynced = false;
-    if (company.ghl_api_key && !shouldBypassSync) {
-      try {
-        await syncLeadToGhl({ lead: newLead, company });
-        ghlSynced = true;
-      } catch (syncError) {
-        console.log('GHL sync failed for new lead:', syncError.message);
-      }
-    } else if (shouldBypassSync) {
+    if (shouldBypassSync) {
       console.log('🔓 GHL sync bypassed for testing (master admin bypass enabled)');
-    }
-
-    // Tag out-of-area large job leads in GHL
-    if (lead.out_of_area_large_job && company.ghl_api_key && newLead.ghl_contact_id) {
-      try {
-        await applyStatusTags(newLead.ghl_contact_id, "Est out of area large job", company);
-      } catch (tagErr) {
-        console.error("❌ Failed to apply out-of-area tag:", tagErr.message);
-      }
     }
 
     // Fire push notification for estimator_only companies
@@ -618,7 +601,26 @@ const insertValues = [
       }
     }
 
-    res.status(201).json({ lead: toCamel(newLead), ghlSynced });
+    // Respond immediately — GHL sync runs in background
+    res.status(201).json({ lead: toCamel(newLead), ghlSynced: !!(company.ghl_api_key && !shouldBypassSync) });
+
+    if (company.ghl_api_key && !shouldBypassSync) {
+      setImmediate(async () => {
+        try {
+          await syncLeadToGhl({ lead: newLead, company });
+        } catch (syncError) {
+          console.error('[BG SYNC] GHL sync failed for new lead', newLead.id, ':', syncError.message);
+        }
+
+        if (lead.out_of_area_large_job && newLead.ghl_contact_id) {
+          try {
+            await applyStatusTags(newLead.ghl_contact_id, "Est out of area large job", company);
+          } catch (tagErr) {
+            console.error("[BG SYNC] Failed to apply out-of-area tag:", tagErr.message);
+          }
+        }
+      });
+    }
   } catch (error) {
     console.error("💥 ERROR CREATING LEAD:");
     console.error("Message:", error.message);
@@ -781,55 +783,41 @@ if (updatedLead.project_type) {
       )
     ).rows[0];
 
-let ghlSynced = false;
-    let calendarConflict = null;
+    // Respond immediately after DB save — GHL sync runs in background
+    res.json({ lead: toCamel(updatedLead), ghlSynced: !!company.ghl_api_key, calendarConflict: null });
+
     if (company.ghl_api_key) {
-      try {
-        const syncResult = await syncLeadToGhl({
-          lead: updatedLead,
-          previousLead,
-          company,
-          previousInstallTentative,
-        });
-        ghlSynced = true;
-        if (syncResult?.calendarConflicts?.length > 0) {
-          const conflict = syncResult.calendarConflicts[0];
-          calendarConflict = {
-            type: conflict.type,
-            message: conflict.type === 'install'
-              ? 'Install date saved in CP but could not sync to GHL calendar. Check GHL calendar availability.'
-              : 'Appointment saved in CP but could not sync to GHL calendar. Check GHL calendar availability.',
-          };
-        }
-      } catch (syncError) {
-        console.log('GHL sync failed for updated lead:', syncError.message);
-      }
-
-      // Always re-fetch so response reflects current appointment_calendar_event_id
-      // (GHL sync updates it in a separate DB query after the main UPDATE)
-      const freshResult = await pool.query('SELECT * FROM leads WHERE id = $1', [updatedLead.id]);
-      if (freshResult.rows.length > 0) updatedLead = freshResult.rows[0];
-
-      // If unjunking: remove the junk tag from GHL
-      if (previousLead.status === 'status_junk' && updatedLead.status !== 'status_junk' && updatedLead.ghl_contact_id) {
+      setImmediate(async () => {
         try {
-          await removeStatusTags(updatedLead.ghl_contact_id, 'status - junk', company);
-        } catch (err) {
-          console.error('Failed to remove GHL junk tag:', err.message);
+          await syncLeadToGhl({
+            lead: updatedLead,
+            previousLead,
+            company,
+            previousInstallTentative,
+          });
+        } catch (syncError) {
+          console.error('[BG SYNC] GHL sync failed for lead', updatedLead.id, ':', syncError.message);
         }
-      }
 
-      // Apply "has left google review" tag when newly set
-      if (lead.has_left_review === true && !previousLead.has_left_review && updatedLead.ghl_contact_id) {
-        try {
-          await applyStatusTags(updatedLead.ghl_contact_id, 'has left google review', company);
-        } catch (err) {
-          console.error('Failed to apply has-left-review GHL tag:', err.message);
+        // Unjunk tag
+        if (previousLead.status === 'status_junk' && updatedLead.status !== 'status_junk' && updatedLead.ghl_contact_id) {
+          try {
+            await removeStatusTags(updatedLead.ghl_contact_id, 'status - junk', company);
+          } catch (err) {
+            console.error('[BG SYNC] Failed to remove GHL junk tag:', err.message);
+          }
         }
-      }
+
+        // Has-left-review tag
+        if (lead.has_left_review === true && !previousLead.has_left_review && updatedLead.ghl_contact_id) {
+          try {
+            await applyStatusTags(updatedLead.ghl_contact_id, 'has left google review', company);
+          } catch (err) {
+            console.error('[BG SYNC] Failed to apply has-left-review GHL tag:', err.message);
+          }
+        }
+      });
     }
-
-    res.json({ lead: toCamel(updatedLead), ghlSynced, calendarConflict });
   } catch (error) {
     console.error("Error updating lead:", error);
     res.status(500).json({ error: "Failed to update lead." });
