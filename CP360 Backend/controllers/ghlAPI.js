@@ -603,8 +603,8 @@ async function updateCalendarEvent(company, eventId, payload) {
   if (!eventId) throw new Error("EVENT_ID_REQUIRED");
 
   console.log("🔄 [CALENDAR] Updating event:", eventId, "| payload contactId:", payload.contactId);
-  
-  const updated = await ghlRequest(
+
+  const updated = await ghlCalendarRequestWithRetry(
     company,
     `/calendars/events/appointments/${eventId}`,
     {
@@ -612,7 +612,7 @@ async function updateCalendarEvent(company, eventId, payload) {
       body: payload,
     }
   );
-  
+
   console.log("✅ [CALENDAR] Event updated successfully");
   return updated;
 }
@@ -1007,6 +1007,40 @@ if (est.all_price_ranges?.custom) {
 }
 
 // ----------------------------------------------------------------------------
+// RETRY HELPER FOR GHL CALENDAR CALLS
+// Retries on: timeout, 429, 5xx, and GHL's "slot not available" false-positive 400.
+// Does NOT retry on other 400s or auth errors (401/403).
+// ----------------------------------------------------------------------------
+function isRetryableCalendarError(err) {
+  if (err.name === "AbortError") return true;
+  if (!err.status) return true; // network-level error
+  if (err.status === 429) return true;
+  if (err.status >= 500) return true;
+  if (
+    err.status === 400 &&
+    err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")
+  ) return true;
+  return false;
+}
+
+async function ghlCalendarRequestWithRetry(company, endpoint, options, maxAttempts = 3) {
+  const delays = [1000, 2000, 4000];
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await ghlRequest(company, endpoint, options);
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableCalendarError(err) || attempt === maxAttempts) throw err;
+      const delay = delays[attempt - 1] ?? 4000;
+      console.warn(`⚠️ [CALENDAR RETRY] Attempt ${attempt} failed (${err.message}) — retrying in ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+// ----------------------------------------------------------------------------
 // VERIFY GHL CALENDAR EVENT EXISTS
 // ----------------------------------------------------------------------------
 async function verifyGhlEventExists(eventId, company) {
@@ -1287,7 +1321,7 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
       // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
       // then create a fresh appointment so the new event ID is stored
       await deleteCalendarEvent(company, existingEventId, ghlContactId);
-      const created = await ghlRequest(company, "/calendars/events/appointments", {
+      const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
         method: "POST",
         body: createPayload,
       });
@@ -1309,7 +1343,7 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   // CREATE NEW — both appointments and installs use the appointments endpoint
   let eventId;
   {
-    const created = await ghlRequest(
+    const created = await ghlCalendarRequestWithRetry(
       company,
       "/calendars/events/appointments",
       {
