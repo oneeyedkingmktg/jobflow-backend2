@@ -1008,7 +1008,8 @@ if (est.all_price_ranges?.custom) {
 
 // ----------------------------------------------------------------------------
 // RETRY HELPER FOR GHL CALENDAR CALLS
-// Retries on: timeout, 429, 5xx, and GHL's "slot not available" false-positive 400.
+// Retries on: timeout, 429, 5xx, and transient GHL 400s that clear on retry
+// ("slot not available" caching bug, "not an event calendar" state confusion).
 // Does NOT retry on other 400s or auth errors (401/403).
 // ----------------------------------------------------------------------------
 function isRetryableCalendarError(err) {
@@ -1016,15 +1017,16 @@ function isRetryableCalendarError(err) {
   if (!err.status) return true; // network-level error
   if (err.status === 429) return true;
   if (err.status >= 500) return true;
-  if (
-    err.status === 400 &&
-    err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")
-  ) return true;
+  if (err.status === 400) {
+    const msg = err.response?.message?.toLowerCase() ?? "";
+    if (msg.includes("slot you have selected is no longer available")) return true;
+    if (msg.includes("calendar is not an event calendar")) return true;
+  }
   return false;
 }
 
 async function ghlCalendarRequestWithRetry(company, endpoint, options, maxAttempts = 3) {
-  const delays = [1000, 2000, 4000];
+  const delays = [3000, 6000, 12000];
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -1032,7 +1034,7 @@ async function ghlCalendarRequestWithRetry(company, endpoint, options, maxAttemp
     } catch (err) {
       lastErr = err;
       if (!isRetryableCalendarError(err) || attempt === maxAttempts) throw err;
-      const delay = delays[attempt - 1] ?? 4000;
+      const delay = delays[attempt - 1] ?? 12000;
       console.warn(`⚠️ [CALENDAR RETRY] Attempt ${attempt} failed (${err.message}) — retrying in ${delay}ms`);
       await new Promise(r => setTimeout(r, delay));
     }
@@ -1053,21 +1055,6 @@ async function verifyGhlEventExists(eventId, company) {
     console.warn("[GHL EVENT VERIFY] Could not verify, assuming event exists:", err.message);
     return true;
   }
-}
-
-// ----------------------------------------------------------------------------
-// BUILD BLOCK-SLOT PAYLOAD (used as fallback when appointments endpoint rejects the slot)
-// ----------------------------------------------------------------------------
-function buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, calendarType) {
-  const payload = {
-    locationId: company.ghl_location_id,
-    calendarId,
-    startTime: startDateTime.toISOString(),
-    endTime: endDateTime.toISOString(),
-    title,
-  };
-  if (assignedUserId && calendarType !== 'install') payload.assignedUserId = assignedUserId;
-  return payload;
 }
 
 // ----------------------------------------------------------------------------
@@ -1334,39 +1321,17 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
   if (changeType === 'changed' && existingEventId) {
     if (type === 'install') {
       await deleteCalendarEvent(company, existingEventId, ghlContactId);
-      let newEventId;
-      try {
-        const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
-          method: "POST",
-          body: createPayload,
-        });
-        newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-        console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
-      } catch (err) {
-        if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
-          console.warn("⚠️ [INSTALL UPDATE] Slot rejected — falling back to block-slot");
-          newEventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
-          console.log("[INSTALL UPDATE FALLBACK] Block slot created, ID:", newEventId);
-        } else {
-          throw err;
-        }
-      }
+      const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
+        method: "POST",
+        body: createPayload,
+      });
+      const newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+      console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
       return { type, action: 'updated', calendarEventId: newEventId };
     }
-    // Appointments: try standard PUT update, fall back to delete + block-slot if slot is rejected
-    try {
-      await updateCalendarEvent(company, existingEventId, updatePayload);
-      return { type, action: 'updated', calendarEventId: existingEventId };
-    } catch (err) {
-      if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
-        console.warn("⚠️ [APPT UPDATE] Slot rejected — deleting old event and falling back to block-slot");
-        await deleteCalendarEvent(company, existingEventId, ghlContactId);
-        const newEventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
-        console.log("[APPT UPDATE FALLBACK] Block slot created, ID:", newEventId);
-        return { type, action: 'updated', calendarEventId: newEventId };
-      }
-      throw err;
-    }
+    // Appointments use standard PUT update
+    await updateCalendarEvent(company, existingEventId, updatePayload);
+    return { type, action: 'updated', calendarEventId: existingEventId };
   }
 
   if (changeType === 'unchanged' && existingEventId) {
@@ -1374,27 +1339,16 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     return { type, action: 'skipped', calendarEventId: existingEventId };
   }
 
-  // CREATE NEW — try appointments endpoint, fall back to block-slot if GHL rejects the slot
-  let eventId;
-  try {
-    const created = await ghlCalendarRequestWithRetry(
-      company,
-      "/calendars/events/appointments",
-      { method: "POST", body: createPayload }
-    );
-    eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-    console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
-    if (!eventId) {
-      console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
-    }
-  } catch (err) {
-    if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
-      console.warn(`⚠️ [CALENDAR CREATE] Slot rejected by GHL — falling back to block-slot for ${calendarType}`);
-      eventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
-      console.log("[CALENDAR CREATE FALLBACK] Block slot created, ID:", eventId);
-    } else {
-      throw err;
-    }
+  // CREATE NEW
+  const created = await ghlCalendarRequestWithRetry(
+    company,
+    "/calendars/events/appointments",
+    { method: "POST", body: createPayload }
+  );
+  const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+  console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
+  if (!eventId) {
+    console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
   }
 
   return {
