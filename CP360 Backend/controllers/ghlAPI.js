@@ -1056,6 +1056,21 @@ async function verifyGhlEventExists(eventId, company) {
 }
 
 // ----------------------------------------------------------------------------
+// BUILD BLOCK-SLOT PAYLOAD (used as fallback when appointments endpoint rejects the slot)
+// ----------------------------------------------------------------------------
+function buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, calendarType) {
+  const payload = {
+    locationId: company.ghl_location_id,
+    calendarId,
+    startTime: startDateTime.toISOString(),
+    endTime: endDateTime.toISOString(),
+    title,
+  };
+  if (assignedUserId && calendarType !== 'install') payload.assignedUserId = assignedUserId;
+  return payload;
+}
+
+// ----------------------------------------------------------------------------
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
 async function syncLeadCalendarEvent(lead, company, changeType, calendarType, contactId) {
@@ -1318,44 +1333,67 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
 
   if (changeType === 'changed' && existingEventId) {
     if (type === 'install') {
-      // Cancel old event (may be a legacy block-slot or appointment — cancel handles both)
-      // then create a fresh appointment so the new event ID is stored
       await deleteCalendarEvent(company, existingEventId, ghlContactId);
-      const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
-        method: "POST",
-        body: createPayload,
-      });
-      const newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-      console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
+      let newEventId;
+      try {
+        const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
+          method: "POST",
+          body: createPayload,
+        });
+        newEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+        console.log("[INSTALL UPDATE] Cancelled old, created new event ID:", newEventId);
+      } catch (err) {
+        if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
+          console.warn("⚠️ [INSTALL UPDATE] Slot rejected — falling back to block-slot");
+          newEventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
+          console.log("[INSTALL UPDATE FALLBACK] Block slot created, ID:", newEventId);
+        } else {
+          throw err;
+        }
+      }
       return { type, action: 'updated', calendarEventId: newEventId };
     }
-    // Appointments use standard PUT update
-    await updateCalendarEvent(company, existingEventId, updatePayload);
-    return { type, action: 'updated', calendarEventId: existingEventId };
+    // Appointments: try standard PUT update, fall back to delete + block-slot if slot is rejected
+    try {
+      await updateCalendarEvent(company, existingEventId, updatePayload);
+      return { type, action: 'updated', calendarEventId: existingEventId };
+    } catch (err) {
+      if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
+        console.warn("⚠️ [APPT UPDATE] Slot rejected — deleting old event and falling back to block-slot");
+        await deleteCalendarEvent(company, existingEventId, ghlContactId);
+        const newEventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
+        console.log("[APPT UPDATE FALLBACK] Block slot created, ID:", newEventId);
+        return { type, action: 'updated', calendarEventId: newEventId };
+      }
+      throw err;
+    }
   }
 
   if (changeType === 'unchanged' && existingEventId) {
-    // SKIP
     console.log("⏭️ [CALENDAR] No changes, skipping sync");
     return { type, action: 'skipped', calendarEventId: existingEventId };
   }
 
-  // CREATE NEW — both appointments and installs use the appointments endpoint
+  // CREATE NEW — try appointments endpoint, fall back to block-slot if GHL rejects the slot
   let eventId;
-  {
+  try {
     const created = await ghlCalendarRequestWithRetry(
       company,
       "/calendars/events/appointments",
-      {
-        method: "POST",
-        body: createPayload,
-      }
+      { method: "POST", body: createPayload }
     );
     eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-    console.log("[CALENDAR CREATE SUCCESS] Full response:", JSON.stringify(created));
     console.log("[CALENDAR CREATE SUCCESS] Extracted event ID:", eventId);
     if (!eventId) {
       console.warn("⚠️ [CALENDAR CREATE] GHL did not return an event ID — appointment_calendar_event_id will not be stored");
+    }
+  } catch (err) {
+    if (err.status === 400 && err.response?.message?.toLowerCase().includes("slot you have selected is no longer available")) {
+      console.warn(`⚠️ [CALENDAR CREATE] Slot rejected by GHL — falling back to block-slot for ${calendarType}`);
+      eventId = await createBlockSlot(company, buildBlockSlotPayload(company, calendarId, startDateTime, endDateTime, title, assignedUserId, type));
+      console.log("[CALENDAR CREATE FALLBACK] Block slot created, ID:", eventId);
+    } else {
+      throw err;
     }
   }
 
