@@ -1007,31 +1007,89 @@ if (est.all_price_ranges?.custom) {
 }
 
 // ----------------------------------------------------------------------------
+// VERIFY GHL CALENDAR EVENT EXISTS
+// ----------------------------------------------------------------------------
+async function verifyGhlEventExists(eventId, company) {
+  try {
+    const result = await ghlRequest(company, `/calendars/events/${eventId}`, { method: "GET" });
+    return !!(result?.id || result?.event?.id);
+  } catch (err) {
+    if (err.status === 404) return false;
+    // On transient errors (timeout, 500, etc.) assume it exists — don't force a re-create
+    console.warn("[GHL EVENT VERIFY] Could not verify, assuming event exists:", err.message);
+    return true;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // CREATE OR UPDATE OR DELETE GHL CALENDAR EVENT
 // ----------------------------------------------------------------------------
 async function syncLeadCalendarEvent(lead, company, changeType, calendarType, contactId) {
   const SYNC_COOLDOWN = 2 * 60 * 1000;
-  
-  // Compare actual dates instead of timestamps
+
+  // Compare actual dates instead of timestamps — but validate the event still exists in GHL
   if (calendarType === 'appointment' && lead.last_synced_appointment_date && lead.last_synced_appointment_time) {
     const currentDate = lead.appointment_date;
     const currentTime = lead.appointment_time;
     const lastSyncedDate = lead.last_synced_appointment_date;
     const lastSyncedTime = lead.last_synced_appointment_time;
-    
+
     if (currentDate === lastSyncedDate && currentTime === lastSyncedTime) {
-      console.log(`⏭️ [ALREADY SYNCED] Skipping appointment - no change detected`);
-      return null;
+      const eventId = lead.appointment_calendar_event_id;
+      if (eventId) {
+        const eventExists = await verifyGhlEventExists(eventId, company);
+        if (!eventExists) {
+          console.log(`⚠️ [CALENDAR VALIDATE] Appointment event ${eventId} not found in GHL — clearing sync state and forcing re-create`);
+          lead.last_synced_appointment_date = null;
+          lead.last_synced_appointment_time = null;
+          lead.appointment_calendar_event_id = null;
+          await db.query(
+            `UPDATE leads SET appointment_calendar_event_id = NULL, last_synced_appointment_date = NULL, last_synced_appointment_time = NULL WHERE id = $1`,
+            [lead.id]
+          );
+          // Fall through to create
+        } else {
+          console.log(`⏭️ [ALREADY SYNCED] Appointment confirmed in GHL — skipping`);
+          return null;
+        }
+      } else {
+        // Dates match but no event ID — CP thinks it synced but has nothing to show for it
+        console.log(`⚠️ [CALENDAR VALIDATE] Appointment dates match but no event ID stored — forcing re-sync`);
+        lead.last_synced_appointment_date = null;
+        lead.last_synced_appointment_time = null;
+        // Fall through to create
+      }
     }
   }
-  
+
   if (calendarType === 'install' && lead.last_synced_install_date) {
     const currentDate = lead.install_date;
     const lastSyncedDate = lead.last_synced_install_date;
-    
+
     if (currentDate === lastSyncedDate) {
-      console.log(`⏭️ [ALREADY SYNCED] Skipping install - no change detected`);
-      return null;
+      const eventId = lead.install_calendar_event_id;
+      if (eventId) {
+        const eventExists = await verifyGhlEventExists(eventId, company);
+        if (!eventExists) {
+          console.log(`⚠️ [CALENDAR VALIDATE] Install event ${eventId} not found in GHL — clearing sync state and forcing re-create`);
+          lead.last_synced_install_date = null;
+          lead.last_synced_install_end_date = null;
+          lead.install_calendar_event_id = null;
+          await db.query(
+            `UPDATE leads SET install_calendar_event_id = NULL, last_synced_install_date = NULL, last_synced_install_end_date = NULL WHERE id = $1`,
+            [lead.id]
+          );
+          // Fall through to create
+        } else {
+          console.log(`⏭️ [ALREADY SYNCED] Install confirmed in GHL — skipping`);
+          return null;
+        }
+      } else {
+        console.log(`⚠️ [CALENDAR VALIDATE] Install dates match but no event ID stored — forcing re-sync`);
+        lead.last_synced_install_date = null;
+        lead.last_synced_install_end_date = null;
+        // Fall through to create
+      }
     }
   }
 
