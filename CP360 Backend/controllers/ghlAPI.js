@@ -682,7 +682,7 @@ async function deleteBlockSlot(company, eventId) {
 // ----------------------------------------------------------------------------
 // UPSERT CONTACT FROM LEAD (GHL SAFE VERSION)
 // ----------------------------------------------------------------------------
-async function upsertContactFromLead(lead, company) {
+async function upsertContactFromLead(lead, company, existingContactId = null) {
   // Fetch company estimator config
   let estimatorConfig = null;
   try {
@@ -952,40 +952,51 @@ if (est.all_price_ranges?.custom) {
   let contact;
   let contactId;
 
-  try {
-    const response = await ghlRequest(company, "/contacts/", {
-      method: "POST",
-      body: createPayload
+  if (existingContactId) {
+    // We already know the contact — skip the create attempt entirely
+    console.log(`[UPSERT] Existing contact ID provided — updating contact ${existingContactId} directly`);
+    contactId = existingContactId;
+    const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
+      method: "PUT",
+      body: updatePayload,
     });
-
-    // ghlRequest returns the 400 duplicate response instead of throwing —
-    // detect it here and do the PUT update in the try block
-    const duplicateId = response?.meta?.contactId;
-    if (duplicateId) {
-      console.log(`[UPSERT] Duplicate detected in try block — updating contact ${duplicateId}`);
-      contactId = duplicateId;
-      const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
-        method: "PUT",
-        body: updatePayload,
+    contact = updateResponse.contact || updateResponse;
+  } else {
+    try {
+      const response = await ghlRequest(company, "/contacts/", {
+        method: "POST",
+        body: createPayload
       });
-      contact = updateResponse.contact || updateResponse;
-    } else {
-      contact = response.contact || response;
-      contactId = contact.id;
-    }
 
-  } catch (err) {
-    // Fallback: some GHL versions throw instead of returning on duplicate
-    const meta = err?.response?.meta || err?.meta;
-    if (meta?.contactId) {
-      contactId = meta.contactId;
-      const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
-        method: "PUT",
-        body: updatePayload,
-      });
-      contact = updateResponse.contact || updateResponse;
-    } else {
-      throw err;
+      // ghlRequest returns the 400 duplicate response instead of throwing —
+      // detect it here and do the PUT update in the try block
+      const duplicateId = response?.meta?.contactId;
+      if (duplicateId) {
+        console.log(`[UPSERT] Duplicate detected in try block — updating contact ${duplicateId}`);
+        contactId = duplicateId;
+        const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
+          method: "PUT",
+          body: updatePayload,
+        });
+        contact = updateResponse.contact || updateResponse;
+      } else {
+        contact = response.contact || response;
+        contactId = contact.id;
+      }
+
+    } catch (err) {
+      // Fallback: some GHL versions throw instead of returning on duplicate
+      const meta = err?.response?.meta || err?.meta;
+      if (meta?.contactId) {
+        contactId = meta.contactId;
+        const updateResponse = await ghlRequest(company, `/contacts/${contactId}`, {
+          method: "PUT",
+          body: updatePayload,
+        });
+        contact = updateResponse.contact || updateResponse;
+      } else {
+        throw err;
+      }
     }
   }
 
@@ -1619,8 +1630,10 @@ module.exports = {
       let contact = null;
       let contactId = lead.ghl_contact_id;
 
-      // Always upsert so updates get pushed (not only first-time create)
-      contact = await upsertContactFromLead(leadData, company);
+      // Always upsert so updates get pushed (not only first-time create).
+      // Pass the existing contact ID if we have one — this prevents a duplicate
+      // contact being created when GHL's own dedup misses the match.
+      contact = await upsertContactFromLead(leadData, company, leadData.ghl_contact_id || null);
       contactId = contact?.id || contact?.contact?.id || contactId;
 
       if (!contactId) {
