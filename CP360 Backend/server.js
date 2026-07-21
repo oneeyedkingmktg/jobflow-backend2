@@ -279,6 +279,18 @@ async function runMigrations() {
       ('conversions_by_source', 'Conversions by Source', 'Lead to appointment to sold conversion rates broken down by UTM source.'),
       ('cost_per_sale', 'Cost Per Sale', 'Ad spend vs. contract revenue by source. Enter your CPL per source to calculate true cost per acquisition.')
     ON CONFLICT (key) DO NOTHING`,
+    // Backfill appt_set_at from appointment_date for leads that were booked via GHL (no timestamp was stamped)
+    `UPDATE leads
+     SET appt_set_at = appointment_date::timestamp
+     WHERE appointment_date IS NOT NULL
+       AND appt_set_at IS NULL
+       AND deleted_at IS NULL`,
+    // Backfill sold_at from updated_at for leads marked sold via GHL (no timestamp was stamped)
+    `UPDATE leads
+     SET sold_at = updated_at
+     WHERE status = 'sold'
+       AND sold_at IS NULL
+       AND deleted_at IS NULL`,
   ];
   for (const sql of migrations) {
     try {
