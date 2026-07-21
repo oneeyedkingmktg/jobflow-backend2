@@ -59,7 +59,11 @@ export default function CompanyModal({
   const [openReport, setOpenReport] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
-  const [reportRange, setReportRange] = useState('30');
+  const [reportRange, setReportRange] = useState('90');
+  const [cplSources, setCplSources] = useState([]);
+  const [cplLoading, setCplLoading] = useState(false);
+  const [cplSaving, setCplSaving] = useState(false);
+  const [editingCpls, setEditingCpls] = useState(false);
 
   // ORPHAN CHECK STATE
   const [orphanLoading, setOrphanLoading] = useState(false);
@@ -381,17 +385,24 @@ const handleSaveTracking = async () => {
     }
   };
 
-  const ENDPOINT_MAP = { recent_activity: "activity", conversions: "conversions", automation_recovery: "automation-recovery" };
+  const ENDPOINT_MAP = {
+    recent_activity: "activity",
+    conversions: "conversions",
+    automation_recovery: "automation-recovery",
+    conversions_by_source: "conversions-by-source",
+    cost_per_sale: "cost-per-sale",
+  };
+
+  const newStyleReports = ["conversions_by_source", "cost_per_sale"];
 
   const fetchReportData = async (def, range) => {
     setReportLoading(true);
     setReportData(null);
     const endpoint = ENDPOINT_MAP[def.key] ?? def.key;
-    let url = `/api/reports/${endpoint}?company_id=${company.id}`;
-    if (range && range !== '30') url += `&range=${range}`;
+    let url = `/api/reports/${endpoint}?company_id=${company.id}&range=${range || '90'}`;
     try {
       const res = await apiRequest(url);
-      setReportData(def.key === 'automation_recovery' ? res.metrics : res.metrics);
+      setReportData(newStyleReports.includes(def.key) ? res : res.metrics);
     } catch (e) {
       setReportData(null);
     }
@@ -400,8 +411,10 @@ const handleSaveTracking = async () => {
 
   const openReportModal = (def) => {
     setOpenReport(def);
-    setReportRange('30');
-    fetchReportData(def, '30');
+    setEditingCpls(false);
+    const defaultRange = newStyleReports.includes(def.key) ? '90' : '30';
+    setReportRange(defaultRange);
+    fetchReportData(def, defaultRange);
   };
 
   const runOrphanCheck = async () => {
@@ -522,6 +535,190 @@ const handleSaveTracking = async () => {
                   {m.avgDaysSale != null && <Row label="Avg Days to Recovery" value={`${m.avgDaysSale} days`} />}
                 </div>
               </>
+            )}
+          </ModalShell>
+        );
+      }
+
+      const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      const fmtPct = (v) => v != null ? `${v}%` : "—";
+      const fmtDays = (v) => v != null ? `${v}d` : "—";
+      const CBS_RANGES = [{ key: "30", label: "30d" }, { key: "60", label: "60d" }, { key: "90", label: "90d" }];
+
+      if (openReport.key === "conversions_by_source") {
+        const rows = data?.rows || [];
+        const totals = data?.totals;
+        return (
+          <ModalShell>
+            <p className="text-xs text-gray-500 mb-3">Leads grouped by UTM source. No UTM = organic. Junk excluded.</p>
+            <div className="flex gap-1.5 mb-3">
+              {CBS_RANGES.map((r) => (
+                <button key={r.key}
+                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            {rows.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Source</th>
+                      <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                      <th className="text-right px-3 py-2 font-semibold">Appts</th>
+                      <th className="text-right px-3 py-2 font-semibold">Appt%</th>
+                      <th className="text-right px-3 py-2 font-semibold">Avg→Appt</th>
+                      <th className="text-right px-3 py-2 font-semibold">Sold</th>
+                      <th className="text-right px-3 py-2 font-semibold">→Sold%</th>
+                      <th className="text-right px-3 py-2 font-semibold">Avg→Sold</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rows.map((r, i) => (
+                      <tr key={i} className="bg-white">
+                        <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.apptsSet}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptRate)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysToAppt)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.sold}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.leadToSoldPct)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysApptToSold)}</td>
+                      </tr>
+                    ))}
+                    {totals && (
+                      <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                        <td className="px-3 py-2 text-gray-900">Totals</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{totals.totalLeads}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{totals.apptsSet}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.apptRate)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtDays(totals.avgDaysToAppt)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{totals.sold}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.leadToSoldPct)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtDays(totals.avgDaysApptToSold)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </ModalShell>
+        );
+      }
+
+      if (openReport.key === "cost_per_sale") {
+        const rows = data?.rows || [];
+        const totals = data?.totals;
+        const loadCpls = () => {
+          setCplLoading(true);
+          setEditingCpls(true);
+          apiRequest(`/api/reports/source-cpls?company_id=${company.id}`)
+            .then((r) => { setCplSources(r.sources); setCplLoading(false); })
+            .catch(() => setCplLoading(false));
+        };
+        const saveCpls = () => {
+          setCplSaving(true);
+          apiRequest(`/api/reports/source-cpls?company_id=${company.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: s.cpl })) }),
+          }).then(() => {
+            setCplSaving(false);
+            setEditingCpls(false);
+            fetchReportData(openReport, reportRange);
+          }).catch(() => setCplSaving(false));
+        };
+        return (
+          <ModalShell>
+            <p className="text-xs text-gray-500 mb-3">Ad spend vs. revenue by UTM source. Sold jobs without contract price excluded.</p>
+            <div className="flex gap-1.5 mb-3">
+              {CBS_RANGES.map((r) => (
+                <button key={r.key}
+                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            {!editingCpls && (
+              <button onClick={loadCpls} className="mb-3 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">
+                Edit CPL Settings
+              </button>
+            )}
+            {editingCpls && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                <div className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-2">CPL Settings</div>
+                {cplLoading ? <div className="text-xs text-gray-400">Loading…</div> : (
+                  <>
+                    <div className="space-y-2 mb-3">
+                      {cplSources.map((s, i) => (
+                        <div key={s.source} className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-700 w-24 capitalize">{s.source}</span>
+                          <span className="text-xs text-gray-500">$</span>
+                          <input type="number" min="0" step="0.01" value={s.cpl}
+                            onChange={(e) => { const u = [...cplSources]; u[i] = { ...s, cpl: parseFloat(e.target.value) || 0 }; setCplSources(u); }}
+                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-20" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={saveCpls} disabled={cplSaving} className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50">
+                        {cplSaving ? "Saving…" : "Save"}
+                      </button>
+                      <button onClick={() => setEditingCpls(false)} className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium text-gray-700">Cancel</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {rows.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Source</th>
+                      <th className="text-right px-3 py-2 font-semibold">CPL</th>
+                      <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                      <th className="text-right px-3 py-2 font-semibold">Spend</th>
+                      <th className="text-right px-3 py-2 font-semibold">Sold</th>
+                      <th className="text-right px-3 py-2 font-semibold">Revenue</th>
+                      <th className="text-right px-3 py-2 font-semibold">Cost/Sale</th>
+                      <th className="text-right px-3 py-2 font-semibold">Ad%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rows.map((r, i) => (
+                      <tr key={i} className="bg-white">
+                        <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.cpl)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.totalAdSpend)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.soldWithPrice}</td>
+                        <td className="px-3 py-2 text-right text-green-700 font-medium">{fmtMoney(r.totalRevenue)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.costPerSale)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.adCostPctOfRevenue)}</td>
+                      </tr>
+                    ))}
+                    {totals && (
+                      <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                        <td className="px-3 py-2 text-gray-900">Totals</td>
+                        <td className="px-3 py-2 text-right text-gray-400">—</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{totals.totalLeads}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(totals.totalAdSpend)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{totals.soldWithPrice}</td>
+                        <td className="px-3 py-2 text-right text-green-700">{fmtMoney(totals.totalRevenue)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(totals.costPerSale)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.adCostPctOfRevenue)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </ModalShell>
         );
