@@ -384,11 +384,9 @@ function ConversionsBySourceContent({ companyId }) {
                   <th className="text-right px-3 py-2 font-semibold">Leads</th>
                   <th className="text-right px-3 py-2 font-semibold">Appts</th>
                   <th className="text-right px-3 py-2 font-semibold">Appt%</th>
-                  <th className="text-right px-3 py-2 font-semibold">Avg→Appt</th>
                   <th className="text-right px-3 py-2 font-semibold">Sold</th>
                   <th className="text-right px-3 py-2 font-semibold">Lead→Sold%</th>
                   <th className="text-right px-3 py-2 font-semibold">Appt→Sold%</th>
-                  <th className="text-right px-3 py-2 font-semibold">Avg→Sold</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -398,11 +396,9 @@ function ConversionsBySourceContent({ companyId }) {
                     <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{r.apptsSet}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptRate)}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysToAppt)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{r.sold}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.leadToSoldPct)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptToSoldPct)}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysApptToSold)}</td>
                   </tr>
                 ))}
                 {data.totals && (
@@ -411,11 +407,9 @@ function ConversionsBySourceContent({ companyId }) {
                     <td className="px-3 py-2 text-right text-gray-900">{data.totals.totalLeads}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{data.totals.apptsSet}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.apptRate)}</td>
-                    <td className="px-3 py-2 text-right text-gray-900">{fmtDays(data.totals.avgDaysToAppt)}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{data.totals.sold}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.leadToSoldPct)}</td>
                     <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.apptToSoldPct)}</td>
-                    <td className="px-3 py-2 text-right text-gray-900">{fmtDays(data.totals.avgDaysApptToSold)}</td>
                   </tr>
                 )}
               </tbody>
