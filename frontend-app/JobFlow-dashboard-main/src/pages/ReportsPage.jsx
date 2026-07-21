@@ -301,12 +301,343 @@ function AutomationRecoveryContent({ companyId }) {
   );
 }
 
+function ConversionsBySourceContent({ companyId }) {
+  const [range, setRange] = useState("90");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  function load(r, start, end) {
+    setLoading(true);
+    setError(null);
+    let url = `/api/reports/conversions-by-source?range=${r}`;
+    if (companyId) url += `&company_id=${companyId}`;
+    if (r === "custom" && start && end) url += `&start=${start}&end=${end}`;
+    apiRequest(url)
+      .then((r) => { setData(r); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
+  }
+
+  useEffect(() => { load("90"); }, [companyId]);
+
+  function handleRangeClick(r) {
+    setRange(r);
+    if (r !== "custom") load(r);
+  }
+
+  function handleCustomApply() {
+    if (customStart && customEnd) load("custom", customStart, customEnd);
+  }
+
+  const fmtPct = (v) => v != null ? `${v}%` : "—";
+  const fmtDays = (v) => v != null ? `${v}d` : "—";
+
+  const RANGES = [
+    { key: "30", label: "30 Days" },
+    { key: "60", label: "60 Days" },
+    { key: "90", label: "90 Days" },
+    { key: "custom", label: "Custom" },
+  ];
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-3">
+        Leads grouped by UTM source, tracked through the full sales funnel. Leads with no UTM source are grouped as "organic". Junk leads excluded.
+      </p>
+
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {RANGES.map((r) => (
+          <button key={r.key} onClick={() => handleRangeClick(r.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              range === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {range === "custom" && (
+        <div className="flex gap-2 items-center mb-3 flex-wrap">
+          <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <span className="text-xs text-gray-500">to</span>
+          <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <button onClick={handleCustomApply}
+            className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium">Apply</button>
+        </div>
+      )}
+
+      {loading && <Spinner />}
+      {error && <ErrorMsg msg={error} />}
+
+      {!loading && !error && data && (
+        data.rows.length === 0 ? (
+          <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Source</th>
+                  <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                  <th className="text-right px-3 py-2 font-semibold">Appts</th>
+                  <th className="text-right px-3 py-2 font-semibold">Appt%</th>
+                  <th className="text-right px-3 py-2 font-semibold">Avg→Appt</th>
+                  <th className="text-right px-3 py-2 font-semibold">Sold</th>
+                  <th className="text-right px-3 py-2 font-semibold">Lead→Sold%</th>
+                  <th className="text-right px-3 py-2 font-semibold">Appt→Sold%</th>
+                  <th className="text-right px-3 py-2 font-semibold">Avg→Sold</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.rows.map((r, i) => (
+                  <tr key={i} className="bg-white">
+                    <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.apptsSet}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptRate)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysToAppt)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.sold}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.leadToSoldPct)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptToSoldPct)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtDays(r.avgDaysApptToSold)}</td>
+                  </tr>
+                ))}
+                {data.totals && (
+                  <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                    <td className="px-3 py-2 text-gray-900">Totals</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{data.totals.totalLeads}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{data.totals.apptsSet}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.apptRate)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtDays(data.totals.avgDaysToAppt)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{data.totals.sold}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.leadToSoldPct)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.apptToSoldPct)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtDays(data.totals.avgDaysApptToSold)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+function CostPerSaleContent({ companyId }) {
+  const [range, setRange] = useState("90");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editingCpls, setEditingCpls] = useState(false);
+  const [cplSources, setCplSources] = useState([]);
+  const [cplLoading, setCplLoading] = useState(false);
+  const [cplSaving, setCplSaving] = useState(false);
+
+  function load(r, start, end) {
+    setLoading(true);
+    setError(null);
+    let url = `/api/reports/cost-per-sale?range=${r}`;
+    if (companyId) url += `&company_id=${companyId}`;
+    if (r === "custom" && start && end) url += `&start=${start}&end=${end}`;
+    apiRequest(url)
+      .then((r) => { setData(r); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
+  }
+
+  useEffect(() => { load("90"); }, [companyId]);
+
+  function handleRangeClick(r) {
+    setRange(r);
+    if (r !== "custom") load(r);
+  }
+
+  function handleCustomApply() {
+    if (customStart && customEnd) load("custom", customStart, customEnd);
+  }
+
+  function openCplEditor() {
+    setCplLoading(true);
+    setEditingCpls(true);
+    let url = "/api/reports/source-cpls";
+    if (companyId) url += `?company_id=${companyId}`;
+    apiRequest(url)
+      .then((r) => { setCplSources(r.sources); setCplLoading(false); })
+      .catch(() => setCplLoading(false));
+  }
+
+  function saveCpls() {
+    setCplSaving(true);
+    const qs = companyId ? `?company_id=${companyId}` : "";
+    apiRequest(`/api/reports/source-cpls${qs}`, {
+      method: "PUT",
+      body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: s.cpl })) }),
+    })
+      .then(() => {
+        setCplSaving(false);
+        setEditingCpls(false);
+        load(range, customStart, customEnd);
+      })
+      .catch(() => setCplSaving(false));
+  }
+
+  const fmtMoney = (v) =>
+    v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmtPct = (v) => v != null ? `${v}%` : "—";
+
+  const RANGES = [
+    { key: "30", label: "30 Days" },
+    { key: "60", label: "60 Days" },
+    { key: "90", label: "90 Days" },
+    { key: "custom", label: "Custom" },
+  ];
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-3">
+        Enter your cost per lead for each UTM source. Sold jobs without a contract price are excluded from revenue calculations.
+      </p>
+
+      <div className="flex gap-1.5 mb-3 flex-wrap">
+        {RANGES.map((r) => (
+          <button key={r.key} onClick={() => handleRangeClick(r.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              range === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+            }`}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {range === "custom" && (
+        <div className="flex gap-2 items-center mb-3 flex-wrap">
+          <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <span className="text-xs text-gray-500">to</span>
+          <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+          <button onClick={handleCustomApply}
+            className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium">Apply</button>
+        </div>
+      )}
+
+      {!editingCpls && (
+        <button onClick={openCplEditor}
+          className="mb-3 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Edit CPL Settings
+        </button>
+      )}
+
+      {editingCpls && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-2">CPL Settings</div>
+          {cplLoading ? <Spinner /> : (
+            <>
+              <p className="text-xs text-gray-500 mb-3">Enter your average cost per lead for each source. Leave at $0 for organic or untracked sources.</p>
+              <div className="space-y-2 mb-3">
+                {cplSources.map((s, i) => (
+                  <div key={s.source} className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-gray-700 w-28 capitalize">{s.source}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">$</span>
+                      <input
+                        type="number" min="0" step="0.01" value={s.cpl}
+                        onChange={(e) => {
+                          const updated = [...cplSources];
+                          updated[i] = { ...s, cpl: parseFloat(e.target.value) || 0 };
+                          setCplSources(updated);
+                        }}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-24"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveCpls} disabled={cplSaving}
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50">
+                  {cplSaving ? "Saving..." : "Save"}
+                </button>
+                <button onClick={() => setEditingCpls(false)}
+                  className="px-4 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700">
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {loading && <Spinner />}
+      {error && <ErrorMsg msg={error} />}
+
+      {!loading && !error && data && (
+        data.rows.length === 0 ? (
+          <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Source</th>
+                  <th className="text-right px-3 py-2 font-semibold">CPL</th>
+                  <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                  <th className="text-right px-3 py-2 font-semibold">Ad Spend</th>
+                  <th className="text-right px-3 py-2 font-semibold">Sold w/Price</th>
+                  <th className="text-right px-3 py-2 font-semibold">Avg Contract</th>
+                  <th className="text-right px-3 py-2 font-semibold">Revenue</th>
+                  <th className="text-right px-3 py-2 font-semibold">Cost/Sale</th>
+                  <th className="text-right px-3 py-2 font-semibold">Ad Cost%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.rows.map((r, i) => (
+                  <tr key={i} className="bg-white">
+                    <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.cpl)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.totalAdSpend)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.soldWithPrice}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.avgContractPrice)}</td>
+                    <td className="px-3 py-2 text-right text-green-700 font-medium">{fmtMoney(r.totalRevenue)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.costPerSale)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.adCostPctOfRevenue)}</td>
+                  </tr>
+                ))}
+                {data.totals && (
+                  <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                    <td className="px-3 py-2 text-gray-900">Totals</td>
+                    <td className="px-3 py-2 text-right text-gray-400">—</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{data.totals.totalLeads}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(data.totals.totalAdSpend)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{data.totals.soldWithPrice}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(data.totals.avgContractPrice)}</td>
+                    <td className="px-3 py-2 text-right text-green-700">{fmtMoney(data.totals.totalRevenue)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(data.totals.costPerSale)}</td>
+                    <td className="px-3 py-2 text-right text-gray-900">{fmtPct(data.totals.adCostPctOfRevenue)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 // ─── report modal wrapper ────────────────────────────────────────────────────
 
 const REPORT_CONTENT = {
   recent_activity: ActivityContent,
   conversions: ConversionsContent,
   automation_recovery: AutomationRecoveryContent,
+  conversions_by_source: ConversionsBySourceContent,
+  cost_per_sale: CostPerSaleContent,
 };
 
 function ReportModal({ report, companyId, onClose }) {

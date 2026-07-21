@@ -266,6 +266,19 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `CREATE INDEX IF NOT EXISTS blocked_times_company_date_idx ON blocked_times (company_id, date)`,
+    // lead_source_cpl — user-entered cost-per-lead by UTM source per company
+    `CREATE TABLE IF NOT EXISTS lead_source_cpl (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id),
+      utm_source TEXT NOT NULL,
+      cpl_amount NUMERIC(10,2) DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(company_id, utm_source)
+    )`,
+    `INSERT INTO report_definitions (key, name, description) VALUES
+      ('conversions_by_source', 'Conversions by Source', 'Lead to appointment to sold conversion rates broken down by UTM source.'),
+      ('cost_per_sale', 'Cost Per Sale', 'Ad spend vs. contract revenue by source. Enter your CPL per source to calculate true cost per acquisition.')
+    ON CONFLICT (key) DO NOTHING`,
   ];
   for (const sql of migrations) {
     try {

@@ -262,6 +262,226 @@ router.get('/automation-recovery', async (req, res) => {
   }
 });
 
+// ─── GET /api/reports/conversions-by-source ──────────────────────────────────
+router.get('/conversions-by-source', async (req, res) => {
+  try {
+    const companyId = companyIdFor(req);
+    const { range, start, end } = req.query;
+
+    const now = new Date();
+    let from, to = now;
+    if (start && end) {
+      from = new Date(start);
+      to = new Date(end); to.setHours(23, 59, 59, 999);
+    } else {
+      const days = parseInt(range) || 90;
+      from = new Date(now); from.setDate(from.getDate() - days);
+    }
+
+    const [rowsRes, totalsRes] = await Promise.all([
+      pool.query(
+        `SELECT
+          COALESCE(utm_source, 'organic') AS source,
+          COUNT(*)::int AS total_leads,
+          COUNT(CASE WHEN appt_set_at IS NOT NULL THEN 1 END)::int AS appts_set,
+          COUNT(CASE WHEN sold_at IS NOT NULL THEN 1 END)::int AS sold,
+          COUNT(CASE WHEN appt_set_at IS NOT NULL AND sold_at IS NOT NULL THEN 1 END)::int AS appt_and_sold,
+          ROUND(AVG(CASE WHEN appt_set_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (appt_set_at - created_at)) / 86400 END)::numeric, 1) AS avg_days_to_appt,
+          ROUND(AVG(CASE WHEN sold_at IS NOT NULL AND appt_set_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (sold_at - appt_set_at)) / 86400 END)::numeric, 1) AS avg_days_appt_to_sold
+        FROM leads
+        WHERE company_id = $1
+          AND status != 'status_junk'
+          AND deleted_at IS NULL
+          AND created_at >= $2 AND created_at <= $3
+        GROUP BY COALESCE(utm_source, 'organic')
+        ORDER BY total_leads DESC`,
+        [companyId, from, to]
+      ),
+      pool.query(
+        `SELECT
+          COUNT(*)::int AS total_leads,
+          COUNT(CASE WHEN appt_set_at IS NOT NULL THEN 1 END)::int AS appts_set,
+          COUNT(CASE WHEN sold_at IS NOT NULL THEN 1 END)::int AS sold,
+          COUNT(CASE WHEN appt_set_at IS NOT NULL AND sold_at IS NOT NULL THEN 1 END)::int AS appt_and_sold,
+          ROUND(AVG(CASE WHEN appt_set_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (appt_set_at - created_at)) / 86400 END)::numeric, 1) AS avg_days_to_appt,
+          ROUND(AVG(CASE WHEN sold_at IS NOT NULL AND appt_set_at IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (sold_at - appt_set_at)) / 86400 END)::numeric, 1) AS avg_days_appt_to_sold
+        FROM leads
+        WHERE company_id = $1
+          AND status != 'status_junk'
+          AND deleted_at IS NULL
+          AND created_at >= $2 AND created_at <= $3`,
+        [companyId, from, to]
+      ),
+    ]);
+
+    const mapRow = (r) => ({
+      source: r.source,
+      totalLeads: r.total_leads,
+      apptsSet: r.appts_set,
+      apptRate: pct(r.appts_set, r.total_leads),
+      avgDaysToAppt: r.avg_days_to_appt != null ? parseFloat(r.avg_days_to_appt) : null,
+      sold: r.sold,
+      leadToSoldPct: pct(r.sold, r.total_leads),
+      apptToSoldPct: pct(r.appt_and_sold, r.appts_set),
+      avgDaysApptToSold: r.avg_days_appt_to_sold != null ? parseFloat(r.avg_days_appt_to_sold) : null,
+    });
+
+    const t = totalsRes.rows[0];
+    const totals = {
+      totalLeads: t.total_leads,
+      apptsSet: t.appts_set,
+      apptRate: pct(t.appts_set, t.total_leads),
+      avgDaysToAppt: t.avg_days_to_appt != null ? parseFloat(t.avg_days_to_appt) : null,
+      sold: t.sold,
+      leadToSoldPct: pct(t.sold, t.total_leads),
+      apptToSoldPct: pct(t.appt_and_sold, t.appts_set),
+      avgDaysApptToSold: t.avg_days_appt_to_sold != null ? parseFloat(t.avg_days_appt_to_sold) : null,
+    };
+
+    res.json({ success: true, rows: rowsRes.rows.map(mapRow), totals });
+  } catch (error) {
+    console.error('[GET /api/reports/conversions-by-source]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── GET /api/reports/cost-per-sale ──────────────────────────────────────────
+router.get('/cost-per-sale', async (req, res) => {
+  try {
+    const companyId = companyIdFor(req);
+    const { range, start, end } = req.query;
+
+    const now = new Date();
+    let from, to = now;
+    if (start && end) {
+      from = new Date(start);
+      to = new Date(end); to.setHours(23, 59, 59, 999);
+    } else {
+      const days = parseInt(range) || 90;
+      from = new Date(now); from.setDate(from.getDate() - days);
+    }
+
+    const result = await pool.query(
+      `SELECT
+        COALESCE(l.utm_source, 'organic') AS source,
+        COALESCE(c.cpl_amount, 0) AS cpl,
+        COUNT(*)::int AS total_leads,
+        (COUNT(*) * COALESCE(c.cpl_amount, 0))::numeric AS total_ad_spend,
+        COUNT(CASE WHEN l.sold_at IS NOT NULL AND l.contract_price IS NOT NULL THEN 1 END)::int AS sold_with_price,
+        ROUND(AVG(CASE WHEN l.sold_at IS NOT NULL AND l.contract_price IS NOT NULL
+          THEN l.contract_price END)::numeric, 2) AS avg_contract_price,
+        COALESCE(SUM(CASE WHEN l.sold_at IS NOT NULL AND l.contract_price IS NOT NULL
+          THEN l.contract_price ELSE 0 END), 0)::numeric AS total_revenue
+      FROM leads l
+      LEFT JOIN lead_source_cpl c
+        ON c.company_id = l.company_id AND c.utm_source = COALESCE(l.utm_source, 'organic')
+      WHERE l.company_id = $1
+        AND l.status != 'status_junk'
+        AND l.deleted_at IS NULL
+        AND l.created_at >= $2 AND l.created_at <= $3
+      GROUP BY COALESCE(l.utm_source, 'organic'), c.cpl_amount
+      ORDER BY total_leads DESC`,
+      [companyId, from, to]
+    );
+
+    const mapRow = (r) => {
+      const cpl = parseFloat(r.cpl) || 0;
+      const totalLeads = r.total_leads;
+      const totalAdSpend = parseFloat(r.total_ad_spend) || 0;
+      const soldWithPrice = r.sold_with_price;
+      const avgContract = r.avg_contract_price != null ? parseFloat(r.avg_contract_price) : null;
+      const totalRevenue = parseFloat(r.total_revenue) || 0;
+      const costPerSale = soldWithPrice > 0 ? totalAdSpend / soldWithPrice : null;
+      const adCostPct = totalRevenue > 0 ? Math.round((totalAdSpend / totalRevenue) * 1000) / 10 : null;
+      return { source: r.source, cpl, totalLeads, totalAdSpend, soldWithPrice, avgContractPrice: avgContract, totalRevenue, costPerSale, adCostPctOfRevenue: adCostPct };
+    };
+
+    const rows = result.rows.map(mapRow);
+    const totalLeads = rows.reduce((s, r) => s + r.totalLeads, 0);
+    const totalAdSpend = rows.reduce((s, r) => s + r.totalAdSpend, 0);
+    const soldWithPrice = rows.reduce((s, r) => s + r.soldWithPrice, 0);
+    const totalRevenue = rows.reduce((s, r) => s + r.totalRevenue, 0);
+    const totals = {
+      cpl: null,
+      totalLeads,
+      totalAdSpend,
+      soldWithPrice,
+      avgContractPrice: soldWithPrice > 0 ? totalRevenue / soldWithPrice : null,
+      totalRevenue,
+      costPerSale: soldWithPrice > 0 ? totalAdSpend / soldWithPrice : null,
+      adCostPctOfRevenue: totalRevenue > 0 ? Math.round((totalAdSpend / totalRevenue) * 1000) / 10 : null,
+    };
+
+    res.json({ success: true, rows, totals });
+  } catch (error) {
+    console.error('[GET /api/reports/cost-per-sale]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── GET /api/reports/source-cpls ────────────────────────────────────────────
+router.get('/source-cpls', async (req, res) => {
+  try {
+    const companyId = companyIdFor(req);
+
+    const [sourcesRes, cplsRes] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT COALESCE(utm_source, 'organic') AS source
+         FROM leads
+         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
+         ORDER BY source`,
+        [companyId]
+      ),
+      pool.query(
+        `SELECT utm_source, cpl_amount FROM lead_source_cpl WHERE company_id = $1`,
+        [companyId]
+      ),
+    ]);
+
+    const cplMap = {};
+    for (const row of cplsRes.rows) cplMap[row.utm_source] = parseFloat(row.cpl_amount) || 0;
+
+    const sources = sourcesRes.rows.map((r) => ({
+      source: r.source,
+      cpl: cplMap[r.source] ?? 0,
+    }));
+
+    res.json({ success: true, sources });
+  } catch (error) {
+    console.error('[GET /api/reports/source-cpls]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── PUT /api/reports/source-cpls ────────────────────────────────────────────
+router.put('/source-cpls', async (req, res) => {
+  try {
+    const companyId = companyIdFor(req);
+    const { cpls } = req.body;
+    if (!Array.isArray(cpls)) return res.status(400).json({ error: 'cpls array required' });
+
+    for (const { source, cpl } of cpls) {
+      if (!source) continue;
+      await pool.query(
+        `INSERT INTO lead_source_cpl (company_id, utm_source, cpl_amount, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (company_id, utm_source)
+         DO UPDATE SET cpl_amount = EXCLUDED.cpl_amount, updated_at = NOW()`,
+        [companyId, source, parseFloat(cpl) || 0]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[PUT /api/reports/source-cpls]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── GET /api/reports/orphan-contacts ────────────────────────────────────────
 // Checks every active lead with a ghl_contact_id against GHL.
 // Returns leads where GHL says the contact doesn't exist.
