@@ -1283,10 +1283,9 @@ if (address) {
   createPayload.address = address;
 }
 
-// Only add assignedUserId for appointments — install calendar manages its own team
-if (assignedUserId && type !== 'install') {
-  createPayload.assignedUserId = assignedUserId;
-}
+// assignedUserId intentionally omitted — when set, GHL validates against the user's
+// connected external calendar (Google/Outlook) independently of ignoreDateRanges, causing
+// false "slot unavailable" rejections. Install calendar already omits it successfully.
 
 // UPDATE payload - only modifiable fields
 const updatePayload = {
@@ -1527,7 +1526,7 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     ignoreDateRanges: true,
     toNotify: false,
   };
-  if (assignedUser) apptPayload.assignedUserId = assignedUser;
+  // assignedUserId omitted — same reason as appointment calendar (connected Google Calendar causes false rejections)
   console.log("[SC GHL] Creating appointment:", JSON.stringify(apptPayload));
   const created = await ghlRequest(company, '/calendars/events/appointments', {
     method: 'POST',
