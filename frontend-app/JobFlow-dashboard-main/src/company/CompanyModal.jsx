@@ -572,7 +572,8 @@ const handleSaveTracking = async () => {
                       <th className="text-right px-3 py-2 font-semibold">Appts</th>
                       <th className="text-right px-3 py-2 font-semibold">Appt%</th>
                       <th className="text-right px-3 py-2 font-semibold">Sold</th>
-                      <th className="text-right px-3 py-2 font-semibold">→Sold%</th>
+                      <th className="text-right px-3 py-2 font-semibold">Lead→Sold%</th>
+                      <th className="text-right px-3 py-2 font-semibold">Appt→Sold%</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -584,6 +585,7 @@ const handleSaveTracking = async () => {
                         <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptRate)}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{r.sold}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.leadToSoldPct)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptToSoldPct)}</td>
                       </tr>
                     ))}
                     {totals && (
@@ -594,6 +596,7 @@ const handleSaveTracking = async () => {
                         <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.apptRate)}</td>
                         <td className="px-3 py-2 text-right text-gray-900">{totals.sold}</td>
                         <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.leadToSoldPct)}</td>
+                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.apptToSoldPct)}</td>
                       </tr>
                     )}
                   </tbody>
