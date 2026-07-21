@@ -5,7 +5,7 @@
 
 console.log("📂 CompanyModal.jsx file loaded");
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { apiRequest } from "../api";
 import UsersHome from "../users/UsersHome";
@@ -64,6 +64,7 @@ export default function CompanyModal({
   const [cplLoading, setCplLoading] = useState(false);
   const [cplSaving, setCplSaving] = useState(false);
   const [editingCpls, setEditingCpls] = useState(false);
+  const cplDraftRef = useRef({});
 
   // ORPHAN CHECK STATE
   const [orphanLoading, setOrphanLoading] = useState(false);
@@ -614,14 +615,19 @@ const handleSaveTracking = async () => {
           setCplLoading(true);
           setEditingCpls(true);
           apiRequest(`/api/reports/source-cpls?company_id=${company.id}`)
-            .then((r) => { setCplSources(r.sources); setCplLoading(false); })
+            .then((r) => {
+              setCplSources(r.sources);
+              cplDraftRef.current = {};
+              r.sources.forEach(s => { cplDraftRef.current[s.source] = String(s.cpl); });
+              setCplLoading(false);
+            })
             .catch(() => setCplLoading(false));
         };
         const saveCpls = () => {
           setCplSaving(true);
           apiRequest(`/api/reports/source-cpls?company_id=${company.id}`, {
             method: "PUT",
-            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: parseFloat(s.cpl) || 0 })) }),
+            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: parseFloat(cplDraftRef.current[s.source]) || 0 })) }),
           }).then(() => {
             setCplSaving(false);
             setEditingCpls(false);
@@ -655,8 +661,8 @@ const handleSaveTracking = async () => {
                         <div key={s.source} className="flex items-center gap-2">
                           <span className="text-xs font-medium text-gray-700 w-24 capitalize">{s.source}</span>
                           <span className="text-xs text-gray-500">$</span>
-                          <input type="text" inputMode="decimal" value={s.cpl}
-                            onChange={(e) => { const u = [...cplSources]; u[i] = { ...s, cpl: e.target.value }; setCplSources(u); }}
+                          <input type="text" inputMode="decimal" defaultValue={s.cpl}
+                            onChange={(e) => { cplDraftRef.current[s.source] = e.target.value; }}
                             className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-20" />
                         </div>
                       ))}
