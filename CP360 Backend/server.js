@@ -291,6 +291,12 @@ async function runMigrations() {
      WHERE status = 'sold'
        AND sold_at IS NULL
        AND deleted_at IS NULL`,
+    // Backfill sold_at for leads that progressed past 'sold' into 'complete' (missed by the sold-only backfill)
+    `UPDATE leads
+     SET sold_at = updated_at
+     WHERE status = 'complete'
+       AND sold_at IS NULL
+       AND deleted_at IS NULL`,
   ];
   for (const sql of migrations) {
     try {
