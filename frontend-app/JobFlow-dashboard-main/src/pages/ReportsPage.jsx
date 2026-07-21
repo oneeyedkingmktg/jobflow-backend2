@@ -470,7 +470,7 @@ function CostPerSaleContent({ companyId }) {
     const qs = companyId ? `?company_id=${companyId}` : "";
     apiRequest(`/api/reports/source-cpls${qs}`, {
       method: "PUT",
-      body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: s.cpl })) }),
+      body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: parseFloat(s.cpl) || 0 })) }),
     })
       .then(() => {
         setCplSaving(false);
@@ -539,10 +539,10 @@ function CostPerSaleContent({ companyId }) {
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-500">$</span>
                       <input
-                        type="number" min="0" step="0.01" value={s.cpl}
+                        type="text" inputMode="decimal" value={s.cpl}
                         onChange={(e) => {
                           const updated = [...cplSources];
-                          updated[i] = { ...s, cpl: parseFloat(e.target.value) || 0 };
+                          updated[i] = { ...s, cpl: e.target.value };
                           setCplSources(updated);
                         }}
                         className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-24"

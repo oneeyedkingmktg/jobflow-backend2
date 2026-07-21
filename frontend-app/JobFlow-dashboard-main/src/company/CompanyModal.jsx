@@ -621,7 +621,7 @@ const handleSaveTracking = async () => {
           setCplSaving(true);
           apiRequest(`/api/reports/source-cpls?company_id=${company.id}`, {
             method: "PUT",
-            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: s.cpl })) }),
+            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: parseFloat(s.cpl) || 0 })) }),
           }).then(() => {
             setCplSaving(false);
             setEditingCpls(false);
@@ -655,8 +655,8 @@ const handleSaveTracking = async () => {
                         <div key={s.source} className="flex items-center gap-2">
                           <span className="text-xs font-medium text-gray-700 w-24 capitalize">{s.source}</span>
                           <span className="text-xs text-gray-500">$</span>
-                          <input type="number" min="0" step="0.01" value={s.cpl}
-                            onChange={(e) => { const u = [...cplSources]; u[i] = { ...s, cpl: parseFloat(e.target.value) || 0 }; setCplSources(u); }}
+                          <input type="text" inputMode="decimal" value={s.cpl}
+                            onChange={(e) => { const u = [...cplSources]; u[i] = { ...s, cpl: e.target.value }; setCplSources(u); }}
                             className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-20" />
                         </div>
                       ))}
