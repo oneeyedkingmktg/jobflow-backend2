@@ -1073,26 +1073,18 @@ router.post('/warranties', async (req, res) => {
     if (!internal_name || !warranty_title || !warranty_pdf_url) {
       return res.status(400).json({ error: 'internal_name, warranty_title, and warranty_pdf_url are required' });
     }
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    const result = await pool.transaction(async (client) => {
       if (is_default) {
         await client.query('UPDATE warranties SET is_default = false WHERE company_id = $1', [companyId]);
       }
-      const result = await client.query(
+      return client.query(
         `INSERT INTO warranties (company_id, internal_name, warranty_title, warranty_pdf_url, is_default)
          VALUES ($1,$2,$3,$4,$5)
          RETURNING id, internal_name, warranty_title, warranty_pdf_url, is_default, created_at`,
         [companyId, internal_name, warranty_title, warranty_pdf_url, is_default]
       );
-      await client.query('COMMIT');
-      res.status(201).json(result.rows[0]);
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
+    });
+    res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('POST /bidder/warranties error:', err);
     res.status(500).json({ error: 'Failed to create warranty' });
@@ -1107,16 +1099,14 @@ router.put('/warranties/:id', async (req, res) => {
     if (!internal_name || !warranty_title) {
       return res.status(400).json({ error: 'internal_name and warranty_title are required' });
     }
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    const result = await pool.transaction(async (client) => {
       if (is_default) {
         await client.query(
           'UPDATE warranties SET is_default = false WHERE company_id = $1 AND id != $2',
           [companyId, req.params.id]
         );
       }
-      const result = await client.query(
+      return client.query(
         `UPDATE warranties SET
           internal_name = $1, warranty_title = $2,
           warranty_pdf_url = COALESCE($3, warranty_pdf_url),
@@ -1125,15 +1115,9 @@ router.put('/warranties/:id', async (req, res) => {
          RETURNING id, internal_name, warranty_title, warranty_pdf_url, is_default, created_at`,
         [internal_name, warranty_title, warranty_pdf_url || null, is_default, req.params.id, companyId]
       );
-      await client.query('COMMIT');
-      if (!result.rows.length) return res.status(404).json({ error: 'Warranty not found' });
-      res.json(result.rows[0]);
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
+    });
+    if (!result.rows.length) return res.status(404).json({ error: 'Warranty not found' });
+    res.json(result.rows[0]);
   } catch (err) {
     console.error('PUT /bidder/warranties/:id error:', err);
     res.status(500).json({ error: 'Failed to update warranty' });
