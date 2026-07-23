@@ -276,4 +276,11 @@ export const BidderAPI = {
     method: 'POST',
     body: JSON.stringify({ ...(email ? { email } : {}), ...(type ? { type } : {}), ...(invoiceNum !== null ? { invoice_num: invoiceNum } : {}) }),
   }),
+
+  // Warranty library
+  getWarranties: (companyId) => apiRequest(`/api/bidder/warranties${companyId ? `?company_id=${companyId}` : ''}`),
+  createWarranty: (data, companyId) => apiRequest(`/api/bidder/warranties${companyId ? `?company_id=${companyId}` : ''}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateWarranty: (id, data, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteWarranty: (id, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
+  sendWarrantyEmail: (id, email) => apiRequest(`/api/bidder/proposal/${id}/send-warranty-email`, { method: 'POST', body: JSON.stringify({ email }) }),
 };

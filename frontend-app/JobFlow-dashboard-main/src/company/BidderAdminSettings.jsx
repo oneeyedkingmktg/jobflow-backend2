@@ -70,6 +70,7 @@ export default function BidderAdminSettings({ companyId }) {
     loadLibrary();
     loadSettings();
     loadDesigns();
+    loadWarranties();
     if (companyId) {
       CompaniesAPI.get(companyId).then(res => {
         const c = res?.company;
@@ -132,6 +133,18 @@ export default function BidderAdminSettings({ companyId }) {
       setDesigns(data);
     } catch (e) {
       // non-critical
+    }
+  }
+
+  async function loadWarranties() {
+    setWarrantiesLoading(true);
+    try {
+      const data = await BidderAPI.getWarranties(companyId);
+      setWarranties(data);
+    } catch (e) {
+      console.error('Failed to load warranties', e);
+    } finally {
+      setWarrantiesLoading(false);
     }
   }
 
@@ -253,8 +266,82 @@ export default function BidderAdminSettings({ companyId }) {
     }
   }
 
+  // ── Warranty library state ─────────────────────────────────────────────────
+  const [warranties,        setWarranties]        = useState([]);
+  const [warrantiesLoading, setWarrantiesLoading] = useState(true);
+  const [warrantyModal,     setWarrantyModal]     = useState(null); // null | { mode:'add'|'edit', data:{} }
+  const [warrantySaving,    setWarrantySaving]    = useState(false);
+  const [warrantyMsg,       setWarrantyMsg]       = useState('');
+  const [pdfUploading,      setPdfUploading]      = useState(false);
+
   // ── Logo upload ────────────────────────────────────────────────────────────
   const [logoUploading, setLogoUploading] = useState(false);
+
+  // ── Warranty CRUD ──────────────────────────────────────────────────────────
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleWarrantyPdfChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') { alert('Please upload a PDF file.'); return; }
+    setPdfUploading(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setWarrantyModal(prev => ({ ...prev, data: { ...prev.data, warranty_pdf_url: dataUrl } }));
+    } finally {
+      setPdfUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  async function handleSaveWarranty() {
+    const { mode, data } = warrantyModal;
+    if (!data.internal_name?.trim()) { setWarrantyMsg('Internal name is required'); return; }
+    if (!data.warranty_title?.trim()) { setWarrantyMsg('Warranty title is required'); return; }
+    if (mode === 'add' && !data.warranty_pdf_url) { setWarrantyMsg('PDF upload is required'); return; }
+    setWarrantySaving(true);
+    setWarrantyMsg('');
+    try {
+      if (mode === 'add') {
+        await BidderAPI.createWarranty({
+          internal_name:    data.internal_name.trim(),
+          warranty_title:   data.warranty_title.trim(),
+          warranty_pdf_url: data.warranty_pdf_url,
+          is_default:       data.is_default || false,
+        }, companyId);
+      } else {
+        await BidderAPI.updateWarranty(data.id, {
+          internal_name:    data.internal_name.trim(),
+          warranty_title:   data.warranty_title.trim(),
+          warranty_pdf_url: data.warranty_pdf_url || null,
+          is_default:       data.is_default || false,
+        }, companyId);
+      }
+      setWarrantyModal(null);
+      await loadWarranties();
+    } catch (e) {
+      setWarrantyMsg(e.message || 'Failed to save warranty');
+    } finally {
+      setWarrantySaving(false);
+    }
+  }
+
+  async function handleDeleteWarranty(id) {
+    if (!window.confirm('Delete this warranty?')) return;
+    try {
+      await BidderAPI.deleteWarranty(id, companyId);
+      await loadWarranties();
+    } catch (e) {
+      alert('Failed to delete warranty');
+    }
+  }
 
   async function handleLogoFileChange(e) {
     const file = e.target.files?.[0];
@@ -457,6 +544,126 @@ export default function BidderAdminSettings({ companyId }) {
             {addingCat ? 'Adding…' : '+ Category'}
           </button>
         </div>
+      </div>
+    );
+  };
+
+  // ── Render: Warranties ────────────────────────────────────────────────────
+  const renderWarranties = () => {
+    if (warrantiesLoading) return <p className="text-sm text-gray-500">Loading warranties…</p>;
+
+    return (
+      <div className="space-y-4">
+        {warranties.length === 0 ? (
+          <div className="flex items-center justify-center h-24 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
+            <p className="text-sm text-gray-400">No warranties yet — add one below.</p>
+          </div>
+        ) : (
+          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+            {warranties.map(w => (
+              <div key={w.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-gray-800">{w.internal_name}</span>
+                    {w.is_default && <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">Default</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{w.warranty_title}</p>
+                </div>
+                <button
+                  onClick={() => setWarrantyModal({ mode: 'edit', data: { ...w, warranty_pdf_url: null } })}
+                  className="text-xs text-blue-600 hover:underline px-2"
+                >Edit</button>
+                <button
+                  onClick={() => handleDeleteWarranty(w.id)}
+                  className="text-xs text-red-500 hover:underline px-2"
+                >Delete</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => setWarrantyModal({ mode: 'add', data: { internal_name: '', warranty_title: '', warranty_pdf_url: null, is_default: false } })}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg"
+        >
+          + Add Warranty
+        </button>
+
+        {/* Add / Edit Modal */}
+        {warrantyModal && (
+          <div className="fixed inset-0 z-[1400] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setWarrantyModal(null)} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 flex flex-col max-h-[90vh]">
+              <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
+                <h3 className="font-bold text-gray-800">{warrantyModal.mode === 'add' ? 'Add Warranty' : 'Edit Warranty'}</h3>
+                <button onClick={() => setWarrantyModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <div className="px-6 py-4 overflow-y-auto space-y-4">
+
+                <div>
+                  <label className={labelCls}>Internal Warranty Name *</label>
+                  <input
+                    className={inputCls}
+                    value={warrantyModal.data.internal_name}
+                    onChange={e => setWarrantyModal(p => ({ ...p, data: { ...p.data, internal_name: e.target.value } }))}
+                    placeholder="e.g. Standard 1-Year Labor Warranty"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Used internally — not shown to customers.</p>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Warranty Title *</label>
+                  <input
+                    className={inputCls}
+                    value={warrantyModal.data.warranty_title}
+                    onChange={e => setWarrantyModal(p => ({ ...p, data: { ...p.data, warranty_title: e.target.value } }))}
+                    placeholder="e.g. 1-Year Workmanship Warranty"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Displayed on the proposal under the Warranty section.</p>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Warranty PDF {warrantyModal.mode === 'add' ? '*' : '(upload new to replace)'}</label>
+                  <label className={`flex items-center gap-2 w-full px-4 py-2.5 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer hover:bg-blue-50 transition ${pdfUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm text-blue-600 font-medium">
+                      {pdfUploading ? 'Reading…' : warrantyModal.data.warranty_pdf_url ? 'PDF selected ✓ (click to replace)' : 'Choose PDF file'}
+                    </span>
+                    <input type="file" accept="application/pdf" onChange={handleWarrantyPdfChange} className="sr-only" />
+                  </label>
+                  {warrantyModal.mode === 'edit' && !warrantyModal.data.warranty_pdf_url && (
+                    <p className="text-xs text-gray-400 mt-1">Leave blank to keep the existing PDF.</p>
+                  )}
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={warrantyModal.data.is_default || false}
+                    onChange={e => setWarrantyModal(p => ({ ...p, data: { ...p.data, is_default: e.target.checked } }))}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Set as default warranty for new bids</span>
+                </label>
+
+                {warrantyMsg && <p className="text-xs text-red-500">{warrantyMsg}</p>}
+              </div>
+              <div className="px-6 pb-5 pt-3 border-t shrink-0 flex gap-3">
+                <button onClick={() => setWarrantyModal(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl text-sm">Cancel</button>
+                <button
+                  onClick={handleSaveWarranty}
+                  disabled={warrantySaving}
+                  className="flex-1 py-2.5 bg-blue-600 text-white font-semibold rounded-xl text-sm disabled:opacity-50"
+                >
+                  {warrantySaving ? 'Saving…' : 'Save Warranty'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -712,18 +919,6 @@ export default function BidderAdminSettings({ companyId }) {
           />
         </div>
 
-        {/* Default Warranty */}
-        <div>
-          <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Default Warranty</h3>
-          <p className="text-xs text-gray-500 mb-2">Pre-fills the Warranty field on every new bid. Can be edited per-bid.</p>
-          <textarea
-            className={`${inputCls} h-24 resize-y`}
-            value={settingsForm.default_warranty}
-            onChange={(e) => setSettingsForm((p) => ({ ...p, default_warranty: e.target.value }))}
-            placeholder="e.g. This installation is warranted against peeling and delamination for 1 year from the date of installation…"
-          />
-        </div>
-
         {/* Terms & Conditions */}
         <div>
           <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Terms &amp; Conditions</h3>
@@ -841,11 +1036,13 @@ export default function BidderAdminSettings({ companyId }) {
       {/* Sub-tabs */}
       <div className="flex gap-2">
         <button className={tabBtn(section === 'library')} onClick={() => setSection('library')}>Item Library</button>
+        <button className={tabBtn(section === 'warranties')} onClick={() => setSection('warranties')}>Warranties</button>
         <button className={tabBtn(section === 'settings')} onClick={() => setSection('settings')}>Settings</button>
       </div>
 
-      {section === 'library' && renderLibrary()}
-      {section === 'settings' && renderSettings()}
+      {section === 'library'    && renderLibrary()}
+      {section === 'warranties' && renderWarranties()}
+      {section === 'settings'   && renderSettings()}
     </div>
   );
 }

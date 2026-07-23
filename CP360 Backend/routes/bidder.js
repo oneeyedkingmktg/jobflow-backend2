@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail } = require('../services/email');
+const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail, sendWarrantyEmail } = require('../services/email');
 const Stripe = require('stripe');
 const axios = require('axios');
 
@@ -245,7 +245,7 @@ router.put('/proposal/:id', async (req, res) => {
       customer_notes, internal_notes, bid_total, down_payment_type = 'percent',
       down_payment_value = 50, down_payment_amount = 0, balance_due,
       payment_url, include_payment_button, proposal_design_id, salesman,
-      site_conditions, warranty,
+      site_conditions, warranty_id,
     } = req.body;
 
     // Auto-set accepted_date when status transitions to accepted and no date was provided
@@ -261,7 +261,7 @@ router.put('/proposal/:id', async (req, res) => {
         down_payment_amount = $15, balance_due = $16,
         payment_url = $17, include_payment_button = $18,
         proposal_design_id = $19, salesman = $20,
-        site_conditions = $21, warranty = $22, updated_at = NOW()
+        site_conditions = $21, warranty_id = $22, updated_at = NOW()
        WHERE id = $23 AND ($24::integer IS NULL OR company_id = $24::integer)
        RETURNING *`,
       [
@@ -274,7 +274,7 @@ router.put('/proposal/:id', async (req, res) => {
         clean(payment_url), include_payment_button,
         clean(proposal_design_id), salesman ?? null,
         site_conditions ? JSON.stringify(site_conditions) : '{}',
-        clean(warranty),
+        warranty_id ? parseInt(warranty_id) : null,
         id, companyId,
       ]
     );
@@ -1045,6 +1045,178 @@ router.delete('/payment/:id', async (req, res) => {
 });
 
 // ============================================================================
+// WARRANTIES
+// ============================================================================
+
+// GET /api/bidder/warranties
+router.get('/warranties', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const result = await pool.query(
+      `SELECT id, internal_name, warranty_title, warranty_pdf_url, is_default, created_at
+       FROM warranties WHERE company_id = $1
+       ORDER BY is_default DESC, internal_name`,
+      [companyId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /bidder/warranties error:', err);
+    res.status(500).json({ error: 'Failed to fetch warranties' });
+  }
+});
+
+// POST /api/bidder/warranties
+router.post('/warranties', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { internal_name, warranty_title, warranty_pdf_url, is_default = false } = req.body;
+    if (!internal_name || !warranty_title || !warranty_pdf_url) {
+      return res.status(400).json({ error: 'internal_name, warranty_title, and warranty_pdf_url are required' });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (is_default) {
+        await client.query('UPDATE warranties SET is_default = false WHERE company_id = $1', [companyId]);
+      }
+      const result = await client.query(
+        `INSERT INTO warranties (company_id, internal_name, warranty_title, warranty_pdf_url, is_default)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id, internal_name, warranty_title, warranty_pdf_url, is_default, created_at`,
+        [companyId, internal_name, warranty_title, warranty_pdf_url, is_default]
+      );
+      await client.query('COMMIT');
+      res.status(201).json(result.rows[0]);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('POST /bidder/warranties error:', err);
+    res.status(500).json({ error: 'Failed to create warranty' });
+  }
+});
+
+// PUT /api/bidder/warranties/:id
+router.put('/warranties/:id', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { internal_name, warranty_title, warranty_pdf_url, is_default = false } = req.body;
+    if (!internal_name || !warranty_title) {
+      return res.status(400).json({ error: 'internal_name and warranty_title are required' });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (is_default) {
+        await client.query(
+          'UPDATE warranties SET is_default = false WHERE company_id = $1 AND id != $2',
+          [companyId, req.params.id]
+        );
+      }
+      const result = await client.query(
+        `UPDATE warranties SET
+          internal_name = $1, warranty_title = $2,
+          warranty_pdf_url = COALESCE($3, warranty_pdf_url),
+          is_default = $4, updated_at = NOW()
+         WHERE id = $5 AND company_id = $6
+         RETURNING id, internal_name, warranty_title, warranty_pdf_url, is_default, created_at`,
+        [internal_name, warranty_title, warranty_pdf_url || null, is_default, req.params.id, companyId]
+      );
+      await client.query('COMMIT');
+      if (!result.rows.length) return res.status(404).json({ error: 'Warranty not found' });
+      res.json(result.rows[0]);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('PUT /bidder/warranties/:id error:', err);
+    res.status(500).json({ error: 'Failed to update warranty' });
+  }
+});
+
+// DELETE /api/bidder/warranties/:id
+router.delete('/warranties/:id', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const result = await pool.query(
+      'DELETE FROM warranties WHERE id = $1 AND company_id = $2 RETURNING id',
+      [req.params.id, companyId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Warranty not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /bidder/warranties/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete warranty' });
+  }
+});
+
+// POST /api/bidder/proposal/:id/send-warranty-email
+router.post('/proposal/:id/send-warranty-email', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const row = (await pool.query(
+      `SELECT bp.warranty_id,
+              l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
+              c.ghl_company_from_name, c.name as company_db_name,
+              bcs.email_from_name, bcs.email_from_email,
+              bp.proposal_design_id, bcs.preferred_proposal_design_id,
+              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+       FROM bidder_proposals bp
+       JOIN leads l ON bp.lead_id = l.id
+       JOIN companies c ON bp.company_id = c.id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = bp.company_id
+       LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
+       LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
+       WHERE bp.id = $1 AND ($2::integer IS NULL OR bp.company_id = $2::integer)`,
+      [req.params.id, companyId]
+    )).rows[0];
+
+    if (!row) return res.status(404).json({ error: 'Proposal not found' });
+    if (!row.warranty_id) return res.status(400).json({ error: 'No warranty attached to this proposal' });
+
+    const toEmail = req.body.email || row.lead_email;
+    if (!toEmail) return res.status(400).json({ error: 'No email address provided' });
+
+    const warranty = (await pool.query(
+      'SELECT warranty_title, warranty_pdf_url FROM warranties WHERE id = $1',
+      [row.warranty_id]
+    )).rows[0];
+    if (!warranty) return res.status(404).json({ error: 'Warranty record not found' });
+
+    const companyName   = row.ghl_company_from_name || row.company_db_name || '';
+    const customerName  = row.lead_name || row.lead_name_short || '';
+    const primaryColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_primary_color || '#1c2333') : null;
+    const accentColor   = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_accent_color  || '#f97316') : null;
+
+    await sendWarrantyEmail({
+      toEmail,
+      customerName,
+      companyName,
+      warrantyTitle:      warranty.warranty_title,
+      warrantyPdfDataUrl: warranty.warranty_pdf_url,
+      fromName:           row.email_from_name  || companyName || undefined,
+      fromEmail:          row.email_from_email || undefined,
+      primaryColor,
+      accentColor,
+    });
+
+    res.json({ success: true, sentTo: toEmail });
+  } catch (err) {
+    console.error('POST /bidder/proposal/:id/send-warranty-email error:', err);
+    res.status(500).json({ error: 'Failed to send warranty email' });
+  }
+});
+
+// ============================================================================
 // PUBLIC PROPOSAL (web proposal page — Phase 7)
 // ============================================================================
 
@@ -1070,13 +1242,15 @@ router.get('/public/:id', async (req, res) => {
               bcs.preferred_proposal_design_id, bcs.logo_url,
               u.name AS created_by_name,
               COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color,
+              w.warranty_title
        FROM bidder_proposals bp
        JOIN companies c ON bp.company_id = c.id
        LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
        LEFT JOIN users u ON bp.created_by_user_id = u.id
        LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
        LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
+       LEFT JOIN warranties w ON w.id = bp.warranty_id
        WHERE bp.doc_number = $1`,
       [parseInt(req.params.id, 10)]
     );
@@ -1554,6 +1728,65 @@ router.post('/public/:id/payment-received', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/payment-received error:', err);
     res.status(500).json({ error: 'Failed to send payment notification' });
+  }
+});
+
+// POST /api/bidder/public/:id/send-warranty-email — no auth required
+router.post('/public/:id/send-warranty-email', async (req, res) => {
+  try {
+    const row = (await pool.query(
+      `SELECT bp.warranty_id,
+              l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
+              c.ghl_company_from_name, c.name as company_db_name,
+              bcs.email_from_name, bcs.email_from_email,
+              bp.proposal_design_id, bcs.preferred_proposal_design_id,
+              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+       FROM bidder_proposals bp
+       JOIN leads l ON bp.lead_id = l.id
+       JOIN companies c ON bp.company_id = c.id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
+       LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
+       LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
+       WHERE bp.doc_number = $1`,
+      [parseInt(req.params.id, 10)]
+    )).rows[0];
+
+    if (!row) return res.status(404).json({ error: 'Proposal not found' });
+    if (!row.warranty_id) return res.status(400).json({ error: 'No warranty attached to this proposal' });
+
+    const toEmail = req.body.email || row.lead_email;
+    if (!toEmail) return res.status(400).json({ error: 'No email address provided' });
+
+    const warranty = (await pool.query(
+      'SELECT warranty_title, warranty_pdf_url FROM warranties WHERE id = $1',
+      [row.warranty_id]
+    )).rows[0];
+    if (!warranty) return res.status(404).json({ error: 'Warranty record not found' });
+
+    const companyName   = row.ghl_company_from_name || row.company_db_name || '';
+    const customerName  = row.lead_name || row.lead_name_short || '';
+    const primaryColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_primary_color || '#1c2333') : null;
+    const accentColor   = (row.proposal_design_id || row.preferred_proposal_design_id)
+      ? (row.design_accent_color  || '#f97316') : null;
+
+    await sendWarrantyEmail({
+      toEmail,
+      customerName,
+      companyName,
+      warrantyTitle:      warranty.warranty_title,
+      warrantyPdfDataUrl: warranty.warranty_pdf_url,
+      fromName:           row.email_from_name  || companyName || undefined,
+      fromEmail:          row.email_from_email || undefined,
+      primaryColor,
+      accentColor,
+    });
+
+    res.json({ success: true, sentTo: toEmail });
+  } catch (err) {
+    console.error('POST /bidder/public/:id/send-warranty-email error:', err);
+    res.status(500).json({ error: 'Failed to send warranty email' });
   }
 });
 

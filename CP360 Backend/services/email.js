@@ -264,9 +264,86 @@ async function sendPaymentReceivedEmail({ contractorEmail, customerEmail, custom
   await Promise.all(sends);
 }
 
+async function sendWarrantyEmail({ toEmail, customerName, companyName, warrantyTitle, warrantyPdfDataUrl, fromName, fromEmail, primaryColor = null, accentColor = null }) {
+  const displayName = fromName || companyName || 'CoatingPro360';
+  const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo     = fromEmail || undefined;
+  const subject     = `Here is your ${companyName || displayName} project warranty`;
+
+  let html;
+  if (primaryColor && accentColor) {
+    const HBG = primaryColor;
+    const AC  = accentColor;
+    html = [
+      `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
+      `<tr><td bgcolor="${HBG}" style="padding:24px 28px">`,
+      `<h2 style="color:#fff;margin:0;font-size:22px;font-weight:900;letter-spacing:0.5px;font-family:Arial,sans-serif">${displayName}</h2>`,
+      `</td></tr>`,
+      `<tr><td bgcolor="${AC}" style="height:4px;font-size:1px;line-height:1px">&nbsp;</td></tr>`,
+      `<tr><td bgcolor="#ffffff" style="padding:28px;border:1px solid #e5e7eb;border-top:none">`,
+      `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
+      `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Please find your project warranty attached to this email. This document outlines the coverage and terms of your warranty with ${companyName || 'us'}. Keep it for your records — if you have any questions, don't hesitate to reach out.</p>`,
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border:2px solid ${HBG};border-radius:6px">`,
+      `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
+      `<p style="margin:0;font-size:11px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">WARRANTY</p>`,
+      `</td></tr>`,
+      `<tr><td style="padding:16px">`,
+      `<p style="margin:0;font-size:17px;font-weight:bold;color:${HBG};font-family:Arial,sans-serif">${warrantyTitle}</p>`,
+      `</td></tr></table>`,
+      `</td></tr>`,
+      `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
+      `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; Thank you for your business!</p>`,
+      `</td></tr>`,
+      `</table>`,
+    ].join('');
+  } else {
+    html = [
+      `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
+      `<tr><td bgcolor="#1d4ed8" style="padding:24px 28px;border-radius:8px 8px 0 0">`,
+      `<h2 style="color:#fff;margin:0;font-size:22px;font-family:Arial,sans-serif">${displayName}</h2>`,
+      `</td></tr>`,
+      `<tr><td bgcolor="#f9fafb" style="padding:28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">`,
+      `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
+      `<p style="font-size:15px;color:#374151;margin:0 0 20px;font-family:Arial,sans-serif">Please find your project warranty attached to this email. This document outlines the coverage and terms of your warranty with ${companyName || 'us'}. Keep it for your records — if you have any questions, don't hesitate to reach out.</p>`,
+      `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">`,
+      `<tr><td bgcolor="#ffffff" style="border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px">`,
+      `<p style="margin:0 0 4px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:bold;font-family:Arial,sans-serif">WARRANTY</p>`,
+      `<p style="margin:0;font-size:18px;font-weight:bold;color:#111;font-family:Arial,sans-serif">${warrantyTitle}</p>`,
+      `</td></tr></table>`,
+      `<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">`,
+      `<p style="color:#9ca3af;font-size:12px;margin:0;font-family:Arial,sans-serif">${displayName}</p>`,
+      `</td></tr></table>`,
+    ].join('');
+  }
+
+  // Extract base64 payload from data URL
+  let attachmentContent = null;
+  if (warrantyPdfDataUrl) {
+    const match = warrantyPdfDataUrl.match(/^data:[^;]+;base64,(.+)$/s);
+    if (match) attachmentContent = match[1];
+  }
+
+  await transporter.sendMail({
+    from: fromHeader,
+    ...(replyTo && { replyTo }),
+    to: toEmail,
+    subject,
+    html,
+    ...(attachmentContent ? {
+      attachments: [{
+        filename: 'warranty.pdf',
+        content: attachmentContent,
+        encoding: 'base64',
+        contentType: 'application/pdf',
+      }],
+    } : {}),
+  });
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendProposalAcceptedEmails,
   sendProposalLinkEmail,
   sendPaymentReceivedEmail,
+  sendWarrantyEmail,
 };

@@ -47,7 +47,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     presented_date: '', accepted_date: '',
     customer_notes: '', internal_notes: '',
     payment_url: '', include_payment_button: true,
-    site_conditions: {}, warranty: '',
+    site_conditions: {}, warranty_id: null,
   });
   const [showSiteCondModal,  setShowSiteCondModal]  = useState(false);
   const [showWarrantyModal,  setShowWarrantyModal]  = useState(false);
@@ -70,9 +70,12 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     : window.location.origin;
   const dn = docId(proposalId);
 
-  const [emailSending,     setEmailSending]     = useState(false);
-  const [emailMsg,         setEmailMsg]         = useState('');
-  const [emailModal,       setEmailModal]       = useState({ show: false, addr: '', type: 'proposal', invoiceNum: null });
+  const [emailSending,          setEmailSending]          = useState(false);
+  const [emailMsg,              setEmailMsg]              = useState('');
+  const [emailModal,            setEmailModal]            = useState({ show: false, addr: '', type: 'proposal', invoiceNum: null });
+  const [warranties,            setWarranties]            = useState([]);
+  const [warrantyEmailSending,  setWarrantyEmailSending]  = useState(false);
+  const [warrantyEmailModal,    setWarrantyEmailModal]    = useState({ show: false, addr: '' });
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -82,17 +85,24 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   async function load() {
     setLoading(true);
     try {
-      const [p, lib, companyRes, settingsRes] = await Promise.all([
+      const [p, lib, companyRes, settingsRes, warrantyList] = await Promise.all([
         BidderAPI.getProposal(proposalId),
         BidderAPI.getLibrary(lead.companyId),
         lead.companyId ? CompaniesAPI.get(lead.companyId) : Promise.resolve(null),
         BidderAPI.getCompanySettings(lead.companyId).catch(() => null),
+        BidderAPI.getWarranties(lead.companyId).catch(() => []),
       ]);
       if (companyRes?.company) setCompany(companyRes.company);
       if (settingsRes) setCompanySettings(settingsRes);
 
       setProposal(p);
       setLibrary(lib);
+      const wList = warrantyList || [];
+      setWarranties(wList);
+
+      // Default warranty: use bid's saved warranty_id, or fall back to the library default
+      const defaultWarranty = wList.find(w => w.is_default);
+      const resolvedWarrantyId = p.warranty_id || (defaultWarranty?.id ?? null);
 
       // Populate header form
       setHdr({
@@ -107,7 +117,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         include_payment_button: p.include_payment_button ?? true,
         salesman:               p.salesman || p.created_by_name || user?.name || '',
         site_conditions:        p.site_conditions   || {},
-        warranty:               p.warranty          || settingsRes?.default_warranty || '',
+        warranty_id:            resolvedWarrantyId,
       });
 
       // Library items (non-freeform only)
@@ -449,6 +459,45 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       setEmailMsg(e.message || 'Failed to send');
     } finally {
       setEmailSending(false);
+    }
+  }
+
+  // ── Warranty email ────────────────────────────────────────────────────────
+  function openWarrantyEmailModal() {
+    setEmailMsg('');
+    setWarrantyEmailModal({ show: true, addr: lead.email || '' });
+  }
+
+  async function handleSendWarrantyEmail() {
+    const { addr } = warrantyEmailModal;
+    if (!addr.trim()) { setEmailMsg('Please enter an email address'); return; }
+    setWarrantyEmailModal(prev => ({ ...prev, show: false }));
+    setWarrantyEmailSending(true);
+    setEmailMsg('');
+    try {
+      const result = await BidderAPI.sendWarrantyEmail(proposalId, addr.trim());
+      setEmailMsg(`Warranty sent to ${result.sentTo}`);
+    } catch (e) {
+      setEmailMsg(e.message || 'Failed to send warranty');
+    } finally {
+      setWarrantyEmailSending(false);
+    }
+  }
+
+  function openWarrantyPdf() {
+    const selectedW = warranties.find(w => w.id === (hdr.warranty_id || proposal?.warranty_id));
+    if (!selectedW?.warranty_pdf_url) return;
+    const match = selectedW.warranty_pdf_url.match(/^data:[^;]+;base64,(.+)$/s);
+    if (!match) { window.open(selectedW.warranty_pdf_url, '_blank'); return; }
+    try {
+      const bytes = atob(match[1]);
+      const ab = new ArrayBuffer(bytes.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < bytes.length; i++) ia[i] = bytes.charCodeAt(i);
+      const blob = new Blob([ab], { type: 'application/pdf' });
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch (_) {
+      window.open(selectedW.warranty_pdf_url, '_blank');
     }
   }
 
@@ -968,13 +1017,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
             {/* Warranty checkbox */}
             {(() => {
-              const hasWarranty = !!(hdr.warranty && hdr.warranty.trim());
+              const selectedWarranty = warranties.find(w => w.id === hdr.warranty_id);
               return (
                 <div>
                   <label className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setShowWarrantyModal(true)}>
-                    <input type="checkbox" readOnly checked={hasWarranty} className="w-4 h-4 cursor-pointer" />
+                    <input type="checkbox" readOnly checked={!!hdr.warranty_id} className="w-4 h-4 cursor-pointer" />
                     <span className="text-sm font-semibold text-gray-700">Warranty</span>
-                    {hasWarranty && <span className="text-xs text-blue-600 font-medium">— filled</span>}
+                    {selectedWarranty && <span className="text-xs text-blue-600 font-medium">— {selectedWarranty.internal_name}</span>}
                   </label>
                   <hr className="mt-2 border-gray-200" />
                 </div>
@@ -1104,6 +1153,28 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     </div>
                   );
                 })()}
+                {/* Warranty row — only shown when a warranty is attached */}
+                {(hdr.warranty_id || proposal?.warranty_id) && (() => {
+                  const wid = hdr.warranty_id || proposal?.warranty_id;
+                  const selectedW = warranties.find(w => w.id === wid);
+                  return (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={openWarrantyPdf}
+                        className="flex-1 px-4 py-3 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 text-sm text-left"
+                      >
+                        📋 View / Print Warranty
+                      </button>
+                      <button
+                        onClick={openWarrantyEmailModal}
+                        disabled={warrantyEmailSending}
+                        className="px-3 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-xs whitespace-nowrap"
+                      >
+                        {warrantyEmailSending ? '…' : '✉ Email'}
+                      </button>
+                    </div>
+                  );
+                })()}
                 )}
               </div>
               <div className="px-6 pb-4 border-t pt-3">
@@ -1214,23 +1285,35 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         );
       })()}
 
-      {/* ── WARRANTY MODAL ───────────────────────────────────────────────── */}
+      {/* ── WARRANTY PICKER MODAL ───────────────────────────────────────── */}
       {showWarrantyModal && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowWarrantyModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 flex flex-col max-h-[70vh]">
             <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-gray-800">Warranty</h3>
+              <h3 className="font-bold text-gray-800">Select Warranty</h3>
               <button onClick={() => setShowWarrantyModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
-            <div className="px-6 py-4 overflow-y-auto flex-1">
-              <textarea
-                className={`${inputCls} h-40 resize-y`}
-                value={hdr.warranty}
-                onChange={e => setHdr(p => ({ ...p, warranty: e.target.value }))}
-                placeholder="Enter warranty terms…"
-                autoFocus
-              />
+            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-2">
+              {warranties.length === 0 ? (
+                <p className="text-sm text-gray-500">No warranties in your library yet. Add warranties in Bidder Settings → Warranties.</p>
+              ) : (
+                <>
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="warranty_pick" checked={!hdr.warranty_id} onChange={() => setHdr(p => ({ ...p, warranty_id: null }))} className="w-4 h-4" />
+                    <span className="text-sm text-gray-400 italic">No warranty</span>
+                  </label>
+                  {warranties.map(w => (
+                    <label key={w.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-blue-50">
+                      <input type="radio" name="warranty_pick" checked={hdr.warranty_id === w.id} onChange={() => setHdr(p => ({ ...p, warranty_id: w.id }))} className="w-4 h-4" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{w.internal_name}</p>
+                        <p className="text-xs text-gray-500">{w.warranty_title}</p>
+                      </div>
+                    </label>
+                  ))}
+                </>
+              )}
             </div>
             <div className="px-6 pb-5 pt-3 border-t shrink-0">
               <button
@@ -1240,6 +1323,36 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               >
                 {saving ? 'Saving…' : 'Save & Close'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WARRANTY EMAIL MODAL ─────────────────────────────────────────── */}
+      {warrantyEmailModal.show && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1350] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="font-bold text-gray-800">Email Warranty</h3>
+              <button onClick={() => setWarrantyEmailModal(prev => ({ ...prev, show: false }))} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Send To</label>
+                <input
+                  type="email"
+                  value={warrantyEmailModal.addr}
+                  onChange={e => setWarrantyEmailModal(prev => ({ ...prev, addr: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="customer@email.com"
+                  autoFocus
+                />
+              </div>
+              <p className="text-xs text-gray-400">Sends the warranty PDF as an email attachment to the customer.</p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => setWarrantyEmailModal(prev => ({ ...prev, show: false }))} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm">Cancel</button>
+              <button onClick={handleSendWarrantyEmail} disabled={warrantyEmailSending} className="flex-1 px-4 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-sm">Send</button>
             </div>
           </div>
         </div>

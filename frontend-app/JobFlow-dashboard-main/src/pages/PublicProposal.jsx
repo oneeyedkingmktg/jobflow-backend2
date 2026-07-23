@@ -64,6 +64,9 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
   const [sigName,    setSigName]    = useState('');
   const [signing,    setSigning]    = useState(false);
   const [justSigned, setJustSigned] = useState(false);
+  const [warrantyEmailModal,  setWarrantyEmailModal]  = useState({ show: false, addr: '' });
+  const [warrantyEmailSending, setWarrantyEmailSending] = useState(false);
+  const [warrantyEmailMsg,     setWarrantyEmailMsg]     = useState('');
 
   useEffect(() => {
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
@@ -227,8 +230,30 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     ? Object.entries(proposal.site_conditions).filter(([, v]) => v && String(v).trim())
     : [];
   const hasSiteConditions = siteConditions.length > 0;
-  const warrantyText      = (proposal.warranty || '').trim();
+  const warrantyTitle     = (proposal.warranty_title || '').trim();
+  const warrantyText      = warrantyTitle || (proposal.warranty || '').trim();
   const designId     = proposal.proposal_design_id || proposal.preferred_proposal_design_id;
+
+  async function handleSendWarrantyEmail() {
+    if (!warrantyEmailModal.addr.trim()) return;
+    setWarrantyEmailSending(true);
+    setWarrantyEmailMsg('');
+    try {
+      const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
+      const resp = await fetch(`${apiBase}/api/bidder/public/${proposalId}/send-warranty-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: warrantyEmailModal.addr.trim() }),
+      });
+      if (!resp.ok) throw new Error('Send failed');
+      setWarrantyEmailMsg('Warranty emailed successfully!');
+      setTimeout(() => setWarrantyEmailModal({ show: false, addr: '' }), 1500);
+    } catch {
+      setWarrantyEmailMsg('Failed to send. Please try again.');
+    } finally {
+      setWarrantyEmailSending(false);
+    }
+  }
 
   // Pre-sort items for proposal view
   const allSortedItems = [
@@ -770,11 +795,22 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
           {/* Warranty */}
           {warrantyText && (
             <div className="bg-white rounded-xl shadow-sm px-5 py-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
-                <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Warranty</span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: AC }} />
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: HBG }}>Warranty</span>
+                </div>
+                {warrantyTitle && (
+                  <button
+                    onClick={() => setWarrantyEmailModal({ show: true, addr: lead?.email || proposal?.contact_email || '' })}
+                    className="no-print text-xs px-3 py-1.5 rounded-lg font-semibold text-white"
+                    style={{ background: HBG }}
+                  >
+                    ✉ Email Warranty
+                  </button>
+                )}
               </div>
-              <p className="text-sm text-gray-600 whitespace-pre-line">{warrantyText}</p>
+              <p className="text-sm text-gray-600 font-medium">{warrantyTitle || warrantyText}</p>
             </div>
           )}
 
@@ -841,6 +877,36 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             </p>
           </div>
         </div>
+
+        {/* Warranty email modal */}
+        {warrantyEmailModal.show && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+              <div className="px-6 py-4 border-b flex items-center justify-between">
+                <h3 className="font-bold text-gray-800">Email Warranty</h3>
+                <button onClick={() => setWarrantyEmailModal({ show: false, addr: '' })} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Send To</label>
+                  <input
+                    type="email"
+                    value={warrantyEmailModal.addr}
+                    onChange={e => setWarrantyEmailModal(prev => ({ ...prev, addr: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="customer@email.com"
+                    autoFocus
+                  />
+                </div>
+                {warrantyEmailMsg && <p className={`text-sm font-medium ${warrantyEmailMsg.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{warrantyEmailMsg}</p>}
+              </div>
+              <div className="px-6 pb-5 flex gap-3">
+                <button onClick={() => setWarrantyEmailModal({ show: false, addr: '' })} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm">Cancel</button>
+                <button onClick={handleSendWarrantyEmail} disabled={warrantyEmailSending} className="flex-1 px-4 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-sm">{warrantyEmailSending ? 'Sending…' : 'Send'}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     );
@@ -1053,8 +1119,18 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
         {/* Warranty */}
         {warrantyText && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Warranty</p>
-            <p className="text-sm text-gray-700 whitespace-pre-line">{warrantyText}</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Warranty</p>
+              {warrantyTitle && (
+                <button
+                  onClick={() => setWarrantyEmailModal({ show: true, addr: lead?.email || proposal?.contact_email || '' })}
+                  className="no-print text-xs px-3 py-1.5 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  ✉ Email Warranty
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-gray-700 font-medium">{warrantyTitle || warrantyText}</p>
           </div>
         )}
 
@@ -1110,6 +1186,36 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
           )}
           <p>{[companyPhone, companyEmail].filter(Boolean).join(' · ')}</p>
         </div>
+
+        {/* Warranty email modal */}
+        {warrantyEmailModal.show && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+              <div className="px-6 py-4 border-b flex items-center justify-between">
+                <h3 className="font-bold text-gray-800">Email Warranty</h3>
+                <button onClick={() => setWarrantyEmailModal({ show: false, addr: '' })} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Send To</label>
+                  <input
+                    type="email"
+                    value={warrantyEmailModal.addr}
+                    onChange={e => setWarrantyEmailModal(prev => ({ ...prev, addr: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="customer@email.com"
+                    autoFocus
+                  />
+                </div>
+                {warrantyEmailMsg && <p className={`text-sm font-medium ${warrantyEmailMsg.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{warrantyEmailMsg}</p>}
+              </div>
+              <div className="px-6 pb-5 flex gap-3">
+                <button onClick={() => setWarrantyEmailModal({ show: false, addr: '' })} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 text-sm">Cancel</button>
+                <button onClick={handleSendWarrantyEmail} disabled={warrantyEmailSending} className="flex-1 px-4 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 text-sm">{warrantyEmailSending ? 'Sending…' : 'Send'}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
