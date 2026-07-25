@@ -23,13 +23,34 @@ const upload = multer({
 });
 
 // ------------------------------------------------------------------
+// Map stored project_type codes to human-readable labels.
+// Falls back to the raw value for free-text entries.
+// ------------------------------------------------------------------
+const PROJECT_TYPE_LABELS = {
+  garage_1: "1 Car Garage",
+  garage_2: "2 Car Garage",
+  garage_3: "3 Car Garage",
+  garage_4: "4 Car Garage",
+  patio: "Patio",
+  basement: "Basement",
+  commercial: "Commercial",
+};
+
+function buildFolderName(leadName, projectType) {
+  const name = leadName || "Lead";
+  if (!projectType) return name;
+  const label = PROJECT_TYPE_LABELS[projectType] || projectType;
+  return `${name} - ${label}`;
+}
+
+// ------------------------------------------------------------------
 // Helper: resolve lead folder for a given leadId.
 // create=true  → get or create the folder (used on upload)
 // create=false → find only, return null if folder doesn't exist yet (used on list)
 // ------------------------------------------------------------------
 async function resolveLeadFolder(leadId, { create = true } = {}) {
   const leadResult = await db.query(
-    `SELECT id, name, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, name, project_type, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
     [leadId]
   );
   if (!leadResult.rows.length)
@@ -52,10 +73,12 @@ async function resolveLeadFolder(leadId, { create = true } = {}) {
     );
   }
 
+  const folderName = buildFolderName(lead.name, lead.project_type);
+
   if (create) {
-    return getOrCreateFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+    return getOrCreateFolder(folderName, company.google_drive_base_folder_id);
   }
-  return findFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+  return findFolder(folderName, company.google_drive_base_folder_id);
 }
 
 // ============================================================================
