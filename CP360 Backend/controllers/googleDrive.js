@@ -125,7 +125,8 @@ async function findFolder(folderName, parentFolderId) {
 
   const searchRes = await drive.files.list({
     q: `mimeType = 'application/vnd.google-apps.folder' and name = '${safeName}' and '${parentFolderId}' in parents and trashed = false`,
-    fields: "files(id, name, webViewLink)",
+    fields: "files(id, name, webViewLink, createdTime)",
+    orderBy: "createdTime asc",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
   });
@@ -166,7 +167,8 @@ async function findFolderByPrefix(prefix, parentFolderId) {
 
   const res = await drive.files.list({
     q: `mimeType = 'application/vnd.google-apps.folder' and name contains '${safePrefix}' and '${parentFolderId}' in parents and trashed = false`,
-    fields: "files(id, name, webViewLink)",
+    fields: "files(id, name, webViewLink, createdTime)",
+    orderBy: "createdTime asc",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
   });
