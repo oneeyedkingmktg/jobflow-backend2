@@ -11,6 +11,8 @@ const db = require("../config/database");
 const {
   getOAuthClient,
   findFolder,
+  findFolderByPrefix,
+  renameFolder,
   getOrCreateFolder,
   listFilesInFolder,
   uploadFileToFolder,
@@ -81,15 +83,24 @@ async function resolveLeadFolder(leadId, { create = true } = {}) {
   const fullName = typeLabel ? `${baseName} - ${typeLabel}` : baseName;
   const parentId = company.google_drive_base_folder_id;
 
-  // Always search for an existing folder before creating.
-  // Try the full "Name - Type" form first, then fall back to the base
-  // name so we reuse whatever folder was originally created.
-  const existing =
-    (fullName !== baseName ? await findFolder(fullName, parentId) : null) ||
-    await findFolder(baseName, parentId);
+  // 1. Exact match on the current expected name — nothing to do.
+  const exactMatch = await findFolder(fullName, parentId);
+  if (exactMatch) return exactMatch;
 
-  if (existing) return existing;
+  // 2. Look for any folder that starts with the lead's base name
+  //    (handles name-only folders and folders with an old project type).
+  const existingFolder = await findFolderByPrefix(baseName, parentId);
 
+  if (existingFolder) {
+    // Rename to the current expected name so it stays in sync.
+    if (existingFolder.name !== fullName) {
+      await renameFolder(existingFolder.id, fullName);
+      existingFolder.name = fullName;
+    }
+    return existingFolder;
+  }
+
+  // 3. No folder found at all — create one (write path only).
   if (create) {
     return getOrCreateFolder(fullName, parentId);
   }

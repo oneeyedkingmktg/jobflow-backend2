@@ -156,6 +156,43 @@ async function getOrCreateFolder(folderName, parentFolderId) {
 }
 
 // ------------------------------------------------------------------
+// Find any folder whose name exactly matches the prefix OR starts with
+// "prefix - " (catches folders created with any project type suffix).
+// Used to locate the lead folder when the project type may have changed.
+// ------------------------------------------------------------------
+async function findFolderByPrefix(prefix, parentFolderId) {
+  const drive = getServiceAccountDriveClient();
+  const safePrefix = prefix.replace(/'/g, "\\'");
+
+  const res = await drive.files.list({
+    q: `mimeType = 'application/vnd.google-apps.folder' and name contains '${safePrefix}' and '${parentFolderId}' in parents and trashed = false`,
+    fields: "files(id, name, webViewLink)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+
+  const match = (res.data.files || []).find(
+    (f) => f.name === prefix || f.name.startsWith(`${prefix} - `)
+  );
+  return match || null;
+}
+
+// ------------------------------------------------------------------
+// Rename an existing folder.
+// Uses OAuth client because renaming is a write operation.
+// ------------------------------------------------------------------
+async function renameFolder(folderId, newName) {
+  const drive = await requireOAuthDriveClient();
+  const res = await drive.files.update({
+    fileId: folderId,
+    requestBody: { name: newName },
+    fields: "id, name, webViewLink",
+    supportsAllDrives: true,
+  });
+  return res.data;
+}
+
+// ------------------------------------------------------------------
 // List files in a folder
 // ------------------------------------------------------------------
 async function listFilesInFolder(folderId) {
@@ -201,6 +238,8 @@ module.exports = {
   requireOAuthDriveClient,
   getOAuthClient,
   findFolder,
+  findFolderByPrefix,
+  renameFolder,
   getOrCreateFolder,
   listFilesInFolder,
   uploadFileToFolder,
