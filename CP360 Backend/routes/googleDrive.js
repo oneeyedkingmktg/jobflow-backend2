@@ -171,6 +171,47 @@ router.post("/lead-folder", async (req, res) => {
 });
 
 // ------------------------------------------------------------------
+// GET /google-drive/lead-folder-init?leadId=X
+// Get or create the lead's root folder plus Before and After subfolders.
+// Returns { root, before, after } each with { id, name }.
+// Called when the folder picker modal opens.
+// ------------------------------------------------------------------
+router.get("/lead-folder-init", async (req, res) => {
+  try {
+    const { leadId } = req.query;
+    if (!leadId) return res.status(400).json({ error: "Missing leadId" });
+
+    const root = await resolveLeadFolder(leadId, { create: true });
+    const [before, after] = await Promise.all([
+      getOrCreateFolder("Before", root.id),
+      getOrCreateFolder("After", root.id),
+    ]);
+
+    return res.json({ ok: true, root, before, after });
+  } catch (err) {
+    console.error("❌ LEAD FOLDER INIT ERROR", err);
+    return res.status(err.status || 500).json({ ok: false, error: err.message, needsReauth: err.needsReauth || false });
+  }
+});
+
+// ------------------------------------------------------------------
+// GET /google-drive/folder-contents?folderId=X
+// List files inside any folder by its Drive ID (used for subfolder navigation)
+// ------------------------------------------------------------------
+router.get("/folder-contents", async (req, res) => {
+  try {
+    const { folderId } = req.query;
+    if (!folderId) return res.status(400).json({ error: "Missing folderId" });
+
+    const files = await listFilesInFolder(folderId);
+    return res.json({ ok: true, files });
+  } catch (err) {
+    console.error("❌ FOLDER CONTENTS ERROR", err);
+    return res.status(err.status || 500).json({ ok: false, error: err.message });
+  }
+});
+
+// ------------------------------------------------------------------
 // GET /google-drive/lead-files?leadId=X
 // List files in a lead's Drive folder
 // ------------------------------------------------------------------
@@ -209,13 +250,22 @@ router.get("/lead-files", async (req, res) => {
 // ------------------------------------------------------------------
 router.post("/upload-file", upload.single("file"), async (req, res) => {
   try {
-    const { leadId } = req.body;
-    if (!leadId) return res.status(400).json({ error: "Missing leadId" });
+    const { leadId, folderId } = req.body;
+    if (!leadId && !folderId) return res.status(400).json({ error: "Missing leadId or folderId" });
     if (!req.file) return res.status(400).json({ error: "No file provided" });
 
-    const folder = await resolveLeadFolder(leadId);
+    // If a specific subfolder ID is provided, upload there directly;
+    // otherwise resolve the lead's root folder (creating it if needed).
+    let targetFolderId;
+    if (folderId) {
+      targetFolderId = folderId;
+    } else {
+      const folder = await resolveLeadFolder(leadId);
+      targetFolderId = folder.id;
+    }
+
     const uploaded = await uploadFileToFolder(
-      folder.id,
+      targetFolderId,
       req.file.originalname,
       req.file.mimetype,
       req.file.buffer

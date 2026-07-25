@@ -1,6 +1,8 @@
 // ============================================================================
 // File: src/leadModalParts/LeadFilesPanel.jsx
-// Purpose: Modal for viewing and uploading files to Google Drive
+// Purpose: Modal for viewing and uploading files to Google Drive.
+//          Phase 1 = folder picker (Before / After / Other).
+//          Phase 2 = file browser inside the chosen folder.
 // ============================================================================
 
 import React, { useEffect, useRef, useState } from "react";
@@ -30,7 +32,7 @@ function fileIcon(mimeType) {
   if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "📊";
   if (mimeType.includes("document") || mimeType.includes("word")) return "📝";
   if (mimeType.startsWith("video/")) return "🎥";
-  return "📁";
+  return "📄";
 }
 
 function formatSize(bytes) {
@@ -38,6 +40,24 @@ function formatSize(bytes) {
   const kb = Number(bytes) / 1024;
   if (kb < 1024) return `${Math.round(kb)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+function FolderTile({ folder, onNavigate }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(folder)}
+      className="flex flex-col rounded-xl overflow-hidden border border-amber-200 shadow-sm hover:shadow-md active:opacity-80 transition bg-white"
+    >
+      <div className="w-full aspect-square flex items-center justify-center bg-amber-50">
+        <span className="text-4xl">📁</span>
+      </div>
+      <div className="px-2 py-2 text-left">
+        <p className="text-xs font-semibold text-gray-800 truncate">{folder.name}</p>
+        <p className="text-xs text-amber-500 truncate mt-0.5">Folder</p>
+      </div>
+    </button>
+  );
 }
 
 function FileTile({ file, onOpen }) {
@@ -50,7 +70,6 @@ function FileTile({ file, onOpen }) {
       onClick={() => onOpen(file.webViewLink)}
       className="flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md active:opacity-80 transition bg-white"
     >
-      {/* Thumbnail or icon */}
       <div className={`w-full aspect-square flex items-center justify-center ${fileBgColor(file.mimeType)}`}>
         {isImage && file.thumbnailLink && !imgError ? (
           <img
@@ -63,8 +82,6 @@ function FileTile({ file, onOpen }) {
           <span className="text-4xl">{fileIcon(file.mimeType)}</span>
         )}
       </div>
-
-      {/* File name + meta */}
       <div className="px-2 py-2 text-left">
         <p className="text-xs font-semibold text-gray-800 truncate">{file.name}</p>
         <p className="text-xs text-gray-400 truncate mt-0.5">
@@ -82,23 +99,83 @@ function FileTile({ file, onOpen }) {
   );
 }
 
+// ─── Shared modal shell ────────────────────────────────────────────────────────
+function ModalShell({ onClose, children }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] md:mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+        <div className="h-4" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function LeadFilesPanel({ leadId, onClose }) {
+  // "picker" shows the Before / After / Other selector.
+  // "browser" shows the file grid inside the chosen folder.
+  const [phase, setPhase] = useState("picker");
+
+  // Folder IDs returned by lead-folder-init
+  const [folderIds, setFolderIds] = useState(null);
+  const [initLoading, setInitLoading] = useState(true);
+  const [initError, setInitError] = useState(null);
+
+  // File browser state
   const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [folderStack, setFolderStack] = useState([]); // [{id, name}]
   const fileInputRef = useRef(null);
 
+  const currentFolder = folderStack[folderStack.length - 1] ?? null;
+  const currentFolderId = currentFolder ? currentFolder.id : null;
+
+  // ── Init: get/create root + Before + After on mount ──────────────────────
   useEffect(() => {
     if (!leadId) return;
-    fetchFiles();
+    (async () => {
+      setInitLoading(true);
+      setInitError(null);
+      try {
+        const res = await fetch(
+          `${API_BASE}/google-drive/lead-folder-init?leadId=${leadId}`,
+          { headers: { Authorization: `Bearer ${getToken()}` } }
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not set up folders");
+        setFolderIds(data); // { root, before, after }
+      } catch (err) {
+        setInitError(err.message || "Could not connect to Google Drive");
+      } finally {
+        setInitLoading(false);
+      }
+    })();
   }, [leadId]);
 
-  async function fetchFiles() {
+  // ── Fetch files whenever the current folder changes (browser phase only) ──
+  useEffect(() => {
+    if (!leadId || phase !== "browser") return;
+    fetchFiles(currentFolderId);
+  }, [leadId, currentFolderId, phase]);
+
+  async function fetchFiles(folderId) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/google-drive/lead-files?leadId=${leadId}`, {
+      const url = folderId
+        ? `${API_BASE}/google-drive/folder-contents?folderId=${folderId}`
+        : `${API_BASE}/google-drive/lead-files?leadId=${leadId}`;
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
@@ -111,6 +188,45 @@ export default function LeadFilesPanel({ leadId, onClose }) {
     }
   }
 
+  // ── Picker handlers ───────────────────────────────────────────────────────
+  function pickBefore() {
+    if (folderIds?.before) {
+      setFolderStack([{ id: folderIds.before.id, name: "Before" }]);
+    } else {
+      setFolderStack([]);
+    }
+    setPhase("browser");
+  }
+
+  function pickAfter() {
+    if (folderIds?.after) {
+      setFolderStack([{ id: folderIds.after.id, name: "After" }]);
+    } else {
+      setFolderStack([]);
+    }
+    setPhase("browser");
+  }
+
+  function pickOther() {
+    setFolderStack([]);
+    setPhase("browser");
+  }
+
+  // ── Browser navigation ────────────────────────────────────────────────────
+  function navigateIntoFolder(folder) {
+    setFolderStack((prev) => [...prev, { id: folder.id, name: folder.name }]);
+  }
+
+  function goBack() {
+    if (folderStack.length > 0) {
+      setFolderStack((prev) => prev.slice(0, -1));
+    } else {
+      // At root → go back to folder picker
+      setPhase("picker");
+    }
+  }
+
+  // ── Upload ────────────────────────────────────────────────────────────────
   async function handleFileChange(e) {
     const selected = Array.from(e.target.files);
     if (!selected.length) return;
@@ -122,6 +238,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
       for (const file of selected) {
         const formData = new FormData();
         formData.append("leadId", leadId);
+        if (currentFolderId) formData.append("folderId", currentFolderId);
         formData.append("file", file);
 
         const res = await fetch(`${API_BASE}/google-drive/upload-file`, {
@@ -132,7 +249,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Upload failed");
       }
-      await fetchFiles();
+      await fetchFiles(currentFolderId);
     } catch (err) {
       setError(err.message || "Upload failed.");
     } finally {
@@ -150,77 +267,154 @@ export default function LeadFilesPanel({ leadId, onClose }) {
     }
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end"
-      onClick={onClose}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+  const folders = files.filter((f) => f.mimeType === "application/vnd.google-apps.folder");
+  const regularFiles = files.filter((f) => f.mimeType !== "application/vnd.google-apps.folder");
 
-      {/* Modal */}
-      <div
-        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] md:mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+  // ── Render: Picker ────────────────────────────────────────────────────────
+  if (phase === "picker") {
+    return (
+      <ModalShell onClose={onClose}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-base font-bold text-gray-900">Photos &amp; Files</h2>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {uploading ? "Uploading…" : "+ Upload"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-            >
-              ×
-            </button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto flex-1 p-4">
-          {loading && (
-            <div className="py-10 text-sm text-gray-400 text-center">Loading…</div>
+        {/* Body */}
+        <div className="flex flex-col gap-4 px-6 py-6">
+          <p className="text-sm text-gray-500 text-center">
+            Tap a folder to upload or view photos for this job.
+          </p>
+
+          {initLoading && (
+            <div className="py-6 text-sm text-gray-400 text-center">Setting up folders…</div>
           )}
 
-          {!loading && error && (
-            <div className="py-10 text-sm text-red-500 text-center">{error}</div>
+          {!initLoading && initError && (
+            <div className="py-4 text-sm text-red-500 text-center">{initError}</div>
           )}
 
-          {!loading && !error && files.length === 0 && (
-            <div className="py-10 text-sm text-gray-400 text-center">
-              No files yet — tap Upload to add photos or documents.
-            </div>
-          )}
+          {!initLoading && !initError && (
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={pickBefore}
+                className="flex items-center gap-4 px-5 py-4 bg-blue-50 border border-blue-200 rounded-2xl shadow-sm hover:bg-blue-100 active:opacity-80 transition text-left"
+              >
+                <span className="text-3xl">📷</span>
+                <div>
+                  <p className="text-sm font-bold text-blue-900">Before</p>
+                  <p className="text-xs text-blue-500 mt-0.5">Job site photos before work begins</p>
+                </div>
+              </button>
 
-          {!loading && files.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              {files.map((file) => (
-                <FileTile key={file.id} file={file} onOpen={openFile} />
-              ))}
+              <button
+                type="button"
+                onClick={pickAfter}
+                className="flex items-center gap-4 px-5 py-4 bg-green-50 border border-green-200 rounded-2xl shadow-sm hover:bg-green-100 active:opacity-80 transition text-left"
+              >
+                <span className="text-3xl">✅</span>
+                <div>
+                  <p className="text-sm font-bold text-green-900">After</p>
+                  <p className="text-xs text-green-600 mt-0.5">Completed work &amp; finished results</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={pickOther}
+                className="flex items-center gap-4 px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl shadow-sm hover:bg-gray-100 active:opacity-80 transition text-left"
+              >
+                <span className="text-3xl">📁</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Other</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Contracts, estimates &amp; other documents</p>
+                </div>
+              </button>
             </div>
           )}
         </div>
+      </ModalShell>
+    );
+  }
 
-        {/* Safe area spacer for iOS home indicator */}
-        <div className="h-4" />
+  // ── Render: Browser ───────────────────────────────────────────────────────
+  return (
+    <ModalShell onClose={onClose}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={goBack}
+            className="text-blue-600 text-sm font-semibold shrink-0 hover:text-blue-800"
+          >
+            ← Back
+          </button>
+          <h2 className="text-base font-bold text-gray-900 truncate">
+            {currentFolder ? currentFolder.name : "All Files"}
+          </h2>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {uploading ? "Uploading…" : "+ Upload"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
-    </div>
+
+      {/* Content */}
+      <div className="overflow-y-auto flex-1 p-4">
+        {loading && (
+          <div className="py-10 text-sm text-gray-400 text-center">Loading…</div>
+        )}
+
+        {!loading && error && (
+          <div className="py-10 text-sm text-red-500 text-center">{error}</div>
+        )}
+
+        {!loading && !error && files.length === 0 && (
+          <div className="py-10 text-sm text-gray-400 text-center">
+            No files yet — tap Upload to add photos or documents.
+          </div>
+        )}
+
+        {!loading && files.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {folders.map((folder) => (
+              <FolderTile key={folder.id} folder={folder} onNavigate={navigateIntoFolder} />
+            ))}
+            {regularFiles.map((file) => (
+              <FileTile key={file.id} file={file} onOpen={openFile} />
+            ))}
+          </div>
+        )}
+      </div>
+    </ModalShell>
   );
 }
