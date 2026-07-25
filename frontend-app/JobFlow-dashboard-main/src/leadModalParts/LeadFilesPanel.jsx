@@ -53,8 +53,8 @@ function FolderTile({ folder, onNavigate }) {
         <span className="text-4xl">📁</span>
       </div>
       <div className="px-2 py-2 text-left">
-        <p className="text-xs font-bold text-gray-400 truncate">{folder.name}</p>
-        <p className="text-xs text-amber-500 truncate mt-0.5">Folder</p>
+        <p className="text-xs font-semibold text-gray-800 truncate">{folder.name}</p>
+        <p className="text-xs text-gray-400 truncate mt-0.5">Folder</p>
       </div>
     </button>
   );
@@ -305,7 +305,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickBefore}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-xl font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
                 Before
               </button>
@@ -313,7 +313,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickAfter}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-xl font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
                 After
               </button>
@@ -321,7 +321,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickOther}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-xl font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
                 Other
               </button>
