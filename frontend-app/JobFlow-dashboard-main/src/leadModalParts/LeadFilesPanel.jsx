@@ -108,7 +108,7 @@ function ModalShell({ onClose, children }) {
     >
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] mx-3 md:mx-4"
+        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] mx-5"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
