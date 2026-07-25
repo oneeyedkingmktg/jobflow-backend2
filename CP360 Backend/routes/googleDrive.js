@@ -23,13 +23,37 @@ const upload = multer({
 });
 
 // ------------------------------------------------------------------
+// Convert project_type codes to the same human-readable labels shown in the UI.
+// ------------------------------------------------------------------
+function formatProjectType(type) {
+  if (!type) return null;
+  if (type.startsWith("garage_")) {
+    const n = type.split("_")[1];
+    return `${n} Car Garage`;
+  }
+  if (type === "patio") return "Patio";
+  if (type === "basement") return "Basement";
+  if (type === "commercial") return "Commercial";
+  if (type === "custom") return "Custom Project";
+  // Free-text entry — use as-is
+  return type;
+}
+
+// ------------------------------------------------------------------
 // Helper: resolve lead folder for a given leadId.
 // create=true  → get or create the folder (used on upload)
 // create=false → find only, return null if folder doesn't exist yet (used on list)
+//
+// Folder name is "Name - Project Type" when a project type exists
+// (e.g. "John Smith - 2 Car Garage"), otherwise just "Name".
+//
+// Search always tries the full name first, then falls back to the base
+// name so that existing folders and type changes never cause a second
+// folder to be created.
 // ------------------------------------------------------------------
 async function resolveLeadFolder(leadId, { create = true } = {}) {
   const leadResult = await db.query(
-    `SELECT id, name, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, name, project_type, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
     [leadId]
   );
   if (!leadResult.rows.length)
@@ -52,10 +76,25 @@ async function resolveLeadFolder(leadId, { create = true } = {}) {
     );
   }
 
+  const baseName = lead.name || "Lead";
+  const typeLabel = formatProjectType(lead.project_type);
+  const fullName = typeLabel ? `${baseName} - ${typeLabel}` : baseName;
+  const parentId = company.google_drive_base_folder_id;
+
+  // Always search for an existing folder before creating.
+  // Try the full "Name - Type" form first, then fall back to the base
+  // name so we reuse whatever folder was originally created.
+  const existing =
+    (fullName !== baseName ? await findFolder(fullName, parentId) : null) ||
+    await findFolder(baseName, parentId);
+
+  if (existing) return existing;
+
   if (create) {
-    return getOrCreateFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+    return getOrCreateFolder(fullName, parentId);
   }
-  return findFolder(lead.name || "Lead", company.google_drive_base_folder_id);
+
+  return null;
 }
 
 // ============================================================================
