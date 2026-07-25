@@ -120,7 +120,7 @@ function getOAuthClient() {
 // Shared Drives; they are harmless on personal My Drive folders.
 // ------------------------------------------------------------------
 async function findFolder(folderName, parentFolderId) {
-  const drive = getServiceAccountDriveClient();
+  const drive = await getDriveClient();
   const safeName = folderName.replace(/'/g, "\\'");
 
   const searchRes = await drive.files.list({
@@ -161,7 +161,7 @@ async function getOrCreateFolder(folderName, parentFolderId) {
 // Used to locate the lead folder when the project type may have changed.
 // ------------------------------------------------------------------
 async function findFolderByPrefix(prefix, parentFolderId) {
-  const drive = getServiceAccountDriveClient();
+  const drive = await getDriveClient();
   const safePrefix = prefix.replace(/'/g, "\\'");
 
   const res = await drive.files.list({
@@ -196,7 +196,7 @@ async function renameFolder(folderId, newName) {
 // List files in a folder
 // ------------------------------------------------------------------
 async function listFilesInFolder(folderId) {
-  const drive = getServiceAccountDriveClient();
+  const drive = await getDriveClient();
 
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
