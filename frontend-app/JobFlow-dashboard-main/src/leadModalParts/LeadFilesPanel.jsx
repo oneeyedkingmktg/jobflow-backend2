@@ -47,13 +47,13 @@ function FolderTile({ folder, onNavigate }) {
     <button
       type="button"
       onClick={() => onNavigate(folder)}
-      className="flex flex-col rounded-xl overflow-hidden border border-amber-200 shadow-sm hover:shadow-md active:opacity-80 transition bg-white"
+      className="flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md active:opacity-80 transition bg-transparent"
     >
-      <div className="w-full aspect-square flex items-center justify-center bg-amber-50">
-        <span className="text-6xl">📁</span>
+      <div className="w-full aspect-square flex items-center justify-center bg-transparent">
+        <span className="text-4xl">📁</span>
       </div>
       <div className="px-2 py-2 text-left">
-        <p className="text-lg font-bold text-gray-800 truncate">{folder.name}</p>
+        <p className="text-xs font-bold text-gray-400 truncate">{folder.name}</p>
         <p className="text-xs text-amber-500 truncate mt-0.5">Folder</p>
       </div>
     </button>
@@ -305,37 +305,25 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickBefore}
-                className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl shadow-sm hover:bg-blue-100 active:opacity-80 transition text-left"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
-                <span className="text-2xl shrink-0">📷</span>
-                <div>
-                  <p className="text-base font-bold text-blue-900">Before</p>
-                  <p className="text-xs text-blue-500 mt-0.5">Job site photos before work begins</p>
-                </div>
+                Before
               </button>
 
               <button
                 type="button"
                 onClick={pickAfter}
-                className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl shadow-sm hover:bg-green-100 active:opacity-80 transition text-left"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
-                <span className="text-2xl shrink-0">✅</span>
-                <div>
-                  <p className="text-base font-bold text-green-900">After</p>
-                  <p className="text-xs text-green-600 mt-0.5">Completed work &amp; finished results</p>
-                </div>
+                After
               </button>
 
               <button
                 type="button"
                 onClick={pickOther}
-                className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl shadow-sm hover:bg-gray-100 active:opacity-80 transition text-left"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-700 active:opacity-80 transition text-center"
               >
-                <span className="text-2xl shrink-0">📁</span>
-                <div>
-                  <p className="text-base font-bold text-gray-800">Other</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Contracts, estimates &amp; other documents</p>
-                </div>
+                Other
               </button>
             </div>
           )}
@@ -405,7 +393,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
         )}
 
         {!loading && files.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {folders.map((folder) => (
               <FolderTile key={folder.id} folder={folder} onNavigate={navigateIntoFolder} />
             ))}
