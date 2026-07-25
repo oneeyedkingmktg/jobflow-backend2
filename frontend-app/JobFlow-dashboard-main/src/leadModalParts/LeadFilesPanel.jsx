@@ -53,7 +53,7 @@ function FolderTile({ folder, onNavigate }) {
         <span className="text-6xl">📁</span>
       </div>
       <div className="px-2 py-2 text-left">
-        <p className="text-sm font-semibold text-gray-800 truncate">{folder.name}</p>
+        <p className="text-lg font-bold text-gray-800 truncate">{folder.name}</p>
         <p className="text-xs text-amber-500 truncate mt-0.5">Folder</p>
       </div>
     </button>
