@@ -11,6 +11,7 @@ const { syncLeadToGhl } = require("../sync/dbToGhlSync");
 const { deleteGhlContact, applyStatusTags, removeStatusTags, updateContactCustomFields } = require("../controllers/ghlAPI");
 const { sendPushToCompany } = require("../services/pushNotificationService");
 const { getDriveTime } = require("../services/distanceService");
+const { buildLeadFolderName, findFolderByPrefix, renameFolder } = require("../controllers/googleDrive");
 
 function formatProjectTypeForPush(type) {
   if (!type) return 'Unknown';
@@ -785,6 +786,26 @@ if (updatedLead.project_type) {
 
     // Respond immediately after DB save — GHL sync runs in background
     res.json({ lead: toCamel(updatedLead), ghlSynced: !!company.ghl_api_key, calendarConflict: null });
+
+    // If the lead name or project type changed, rename the Drive folder in the background
+    const nameChanged = previousLead.name !== updatedLead.name;
+    const typeChanged = previousLead.project_type !== updatedLead.project_type;
+    if ((nameChanged || typeChanged) && company.google_drive_base_folder_id) {
+      setImmediate(async () => {
+        try {
+          const newFolderName = buildLeadFolderName(updatedLead.name, updatedLead.project_type);
+          const baseName = updatedLead.name || "Lead";
+          const existing = await findFolderByPrefix(baseName, company.google_drive_base_folder_id)
+            || await findFolderByPrefix(previousLead.name || "Lead", company.google_drive_base_folder_id);
+          if (existing && existing.name !== newFolderName) {
+            await renameFolder(existing.id, newFolderName);
+            console.log(`[DRIVE] Renamed folder "${existing.name}" → "${newFolderName}"`);
+          }
+        } catch (err) {
+          console.error('[DRIVE] Failed to rename lead folder:', err.message);
+        }
+      });
+    }
 
     if (company.ghl_api_key) {
       setImmediate(async () => {

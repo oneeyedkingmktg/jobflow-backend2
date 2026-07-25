@@ -10,6 +10,7 @@ const multer = require("multer");
 const db = require("../config/database");
 const {
   getOAuthClient,
+  buildLeadFolderName,
   findFolder,
   findFolderByPrefix,
   renameFolder,
@@ -24,22 +25,6 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per file
 });
 
-// ------------------------------------------------------------------
-// Convert project_type codes to the same human-readable labels shown in the UI.
-// ------------------------------------------------------------------
-function formatProjectType(type) {
-  if (!type) return null;
-  if (type.startsWith("garage_")) {
-    const n = type.split("_")[1];
-    return `${n} Car Garage`;
-  }
-  if (type === "patio") return "Patio";
-  if (type === "basement") return "Basement";
-  if (type === "commercial") return "Commercial";
-  if (type === "custom") return "Custom Project";
-  // Free-text entry — use as-is
-  return type;
-}
 
 // ------------------------------------------------------------------
 // Helper: resolve lead folder for a given leadId.
@@ -78,9 +63,8 @@ async function resolveLeadFolder(leadId, { create = true } = {}) {
     );
   }
 
+  const fullName = buildLeadFolderName(lead.name, lead.project_type);
   const baseName = lead.name || "Lead";
-  const typeLabel = formatProjectType(lead.project_type);
-  const fullName = typeLabel ? `${baseName} - ${typeLabel}` : baseName;
   const parentId = company.google_drive_base_folder_id;
 
   // 1. Exact match on the current expected name — nothing to do.

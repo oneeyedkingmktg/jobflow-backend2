@@ -195,6 +195,31 @@ async function renameFolder(folderId, newName) {
 }
 
 // ------------------------------------------------------------------
+// Convert project_type codes to human-readable labels (same as the UI).
+// ------------------------------------------------------------------
+function formatProjectType(type) {
+  if (!type) return null;
+  if (type.startsWith("garage_")) {
+    const n = type.split("_")[1];
+    return `${n} Car Garage`;
+  }
+  if (type === "patio") return "Patio";
+  if (type === "basement") return "Basement";
+  if (type === "commercial") return "Commercial";
+  if (type === "custom") return "Custom Project";
+  return type;
+}
+
+// ------------------------------------------------------------------
+// Build the canonical Drive folder name for a lead.
+// ------------------------------------------------------------------
+function buildLeadFolderName(leadName, projectType) {
+  const base = leadName || "Lead";
+  const label = formatProjectType(projectType);
+  return label ? `${base} - ${label}` : base;
+}
+
+// ------------------------------------------------------------------
 // List files in a folder
 // ------------------------------------------------------------------
 async function listFilesInFolder(folderId) {
@@ -239,6 +264,8 @@ module.exports = {
   getDriveClient,
   requireOAuthDriveClient,
   getOAuthClient,
+  formatProjectType,
+  buildLeadFolderName,
   findFolder,
   findFolderByPrefix,
   renameFolder,
