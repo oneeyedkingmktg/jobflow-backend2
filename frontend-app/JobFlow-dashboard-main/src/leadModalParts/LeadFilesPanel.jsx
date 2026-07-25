@@ -118,7 +118,7 @@ function ModalShell({ onClose, children }) {
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function LeadFilesPanel({ leadId, onClose }) {
   // "picker" shows the Before / After / Other selector.
   // "browser" shows the file grid inside the chosen folder.
