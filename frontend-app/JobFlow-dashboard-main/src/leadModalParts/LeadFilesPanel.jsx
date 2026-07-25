@@ -103,12 +103,12 @@ function FileTile({ file, onOpen }) {
 function ModalShell({ onClose, children }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center md:justify-center justify-end px-5"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh] mx-5"
+        className="relative bg-white rounded-2xl shadow-xl flex flex-col w-full max-w-lg max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -305,11 +305,11 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickBefore}
-                className="flex items-center gap-5 px-5 py-5 bg-blue-50 border border-blue-200 rounded-2xl shadow-sm hover:bg-blue-100 active:opacity-80 transition text-left"
+                className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl shadow-sm hover:bg-blue-100 active:opacity-80 transition text-left"
               >
-                <span className="text-5xl shrink-0">📷</span>
+                <span className="text-2xl shrink-0">📷</span>
                 <div>
-                  <p className="text-2xl font-bold text-blue-900">Before</p>
+                  <p className="text-base font-bold text-blue-900">Before</p>
                   <p className="text-xs text-blue-500 mt-0.5">Job site photos before work begins</p>
                 </div>
               </button>
@@ -317,11 +317,11 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickAfter}
-                className="flex items-center gap-5 px-5 py-5 bg-green-50 border border-green-200 rounded-2xl shadow-sm hover:bg-green-100 active:opacity-80 transition text-left"
+                className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-2xl shadow-sm hover:bg-green-100 active:opacity-80 transition text-left"
               >
-                <span className="text-5xl shrink-0">✅</span>
+                <span className="text-2xl shrink-0">✅</span>
                 <div>
-                  <p className="text-2xl font-bold text-green-900">After</p>
+                  <p className="text-base font-bold text-green-900">After</p>
                   <p className="text-xs text-green-600 mt-0.5">Completed work &amp; finished results</p>
                 </div>
               </button>
@@ -329,11 +329,11 @@ export default function LeadFilesPanel({ leadId, onClose }) {
               <button
                 type="button"
                 onClick={pickOther}
-                className="flex items-center gap-5 px-5 py-5 bg-gray-50 border border-gray-200 rounded-2xl shadow-sm hover:bg-gray-100 active:opacity-80 transition text-left"
+                className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl shadow-sm hover:bg-gray-100 active:opacity-80 transition text-left"
               >
-                <span className="text-5xl shrink-0">📁</span>
+                <span className="text-2xl shrink-0">📁</span>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">Other</p>
+                  <p className="text-base font-bold text-gray-800">Other</p>
                   <p className="text-xs text-gray-500 mt-0.5">Contracts, estimates &amp; other documents</p>
                 </div>
               </button>
