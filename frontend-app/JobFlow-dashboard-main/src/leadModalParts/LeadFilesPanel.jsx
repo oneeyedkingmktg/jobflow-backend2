@@ -119,7 +119,7 @@ function ModalShell({ onClose, children }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function LeadFilesPanel({ leadId, onClose }) {
+export default function LeadFilesPanel({ leadId, projectType = "", onClose }) {
   // "picker" shows the Before / After / Other selector.
   // "browser" shows the file grid inside the chosen folder.
   const [phase, setPhase] = useState("picker");
@@ -148,7 +148,7 @@ export default function LeadFilesPanel({ leadId, onClose }) {
       setInitError(null);
       try {
         const res = await fetch(
-          `${API_BASE}/google-drive/lead-folder-init?leadId=${leadId}`,
+          `${API_BASE}/google-drive/lead-folder-init?leadId=${leadId}&projectType=${encodeURIComponent(projectType)}`,
           { headers: { Authorization: `Bearer ${getToken()}` } }
         );
         const data = await res.json();

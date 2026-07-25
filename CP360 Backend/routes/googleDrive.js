@@ -228,8 +228,19 @@ router.post("/lead-folder", async (req, res) => {
 // ------------------------------------------------------------------
 router.get("/lead-folder-init", async (req, res) => {
   try {
-    const { leadId } = req.query;
+    const { leadId, projectType } = req.query;
     if (!leadId) return res.status(400).json({ error: "Missing leadId" });
+
+    // If the caller passes the current form value for projectType, persist it
+    // to the DB now (project_type field only) so the folder name stays in sync
+    // even before the user explicitly saves the full lead form.
+    if (projectType !== undefined) {
+      const newValue = projectType.trim() || null;
+      await db.query(
+        `UPDATE leads SET project_type = $1 WHERE id = $2 AND project_type IS DISTINCT FROM $1`,
+        [newValue, leadId]
+      );
+    }
 
     const root = await resolveLeadFolder(leadId, { create: true });
     const [before, after] = await Promise.all([
