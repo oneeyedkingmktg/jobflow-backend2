@@ -1,7 +1,7 @@
 import React from "react";
 import { usePermission } from "../utils/usePermission";
 
-export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
+export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhoneBlur, phoneWarning }) {
   const financialPermission = usePermission('financial_information');
   return (
     <div className="bg-white rounded-2xl border border-gray-200 px-5 py-5 shadow-sm space-y-4 text-sm text-gray-800">
@@ -35,8 +35,14 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange }) {
           type="text"
           value={form.phone}
           onChange={(e) => onPhoneChange(e.target.value)}
+          onBlur={onPhoneBlur}
           className="w-full mt-1 px-3 py-2 border rounded-lg"
         />
+        {phoneWarning && (
+          <p className="mt-1 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {phoneWarning}
+          </p>
+        )}
       </div>
 
       {/* ADDRESS */}

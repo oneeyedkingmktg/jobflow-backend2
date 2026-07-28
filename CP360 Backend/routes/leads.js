@@ -134,6 +134,8 @@ function parseName(full) {
 const validateLead = (lead) => {
   if (!lead.name && !lead.full_name) return "Name is required.";
   if (!lead.phone) return "Phone is required.";
+  const digits = normalizePhone(lead.phone);
+  if (!digits || digits.length < 10) return "Please enter a complete 10-digit phone number.";
   return null;
 };
 
@@ -219,6 +221,51 @@ router.get("/appt-slot-check", async (req, res) => {
   } catch (error) {
     console.error("Error checking appointment slot:", error);
     res.status(500).json({ error: "Failed to check appointment slot." });
+  }
+});
+
+// ============================================================================
+// PHONE LOOKUP — returns active + deleted matches for a given phone number
+// ============================================================================
+router.get("/phone-lookup", async (req, res) => {
+  try {
+    const { phone, company_id, exclude_lead_id } = req.query;
+    if (!phone || !company_id) {
+      return res.status(400).json({ error: "phone and company_id required" });
+    }
+
+    const normalized = normalizePhone(phone);
+    if (!normalized || normalized.length < 10) {
+      return res.status(400).json({ error: "Incomplete phone number" });
+    }
+
+    const params = [company_id, normalized];
+    const excludeClause = exclude_lead_id ? `AND id != $3` : "";
+    if (exclude_lead_id) params.push(exclude_lead_id);
+
+    const [activeResult, deletedResult] = await Promise.all([
+      pool.query(
+        `SELECT id, name, email, phone, status FROM leads
+         WHERE company_id = $1
+         AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
+         AND deleted_at IS NULL
+         ${excludeClause}`,
+        params
+      ),
+      pool.query(
+        `SELECT id, name, email, phone, status, deleted_at FROM leads
+         WHERE company_id = $1
+         AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
+         AND deleted_at IS NOT NULL
+         ${excludeClause}`,
+        params
+      ),
+    ]);
+
+    res.json({ active: activeResult.rows, deleted: deletedResult.rows });
+  } catch (err) {
+    console.error("Phone lookup error:", err);
+    res.status(500).json({ error: "Phone lookup failed" });
   }
 });
 
@@ -447,6 +494,16 @@ const existingLead = existingLeadResult.rows[0];
         message: "Estimate appended to existing lead"
       });
     }
+
+    // 🧹 CLEAR PHONE ON DELETED CONTACTS WITH SAME NUMBER
+    // Prevents future duplicate-matching ambiguity when the user chose "Create New"
+    await pool.query(
+      `UPDATE leads SET phone = NULL
+       WHERE company_id = $1
+       AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
+       AND deleted_at IS NOT NULL`,
+      [companyId, normalizedPhone]
+    );
 
     // 🆕 NO EXISTING LEAD - CREATE NEW ONE
     console.log("➕ No existing lead found - creating new lead");

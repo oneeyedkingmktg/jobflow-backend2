@@ -204,6 +204,12 @@ export const LeadsAPI = {
       method: "DELETE",
     }),
 
+  phoneLookup: (phone, companyId, excludeLeadId = null) => {
+    const params = new URLSearchParams({ phone, company_id: companyId });
+    if (excludeLeadId) params.set("exclude_lead_id", excludeLeadId);
+    return apiRequest(`/leads/phone-lookup?${params}`);
+  },
+
   getCalendarDots: (companyId) =>
     apiRequest(`/leads/calendar-dots?company_id=${companyId}`),
 

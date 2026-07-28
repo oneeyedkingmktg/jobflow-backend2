@@ -555,7 +555,6 @@ onSaveAndExit={async (data) => {
 
       {showPhoneLookup && (
         <PhoneLookupModal
-          leads={leads}
           onClose={() => setShowPhoneLookup(false)}
 onCreateNew={(phone) => {
   console.log("📝 Creating new lead - Company ID:", currentCompany?.id, "Company:", currentCompany);

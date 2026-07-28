@@ -7,6 +7,10 @@ import React, { useState, useRef } from "react";
 import { useCompany } from "./CompanyContext";
 import { formatPhoneNumber } from "./utils/formatting";
 import { LeadsAPI } from "./api";
+
+function cleanDigits(v) {
+  return v ? v.replace(/[^\d]/g, "") : "";
+}
 import { useSoftphone } from "./hooks/useSoftphone.js";
 import { isNativeApp } from "./utils/platform";
 import ConversationModal from "./leadModalParts/ConversationModal.jsx";
@@ -56,6 +60,7 @@ export default function LeadModal({
   const [estimateData, setEstimateData] = useState(null);
   const [loadingEstimate, setLoadingEstimate] = useState(false);
 
+  const [phoneWarning, setPhoneWarning] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showDateModal, setShowDateModal] = useState(null);
   const [showApptModal, setShowApptModal] = useState(false);
@@ -165,6 +170,28 @@ const handlePauseSave = (pauseFields) => {
     setForm((prev) => ({ ...prev, ...pauseFields }));
   };
 
+  const handlePhoneBlur = async () => {
+    if (!form.id) return;
+    const digits = cleanDigits(form.phone);
+    if (digits.length < 10) return;
+    const original = JSON.parse(initialFormRef.current);
+    if (cleanDigits(original.phone) === digits) {
+      setPhoneWarning(null);
+      return;
+    }
+    try {
+      const data = await LeadsAPI.phoneLookup(digits, currentCompany.id, form.id);
+      if (data.active.length > 0) {
+        const names = data.active.map((l) => l.name).join(", ");
+        setPhoneWarning(`This number already belongs to: ${names}. You can still save — records will not be merged.`);
+      } else {
+        setPhoneWarning(null);
+      }
+    } catch {
+      setPhoneWarning(null);
+    }
+  };
+
   const handleOpenEstimate = async () => {
     if (!form.id || !form.hasEstimate) return;
     setLoadingEstimate(true);
@@ -251,12 +278,15 @@ const handlePauseSave = (pauseFields) => {
                 onChange={(k, v) =>
                   setForm((p) => ({ ...p, [k]: v }))
                 }
-                onPhoneChange={(v) =>
+                onPhoneChange={(v) => {
+                  setPhoneWarning(null);
                   setForm((p) => ({
                     ...p,
                     phone: formatPhoneNumber(v),
-                  }))
-                }
+                  }));
+                }}
+                onPhoneBlur={handlePhoneBlur}
+                phoneWarning={phoneWarning}
               />
             ) : (
 <LeadDetailsView
