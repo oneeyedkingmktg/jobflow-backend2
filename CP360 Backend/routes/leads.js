@@ -362,18 +362,20 @@ const userId = req.user?.id || null;
       return res.status(400).json({ error });
     }
 
-    // 🔍 CHECK FOR EXISTING LEAD BY PHONE
+    // 🔍 CHECK FOR EXISTING LEAD BY PHONE (skipped when user explicitly chose "Create New")
     const normalizedPhone = normalizePhone(lead.phone);
-    console.log("🔍 Checking for existing lead with phone:", normalizedPhone);
+    console.log("🔍 Checking for existing lead with phone:", normalizedPhone, "| force_create:", !!lead.force_create);
 
-const existingLeadResult = await pool.query(
-      `SELECT * FROM leads 
-       WHERE company_id = $1 
-       AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
-       AND deleted_at IS NULL
-       LIMIT 1`,
-      [companyId, normalizedPhone]
-    );
+    const existingLeadResult = lead.force_create
+      ? { rows: [] }
+      : await pool.query(
+          `SELECT * FROM leads
+           WHERE company_id = $1
+           AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
+           AND deleted_at IS NULL
+           LIMIT 1`,
+          [companyId, normalizedPhone]
+        );
 
 const existingLead = existingLeadResult.rows[0];
     if (existingLead) {

@@ -475,6 +475,7 @@ onAddLead={() => {
           } : null}
 onSave={async (data) => {
   const backendData = convertLeadToBackend(data);
+  if (!data.id && data.forceCreate) backendData.force_create = true;
   const res = data.id
     ? await LeadsAPI.update(data.id, backendData)
     : await LeadsAPI.create(backendData);
@@ -495,9 +496,10 @@ onSaveAndExit={async (data) => {
   
   try {
     const backendData = convertLeadToBackend(data);
+    if (!data.id && data.forceCreate) backendData.force_create = true;
     console.log("🔄 Converted to backend format:", backendData);
     console.log("🆔 Company ID being sent:", backendData.company_id);
-    
+
     const res = data.id
       ? await LeadsAPI.update(data.id, backendData)
       : await LeadsAPI.create(backendData);
@@ -556,12 +558,13 @@ onSaveAndExit={async (data) => {
       {showPhoneLookup && (
         <PhoneLookupModal
           onClose={() => setShowPhoneLookup(false)}
-onCreateNew={(phone) => {
+onCreateNew={(phone, forceCreate) => {
   console.log("📝 Creating new lead - Company ID:", currentCompany?.id, "Company:", currentCompany);
-  setSelectedLead({ 
-    id: null, 
-    name: "", 
-    phone, 
+  setSelectedLead({
+    id: null,
+    name: "",
+    phone,
+    forceCreate: !!forceCreate,
     status: "status_pre_lead",
     companyId: currentCompany?.id,
     createdByUserId: user?.id

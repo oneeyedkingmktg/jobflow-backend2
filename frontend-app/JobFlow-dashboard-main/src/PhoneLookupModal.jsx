@@ -172,7 +172,7 @@ export default function PhoneLookupModal({
 
             <div className="pt-2">
               <button
-                onClick={() => onCreateNew(digits)}
+                onClick={() => onCreateNew(digits, results?.active?.length > 0)}
                 className="w-full px-4 py-3 bg-gray-100 text-gray-800 rounded-lg font-semibold hover:bg-gray-200 transition"
               >
                 + Create New Contact
