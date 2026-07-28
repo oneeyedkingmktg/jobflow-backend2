@@ -729,6 +729,13 @@ router.put("/:id", async (req, res) => {
       return res.status(403).json({ error: "Access denied to this lead." });
     }
 
+    if (lead.phone) {
+      const digits = normalizePhone(lead.phone);
+      if (!digits || digits.length < 10) {
+        return res.status(400).json({ error: "Please enter a complete 10-digit phone number." });
+      }
+    }
+
     const { first, last, full } = parseName(lead.name || lead.full_name);
 
 const result = await pool.query(

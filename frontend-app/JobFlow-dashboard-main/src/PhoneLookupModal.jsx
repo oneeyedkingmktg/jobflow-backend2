@@ -114,7 +114,7 @@ export default function PhoneLookupModal({
         </button>
 
         {results && (
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-3 max-h-72 overflow-y-auto pr-1">
             {!hasAnyResults && (
               <div className="p-3 border rounded-lg bg-gray-50 text-gray-600 text-sm text-center">
                 No existing contacts found with this number.

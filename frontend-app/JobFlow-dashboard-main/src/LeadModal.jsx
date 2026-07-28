@@ -93,6 +93,10 @@ const handleExitNoSave = () => {
   // ------------------------------------------------------------------
   const handleSave = async () => {
     if (saving) return;
+    if (form.phone && cleanDigits(form.phone).length < 10) {
+      setPhoneWarning("Please enter a complete 10-digit phone number before saving.");
+      return;
+    }
     setSaving(true);
     try {
       const updated = await onSave(form);
@@ -102,6 +106,7 @@ const handleExitNoSave = () => {
         initialFormRef.current = JSON.stringify(merged);
       }
       setIsEditing(false);
+      setPhoneWarning(null);
     } finally {
       setSaving(false);
     }
