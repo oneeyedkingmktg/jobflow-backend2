@@ -497,13 +497,19 @@ const existingLead = existingLeadResult.rows[0];
       });
     }
 
-    // 🧹 CLEAR PHONE ON DELETED CONTACTS WITH SAME NUMBER
-    // Prevents future duplicate-matching ambiguity when the user chose "Create New"
+    // 🧹 CLEAR PHONE ON ALL OTHER CONTACTS WITH SAME NUMBER
+    // When force_create is set, user explicitly chose "Create New" after seeing existing contacts —
+    // clear phone on ALL matching leads (active and deleted) so they no longer match this number.
+    // When not force_create (no duplicates existed), only clear deleted contacts as a safety sweep.
     await pool.query(
-      `UPDATE leads SET phone = NULL
-       WHERE company_id = $1
-       AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
-       AND deleted_at IS NOT NULL`,
+      lead.force_create
+        ? `UPDATE leads SET phone = NULL
+           WHERE company_id = $1
+           AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2`
+        : `UPDATE leads SET phone = NULL
+           WHERE company_id = $1
+           AND replace(replace(replace(replace(phone, '(', ''), ')', ''), '-', ''), ' ', '') = $2
+           AND deleted_at IS NOT NULL`,
       [companyId, normalizedPhone]
     );
 
