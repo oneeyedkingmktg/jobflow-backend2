@@ -80,6 +80,7 @@ const ownershipCheck = await client.query(
 );
 
 const isUpdate = ownershipCheck.rows.length > 0;
+const matchedLeadId = isUpdate ? ownershipCheck.rows[0].id : null;
 
 console.log(
   isUpdate
@@ -239,42 +240,17 @@ if (!isUpdate) {
 // UPDATE PATH — Verify event ID matches stored ID
 // =======================================================
 
-if (isUpdate && !lead && contactId) {
-  console.log('🔄 [UPDATE] Looking up lead by contact ID:', contactId);
-  
-  const contactResult = await client.query(
-    'SELECT * FROM leads WHERE company_id = $1 AND ghl_contact_id = $2',
-    [company.id, contactId]
+if (isUpdate && !lead) {
+  console.log('🔄 [UPDATE] Looking up lead by matched ID:', matchedLeadId);
+
+  const updateResult = await client.query(
+    'SELECT * FROM leads WHERE id = $1 AND company_id = $2',
+    [matchedLeadId, company.id]
   );
-  
-  if (contactResult.rows.length > 0) {
-    const foundLead = contactResult.rows[0];
-    
-    // Event ID must match stored event ID (gospel rule)
-    const storedEventId = eventType === 'appointment' 
-      ? foundLead.appointment_calendar_event_id 
-      : foundLead.install_calendar_event_id;
-    
-    if (!storedEventId) {
-      console.error(`❌ [UPDATE REJECTED] Lead ${foundLead.id} has no ${eventType} event ID stored`);
-      return res.status(400).json({
-        error: 'No event ID stored',
-        message: `Lead does not have a ${eventType} event ID stored`
-      });
-    }
-    
-    if (storedEventId !== eventId) {
-      console.error(`❌ [UPDATE REJECTED] Event ID mismatch for lead ${foundLead.id}`);
-      console.error(`   Stored: ${storedEventId}`);
-      console.error(`   Incoming: ${eventId}`);
-      return res.status(400).json({
-        error: 'Event ID mismatch',
-        message: 'Incoming event ID does not match stored event ID'
-      });
-    }
-    
-    lead = foundLead;
-    console.log(`✅ [UPDATE] Event ID verified (${eventId}), updating lead ${lead.id}`);
+
+  if (updateResult.rows.length > 0) {
+    lead = updateResult.rows[0];
+    console.log(`✅ [UPDATE] Lead ${lead.id} found — event ID verified by ownership check`);
   }
 }
 
