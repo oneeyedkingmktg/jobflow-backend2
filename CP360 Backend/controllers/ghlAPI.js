@@ -1533,6 +1533,10 @@ async function syncServiceCallToGhl({ serviceCall, lead, company }) {
     body: apptPayload,
   });
 
+  if (isInstallType && lead.ghl_contact_id) {
+    await applyStatusTags(lead.ghl_contact_id, 'follow_up_install', company);
+  }
+
   const eventId = created?.id || created?.event?.id || created?.appointment?.id || null;
   console.log("[SC GHL] Created event ID:", eventId);
   return eventId;
