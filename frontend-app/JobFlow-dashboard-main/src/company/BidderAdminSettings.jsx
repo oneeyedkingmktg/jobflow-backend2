@@ -673,6 +673,143 @@ export default function BidderAdminSettings({ companyId }) {
   };
 
   // ── Render: Settings ───────────────────────────────────────────────────────
+  const renderDesign = () => {
+    if (settingsLoading) return <p className="text-sm text-gray-500">Loading…</p>;
+
+    return (
+      <div className="space-y-6">
+        {/* Proposal Design Template */}
+        {designs.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Proposal Template</h3>
+            <div>
+              <label className={labelCls}>Default Layout</label>
+              <select
+                className={inputCls}
+                value={settingsForm.preferred_proposal_design_id}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, preferred_proposal_design_id: e.target.value }))}
+              >
+                <option value="">Standard (default)</option>
+                {designs.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Color Scheme */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Color Scheme</h3>
+          <p className="text-xs text-gray-500 mb-4">Applied to proposals, invoices, and emails. Overrides the template colors above.</p>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={labelCls}>Header Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={settingsForm.primary_color || '#1c2333'}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.primary_color || ''}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  placeholder="#1c2333"
+                  maxLength={7}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Accent Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={settingsForm.accent_color || '#f97316'}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
+                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.accent_color || ''}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
+                  placeholder="#f97316"
+                  maxLength={7}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Live preview */}
+          <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <div
+              style={{ background: settingsForm.primary_color || '#1c2333' }}
+              className="px-5 py-3 flex items-center justify-between"
+            >
+              <span className="text-white font-bold text-sm">Your Company Name</span>
+              <span
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: settingsForm.accent_color || '#f97316' }}
+              >
+                Proposal
+              </span>
+            </div>
+            <div style={{ background: settingsForm.accent_color || '#f97316', height: 3 }} />
+            <div className="bg-white px-5 py-4 flex items-center justify-between">
+              <span className="text-sm text-gray-600">Customer Name</span>
+              <span
+                style={{ background: settingsForm.accent_color || '#f97316' }}
+                className="px-4 py-1.5 text-white text-xs font-bold rounded-lg"
+              >
+                Accept Proposal
+              </span>
+            </div>
+            <div
+              style={{ background: settingsForm.primary_color || '#1c2333' }}
+              className="px-5 py-2.5 text-center"
+            >
+              <span
+                className="text-xs font-semibold tracking-wide"
+                style={{ color: settingsForm.accent_color || '#f97316' }}
+              >
+                Thank you for your business
+              </span>
+            </div>
+          </div>
+
+          {(settingsForm.primary_color || settingsForm.accent_color) && (
+            <button
+              type="button"
+              onClick={() => setSettingsForm((p) => ({ ...p, primary_color: '', accent_color: '' }))}
+              className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              Reset to template defaults
+            </button>
+          )}
+        </div>
+
+        {/* Save */}
+        <div className="flex items-center gap-4 pt-2">
+          <button
+            onClick={handleSaveSettings}
+            disabled={settingsSaving}
+            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50"
+          >
+            {settingsSaving ? 'Saving…' : 'Save Design'}
+          </button>
+          {settingsMsg && (
+            <span className={`text-sm font-medium ${settingsMsg === 'Saved' ? 'text-green-600' : 'text-red-500'}`}>
+              {settingsMsg}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderSettings = () => {
     if (settingsLoading) return <p className="text-sm text-gray-500">Loading settings…</p>;
 
@@ -823,117 +960,6 @@ export default function BidderAdminSettings({ companyId }) {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Proposal Design */}
-        {designs.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Proposal Design</h3>
-            <div>
-              <label className={labelCls}>Default Design</label>
-              <select
-                className={inputCls}
-                value={settingsForm.preferred_proposal_design_id}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, preferred_proposal_design_id: e.target.value }))}
-              >
-                <option value="">Standard Invoice (default)</option>
-                {designs.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* Color Scheme */}
-        <div>
-          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Color Scheme</h3>
-          <p className="text-xs text-gray-500 mb-4">Applied to proposals, invoices, and emails. Overrides the design selection above.</p>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Header Color</label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="color"
-                  value={settingsForm.primary_color || '#1c2333'}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
-                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
-                />
-                <input
-                  type="text"
-                  value={settingsForm.primary_color || ''}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
-                  placeholder="#1c2333"
-                  maxLength={7}
-                  className={inputCls}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelCls}>Accent Color</label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="color"
-                  value={settingsForm.accent_color || '#f97316'}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
-                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
-                />
-                <input
-                  type="text"
-                  value={settingsForm.accent_color || ''}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
-                  placeholder="#f97316"
-                  maxLength={7}
-                  className={inputCls}
-                />
-              </div>
-            </div>
-          </div>
-          {/* Live preview */}
-          <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            <div
-              style={{ background: settingsForm.primary_color || '#1c2333' }}
-              className="px-5 py-3 flex items-center justify-between"
-            >
-              <span className="text-white font-bold text-sm">Your Company Name</span>
-              <span
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: settingsForm.accent_color || '#f97316' }}
-              >
-                Proposal
-              </span>
-            </div>
-            <div style={{ background: settingsForm.accent_color || '#f97316', height: 3 }} />
-            <div className="bg-white px-5 py-4 flex items-center justify-between">
-              <span className="text-sm text-gray-600">Customer Name</span>
-              <span
-                style={{ background: settingsForm.accent_color || '#f97316' }}
-                className="px-4 py-1.5 text-white text-xs font-bold rounded-lg"
-              >
-                Accept Proposal
-              </span>
-            </div>
-            <div
-              style={{ background: settingsForm.primary_color || '#1c2333' }}
-              className="px-5 py-2.5 text-center"
-            >
-              <span
-                className="text-xs font-semibold tracking-wide"
-                style={{ color: settingsForm.accent_color || '#f97316' }}
-              >
-                Thank you for your business
-              </span>
-            </div>
-          </div>
-          {(settingsForm.primary_color || settingsForm.accent_color) && (
-            <button
-              type="button"
-              onClick={() => setSettingsForm((p) => ({ ...p, primary_color: '', accent_color: '' }))}
-              className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
-            >
-              Reset to design defaults
-            </button>
-          )}
         </div>
 
         {/* Company Logo */}
@@ -1133,11 +1159,13 @@ export default function BidderAdminSettings({ companyId }) {
         <button className={tabBtn(section === 'library')} onClick={() => setSection('library')}>Item Library</button>
         <button className={tabBtn(section === 'warranties')} onClick={() => setSection('warranties')}>Warranties</button>
         <button className={tabBtn(section === 'settings')} onClick={() => setSection('settings')}>Settings</button>
+        <button className={tabBtn(section === 'design')} onClick={() => setSection('design')}>Design</button>
       </div>
 
       {section === 'library'    && renderLibrary()}
       {section === 'warranties' && renderWarranties()}
       {section === 'settings'   && renderSettings()}
+      {section === 'design'     && renderDesign()}
     </div>
   );
 }
