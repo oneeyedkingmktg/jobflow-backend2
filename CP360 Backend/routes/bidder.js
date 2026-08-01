@@ -1174,7 +1174,7 @@ router.post('/proposal/:id/send-warranty-email', async (req, res) => {
       `SELECT bp.warranty_id,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
-              bcs.email_from_name, bcs.email_from_email,
+              bcs.email_from_name, bcs.email_from_email, bcs.logo_url,
               bp.proposal_design_id, bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1215,6 +1215,7 @@ router.post('/proposal/:id/send-warranty-email', async (req, res) => {
       fromEmail:          row.email_from_email || undefined,
       primaryColor,
       accentColor,
+      logoUrl:            row.logo_url || null,
     });
 
     res.json({ success: true, sentTo: toEmail });
@@ -1305,7 +1306,7 @@ router.post('/proposal/:id/send-email', async (req, res) => {
               bp.proposal_design_id, bp.doc_number,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
-              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain, bcs.logo_url,
               bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1339,6 +1340,7 @@ router.post('/proposal/:id/send-email', async (req, res) => {
     const fromEmail    = row.email_from_email || undefined;
     const primaryColor = row.design_primary_color || null;
     const accentColor  = row.design_accent_color  || null;
+    const logoUrl      = row.logo_url || null;
 
     // For invoice emails, fetch the specific payment schedule entry
     let invoiceLabel = null;
@@ -1385,6 +1387,7 @@ router.post('/proposal/:id/send-email', async (req, res) => {
       emailType,
       primaryColor,
       accentColor,
+      logoUrl,
       invoiceLabel,
       payDescription,
       payAmountStr,
@@ -1410,7 +1413,20 @@ router.post('/public/:id/accept', async (req, res) => {
 
     // Check proposal exists and isn't already signed
     const existing = await pool.query(
-      'SELECT bp.*, l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short, c.ghl_company_from_name, c.company_name as company_db_name, bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain FROM bidder_proposals bp JOIN leads l ON bp.lead_id = l.id JOIN companies c ON bp.company_id = c.id LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id WHERE bp.doc_number = $1',
+      `SELECT bp.*, bp.doc_number,
+              l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
+              c.ghl_company_from_name, c.company_name as company_db_name,
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.logo_url, bcs.preferred_proposal_design_id,
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+       FROM bidder_proposals bp
+       JOIN leads l ON bp.lead_id = l.id
+       JOIN companies c ON bp.company_id = c.id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = c.id
+       LEFT JOIN bidder_proposal_designs bpd_prop ON bpd_prop.id = bp.proposal_design_id
+       LEFT JOIN bidder_proposal_designs bpd_pref ON bpd_pref.id = bcs.preferred_proposal_design_id
+       WHERE bp.doc_number = $1`,
       [parseInt(req.params.id, 10)]
     );
     if (!existing.rows.length) return res.status(404).json({ error: 'Proposal not found' });
@@ -1443,6 +1459,7 @@ router.post('/public/:id/accept', async (req, res) => {
     // Send emails (non-blocking — don't fail the request if email fails)
     sendProposalAcceptedEmails({
       proposalId: req.params.id,
+      proposalDocNum: proposal.doc_number,
       bidName: proposal.bid_name,
       signatureName: signature_name.trim(),
       signedAt,
@@ -1453,6 +1470,9 @@ router.post('/public/:id/accept', async (req, res) => {
       proposalUrl,
       fromName: proposal.email_from_name || null,
       fromEmail: proposal.email_from_email || null,
+      primaryColor: proposal.design_primary_color || null,
+      accentColor:  proposal.design_accent_color  || null,
+      logoUrl:      proposal.logo_url             || null,
     }).catch(err => console.error('Proposal accept email error:', err));
 
     res.json({ success: true, signed_at: signedAt });
@@ -1666,7 +1686,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               COALESCE(c.company_name, c.name) as company_db_name,
               c.ghl_company_from_name,
-              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain, bcs.logo_url,
               bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1726,6 +1746,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
       fromEmail:  row.email_from_email || null,
       primaryColor,
       accentColor,
+      logoUrl:    row.logo_url || null,
     }).catch(err => console.error('Payment received email error:', err));
 
     res.json({ success: true });
@@ -1742,7 +1763,7 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
       `SELECT bp.warranty_id,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.name as company_db_name,
-              bcs.email_from_name, bcs.email_from_email,
+              bcs.email_from_name, bcs.email_from_email, bcs.logo_url,
               bp.proposal_design_id, bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1783,6 +1804,7 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
       fromEmail:          row.email_from_email || undefined,
       primaryColor,
       accentColor,
+      logoUrl:            row.logo_url || null,
     });
 
     res.json({ success: true, sentTo: toEmail });
