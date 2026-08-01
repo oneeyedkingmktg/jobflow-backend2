@@ -262,6 +262,7 @@ export const BidderAPI = {
   // Company settings
   getCompanySettings: (companyId) => apiRequest(`/api/bidder/company-settings${companyId ? `?company_id=${companyId}` : ''}`),
   updateCompanySettings: (data, companyId) => apiRequest(`/api/bidder/company-settings${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+  saveCompanyColors: (data, companyId) => apiRequest(`/api/bidder/company-colors${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Proposal designs (master only for write, all for read)
   getProposalDesigns: () => apiRequest('/api/bidder/proposal-designs'),
