@@ -364,11 +364,14 @@ export default function BidderAdminSettings({ companyId }) {
     setSettingsMsg('');
     try {
       const result = await BidderAPI.saveCompanyColors({
+        preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
         primary_color: settingsForm.primary_color || null,
         accent_color:  settingsForm.accent_color  || null,
       }, companyId);
       setSettingsForm((p) => ({
         ...p,
+        preferred_proposal_design_id: result.preferred_proposal_design_id
+          ? String(result.preferred_proposal_design_id) : '',
         primary_color: result.primary_color || '',
         accent_color:  result.accent_color  || '',
       }));
@@ -699,19 +702,100 @@ export default function BidderAdminSettings({ companyId }) {
   const renderDesign = () => {
     if (settingsLoading) return <p className="text-sm text-gray-500">Loading…</p>;
 
+    // Determine effective colors: custom override → selected template → hardcoded fallback
+    const selectedTemplate = designs.find(
+      (d) => String(d.id) === String(settingsForm.preferred_proposal_design_id)
+    );
+    const effectivePrimary = settingsForm.primary_color || selectedTemplate?.primary_color || '#1c2333';
+    const effectiveAccent  = settingsForm.accent_color  || selectedTemplate?.accent_color  || '#f97316';
+    const templatePlaceholderPrimary = selectedTemplate?.primary_color || '#1c2333';
+    const templatePlaceholderAccent  = selectedTemplate?.accent_color  || '#f97316';
+
     return (
       <div className="space-y-6">
-        {/* Color Scheme */}
+
+        {/* Template selector */}
         <div>
-          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Color Scheme</h3>
-          <p className="text-xs text-gray-500 mb-4">Applied to all proposals, invoices, and emails sent from this account.</p>
+          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Proposal Template</h3>
+          <p className="text-xs text-gray-500 mb-3">Choose the layout style for your proposals and invoices.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Default option */}
+            <label
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${
+                !settingsForm.preferred_proposal_design_id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <input
+                type="radio"
+                className="sr-only"
+                name="template"
+                value=""
+                checked={!settingsForm.preferred_proposal_design_id}
+                onChange={() => setSettingsForm((p) => ({ ...p, preferred_proposal_design_id: '' }))}
+              />
+              {/* Mini preview — default (white/blue) */}
+              <div className="w-full rounded overflow-hidden border border-gray-200 text-[9px]">
+                <div className="bg-blue-700 px-2 py-1 text-white font-bold">Company</div>
+                <div className="bg-blue-200 h-1" />
+                <div className="bg-white px-2 py-1.5 flex justify-between items-center">
+                  <span className="text-gray-500">Customer</span>
+                  <span className="bg-blue-700 text-white rounded px-1.5 py-0.5">Sign</span>
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-gray-700">Default</span>
+            </label>
+
+            {/* One card per template in DB */}
+            {designs.filter(d => d.visibility === 'public').map((d) => (
+              <label
+                key={d.id}
+                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition ${
+                  String(settingsForm.preferred_proposal_design_id) === String(d.id)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="sr-only"
+                  name="template"
+                  value={d.id}
+                  checked={String(settingsForm.preferred_proposal_design_id) === String(d.id)}
+                  onChange={() => setSettingsForm((p) => ({ ...p, preferred_proposal_design_id: String(d.id) }))}
+                />
+                {/* Mini preview using template's base colors */}
+                <div className="w-full rounded overflow-hidden border border-gray-200 text-[9px]">
+                  <div style={{ background: d.primary_color }} className="px-2 py-1 text-white font-bold flex justify-between">
+                    <span>Company</span>
+                    <span style={{ color: d.accent_color }}>Proposal</span>
+                  </div>
+                  <div style={{ background: d.accent_color, height: 3 }} />
+                  <div className="bg-white px-2 py-1.5 flex justify-between items-center">
+                    <span className="text-gray-500">Customer</span>
+                    <span style={{ background: d.accent_color }} className="text-white rounded px-1.5 py-0.5">Sign</span>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-gray-700">{d.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Color overrides */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Custom Colors</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Override the template's default colors. Leave blank to use the template's colors.
+          </p>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelCls}>Header Color</label>
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
-                  value={settingsForm.primary_color || '#1c2333'}
+                  value={effectivePrimary}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
                   className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
                 />
@@ -719,7 +803,7 @@ export default function BidderAdminSettings({ companyId }) {
                   type="text"
                   value={settingsForm.primary_color || ''}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
-                  placeholder="#1c2333"
+                  placeholder={templatePlaceholderPrimary}
                   maxLength={7}
                   className={inputCls}
                 />
@@ -730,7 +814,7 @@ export default function BidderAdminSettings({ companyId }) {
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
-                  value={settingsForm.accent_color || '#f97316'}
+                  value={effectiveAccent}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
                   className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
                 />
@@ -738,7 +822,7 @@ export default function BidderAdminSettings({ companyId }) {
                   type="text"
                   value={settingsForm.accent_color || ''}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
-                  placeholder="#f97316"
+                  placeholder={templatePlaceholderAccent}
                   maxLength={7}
                   className={inputCls}
                 />
@@ -748,36 +832,21 @@ export default function BidderAdminSettings({ companyId }) {
 
           {/* Live preview */}
           <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-            <div
-              style={{ background: settingsForm.primary_color || '#1c2333' }}
-              className="px-5 py-3 flex items-center justify-between"
-            >
+            <div style={{ background: effectivePrimary }} className="px-5 py-3 flex items-center justify-between">
               <span className="text-white font-bold text-sm">Your Company Name</span>
-              <span
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: settingsForm.accent_color || '#f97316' }}
-              >
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: effectiveAccent }}>
                 Proposal
               </span>
             </div>
-            <div style={{ background: settingsForm.accent_color || '#f97316', height: 3 }} />
+            <div style={{ background: effectiveAccent, height: 3 }} />
             <div className="bg-white px-5 py-4 flex items-center justify-between">
               <span className="text-sm text-gray-600">Customer Name</span>
-              <span
-                style={{ background: settingsForm.accent_color || '#f97316' }}
-                className="px-4 py-1.5 text-white text-xs font-bold rounded-lg"
-              >
+              <span style={{ background: effectiveAccent }} className="px-4 py-1.5 text-white text-xs font-bold rounded-lg">
                 Accept Proposal
               </span>
             </div>
-            <div
-              style={{ background: settingsForm.primary_color || '#1c2333' }}
-              className="px-5 py-2.5 text-center"
-            >
-              <span
-                className="text-xs font-semibold tracking-wide"
-                style={{ color: settingsForm.accent_color || '#f97316' }}
-              >
+            <div style={{ background: effectivePrimary }} className="px-5 py-2.5 text-center">
+              <span className="text-xs font-semibold tracking-wide" style={{ color: effectiveAccent }}>
                 Thank you for your business
               </span>
             </div>
@@ -789,7 +858,7 @@ export default function BidderAdminSettings({ companyId }) {
               onClick={() => setSettingsForm((p) => ({ ...p, primary_color: '', accent_color: '' }))}
               className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
             >
-              Reset to defaults
+              Reset colors to template defaults
             </button>
           )}
         </div>
