@@ -832,7 +832,7 @@ router.put('/company-settings', async (req, res) => {
       include_payment_button, down_payment_default_percent, convenience_fee_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
       email_from_name, email_from_email, proposal_top_text, invoice_top_text,
-      proposal_domain, logo_url, default_warranty,
+      proposal_domain, logo_url, default_warranty, primary_color, accent_color,
     } = req.body;
 
     const result = await pool.query(
@@ -843,8 +843,8 @@ router.put('/company-settings', async (req, res) => {
           down_payment_default_percent, convenience_fee_percent, preferred_proposal_design_id,
           terms_and_conditions, system_notes, email_from_name, email_from_email,
           proposal_top_text, invoice_top_text, proposal_domain, logo_url,
-          default_warranty, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW())
+          default_warranty, primary_color, accent_color, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          stripe_publishable_key = EXCLUDED.stripe_publishable_key,
          stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
@@ -864,6 +864,8 @@ router.put('/company-settings', async (req, res) => {
          proposal_domain = EXCLUDED.proposal_domain,
          logo_url = EXCLUDED.logo_url,
          default_warranty = EXCLUDED.default_warranty,
+         primary_color = EXCLUDED.primary_color,
+         accent_color = EXCLUDED.accent_color,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -880,7 +882,7 @@ router.put('/company-settings', async (req, res) => {
         clean(email_from_name), clean(email_from_email),
         clean(proposal_top_text), clean(invoice_top_text),
         clean(proposal_domain), clean(logo_url),
-        clean(default_warranty),
+        clean(default_warranty), clean(primary_color), clean(accent_color),
       ]
     );
 
@@ -1150,8 +1152,8 @@ router.post('/proposal/:id/send-warranty-email', async (req, res) => {
               c.ghl_company_from_name, c.name as company_db_name,
               bcs.email_from_name, bcs.email_from_email,
               bp.proposal_design_id, bcs.preferred_proposal_design_id,
-              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1176,10 +1178,8 @@ router.post('/proposal/:id/send-warranty-email', async (req, res) => {
 
     const companyName   = row.ghl_company_from_name || row.company_db_name || '';
     const customerName  = row.lead_name || row.lead_name_short || '';
-    const primaryColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_primary_color || '#1c2333') : null;
-    const accentColor   = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_accent_color  || '#f97316') : null;
+    const primaryColor  = row.design_primary_color || null;
+    const accentColor   = row.design_accent_color  || null;
 
     await sendWarrantyEmail({
       toEmail,
@@ -1225,8 +1225,8 @@ router.get('/public/:id', async (req, res) => {
               bcs.convenience_fee_percent as company_convenience_fee_percent,
               bcs.preferred_proposal_design_id, bcs.logo_url,
               u.name AS created_by_name,
-              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color,
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color,
               w.warranty_title
        FROM bidder_proposals bp
        JOIN companies c ON bp.company_id = c.id
@@ -1283,8 +1283,8 @@ router.post('/proposal/:id/send-email', async (req, res) => {
               c.ghl_company_from_name, c.name as company_db_name,
               bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
               bcs.preferred_proposal_design_id,
-              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1313,10 +1313,8 @@ router.post('/proposal/:id/send-email', async (req, res) => {
       : `${baseUrl}/proposal/${dn}`;
     const fromName     = row.email_from_name || companyName || undefined;
     const fromEmail    = row.email_from_email || undefined;
-    const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_primary_color || '#1c2333') : null;
-    const accentColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_accent_color || '#f97316') : null;
+    const primaryColor = row.design_primary_color || null;
+    const accentColor  = row.design_accent_color  || null;
 
     // For invoice emails, fetch the specific payment schedule entry
     let invoiceLabel = null;
@@ -1646,8 +1644,8 @@ router.post('/public/:id/payment-received', async (req, res) => {
               c.ghl_company_from_name,
               bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
               bcs.preferred_proposal_design_id,
-              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1688,10 +1686,8 @@ router.post('/public/:id/payment-received', async (req, res) => {
     );
     const contractorEmail = contractorResult.rows[0]?.email || null;
 
-    const primaryColor = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_primary_color || '#1c2333') : null;
-    const accentColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_accent_color  || '#f97316') : null;
+    const primaryColor = row.design_primary_color || null;
+    const accentColor  = row.design_accent_color  || null;
 
     sendPaymentReceivedEmail({
       contractorEmail,
@@ -1724,8 +1720,8 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
               c.ghl_company_from_name, c.name as company_db_name,
               bcs.email_from_name, bcs.email_from_email,
               bp.proposal_design_id, bcs.preferred_proposal_design_id,
-              COALESCE(bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
-              COALESCE(bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
+              COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
+              COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
        FROM bidder_proposals bp
        JOIN leads l ON bp.lead_id = l.id
        JOIN companies c ON bp.company_id = c.id
@@ -1750,10 +1746,8 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
 
     const companyName   = row.ghl_company_from_name || row.company_db_name || '';
     const customerName  = row.lead_name || row.lead_name_short || '';
-    const primaryColor  = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_primary_color || '#1c2333') : null;
-    const accentColor   = (row.proposal_design_id || row.preferred_proposal_design_id)
-      ? (row.design_accent_color  || '#f97316') : null;
+    const primaryColor  = row.design_primary_color || null;
+    const accentColor   = row.design_accent_color  || null;
 
     await sendWarrantyEmail({
       toEmail,

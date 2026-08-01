@@ -119,6 +119,8 @@ export default function BidderAdminSettings({ companyId }) {
         invoice_top_text: data.invoice_top_text || '',
         proposal_domain: data.proposal_domain || '',
         logo_url: data.logo_url || '',
+        primary_color: data.primary_color || '',
+        accent_color: data.accent_color || '',
       });
     } catch (e) {
       console.error('Failed to load settings', e);
@@ -367,6 +369,8 @@ export default function BidderAdminSettings({ companyId }) {
         convenience_fee_percent: parseFloat(settingsForm.convenience_fee_percent) || 0,
         preferred_proposal_design_id: settingsForm.preferred_proposal_design_id || null,
         proposal_domain: settingsForm.proposal_domain.trim() || null,
+        primary_color: settingsForm.primary_color || null,
+        accent_color: settingsForm.accent_color || null,
       };
       // Don't overwrite saved secret keys if the fields were left blank
       if (!payload.stripe_secret_key) delete payload.stripe_secret_key;
@@ -840,6 +844,97 @@ export default function BidderAdminSettings({ companyId }) {
             </div>
           </div>
         )}
+
+        {/* Color Scheme */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Color Scheme</h3>
+          <p className="text-xs text-gray-500 mb-4">Applied to proposals, invoices, and emails. Overrides the design selection above.</p>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={labelCls}>Header Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={settingsForm.primary_color || '#1c2333'}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.primary_color || ''}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  placeholder="#1c2333"
+                  maxLength={7}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Accent Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={settingsForm.accent_color || '#f97316'}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
+                  className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 flex-shrink-0"
+                />
+                <input
+                  type="text"
+                  value={settingsForm.accent_color || ''}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, accent_color: e.target.value }))}
+                  placeholder="#f97316"
+                  maxLength={7}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+          {/* Live preview */}
+          <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <div
+              style={{ background: settingsForm.primary_color || '#1c2333' }}
+              className="px-5 py-3 flex items-center justify-between"
+            >
+              <span className="text-white font-bold text-sm">Your Company Name</span>
+              <span
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: settingsForm.accent_color || '#f97316' }}
+              >
+                Proposal
+              </span>
+            </div>
+            <div style={{ background: settingsForm.accent_color || '#f97316', height: 3 }} />
+            <div className="bg-white px-5 py-4 flex items-center justify-between">
+              <span className="text-sm text-gray-600">Customer Name</span>
+              <span
+                style={{ background: settingsForm.accent_color || '#f97316' }}
+                className="px-4 py-1.5 text-white text-xs font-bold rounded-lg"
+              >
+                Accept Proposal
+              </span>
+            </div>
+            <div
+              style={{ background: settingsForm.primary_color || '#1c2333' }}
+              className="px-5 py-2.5 text-center"
+            >
+              <span
+                className="text-xs font-semibold tracking-wide"
+                style={{ color: settingsForm.accent_color || '#f97316' }}
+              >
+                Thank you for your business
+              </span>
+            </div>
+          </div>
+          {(settingsForm.primary_color || settingsForm.accent_color) && (
+            <button
+              type="button"
+              onClick={() => setSettingsForm((p) => ({ ...p, primary_color: '', accent_color: '' }))}
+              className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              Reset to design defaults
+            </button>
+          )}
+        </div>
 
         {/* Company Logo */}
         <div>
