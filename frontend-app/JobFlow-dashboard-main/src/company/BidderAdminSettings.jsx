@@ -115,6 +115,7 @@ export default function BidderAdminSettings({ companyId }) {
         terms_and_conditions: data.terms_and_conditions || '',
         email_from_name: data.email_from_name || '',
         email_from_email: data.email_from_email || '',
+        notification_emails: data.notification_emails || '',
         proposal_top_text: data.proposal_top_text || '',
         invoice_top_text: data.invoice_top_text || '',
         proposal_domain: data.proposal_domain || '',
@@ -388,6 +389,21 @@ export default function BidderAdminSettings({ companyId }) {
   async function handleSaveSettings() {
     setSettingsSaving(true);
     setSettingsMsg('');
+
+    // Validate: notification_emails must not contain the From Email
+    const fromEmail = (settingsForm.email_from_email || '').trim().toLowerCase();
+    const notifyList = (settingsForm.notification_emails || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (fromEmail && notifyList.includes(fromEmail)) {
+      alert(
+        `Duplicate email detected.\n\n"${settingsForm.email_from_email.trim()}" is already set as your From Email and cannot also be a notification recipient.\n\nRemove it from the Notification Emails field and save again.`
+      );
+      setSettingsSaving(false);
+      return;
+    }
+
     try {
       const payload = {
         ...settingsForm,
@@ -1173,6 +1189,20 @@ export default function BidderAdminSettings({ companyId }) {
                 placeholder="e.g. info@rfcfloors.com"
               />
               <p className="text-xs text-gray-400 mt-1">Must be an email address you control. Leave blank to use the system default.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Notification Emails</label>
+              <input
+                className={inputCls}
+                type="text"
+                value={settingsForm.notification_emails}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, notification_emails: e.target.value }))}
+                placeholder="e.g. owner@rfcfloors.com, manager@rfcfloors.com"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Where to send contractor alerts (proposal accepted, payment received). Separate multiple addresses with a comma.
+                Do not include the From Email address above.
+              </p>
             </div>
           </div>
         </div>

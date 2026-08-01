@@ -831,7 +831,8 @@ router.put('/company-settings', async (req, res) => {
       paypal_client_id, paypal_secret_key, payment_processor,
       include_payment_button, down_payment_default_percent, convenience_fee_percent,
       preferred_proposal_design_id, terms_and_conditions, system_notes,
-      email_from_name, email_from_email, proposal_top_text, invoice_top_text,
+      email_from_name, email_from_email, notification_emails,
+      proposal_top_text, invoice_top_text,
       proposal_domain, logo_url, default_warranty, primary_color, accent_color,
     } = req.body;
 
@@ -842,9 +843,10 @@ router.put('/company-settings', async (req, res) => {
           include_payment_button,
           down_payment_default_percent, convenience_fee_percent, preferred_proposal_design_id,
           terms_and_conditions, system_notes, email_from_name, email_from_email,
+          notification_emails,
           proposal_top_text, invoice_top_text, proposal_domain, logo_url,
           default_warranty, primary_color, accent_color, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          stripe_publishable_key = EXCLUDED.stripe_publishable_key,
          stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
@@ -859,6 +861,7 @@ router.put('/company-settings', async (req, res) => {
          system_notes = EXCLUDED.system_notes,
          email_from_name = EXCLUDED.email_from_name,
          email_from_email = EXCLUDED.email_from_email,
+         notification_emails = EXCLUDED.notification_emails,
          proposal_top_text = EXCLUDED.proposal_top_text,
          invoice_top_text = EXCLUDED.invoice_top_text,
          proposal_domain = EXCLUDED.proposal_domain,
@@ -880,6 +883,7 @@ router.put('/company-settings', async (req, res) => {
         clean(preferred_proposal_design_id),
         clean(terms_and_conditions), clean(system_notes),
         clean(email_from_name), clean(email_from_email),
+        clean(notification_emails),
         clean(proposal_top_text), clean(invoice_top_text),
         clean(proposal_domain), clean(logo_url),
         clean(default_warranty), clean(primary_color), clean(accent_color),
@@ -1419,7 +1423,7 @@ router.post('/public/:id/accept', async (req, res) => {
       `SELECT bp.*, bp.doc_number,
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               c.ghl_company_from_name, c.company_name as company_db_name, c.phone as company_phone,
-              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain,
+              bcs.email_from_name, bcs.email_from_email, bcs.notification_emails, bcs.proposal_domain,
               bcs.logo_url, bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1445,12 +1449,7 @@ router.post('/public/:id/accept', async (req, res) => {
       [signature_name.trim(), signedAt, ip, proposal.id]
     );
 
-    // Contractor notification goes to the company admin user's login email (different from SMTP sender)
-    const contractorResult = await pool.query(
-      `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
-      [proposal.company_id]
-    );
-    const contractorEmail = contractorResult.rows[0]?.email || null;
+    const contractorEmail = proposal.notification_emails ? proposal.notification_emails.trim() : null;
     const companyName = proposal.ghl_company_from_name || proposal.company_db_name || '';
     const customerEmail = proposal.lead_email || null;
     const customerName = proposal.lead_name || proposal.lead_name_short || '';
@@ -1691,7 +1690,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
               l.email as lead_email, l.full_name as lead_name, l.name as lead_name_short,
               COALESCE(c.company_name, c.name) as company_db_name,
               c.ghl_company_from_name, c.phone as company_phone,
-              bcs.email_from_name, bcs.email_from_email, bcs.proposal_domain, bcs.logo_url,
+              bcs.email_from_name, bcs.email_from_email, bcs.notification_emails, bcs.proposal_domain, bcs.logo_url,
               bcs.preferred_proposal_design_id,
               COALESCE(bcs.primary_color, bpd_prop.primary_color, bpd_pref.primary_color) AS design_primary_color,
               COALESCE(bcs.accent_color,  bpd_prop.accent_color,  bpd_pref.accent_color)  AS design_accent_color
@@ -1729,12 +1728,7 @@ router.post('/public/:id/payment-received', async (req, res) => {
       : process.env.APP_URL;
     const invoiceUrl    = `${baseUrl}/invoice/${req.params.id}/${String(invoice_num)}`;
 
-    // Contractor notification goes to the company admin user's login email (different from SMTP sender)
-    const contractorResult = await pool.query(
-      `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
-      [row.company_id]
-    );
-    const contractorEmail = contractorResult.rows[0]?.email || null;
+    const contractorEmail = row.notification_emails ? row.notification_emails.trim() : null;
 
     const primaryColor = row.design_primary_color || null;
     const accentColor  = row.design_accent_color  || null;
