@@ -891,6 +891,29 @@ router.put('/company-settings', async (req, res) => {
   }
 });
 
+// PUT /api/bidder/company-colors — save just header + accent colors
+router.put('/company-colors', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { primary_color, accent_color } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO bidder_company_settings (company_id, primary_color, accent_color)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (company_id) DO UPDATE SET
+         primary_color = EXCLUDED.primary_color,
+         accent_color  = EXCLUDED.accent_color
+       RETURNING primary_color, accent_color`,
+      [companyId, clean(primary_color), clean(accent_color)]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PUT /bidder/company-colors error:', err);
+    res.status(500).json({ error: 'Failed to save colors' });
+  }
+});
+
 // ============================================================================
 // PROPOSAL DESIGNS (master role only)
 // ============================================================================
