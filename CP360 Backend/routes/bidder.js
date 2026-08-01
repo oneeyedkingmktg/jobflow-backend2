@@ -1445,12 +1445,13 @@ router.post('/public/:id/accept', async (req, res) => {
       [signature_name.trim(), signedAt, ip, proposal.id]
     );
 
-    // Fetch contractor email (company admin/owner)
-    const contractorResult = await pool.query(
-      `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
-      [proposal.company_id]
-    );
-    const contractorEmail = contractorResult.rows[0]?.email || null;
+    // Contractor notification goes to the configured business email; fall back to first admin user
+    const contractorEmail = proposal.email_from_email || (
+      await pool.query(
+        `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
+        [proposal.company_id]
+      )
+    ).rows[0]?.email || null;
     const companyName = proposal.ghl_company_from_name || proposal.company_db_name || '';
     const customerEmail = proposal.lead_email || null;
     const customerName = proposal.lead_name || proposal.lead_name_short || '';
@@ -1729,11 +1730,13 @@ router.post('/public/:id/payment-received', async (req, res) => {
       : process.env.APP_URL;
     const invoiceUrl    = `${baseUrl}/invoice/${req.params.id}/${String(invoice_num)}`;
 
-    const contractorResult = await pool.query(
-      `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
-      [row.company_id]
-    );
-    const contractorEmail = contractorResult.rows[0]?.email || null;
+    // Contractor notification goes to the configured business email; fall back to first admin user
+    const contractorEmail = row.email_from_email || (
+      await pool.query(
+        `SELECT email FROM users WHERE company_id = $1 AND role IN ('admin', 'master') ORDER BY id ASC LIMIT 1`,
+        [row.company_id]
+      )
+    ).rows[0]?.email || null;
 
     const primaryColor = row.design_primary_color || null;
     const accentColor  = row.design_accent_color  || null;

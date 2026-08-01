@@ -336,7 +336,7 @@ async function sendPaymentReceivedEmail({
     sends.push(transporter.sendMail({
       from: fromHeader, ...(replyTo && { replyTo }),
       to: contractorEmail,
-      subject: `Payment Received — ${bidName}`,
+      subject: `${customerName || 'A customer'} has paid ${amountStr} for ${bidName}`,
       html: buildHtml(false),
     }));
   }
