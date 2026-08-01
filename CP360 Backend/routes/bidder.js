@@ -891,26 +891,27 @@ router.put('/company-settings', async (req, res) => {
   }
 });
 
-// PUT /api/bidder/company-colors — save just header + accent colors
+// PUT /api/bidder/company-colors — save template selection + color overrides
 router.put('/company-colors', async (req, res) => {
   try {
     const companyId = req.user.company_id;
-    const { primary_color, accent_color } = req.body;
+    const { primary_color, accent_color, preferred_proposal_design_id } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO bidder_company_settings (company_id, primary_color, accent_color)
-       VALUES ($1, $2, $3)
+      `INSERT INTO bidder_company_settings (company_id, primary_color, accent_color, preferred_proposal_design_id)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (company_id) DO UPDATE SET
-         primary_color = EXCLUDED.primary_color,
-         accent_color  = EXCLUDED.accent_color
-       RETURNING primary_color, accent_color`,
-      [companyId, clean(primary_color), clean(accent_color)]
+         primary_color                = EXCLUDED.primary_color,
+         accent_color                 = EXCLUDED.accent_color,
+         preferred_proposal_design_id = EXCLUDED.preferred_proposal_design_id
+       RETURNING primary_color, accent_color, preferred_proposal_design_id`,
+      [companyId, clean(primary_color), clean(accent_color), clean(preferred_proposal_design_id)]
     );
 
     res.json(result.rows[0]);
   } catch (err) {
     console.error('PUT /bidder/company-colors error:', err);
-    res.status(500).json({ error: 'Failed to save colors' });
+    res.status(500).json({ error: 'Failed to save design settings' });
   }
 });
 
