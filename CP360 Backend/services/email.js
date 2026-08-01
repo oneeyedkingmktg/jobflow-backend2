@@ -16,6 +16,14 @@ function isEmailSafeUrl(url) {
   return url && (url.startsWith('http://') || url.startsWith('https://'));
 }
 
+// Contact line added above footer in all customer emails
+function contactLine(companyPhone) {
+  const reach = companyPhone
+    ? ` at ${companyPhone}`
+    : '';
+  return `<p style="font-size:13px;color:#9ca3af;margin:24px 0 0;font-family:Arial,sans-serif;text-align:center">If you have any questions or concerns please reach out to us${reach} or reply to this email.</p>`;
+}
+
 // Shared header row: colored bar with optional logo left + company name right
 function emailHeader(HBG, AC, displayName, logoUrl) {
   const safeLogoUrl = isEmailSafeUrl(logoUrl) ? logoUrl : null;
@@ -73,7 +81,7 @@ async function sendPasswordResetEmail(email, resetToken) {
 async function sendProposalAcceptedEmails({
   proposalId, proposalDocNum, bidName, bidTotal = null, signatureName, signedAt,
   customerEmail, customerName, contractorEmail, companyName, proposalUrl,
-  fromName, fromEmail,
+  fromName, fromEmail, companyPhone = null,
   primaryColor = null, accentColor = null, logoUrl = null,
 }) {
   const dateStr     = new Date(signedAt).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -95,7 +103,6 @@ async function sendProposalAcceptedEmails({
       `<p style="font-size:16px;color:#111;margin:0 0 6px;font-family:Arial,sans-serif">`,
       `<strong>${customerName || 'Your customer'}</strong> has accepted a proposal.</p>`,
 
-      // Detail card
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:2px solid ${HBG};border-radius:6px">`,
       `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
       `<p style="margin:0;font-size:11px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">Proposal Accepted</p>`,
@@ -117,8 +124,6 @@ async function sendProposalAcceptedEmails({
       ].join('') : '',
 
       `</td></tr>`,
-
-      // Footer
       `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
       `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; ${companyName || 'CoatingPro360'}</p>`,
       `</td></tr>`,
@@ -129,7 +134,7 @@ async function sendProposalAcceptedEmails({
       from: fromHeader,
       ...(replyTo && { replyTo }),
       to: contractorEmail,
-      subject: `Proposal Accepted — ${docLabel}`,
+      subject: `${customerName || 'A customer'} has accepted the proposal for ${bidName}`,
       html: contractorHtml,
     });
   }
@@ -144,7 +149,6 @@ async function sendProposalAcceptedEmails({
       `<p style="font-size:16px;color:#111;margin:0 0 6px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
       `<p style="font-size:15px;color:#4b5563;margin:0 0 20px;font-family:Arial,sans-serif">Your proposal acceptance has been received. Here is a summary for your records.</p>`,
 
-      // Detail card
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:2px solid ${HBG};border-radius:6px">`,
       `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
       `<p style="margin:0;font-size:11px;font-weight:900;color:${AC};text-transform:uppercase;letter-spacing:2px;font-family:Arial,sans-serif">Acceptance Summary</p>`,
@@ -157,7 +161,6 @@ async function sendProposalAcceptedEmails({
       `</table>`,
       `</td></tr></table>`,
 
-      // Pay Now prompt
       `<p style="font-size:15px;color:#4b5563;margin:0 0 16px;font-family:Arial,sans-serif">Click below to make your payment.</p>`,
       `<table cellpadding="0" cellspacing="0" style="margin:0 auto 28px">`,
       `<tr><td bgcolor="${AC}" style="border-radius:6px">`,
@@ -165,9 +168,9 @@ async function sendProposalAcceptedEmails({
       `</td></tr></table>`,
 
       `<p style="font-size:14px;color:#374151;margin:0;font-family:Arial,sans-serif">A representative from <strong>${companyName || 'our team'}</strong> will be in touch shortly.</p>`,
+      contactLine(companyPhone),
       `</td></tr>`,
 
-      // Footer
       `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
       `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; Thank you for your business!</p>`,
       `</td></tr>`,
@@ -186,7 +189,7 @@ async function sendProposalAcceptedEmails({
 
 async function sendProposalLinkEmail({
   toEmail, customerName, companyName, bidName, bidTotal, proposalUrl,
-  fromName, fromEmail, emailType,
+  fromName, fromEmail, emailType, companyPhone = null,
   primaryColor = null, accentColor = null, logoUrl = null,
   invoiceLabel = null, payDescription = null, payAmountStr = null,
 }) {
@@ -198,7 +201,7 @@ async function sendProposalLinkEmail({
   const docLabel    = isInvoice ? (invoiceLabel || 'Invoice') : 'Proposal';
   const lineTitle   = isInvoice ? (payDescription || bidName) : bidName;
   const subject     = isInvoice
-    ? `${invoiceLabel ? invoiceLabel + ' — ' : ''}Invoice from ${displayName}`
+    ? `Your ${displayName} Invoice & Payment Link`
     : `Your Proposal from ${displayName} is Ready`;
   const preheader   = isInvoice
     ? `Invoice from ${displayName}${payDescription ? ' — ' + payDescription : ''} ${totalStr}`
@@ -206,7 +209,6 @@ async function sendProposalLinkEmail({
   const btnText     = isInvoice ? 'View Your Invoice' : 'View Your Proposal';
   const HBG         = primaryColor || '#1d4ed8';
   const AC          = accentColor  || (isInvoice ? '#1d4ed8' : '#16a34a');
-
   const useCustom   = !!(primaryColor && accentColor);
 
   const html = [
@@ -217,7 +219,6 @@ async function sendProposalLinkEmail({
       ? emailHeader(HBG, AC, displayName, logoUrl)
       : emailHeaderClassic(displayName, logoUrl),
 
-    // Body
     `<tr><td bgcolor="${useCustom ? '#ffffff' : '#f9fafb'}" style="padding:28px;border:1px solid #e5e7eb;border-top:none${useCustom ? '' : ';border-radius:0 0 8px 8px'}">`,
     `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
     isInvoice
@@ -251,6 +252,8 @@ async function sendProposalLinkEmail({
 
     `<p style="font-size:12px;color:#9ca3af;margin:0;font-family:Arial,sans-serif">Or copy this link into your browser:<br>`,
     `<a href="${proposalUrl}" style="color:${HBG}">${proposalUrl}</a></p>`,
+
+    contactLine(companyPhone),
     `</td></tr>`,
 
     // Footer
@@ -273,66 +276,84 @@ async function sendProposalLinkEmail({
 async function sendPaymentReceivedEmail({
   contractorEmail, customerEmail, customerName, companyName,
   bidName, amountStr, payLabel, invoiceUrl,
-  fromName, fromEmail,
+  fromName, fromEmail, companyPhone = null,
   primaryColor = null, accentColor = null, logoUrl = null,
 }) {
   const displayName = fromName || companyName || 'CoatingPro360';
   const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
   const replyTo     = fromEmail || undefined;
   const dateStr     = new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const firstName   = customerName ? customerName.trim().split(' ')[0] : '';
   const greeting    = customerName ? `Hi ${customerName},` : 'Hi there,';
   const closing     = `We look forward to completing your project${bidName ? ` — ${bidName}` : ''}.`;
   const HBG         = primaryColor || '#1d4ed8';
   const AC          = accentColor  || '#f97316';
   const useCustom   = !!(primaryColor && accentColor);
 
-  const html = [
-    `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
+  function buildHtml(forCustomer) {
+    return [
+      `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">`,
 
-    useCustom
-      ? emailHeader(HBG, AC, displayName, logoUrl)
-      : emailHeaderClassic(displayName, logoUrl),
+      useCustom
+        ? emailHeader(HBG, AC, displayName, logoUrl)
+        : emailHeaderClassic(displayName, logoUrl),
 
-    `<tr><td bgcolor="${useCustom ? '#ffffff' : '#f9fafb'}" style="padding:32px 28px;border:1px solid #e5e7eb;border-top:none${useCustom ? '' : ';border-radius:0 0 8px 8px'};text-align:center">`,
-    `<div style="display:inline-block;background:#16a34a;border-radius:50%;width:60px;height:60px;line-height:60px;text-align:center;font-size:30px;color:#fff;margin-bottom:20px">&#10003;</div>`,
-    `<h2 style="color:${useCustom ? HBG : '#111'};margin:0 0 20px;font-size:24px;font-weight:900;font-family:Arial,sans-serif">Thank you for your payment</h2>`,
-    `<p style="font-size:38px;font-weight:900;color:#16a34a;margin:0 0 6px;font-family:Arial,sans-serif">${amountStr}</p>`,
-    `<p style="color:#6b7280;font-size:16px;font-weight:600;margin:0 0 28px;font-family:Arial,sans-serif">${payLabel}</p>`,
-    `<p style="color:#4b5563;font-size:15px;margin:0 0 28px;font-family:Arial,sans-serif">${greeting} ${closing}</p>`,
-    invoiceUrl ? [
-      `<table cellpadding="0" cellspacing="0" style="margin:0 auto">`,
-      `<tr><td bgcolor="${HBG}" style="border-radius:6px">`,
-      `<a href="${invoiceUrl}" style="display:block;color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif;padding:13px 28px">View Invoice</a>`,
-      `</td></tr></table>`,
-    ].join('') : '',
-    `</td></tr>`,
-
-    useCustom ? [
-      `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
-      `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; Thank you for your business!</p>`,
+      `<tr><td bgcolor="${useCustom ? '#ffffff' : '#f9fafb'}" style="padding:32px 28px;border:1px solid #e5e7eb;border-top:none${useCustom ? '' : ';border-radius:0 0 8px 8px'};text-align:center">`,
+      `<div style="display:inline-block;background:#16a34a;border-radius:50%;width:60px;height:60px;line-height:60px;text-align:center;font-size:30px;color:#fff;margin-bottom:20px">&#10003;</div>`,
+      `<h2 style="color:${useCustom ? HBG : '#111'};margin:0 0 20px;font-size:24px;font-weight:900;font-family:Arial,sans-serif">Thank you for your payment</h2>`,
+      `<p style="font-size:38px;font-weight:900;color:#16a34a;margin:0 0 6px;font-family:Arial,sans-serif">${amountStr}</p>`,
+      `<p style="color:#6b7280;font-size:16px;font-weight:600;margin:0 0 28px;font-family:Arial,sans-serif">${payLabel}</p>`,
+      `<p style="color:#4b5563;font-size:15px;margin:0 0 28px;font-family:Arial,sans-serif">${greeting} ${closing}</p>`,
+      invoiceUrl ? [
+        `<table cellpadding="0" cellspacing="0" style="margin:0 auto">`,
+        `<tr><td bgcolor="${HBG}" style="border-radius:6px">`,
+        `<a href="${invoiceUrl}" style="display:block;color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif;padding:13px 28px">View Invoice</a>`,
+        `</td></tr></table>`,
+      ].join('') : '',
+      forCustomer ? contactLine(companyPhone) : '',
       `</td></tr>`,
-    ].join('') : [
-      `<tr><td style="padding:16px 28px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">`,
-      `<p style="color:#9ca3af;font-size:12px;margin:0;font-family:Arial,sans-serif">${displayName}</p>`,
-      `</td></tr>`,
-    ].join(''),
 
-    `</table>`,
-  ].join('');
+      useCustom ? [
+        `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
+        `<p style="margin:0;font-size:12px;color:${AC};font-weight:bold;font-family:Arial,sans-serif">&#9733; Thank you for your business!</p>`,
+        `</td></tr>`,
+      ].join('') : [
+        `<tr><td style="padding:16px 28px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">`,
+        `<p style="color:#9ca3af;font-size:12px;margin:0;font-family:Arial,sans-serif">${displayName}</p>`,
+        `</td></tr>`,
+      ].join(''),
+
+      `</table>`,
+    ].join('');
+  }
+
+  const customerSubject = firstName
+    ? `Thank you ${firstName}, we have received your payment — details inside`
+    : `Thank you, we have received your payment — details inside`;
 
   const sends = [];
   if (contractorEmail) {
-    sends.push(transporter.sendMail({ from: fromHeader, ...(replyTo && { replyTo }), to: contractorEmail, subject: `Payment Received — ${bidName}`, html }));
+    sends.push(transporter.sendMail({
+      from: fromHeader, ...(replyTo && { replyTo }),
+      to: contractorEmail,
+      subject: `Payment Received — ${bidName}`,
+      html: buildHtml(false),
+    }));
   }
   if (customerEmail) {
-    sends.push(transporter.sendMail({ from: fromHeader, ...(replyTo && { replyTo }), to: customerEmail, subject: `Payment Confirmation — ${companyName || 'CoatingPro360'}`, html }));
+    sends.push(transporter.sendMail({
+      from: fromHeader, ...(replyTo && { replyTo }),
+      to: customerEmail,
+      subject: customerSubject,
+      html: buildHtml(true),
+    }));
   }
   await Promise.all(sends);
 }
 
 async function sendWarrantyEmail({
   toEmail, customerName, companyName, warrantyTitle, warrantyPdfDataUrl,
-  fromName, fromEmail,
+  fromName, fromEmail, companyPhone = null,
   primaryColor = null, accentColor = null, logoUrl = null,
 }) {
   const displayName = fromName || companyName || 'CoatingPro360';
@@ -354,7 +375,6 @@ async function sendWarrantyEmail({
     `<p style="font-size:16px;color:#111;margin:0 0 16px;font-family:Arial,sans-serif">Hi ${customerName || 'there'},</p>`,
     `<p style="font-size:15px;color:#4b5563;margin:0 0 24px;font-family:Arial,sans-serif">Please find your project warranty attached to this email. This document outlines the coverage and terms of your warranty with ${companyName || 'us'}. Keep it for your records — if you have any questions, don't hesitate to reach out.</p>`,
 
-    // Warranty card
     useCustom ? [
       `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;border:2px solid ${HBG};border-radius:6px">`,
       `<tr><td bgcolor="${HBG}" style="padding:10px 16px;border-radius:4px 4px 0 0">`,
@@ -371,6 +391,7 @@ async function sendWarrantyEmail({
       `</td></tr></table>`,
     ].join(''),
 
+    contactLine(companyPhone),
     `</td></tr>`,
 
     useCustom ? [
