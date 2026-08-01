@@ -11,16 +11,22 @@ const transporter = nodemailer.createTransport({
   tls: { rejectUnauthorized: false },
 });
 
+// Returns true only for http/https URLs — data: URLs break in email clients
+function isEmailSafeUrl(url) {
+  return url && (url.startsWith('http://') || url.startsWith('https://'));
+}
+
 // Shared header row: colored bar with optional logo left + company name right
 function emailHeader(HBG, AC, displayName, logoUrl) {
-  const logo = logoUrl
-    ? `<img src="${logoUrl}" alt="${displayName}" style="max-height:44px;max-width:160px;display:block;object-fit:contain">`
+  const safeLogoUrl = isEmailSafeUrl(logoUrl) ? logoUrl : null;
+  const logo = safeLogoUrl
+    ? `<img src="${safeLogoUrl}" alt="${displayName}" style="max-height:44px;max-width:160px;display:block;object-fit:contain">`
     : `<span style="color:#fff;font-size:22px;font-weight:900;letter-spacing:0.5px;font-family:Arial,sans-serif">${displayName}</span>`;
   return [
     `<tr><td bgcolor="${HBG}" style="padding:18px 28px">`,
     `<table width="100%" cellpadding="0" cellspacing="0"><tr>`,
     `<td style="vertical-align:middle">${logo}</td>`,
-    logoUrl
+    safeLogoUrl
       ? `<td style="vertical-align:middle;text-align:right"><span style="color:#fff;font-size:15px;font-weight:700;font-family:Arial,sans-serif">${displayName}</span></td>`
       : '',
     `</tr></table>`,
@@ -31,14 +37,15 @@ function emailHeader(HBG, AC, displayName, logoUrl) {
 
 // Classic (blue) header with optional logo
 function emailHeaderClassic(displayName, logoUrl) {
-  const logo = logoUrl
-    ? `<img src="${logoUrl}" alt="${displayName}" style="max-height:44px;max-width:160px;display:block;object-fit:contain">`
+  const safeLogoUrl = isEmailSafeUrl(logoUrl) ? logoUrl : null;
+  const logo = safeLogoUrl
+    ? `<img src="${safeLogoUrl}" alt="${displayName}" style="max-height:44px;max-width:160px;display:block;object-fit:contain">`
     : `<span style="color:#fff;font-size:22px;font-weight:700;font-family:Arial,sans-serif">${displayName}</span>`;
   return [
     `<tr><td bgcolor="#1d4ed8" style="padding:18px 28px;border-radius:8px 8px 0 0">`,
     `<table width="100%" cellpadding="0" cellspacing="0"><tr>`,
     `<td style="vertical-align:middle">${logo}</td>`,
-    logoUrl
+    safeLogoUrl
       ? `<td style="vertical-align:middle;text-align:right"><span style="color:#fff;font-size:15px;font-weight:700;font-family:Arial,sans-serif">${displayName}</span></td>`
       : '',
     `</tr></table>`,
