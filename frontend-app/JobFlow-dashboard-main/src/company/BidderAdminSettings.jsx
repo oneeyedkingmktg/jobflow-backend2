@@ -378,6 +378,7 @@ export default function BidderAdminSettings({ companyId }) {
       if (!payload.paypal_secret_key) delete payload.paypal_secret_key;
       delete payload.paypal_secret_key_saved;
       await BidderAPI.updateCompanySettings(payload, companyId);
+      await loadSettings();
       setSettingsMsg('Saved');
       setTimeout(() => setSettingsMsg(''), 3000);
     } catch (e) {
@@ -678,30 +679,10 @@ export default function BidderAdminSettings({ companyId }) {
 
     return (
       <div className="space-y-6">
-        {/* Proposal Design Template */}
-        {designs.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">Proposal Template</h3>
-            <div>
-              <label className={labelCls}>Default Layout</label>
-              <select
-                className={inputCls}
-                value={settingsForm.preferred_proposal_design_id}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, preferred_proposal_design_id: e.target.value }))}
-              >
-                <option value="">Standard (default)</option>
-                {designs.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
         {/* Color Scheme */}
         <div>
           <h3 className="font-semibold text-gray-800 mb-1 text-sm uppercase tracking-wide">Color Scheme</h3>
-          <p className="text-xs text-gray-500 mb-4">Applied to proposals, invoices, and emails. Overrides the template colors above.</p>
+          <p className="text-xs text-gray-500 mb-4">Applied to all proposals, invoices, and emails sent from this account.</p>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelCls}>Header Color</label>
@@ -786,7 +767,7 @@ export default function BidderAdminSettings({ companyId }) {
               onClick={() => setSettingsForm((p) => ({ ...p, primary_color: '', accent_color: '' }))}
               className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
             >
-              Reset to template defaults
+              Reset to defaults
             </button>
           )}
         </div>
