@@ -1461,6 +1461,7 @@ router.post('/public/:id/accept', async (req, res) => {
       proposalId: req.params.id,
       proposalDocNum: proposal.doc_number,
       bidName: proposal.bid_name,
+      bidTotal: proposal.bid_total || null,
       signatureName: signature_name.trim(),
       signedAt,
       customerEmail,

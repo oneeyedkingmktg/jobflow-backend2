@@ -71,7 +71,7 @@ async function sendPasswordResetEmail(email, resetToken) {
 }
 
 async function sendProposalAcceptedEmails({
-  proposalId, proposalDocNum, bidName, signatureName, signedAt,
+  proposalId, proposalDocNum, bidName, bidTotal = null, signatureName, signedAt,
   customerEmail, customerName, contractorEmail, companyName, proposalUrl,
   fromName, fromEmail,
   primaryColor = null, accentColor = null, logoUrl = null,
@@ -81,6 +81,7 @@ async function sendProposalAcceptedEmails({
   const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
   const replyTo     = fromEmail || undefined;
   const docLabel    = proposalDocNum ? `Proposal #${proposalDocNum}` : (bidName || 'Proposal');
+  const totalStr    = bidTotal ? `$${(parseFloat(bidTotal) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null;
   const HBG         = primaryColor || '#1d4ed8';
   const AC          = accentColor  || '#f97316';
 
@@ -102,6 +103,7 @@ async function sendProposalAcceptedEmails({
       `<tr><td style="padding:16px">`,
       `<table width="100%" cellpadding="0" cellspacing="0">`,
       `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif;width:140px">Proposal</td><td style="padding:6px 0;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;color:#111">${docLabel}</td></tr>`,
+      totalStr ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Amount</td><td style="padding:6px 0;font-weight:bold;font-size:16px;font-family:Arial,sans-serif;color:${HBG}">${totalStr}</td></tr>` : '',
       `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Signed by</td><td style="padding:6px 0;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;color:#111">${signatureName}</td></tr>`,
       `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Date &amp; Time</td><td style="padding:6px 0;font-size:14px;font-family:Arial,sans-serif;color:#111">${dateStr}</td></tr>`,
       `</table>`,
@@ -109,8 +111,8 @@ async function sendProposalAcceptedEmails({
 
       proposalUrl ? [
         `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
-        `<tr><td bgcolor="${AC}" style="border-radius:6px;padding:13px 28px">`,
-        `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">View Proposal</a>`,
+        `<tr><td bgcolor="${AC}" style="border-radius:6px">`,
+        `<a href="${proposalUrl}" style="display:block;color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap;padding:13px 28px">View Proposal</a>`,
         `</td></tr></table>`,
       ].join('') : '',
 
@@ -158,8 +160,8 @@ async function sendProposalAcceptedEmails({
       // Pay Now prompt
       `<p style="font-size:15px;color:#4b5563;margin:0 0 16px;font-family:Arial,sans-serif">Click below to make your payment.</p>`,
       `<table cellpadding="0" cellspacing="0" style="margin:0 auto 28px">`,
-      `<tr><td bgcolor="${AC}" style="border-radius:6px;padding:14px 36px">`,
-      `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">Pay Now</a>`,
+      `<tr><td bgcolor="${AC}" style="border-radius:6px">`,
+      `<a href="${proposalUrl}" style="display:block;color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap;padding:14px 36px">Pay Now</a>`,
       `</td></tr></table>`,
 
       `<p style="font-size:14px;color:#374151;margin:0;font-family:Arial,sans-serif">A representative from <strong>${companyName || 'our team'}</strong> will be in touch shortly.</p>`,
@@ -243,8 +245,8 @@ async function sendProposalLinkEmail({
 
     // Button
     `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
-    `<tr><td bgcolor="${AC}" style="border-radius:6px;padding:14px 32px">`,
-    `<a href="${proposalUrl}" style="color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap">${btnText}</a>`,
+    `<tr><td bgcolor="${AC}" style="border-radius:6px">`,
+    `<a href="${proposalUrl}" style="display:block;color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap;padding:14px 32px">${btnText}</a>`,
     `</td></tr></table>`,
 
     `<p style="font-size:12px;color:#9ca3af;margin:0;font-family:Arial,sans-serif">Or copy this link into your browser:<br>`,
@@ -299,8 +301,8 @@ async function sendPaymentReceivedEmail({
     `<p style="color:#4b5563;font-size:15px;margin:0 0 28px;font-family:Arial,sans-serif">${greeting} ${closing}</p>`,
     invoiceUrl ? [
       `<table cellpadding="0" cellspacing="0" style="margin:0 auto">`,
-      `<tr><td bgcolor="${HBG}" style="border-radius:6px;padding:13px 28px">`,
-      `<a href="${invoiceUrl}" style="color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif">View Invoice</a>`,
+      `<tr><td bgcolor="${HBG}" style="border-radius:6px">`,
+      `<a href="${invoiceUrl}" style="display:block;color:#fff;font-weight:bold;font-size:14px;text-decoration:none;font-family:Arial,sans-serif;padding:13px 28px">View Invoice</a>`,
       `</td></tr></table>`,
     ].join('') : '',
     `</td></tr>`,
