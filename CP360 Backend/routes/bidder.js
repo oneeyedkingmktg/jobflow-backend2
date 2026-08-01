@@ -10,6 +10,16 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { sendProposalAcceptedEmails, sendProposalLinkEmail, sendPaymentReceivedEmail, sendWarrantyEmail } = require('../services/email');
 const Stripe = require('stripe');
 const axios = require('axios');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const PAYPAL_BASE = 'https://api-m.paypal.com';
 
@@ -918,6 +928,26 @@ router.put('/company-colors', async (req, res) => {
   } catch (err) {
     console.error('PUT /bidder/company-colors error:', err);
     res.status(500).json({ error: 'Failed to save design settings' });
+  }
+});
+
+// POST /api/bidder/upload-logo — upload logo image to Cloudinary, return public URL
+router.post('/upload-logo', logoUpload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    const result = await new Promise((resolve, reject) => {
+      const companyId = req.user.company_id || 'master';
+      cloudinary.uploader.upload_stream(
+        { folder: `jobflow/logos/${companyId}`, resource_type: 'image', overwrite: true },
+        (err, r) => (err ? reject(err) : resolve(r))
+      ).end(req.file.buffer);
+    });
+
+    res.json({ url: result.secure_url });
+  } catch (err) {
+    console.error('POST /bidder/upload-logo error:', err);
+    res.status(500).json({ error: 'Logo upload failed' });
   }
 });
 

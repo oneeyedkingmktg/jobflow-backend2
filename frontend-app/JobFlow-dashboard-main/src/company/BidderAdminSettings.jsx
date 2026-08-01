@@ -6,26 +6,6 @@
 import React, { useEffect, useState } from 'react';
 import { BidderAPI, CompaniesAPI } from '../api';
 
-function resizeImageToDataUrl(file, maxWidth = 400) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width  = Math.round(img.width  * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function BidderAdminSettings({ companyId }) {
   // ── Library state ──────────────────────────────────────────────────────────
@@ -351,8 +331,20 @@ export default function BidderAdminSettings({ companyId }) {
     if (!file) return;
     setLogoUploading(true);
     try {
-      const dataUrl = await resizeImageToDataUrl(file, 400);
-      setSettingsForm(p => ({ ...p, logo_url: dataUrl }));
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('logo', file);
+      const qs = companyId ? `?company_id=${companyId}` : '';
+      const res = await fetch(`${import.meta.env.APP_URL || import.meta.env.VITE_API_URL}/api/bidder/upload-logo${qs}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const { url } = await res.json();
+      setSettingsForm(p => ({ ...p, logo_url: url }));
+    } catch (err) {
+      alert('Logo upload failed. Please try again or paste a URL manually.');
     } finally {
       setLogoUploading(false);
       e.target.value = '';
@@ -1089,7 +1081,7 @@ export default function BidderAdminSettings({ companyId }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm text-blue-600 font-medium">
-                  {logoUploading ? 'Processing…' : 'Choose image file (PNG, JPG, SVG)'}
+                  {logoUploading ? 'Uploading…' : 'Choose image file (PNG, JPG, SVG)'}
                 </span>
                 <input
                   type="file"
@@ -1098,7 +1090,7 @@ export default function BidderAdminSettings({ companyId }) {
                   className="sr-only"
                 />
               </label>
-              <p className="text-xs text-gray-400 mt-1">Image will be automatically resized. Hit Save Settings after uploading.</p>
+              <p className="text-xs text-gray-400 mt-1">Image is uploaded to cloud storage and will display in emails and proposals. Hit Save Settings after uploading.</p>
             </div>
 
             {/* URL input */}
@@ -1106,7 +1098,7 @@ export default function BidderAdminSettings({ companyId }) {
               <label className={labelCls}>Or paste image URL</label>
               <input
                 className={inputCls}
-                value={settingsForm.logo_url?.startsWith('data:') ? '' : (settingsForm.logo_url || '')}
+                value={settingsForm.logo_url || ''}
                 onChange={(e) => setSettingsForm((p) => ({ ...p, logo_url: e.target.value }))}
                 placeholder="https://example.com/logo.png"
               />
