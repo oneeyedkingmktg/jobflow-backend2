@@ -358,6 +358,29 @@ export default function BidderAdminSettings({ companyId }) {
     }
   }
 
+  // ── Design (colors) save ───────────────────────────────────────────────────
+  async function handleSaveDesign() {
+    setSettingsSaving(true);
+    setSettingsMsg('');
+    try {
+      const result = await BidderAPI.saveCompanyColors({
+        primary_color: settingsForm.primary_color || null,
+        accent_color:  settingsForm.accent_color  || null,
+      }, companyId);
+      setSettingsForm((p) => ({
+        ...p,
+        primary_color: result.primary_color || '',
+        accent_color:  result.accent_color  || '',
+      }));
+      setSettingsMsg('Saved');
+      setTimeout(() => setSettingsMsg(''), 3000);
+    } catch (e) {
+      setSettingsMsg('Failed to save');
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
   // ── Settings save ──────────────────────────────────────────────────────────
   async function handleSaveSettings() {
     setSettingsSaving(true);
@@ -378,7 +401,6 @@ export default function BidderAdminSettings({ companyId }) {
       if (!payload.paypal_secret_key) delete payload.paypal_secret_key;
       delete payload.paypal_secret_key_saved;
       await BidderAPI.updateCompanySettings(payload, companyId);
-      await loadSettings();
       setSettingsMsg('Saved');
       setTimeout(() => setSettingsMsg(''), 3000);
     } catch (e) {
@@ -775,7 +797,7 @@ export default function BidderAdminSettings({ companyId }) {
         {/* Save */}
         <div className="flex items-center gap-4 pt-2">
           <button
-            onClick={handleSaveSettings}
+            onClick={handleSaveDesign}
             disabled={settingsSaving}
             className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50"
           >
