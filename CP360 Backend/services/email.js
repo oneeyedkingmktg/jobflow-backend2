@@ -109,7 +109,7 @@ async function sendProposalAcceptedEmails({
       `</td></tr>`,
       `<tr><td style="padding:16px">`,
       `<table width="100%" cellpadding="0" cellspacing="0">`,
-      `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif;width:140px">Proposal</td><td style="padding:6px 0;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;color:#111">${docLabel}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif;width:140px">Project</td><td style="padding:6px 0;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;color:#111">${bidName || '—'}</td></tr>`,
       totalStr ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Amount</td><td style="padding:6px 0;font-weight:bold;font-size:16px;font-family:Arial,sans-serif;color:${HBG}">${totalStr}</td></tr>` : '',
       `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Signed by</td><td style="padding:6px 0;font-weight:bold;font-size:14px;font-family:Arial,sans-serif;color:#111">${signatureName}</td></tr>`,
       `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;font-family:Arial,sans-serif">Date &amp; Time</td><td style="padding:6px 0;font-size:14px;font-family:Arial,sans-serif;color:#111">${dateStr}</td></tr>`,
