@@ -169,6 +169,7 @@ export default function LeadsHome() {
   const [blockedTimes, setBlockedTimes] = useState([]);
   const [salespeople, setSalespeople] = useState([]);
   const [crewAssignments, setCrewAssignments] = useState({});
+  const [individualAssignments, setIndividualAssignments] = useState({});
 
   // --------------------------------------------------
   // Load leads
@@ -221,6 +222,9 @@ const loadLeads = async () => {
       .catch(() => {});
     CrewsAPI.getLeadAssignments(currentCompany.id)
       .then((data) => setCrewAssignments(data.assignments || {}))
+      .catch(() => {});
+    CrewsAPI.getLeadIndividualAssignments(currentCompany.id)
+      .then((data) => setIndividualAssignments(data.assignments || {}))
       .catch(() => {});
   };
 
@@ -433,6 +437,7 @@ onAddLead={() => {
       onBlockDelete={handleBlockDelete}
       salespeople={salespeople}
       crewAssignments={crewAssignments}
+      individualAssignments={individualAssignments}
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>

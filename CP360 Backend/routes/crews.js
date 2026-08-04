@@ -86,6 +86,7 @@ router.get("/lead-assignments", async (req, res) => {
        FROM lead_assignments la
        JOIN crews c ON c.id = la.crew_id
        WHERE la.company_id = $1 AND la.crew_id IS NOT NULL
+       GROUP BY la.lead_id, c.id, c.name, c.color
        ORDER BY la.lead_id, c.name`,
       [companyId]
     );
@@ -100,6 +101,37 @@ router.get("/lead-assignments", async (req, res) => {
   } catch (err) {
     console.error("Get lead assignments error:", err);
     res.status(500).json({ error: "Failed to fetch lead assignments" });
+  }
+});
+
+// ============================================================================
+// GET /api/crews/lead-individual-assignments — non-crew (individual) assignments per lead
+// Returns { assignments: { [leadId]: [{userId, name}] } }
+// ============================================================================
+router.get("/lead-individual-assignments", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT la.lead_id, u.id AS user_id, u.name
+       FROM lead_assignments la
+       JOIN users u ON u.id = la.user_id AND u.deleted_at IS NULL
+       WHERE la.company_id = $1 AND la.crew_id IS NULL AND la.assignment_role != 'salesperson'
+       ORDER BY la.lead_id, u.name`,
+      [companyId]
+    );
+
+    const assignments = {};
+    for (const row of result.rows) {
+      if (!assignments[row.lead_id]) assignments[row.lead_id] = [];
+      assignments[row.lead_id].push({ userId: row.user_id, name: row.name });
+    }
+
+    res.json({ assignments });
+  } catch (err) {
+    console.error("Get individual assignments error:", err);
+    res.status(500).json({ error: "Failed to fetch individual assignments" });
   }
 });
 

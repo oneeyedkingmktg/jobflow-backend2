@@ -57,6 +57,7 @@ export default function CalendarView({
   onBlockDelete,
   salespeople = [],
   crewAssignments = {},
+  individualAssignments = {},
 }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
@@ -698,11 +699,15 @@ export default function CalendarView({
                         {!isSC && lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
                           <div className="text-xs text-gray-700 font-semibold mt-0.5">{lead.companyName}</div>
                         )}
-                        {leadCrews.length > 0 && (
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            Crew{leadCrews.length > 1 ? "s" : ""}: {leadCrews.map((c) => c.name).join(", ")}
-                          </div>
-                        )}
+                        {(() => {
+                          const indivs = isInstall ? (individualAssignments[lead.id] || []) : [];
+                          const crewPart = leadCrews.map((c) => c.name).join(", ");
+                          const indivPart = indivs.map((i) => i.name).join(", ");
+                          const teamLabel = [crewPart, indivPart].filter(Boolean).join(" + ");
+                          return teamLabel ? (
+                            <div className="text-xs text-gray-500 mt-0.5">{teamLabel}</div>
+                          ) : null;
+                        })()}
                         {leadSalesman && (
                           <div className="text-xs text-gray-500 mt-0.5">
                             Salesman: {leadSalesman.name}
@@ -836,11 +841,15 @@ export default function CalendarView({
                     {isInstall && lead.driveTimeMinutes != null && (
                       <div className="text-xs text-gray-500 mt-0.5">Approx {lead.driveTimeMinutes} min away</div>
                     )}
-                    {leadCrews.length > 0 && (
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        Crew{leadCrews.length > 1 ? "s" : ""}: {leadCrews.map((c) => c.name).join(", ")}
-                      </div>
-                    )}
+                    {(() => {
+                      const indivs = isInstall ? (individualAssignments[lead.id] || []) : [];
+                      const crewPart = leadCrews.map((c) => c.name).join(", ");
+                      const indivPart = indivs.map((i) => i.name).join(", ");
+                      const teamLabel = [crewPart, indivPart].filter(Boolean).join(" + ");
+                      return teamLabel ? (
+                        <div className="text-xs text-gray-500 mt-0.5">{teamLabel}</div>
+                      ) : null;
+                    })()}
                     {leadSalesman && (
                       <div className="text-xs text-gray-500 mt-0.5">
                         Salesman: {leadSalesman.name}

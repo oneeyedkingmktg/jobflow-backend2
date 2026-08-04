@@ -211,6 +211,11 @@ export const CrewsAPI = {
     return apiRequest(url);
   },
 
+  getLeadIndividualAssignments: (companyId) => {
+    const url = companyId ? `/api/crews/lead-individual-assignments?company_id=${companyId}` : "/api/crews/lead-individual-assignments";
+    return apiRequest(url);
+  },
+
   addMember: (crewId, userId, isLead = false) =>
     apiRequest(`/api/crews/${crewId}/members`, {
       method: "POST",
@@ -254,6 +259,9 @@ export const LeadAssignmentsAPI = {
 
   remove: (leadId, userId) =>
     apiRequest(`/leads/${leadId}/assignments/${userId}`, { method: "DELETE" }),
+
+  removeCrew: (leadId, crewId) =>
+    apiRequest(`/leads/${leadId}/assignments/crew/${crewId}`, { method: "DELETE" }),
 };
 
 /* ============================================================================

@@ -1,6 +1,8 @@
 // ============================================================================
 // File: src/leadModalParts/LeadTeamPanel.jsx
 // Assign employees and/or crews to a job (lead)
+// Crew assignments show as a single block — only whole crew can be removed.
+// Individual assignments can be removed one-by-one.
 // ============================================================================
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -69,6 +71,28 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
     }
   };
 
+  // Split assignments into crew groups and individuals
+  const { crewGroups, individuals } = useMemo(() => {
+    const groups = {};
+    const indivs = [];
+    for (const a of assignments) {
+      if (a.crewId) {
+        if (!groups[a.crewId]) {
+          groups[a.crewId] = {
+            crewId: a.crewId,
+            crewName: a.crewName,
+            crewColor: a.crewColor,
+            members: [],
+          };
+        }
+        groups[a.crewId].members.push(a);
+      } else {
+        indivs.push(a);
+      }
+    }
+    return { crewGroups: Object.values(groups), individuals: indivs };
+  }, [assignments]);
+
   const assignedUserIds = useMemo(
     () => new Set(assignments.map((a) => a.userId)),
     [assignments]
@@ -117,6 +141,15 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
     }
   };
 
+  const handleRemoveCrew = async (crewId) => {
+    try {
+      const res = await LeadAssignmentsAPI.removeCrew(leadId, crewId);
+      setAssignments(res.assignments || []);
+    } catch (err) {
+      setError(err.message || "Failed to remove crew");
+    }
+  };
+
   const handleChangeRole = async (assignment, newRole) => {
     try {
       await LeadAssignmentsAPI.updateRole(leadId, assignment.userId, newRole);
@@ -128,7 +161,7 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
     }
   };
 
-  const handleRemove = async (assignment) => {
+  const handleRemoveIndividual = async (assignment) => {
     try {
       await LeadAssignmentsAPI.remove(leadId, assignment.userId);
       setAssignments((prev) => prev.filter((a) => a.userId !== assignment.userId));
@@ -136,6 +169,8 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
       setError(err.message || "Failed to remove assignment");
     }
   };
+
+  const totalCount = crewGroups.length + individuals.length;
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black/60 backdrop-blur-sm">
@@ -166,41 +201,58 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
           {/* Current team */}
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2">
-              Assigned Team {assignments.length > 0 && `(${assignments.length})`}
+              Assigned Team {totalCount > 0 && `(${totalCount})`}
             </div>
 
             {loading ? (
               <div className="text-sm text-gray-400 text-center py-6">Loading…</div>
-            ) : assignments.length === 0 ? (
+            ) : totalCount === 0 ? (
               <div className="text-sm text-gray-400 text-center py-6 border border-dashed border-gray-200 rounded-xl">
                 No one assigned yet
               </div>
             ) : (
               <div className="space-y-2">
-                {assignments.map((a) => (
+                {/* Crew blocks — one block per crew, no individual remove buttons */}
+                {crewGroups.map((group) => (
+                  <div
+                    key={`crew-${group.crewId}`}
+                    className="p-3 bg-blue-50 rounded-xl border border-blue-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: group.crewColor || "#6366f1" }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm">
+                          {group.crewName}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5 truncate">
+                          {group.members.map((m) => m.userName).join(", ")}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveCrew(group.crewId)}
+                        className="text-xs text-red-400 hover:text-red-600 font-medium shrink-0 px-1"
+                      >
+                        Remove crew
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Individual assignments — with role selector and individual remove button */}
+                {individuals.map((a) => (
                   <div
                     key={a.userId}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100"
                   >
-                    {/* Crew color dot */}
-                    {a.crewColor && (
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: a.crewColor }}
-                        title={a.crewName || ""}
-                      />
-                    )}
-
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm truncate">
                         {a.userName}
                       </div>
-                      {a.crewName && (
-                        <div className="text-xs text-gray-400">{a.crewName}</div>
-                      )}
                     </div>
 
-                    {/* Role selector */}
                     <select
                       value={a.role}
                       onChange={(e) => handleChangeRole(a, e.target.value)}
@@ -216,7 +268,7 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
                     </select>
 
                     <button
-                      onClick={() => handleRemove(a)}
+                      onClick={() => handleRemoveIndividual(a)}
                       className="text-gray-300 hover:text-red-500 text-xl leading-none px-1 shrink-0"
                     >
                       ×
@@ -299,6 +351,9 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
             {/* Add individual employee */}
             {addTab === "employee" && (
               <div className="space-y-3">
+                <p className="text-xs text-gray-500">
+                  Add individuals when partial crew shows up — first remove the crew, then add the people who showed up.
+                </p>
                 {availableUsers.length === 0 ? (
                   <div className="text-sm text-gray-400 text-center py-3">
                     All active employees are already assigned

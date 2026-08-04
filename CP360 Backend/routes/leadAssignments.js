@@ -182,6 +182,53 @@ router.put("/:userId", async (req, res) => {
 });
 
 // ============================================================================
+// DELETE /leads/:leadId/assignments/crew/:crewId — remove all members of a crew from this lead
+// Must be declared before /:userId to avoid route conflict
+// ============================================================================
+router.delete("/crew/:crewId", async (req, res) => {
+  try {
+    const leadId = parseInt(req.params.leadId, 10);
+    const crewId = parseInt(req.params.crewId, 10);
+
+    await db.query(
+      "DELETE FROM lead_assignments WHERE lead_id = $1 AND crew_id = $2",
+      [leadId, crewId]
+    );
+
+    const updated = await db.query(
+      `SELECT
+         la.id, la.user_id, la.crew_id, la.assignment_role, la.assigned_at,
+         u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
+         c.name AS crew_name, c.color AS crew_color
+       FROM lead_assignments la
+       JOIN users u ON u.id = la.user_id
+       LEFT JOIN crews c ON c.id = la.crew_id
+       WHERE la.lead_id = $1
+       ORDER BY la.assignment_role ASC, u.name ASC`,
+      [leadId]
+    );
+
+    const assignments = updated.rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      userName: r.user_name,
+      userEmail: r.user_email,
+      userPhone: r.user_phone,
+      crewId: r.crew_id,
+      crewName: r.crew_name,
+      crewColor: r.crew_color,
+      role: r.assignment_role,
+      assignedAt: r.assigned_at,
+    }));
+
+    res.json({ assignments });
+  } catch (err) {
+    console.error("Remove crew assignment error:", err);
+    res.status(500).json({ error: "Failed to remove crew assignment" });
+  }
+});
+
+// ============================================================================
 // DELETE /leads/:leadId/assignments/:userId — remove an assignment
 // ============================================================================
 router.delete("/:userId", async (req, res) => {
