@@ -7,6 +7,7 @@ import EstimateModal from "../EstimateModal.jsx";
 import ConversationModal from "./ConversationModal.jsx";
 import LeadFilesPanel from "./LeadFilesPanel.jsx";
 import BidderPanel from "./BidderPanel.jsx";
+import LeadTeamPanel from "./LeadTeamPanel.jsx";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import { BidderAPI } from "../api";
@@ -31,6 +32,7 @@ const hasEstimate = form?.hasEstimate === true;
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showBidderPanel, setShowBidderPanel] = useState(false);
   const [bidCount, setBidCount] = useState(null);
+  const [showTeamPanel, setShowTeamPanel] = useState(false);
 
   useEffect(() => {
     if (form?.id && !isEstimatorOnly && bidderEnabled) {
@@ -281,6 +283,17 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
+        {/* Assign Team */}
+        {!isEstimatorOnly && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowTeamPanel(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            Assign Team
+          </button>
+        )}
+
       </div>
 
       {/* FILES MODAL */}
@@ -308,6 +321,15 @@ const hasEstimate = form?.hasEstimate === true;
         <ConversationModal
           lead={form}
           onClose={() => setShowConversationModal(false)}
+        />
+      )}
+
+      {/* TEAM PANEL */}
+      {showTeamPanel && (
+        <LeadTeamPanel
+          lead={form}
+          companyId={currentCompany?.id || currentCompany?.companyId}
+          onClose={() => setShowTeamPanel(false)}
         />
       )}
     </>
