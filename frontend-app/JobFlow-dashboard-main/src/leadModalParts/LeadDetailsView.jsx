@@ -24,6 +24,9 @@ const hasEstimate = form?.hasEstimate === true;
   const { currentCompany } = useCompany();
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const financialPermission = usePermission('financial_information');
+  const contactEditPermission = usePermission('contact_editing');
+  const customerCommsPermission = usePermission('customer_communications');
+  const bidderPermission = usePermission('bidder');
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
   const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
   const [showEstimateModal, setShowEstimateModal] = useState(false);
@@ -97,10 +100,8 @@ const hasEstimate = form?.hasEstimate === true;
     <>
       {/* MAIN DETAILS CARD */}
       <div
-        className="bg-[#f5f6f7] rounded-2xl border border-gray-200 px-5 py-5 
-                   shadow-sm text-sm text-gray-800 space-y-4 cursor-pointer 
-                   hover:shadow-md transition-shadow"
-        onClick={onEdit}
+        className={`bg-[#f5f6f7] rounded-2xl border border-gray-200 px-5 py-5 shadow-sm text-sm text-gray-800 space-y-4 transition-shadow${contactEditPermission === 'edit' ? ' cursor-pointer hover:shadow-md' : ''}`}
+        onClick={contactEditPermission === 'edit' ? onEdit : undefined}
       >
         <div>
           <span className="text-gray-500 block">Email</span>
@@ -230,7 +231,7 @@ const hasEstimate = form?.hasEstimate === true;
       <div className="mt-4 grid grid-cols-2 gap-3">
 
         {/* Conversations */}
-        {showConversations && (
+        {showConversations && customerCommsPermission !== 'hide' && (
           isEstimatorOnly ? (
             <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
               🔒 Messages<br/>Upgrade to Pro
@@ -258,22 +259,24 @@ const hasEstimate = form?.hasEstimate === true;
         )}
 
         {/* Photos & Files */}
-        {isEstimatorOnly ? (
-          <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
-            🔒 Upgrade to Pro for jobsite photos
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
-            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
-          >
-            Photos &amp; Files
-          </button>
+        {contactEditPermission !== 'hide' && (
+          isEstimatorOnly ? (
+            <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
+              🔒 Upgrade to Pro for jobsite photos
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
+              className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+            >
+              Photos &amp; Files
+            </button>
+          )
         )}
 
         {/* Bids */}
-        {!isEstimatorOnly && bidderEnabled && (
+        {!isEstimatorOnly && bidderEnabled && bidderPermission !== 'hide' && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowBidderPanel(true); }}

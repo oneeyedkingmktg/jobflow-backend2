@@ -20,6 +20,7 @@ export default function LeadAppointmentSection({
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const serviceCallsEnabled = usePermission('service_calls') !== 'hide';
+  const calendarPermission = usePermission('calendar');
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);
@@ -73,8 +74,8 @@ export default function LeadAppointmentSection({
         {/* APPOINTMENT BOX */}
         <button
           type="button"
-          onClick={() => setShowApptModal(true)}
-          className="bg-[#f5f6f7] rounded-xl border border-gray-200 px-3 py-3 text-left shadow-sm flex flex-col"
+          onClick={calendarPermission === 'edit' ? () => setShowApptModal(true) : undefined}
+          className={`bg-[#f5f6f7] rounded-xl border border-gray-200 px-3 py-3 text-left shadow-sm flex flex-col${calendarPermission !== 'edit' ? ' cursor-default' : ''}`}
         >
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Appointment
@@ -92,9 +93,8 @@ export default function LeadAppointmentSection({
         {/* INSTALL BOX */}
         <button
           type="button"
-          onClick={() => setShowDateModal("installDate")}
-          className="bg-[#f5f6f7] rounded-xl border border-gray-200 px-3 py-3
-                     text-left shadow-sm flex flex-col"
+          onClick={calendarPermission === 'edit' ? () => setShowDateModal("installDate") : undefined}
+          className={`bg-[#f5f6f7] rounded-xl border border-gray-200 px-3 py-3 text-left shadow-sm flex flex-col${calendarPermission !== 'edit' ? ' cursor-default' : ''}`}
         >
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Install Date

@@ -17,6 +17,7 @@ import "./index.css";
 import { initializePushNotifications, setupPushListeners } from "./services/pushNotificationService";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { isNativeApp } from "./utils/platform";
+import { usePermission } from "./utils/usePermission";
 
 // Register push listeners immediately at module load — before React renders
 setupPushListeners();
@@ -114,6 +115,7 @@ function AppContent() {
 
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const reportsEnabled = currentCompany?.reports_enabled === true || currentCompany?.reportsEnabled === true;
+  const reportsPermission = usePermission('reports');
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
@@ -282,7 +284,7 @@ function AppContent() {
           Messages
         </button>
 
-        {reportsEnabled && (
+        {reportsEnabled && reportsPermission !== 'hide' && (
           <button
             onClick={() => setActiveScreen("reports")}
             className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors ${

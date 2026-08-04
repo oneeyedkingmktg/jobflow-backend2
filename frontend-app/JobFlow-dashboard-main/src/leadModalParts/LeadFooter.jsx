@@ -4,6 +4,7 @@
 
 import React from "react";
 import { useAuth } from "../AuthContext";
+import { usePermission } from "../utils/usePermission";
 
 export default function LeadFooter({
   isEditing,
@@ -22,6 +23,8 @@ export default function LeadFooter({
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const leadMgmtPermission = usePermission('lead_management');
+  const contactEditPermission = usePermission('contact_editing');
 
   return (
     <div className="pt-6 border-t border-gray-200">
@@ -51,13 +54,15 @@ export default function LeadFooter({
 
         {/* EDIT / SAVE */}
         {!isEditing ? (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex-1 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition"
-          >
-            Edit
-          </button>
+          contactEditPermission === 'edit' && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex-1 py-3 bg-gray-300 text-gray-900 rounded-xl font-semibold text-sm hover:bg-gray-400 transition"
+            >
+              Edit
+            </button>
+          )
         ) : (
           <button
             type="button"
@@ -73,14 +78,16 @@ export default function LeadFooter({
       {/* BOTTOM ROW: Pause | Junk | Delete (or Reinstate) */}
       <div className="mt-4 flex justify-center">
         {onReinstate ? (
-          <button
-            type="button"
-            onClick={onReinstate}
-            disabled={saving}
-            className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
-          >
-            Reinstate Contact
-          </button>
+          leadMgmtPermission === 'edit' && (
+            <button
+              type="button"
+              onClick={onReinstate}
+              disabled={saving}
+              className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-green-700 transition disabled:opacity-50"
+            >
+              Reinstate Contact
+            </button>
+          )
         ) : deleteConfirm ? (
           <div className="flex flex-col items-center gap-2">
             <div className="text-sm text-gray-700 text-center">
@@ -105,36 +112,38 @@ export default function LeadFooter({
             </div>
           </div>
         ) : (
-          <div className="flex gap-6 flex-wrap justify-center">
-            {!isEstimatorOnly && onPause && (
+          leadMgmtPermission === 'edit' && (
+            <div className="flex gap-6 flex-wrap justify-center">
+              {!isEstimatorOnly && onPause && (
+                <button
+                  type="button"
+                  onClick={onPause}
+                  disabled={saving}
+                  className="text-sm text-yellow-600 hover:text-yellow-800 underline disabled:opacity-50"
+                >
+                  ⏸ Pause
+                </button>
+              )}
+              {!isJunk && onJunk && (
+                <button
+                  type="button"
+                  onClick={onJunk}
+                  disabled={saving}
+                  className="text-sm text-orange-500 hover:text-orange-700 underline disabled:opacity-50"
+                >
+                  Mark as Junk
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onPause}
+                onClick={() => setDeleteConfirm(true)}
                 disabled={saving}
-                className="text-sm text-yellow-600 hover:text-yellow-800 underline disabled:opacity-50"
+                className="text-sm text-red-600 hover:text-red-800 underline disabled:opacity-50"
               >
-                ⏸ Pause
+                Delete Contact
               </button>
-            )}
-            {!isJunk && onJunk && (
-              <button
-                type="button"
-                onClick={onJunk}
-                disabled={saving}
-                className="text-sm text-orange-500 hover:text-orange-700 underline disabled:opacity-50"
-              >
-                Mark as Junk
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setDeleteConfirm(true)}
-              disabled={saving}
-              className="text-sm text-red-600 hover:text-red-800 underline disabled:opacity-50"
-            >
-              Delete Contact
-            </button>
-          </div>
+            </div>
+          )
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@
 import React from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "./statusConfig.js";
 import { useAuth } from "../AuthContext";
+import { usePermission } from "../utils/usePermission";
 
 export default function LeadStatusBar({
   form,
@@ -13,6 +14,7 @@ export default function LeadStatusBar({
 
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const leadMgmtPermission = usePermission('lead_management');
 
   const [pauseBlockAction, setPauseBlockAction] = React.useState(null);
   const [showCompleteModal, setShowCompleteModal] = React.useState(false);
@@ -327,13 +329,15 @@ export default function LeadStatusBar({
           <div className="relative w-full sm:w-auto">
             <select
               value={form.status}
-              onChange={(e) => guardedSetStatus(e.target.value)}
-              className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow cursor-pointer"
+              onChange={leadMgmtPermission === 'edit' ? (e) => guardedSetStatus(e.target.value) : undefined}
+              disabled={leadMgmtPermission !== 'edit'}
+              className="appearance-none font-semibold rounded-2xl w-full px-4 pr-10 shadow"
               style={{
                 backgroundColor: STATUS_COLORS[form.status],
                 color: "#FFFFFF",
                 height: "48px",
                 fontSize: "1.05rem",
+                cursor: leadMgmtPermission === 'edit' ? 'pointer' : 'default',
               }}
             >
               {Object.keys(STATUS_LABELS).map((s) => (
@@ -361,28 +365,30 @@ export default function LeadStatusBar({
           </div>
         </div>
 
-        {currentStatus === "complete" ? (
-          form.hasLeftReview ? (
-            <button
-              onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: false }))}
-              className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
-              style={{ backgroundColor: "#16a34a" }}
-            >
-              <span className="text-[10px] uppercase opacity-80">tap to undo</span>
-              <span className="text-sm font-semibold">✓ Has Left Review</span>
-            </button>
+        {leadMgmtPermission === 'edit' && (
+          currentStatus === "complete" ? (
+            form.hasLeftReview ? (
+              <button
+                onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: false }))}
+                className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
+                style={{ backgroundColor: "#16a34a" }}
+              >
+                <span className="text-[10px] uppercase opacity-80">tap to undo</span>
+                <span className="text-sm font-semibold">✓ Has Left Review</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: true }))}
+                className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
+                style={{ backgroundColor: "#f59e0b" }}
+              >
+                <span className="text-[10px] uppercase opacity-80">Click here if</span>
+                <span className="text-sm font-semibold">Customer Left a Review</span>
+              </button>
+            )
           ) : (
-            <button
-              onClick={() => setForm((prev) => ({ ...prev, hasLeftReview: true }))}
-              className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
-              style={{ backgroundColor: "#f59e0b" }}
-            >
-              <span className="text-[10px] uppercase opacity-80">Click here if</span>
-              <span className="text-sm font-semibold">Customer Left a Review</span>
-            </button>
+            renderProgressButton()
           )
-        ) : (
-          renderProgressButton()
         )}
       </div>
       )}
