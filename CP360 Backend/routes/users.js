@@ -47,7 +47,7 @@ router.get("/salespeople", async (req, res) => {
     const result = await db.query(
       `SELECT id, name, salesman_color, ghl_calendar_id
        FROM users
-       WHERE company_id = $1 AND is_salesman = true AND is_active = true AND deleted_at IS NULL
+       WHERE company_id = $1 AND (is_salesman = true OR role = 'admin') AND is_active = true AND deleted_at IS NULL
        ORDER BY name ASC`,
       [companyId]
     );

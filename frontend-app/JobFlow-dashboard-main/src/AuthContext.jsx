@@ -40,8 +40,8 @@ const normalizeUser = (u) => {
     // Per-user permissions
     permissions: u.permissions ?? {},
 
-    // Crew & salesman fields (Phase 4)
-    isSalesman: u.is_salesman ?? u.isSalesman ?? false,
+    // Crew & salesman fields (Phase 4) — admins are always considered salespeople
+    isSalesman: (u.is_salesman ?? u.isSalesman ?? false) || u.role === 'admin',
     crewIds: u.crew_ids ?? u.crewIds ?? [],
 
     // Meta fields
