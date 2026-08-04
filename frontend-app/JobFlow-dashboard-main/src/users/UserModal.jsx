@@ -280,33 +280,6 @@ export default function UserModal({
             </div>
           )}
 
-          {/* SERVICE CALLS */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-sm font-semibold text-gray-700">Service Calls</span>
-            {viewMode === "view" ? (
-              <span className="font-medium text-gray-700">
-                {form.service_calls_enabled ? "Enabled" : "Disabled"}
-              </span>
-            ) : (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div
-                  onClick={() => handleChange("service_calls_enabled", !form.service_calls_enabled)}
-                  className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-                    form.service_calls_enabled ? "bg-blue-600" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                      form.service_calls_enabled ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </div>
-                <span className="text-sm text-gray-600">
-                  {form.service_calls_enabled ? "Enabled" : "Disabled"}
-                </span>
-              </label>
-            )}
-          </div>
 
           {/* PASSWORD */}
           {viewMode === "edit" && (
