@@ -4,14 +4,18 @@
 // ✅ Up to 2 simultaneous installs supported (stacked bar rows)
 // ✅ List view shows date range for multi-day installs
 // ✅ Day view handles multi-day install entries
+// ✅ Phase 3: Diagonal stripe bars (crew color on install, salesman color on appt)
+// ✅ Phase 3: Multi-crew badge indicator on install bars
+// ✅ Phase 3: Crew(s) and Salesman labels in day view + list view cards
+// ✅ Phase 3: Gear icon + filter panel (per-user, localStorage persisted)
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
 import BlockTimeModal from "./BlockTimeModal.jsx";
 
-const GAP_PX = 8; // gap-x-2 = 0.5rem = 8px
+const GAP_PX = 8;
 const COLS = 7;
-const TOTAL_GAP_PX = (COLS - 1) * GAP_PX; // 48px
+const TOTAL_GAP_PX = (COLS - 1) * GAP_PX;
 
 function barLeftCalc(colStart) {
   if (colStart === 0) return "0px";
@@ -22,14 +26,79 @@ function barWidthCalc(colSpan) {
   return `calc(${colSpan} * (100% - ${TOTAL_GAP_PX}px) / ${COLS} + ${Math.max(colSpan - 1, 0)} * ${GAP_PX}px)`;
 }
 
-export default function CalendarView({ leads, serviceCalls = [], holidays = [], onSelectLead, blockedTimes = [], currentUser, onBlockSave, onBlockDelete }) {
+function getInstallBarStyle(lead, crewAssignments) {
+  const baseColor = lead.installTentative ? "#15803d" : "#22c55e";
+  const crews = crewAssignments[lead.id];
+  if (!crews || crews.length === 0) return { backgroundColor: baseColor };
+  return {
+    background: `repeating-linear-gradient(-45deg, ${baseColor}, ${baseColor} 6px, ${crews[0].color} 6px, ${crews[0].color} 10px)`,
+  };
+}
+
+function getApptBarStyle(lead, salesmanMap) {
+  const baseColor = "#3b82f6";
+  const salesman = lead.appointmentSalesmanId ? salesmanMap[lead.appointmentSalesmanId] : null;
+  if (!salesman?.salesmanColor) return { backgroundColor: baseColor };
+  return {
+    background: `repeating-linear-gradient(-45deg, ${baseColor}, ${baseColor} 6px, ${salesman.salesmanColor} 6px, ${salesman.salesmanColor} 10px)`,
+  };
+}
+
+export default function CalendarView({
+  leads,
+  serviceCalls = [],
+  holidays = [],
+  onSelectLead,
+  blockedTimes = [],
+  currentUser,
+  onBlockSave,
+  onBlockDelete,
+  salespeople = [],
+  crewAssignments = {},
+}) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
   const [blockModal, setBlockModal] = useState({ open: false, date: null, block: null });
+  const [showFilter, setShowFilter] = useState(false);
+  const filterRef = useRef(null);
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+
+  const filterKey = `calendarFilters_${currentUser?.id || "default"}`;
+
+  const [visibleCalendars, setVisibleCalendars] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`calendarFilters_${currentUser?.id || "default"}`);
+      return stored
+        ? { appointment: true, install: true, serviceCall: true, ...JSON.parse(stored) }
+        : { appointment: true, install: true, serviceCall: true };
+    } catch {
+      return { appointment: true, install: true, serviceCall: true };
+    }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(filterKey, JSON.stringify(visibleCalendars)); } catch {}
+  }, [visibleCalendars, filterKey]);
+
+  useEffect(() => {
+    if (!showFilter) return;
+    const handleClick = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setShowFilter(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showFilter]);
+
+  const salesmanMap = useMemo(() => {
+    const map = {};
+    salespeople.forEach((s) => { map[s.id] = s; });
+    return map;
+  }, [salespeople]);
 
   const getDaysInMonth = (year, month) => {
     const date = new Date(year, month, 1);
@@ -73,7 +142,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     return `${hour}:${m} ${ampm}`;
   };
 
-  // Expand installs across all days of their duration
   const groupedByDate = useMemo(() => {
     const map = {};
     leads.forEach((lead) => {
@@ -132,7 +200,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     return map;
   }, [blockedTimes]);
 
-  // Group monthDays into weeks (arrays of 7, nulls for padding)
   const weeks = useMemo(() => {
     const result = [];
     let week = Array(monthDays[0].getDay()).fill(null);
@@ -150,7 +217,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     return result;
   }, [monthDays]);
 
-  // Compute install bar segments for a given week
   const getWeekBars = (week) => {
     const installsByLead = {};
     week.forEach((day, colIdx) => {
@@ -181,7 +247,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
       };
     });
 
-    // Assign row indices using greedy interval scheduling
     bars.sort((a, b) => a.colStart - b.colStart);
     const rowEndCols = [];
     bars.forEach((bar) => {
@@ -194,7 +259,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     return bars;
   };
 
-  // Compute SC bar segments for a given week (same logic as install bars)
   const getWeekScBars = (week) => {
     const scById = {};
     week.forEach((day, colIdx) => {
@@ -237,7 +301,6 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     return bars;
   };
 
-  // Build { "2026-07-04": "Independence Day", ... } for O(1) lookup
   const holidayMap = useMemo(() => {
     const map = {};
     holidays.forEach((h) => { map[h.date] = h.name; });
@@ -275,26 +338,67 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
     onSelectLead(lead, subView, date);
   };
 
+  // Gear button + dropdown filter panel — shared across MonthView and ListView
+  const GearPanel = () => (
+    <div className="relative" ref={filterRef}>
+      <button
+        onClick={() => setShowFilter((f) => !f)}
+        className={`p-2 rounded border transition-colors ${showFilter ? "bg-gray-200 border-gray-400" : "bg-white border-gray-300 hover:bg-gray-100"} text-gray-600`}
+        title="Calendar filters"
+        aria-label="Calendar filters"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
+      {showFilter && (
+        <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[190px]">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Show Calendars</div>
+          {[
+            { key: "appointment", label: "Appointments", color: "#3b82f6" },
+            { key: "install", label: "Installs", color: "#22c55e" },
+            { key: "serviceCall", label: "Service Calls", color: "#fb923c" },
+          ].map(({ key, label, color }) => (
+            <label key={key} className="flex items-center gap-2 py-1 cursor-pointer select-none">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className="text-sm text-gray-700 flex-1">{label}</span>
+              <input
+                type="checkbox"
+                checked={visibleCalendars[key]}
+                onChange={() => setVisibleCalendars((prev) => ({ ...prev, [key]: !prev[key] }))}
+                className="w-4 h-4 accent-blue-600"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   // ========= Month View =========
   const MonthView = () => (
     <div>
-      <div className="grid grid-cols-2 gap-2 mb-3 sm:flex sm:gap-4">
-        <button
-          onClick={() => setViewMode("month")}
-          className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
-            viewMode === "month" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          }`}
-        >
-          Month View
-        </button>
-        <button
-          onClick={() => setViewMode("list")}
-          className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
-            viewMode === "list" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          }`}
-        >
-          List View
-        </button>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:gap-4 sm:flex-none">
+          <button
+            onClick={() => setViewMode("month")}
+            className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
+              viewMode === "month" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+            }`}
+          >
+            Month View
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
+              viewMode === "list" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+            }`}
+          >
+            List View
+          </button>
+        </div>
+        <GearPanel />
       </div>
 
       <div className="flex items-center justify-between mb-3 bg-white rounded border border-gray-300 px-2 py-2">
@@ -311,33 +415,29 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
         </button>
       </div>
 
-      {/* Day of week headers */}
       <div className="grid grid-cols-7 gap-x-2 text-center text-xs sm:text-sm mb-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="font-semibold">{d}</div>
         ))}
       </div>
 
-      {/* Weeks */}
       {weeks.map((week, wIdx) => {
-        const weekBars = getWeekBars(week);
+        const weekBars = visibleCalendars.install ? getWeekBars(week) : [];
         const barRowCount = weekBars.length > 0 ? Math.max(...weekBars.map((b) => b.rowIdx)) + 1 : 0;
         const barAreaHeight = barRowCount * 28;
 
-        const weekScBars = getWeekScBars(week);
+        const weekScBars = visibleCalendars.serviceCall ? getWeekScBars(week) : [];
         const scBarRowCount = weekScBars.length > 0 ? Math.max(...weekScBars.map((b) => b.rowIdx)) + 1 : 0;
         const scBarAreaHeight = scBarRowCount * 28;
 
         return (
           <div key={wIdx} className="mb-1">
-            {/* Day cells */}
             <div className="grid grid-cols-7 gap-x-2">
               {week.map((day, dIdx) => {
                 if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[60px]" />;
                 const key = formatDateKey(day);
                 const data = groupedByDate[key] || { appt: [], install: [], sc: [] };
                 const isToday = key === formatDateKey(today);
-                // Only show single-day SCs inline in the cell; multi-day ones render as bars below
                 const singleDayScs = data.sc.filter((sc) => !sc._multiDay);
                 const holidayName = holidayMap[key];
 
@@ -355,16 +455,20 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                         {holidayName}
                       </div>
                     )}
-                    {data.appt.length > 0 && (
+                    {visibleCalendars.appointment && data.appt.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-1">
                         {data.appt.map((apptLead, i) => (
-                          <div key={`a-${i}`} className="w-full h-6 bg-blue-500 rounded-sm overflow-hidden flex items-center px-1">
+                          <div
+                            key={`a-${i}`}
+                            className="w-full h-6 rounded-sm overflow-hidden flex items-center px-1"
+                            style={getApptBarStyle(apptLead, salesmanMap)}
+                          >
                             <span className="text-white text-xs font-semibold truncate leading-none">{apptLead.name}</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    {singleDayScs.length > 0 && (
+                    {visibleCalendars.serviceCall && singleDayScs.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-0.5">
                         {singleDayScs.map((sc, i) => (
                           <div key={`sc-${i}`} className="w-full h-6 bg-orange-400 rounded-sm overflow-hidden flex items-center px-1">
@@ -398,19 +502,25 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                     : bar.roundLeft ? "rounded-l"
                     : bar.roundRight ? "rounded-r"
                     : "";
-                  const bgColor = bar.lead.installTentative ? "bg-green-700" : "bg-green-500";
+                  const crewCount = crewAssignments[bar.lead.id]?.length || 0;
                   return (
                     <div
                       key={bar.id}
                       onClick={() => handleDayClick(formatDateKey(week[bar.colStart]))}
-                      className={`absolute h-6 ${bgColor} ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
+                      className={`absolute h-6 ${roundClass} cursor-pointer hover:opacity-80 overflow-hidden flex items-center px-1`}
                       style={{
                         left: barLeftCalc(bar.colStart),
                         width: barWidthCalc(bar.colSpan),
                         top: `${bar.rowIdx * 28}px`,
+                        ...getInstallBarStyle(bar.lead, crewAssignments),
                       }}
                     >
-                      <span className="text-white text-xs font-semibold truncate leading-none">{bar.lead.name}</span>
+                      <span className="text-white text-xs font-semibold truncate leading-none flex-1">{bar.lead.name}</span>
+                      {crewCount > 1 && (
+                        <span className="ml-1 flex-shrink-0 text-[10px] bg-black bg-opacity-25 rounded px-1 text-white leading-none font-bold">
+                          +{crewCount - 1}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -452,93 +562,126 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
   );
 
   // ========= List View =========
-  const ListView = () => (
-    <div>
-      <div className="grid grid-cols-2 gap-2 mb-3 sm:flex sm:gap-4">
-        <button
-          onClick={() => setViewMode("month")}
-          className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
-            viewMode === "month" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          }`}
-        >
-          Month View
-        </button>
-        <button
-          onClick={() => setViewMode("list")}
-          className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
-            viewMode === "list" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-          }`}
-        >
-          List View
-        </button>
-      </div>
+  const ListView = () => {
+    const filtered = futureLeads.filter((l) => {
+      if (l.displayType === "appointment" && !visibleCalendars.appointment) return false;
+      if (l.displayType === "install" && !visibleCalendars.install) return false;
+      if (l.displayType === "serviceCall" && !visibleCalendars.serviceCall) return false;
+      return true;
+    });
 
-      {futureLeads.length === 0 ? (
-        <p className="text-gray-500 italic">No upcoming appointments or installs.</p>
-      ) : (
-        <div className="space-y-3">
-          {futureLeads.map((lead, idx) => {
-            const isInstall = lead.displayType === "install";
-            const isAppt = lead.displayType === "appointment";
-            const isSC = lead.displayType === "serviceCall";
-            const barColor = isInstall ? "bg-green-500" : isSC ? "bg-orange-400" : "bg-blue-500";
-            const labelType = isInstall ? "Install" : isSC ? "Service Call" : "Appointment";
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:gap-4 sm:flex-none">
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
+                viewMode === "month" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+              }`}
+            >
+              Month View
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-2 rounded font-medium border w-full sm:w-auto ${
+                viewMode === "list" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+              }`}
+            >
+              List View
+            </button>
+          </div>
+          <GearPanel />
+        </div>
 
-            let labelDate = formatDisplayDate(lead.displayDate);
-            if (isInstall && lead.installEndDate && lead.installEndDate !== lead.installDate) {
-              labelDate = `${formatDisplayDate(lead.installDate)} – ${formatDisplayDate(lead.installEndDate)}`;
-            }
-            if (isAppt && lead.appointmentTime) {
-              labelDate = `${labelDate} @ ${formatTime12h(lead.appointmentTime)}`;
-            }
-            if (isSC && lead.scheduled_time) {
-              labelDate = `${labelDate} @ ${formatTime12h(lead.scheduled_time)}`;
-            }
+        {filtered.length === 0 ? (
+          <p className="text-gray-500 italic">No upcoming appointments or installs.</p>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((lead, idx) => {
+              const isInstall = lead.displayType === "install";
+              const isAppt = lead.displayType === "appointment";
+              const isSC = lead.displayType === "serviceCall";
+              const labelType = isInstall ? "Install" : isSC ? "Service Call" : "Appointment";
 
-            return (
-              <div
-                key={idx}
-                className="border rounded-md overflow-hidden"
-              >
-                <div className={`${barColor} text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md`}>
-                  {isSC
-                    ? `${lead.name}${lead.title ? ` - ${lead.title}` : ""} — ${labelDate}`
-                    : `${labelType} — ${labelDate}`}
-                </div>
-                <div className="px-3 pb-3 pt-2 text-sm">
-                  <div className="flex justify-between flex-wrap">
-                    <div className="flex-1">
-                      <span className="font-semibold">
-                        {lead.name}{!isSC && lead.projectType ? ` — ${lead.projectType}` : ""}
-                      </span>
-                      {isSC && lead.title && (
-                        <div className="text-xs text-gray-600 mt-0.5">{lead.title}</div>
-                      )}
-                      {!isSC && lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
-                        <div className="text-xs text-gray-700 font-semibold mt-0.5">{lead.companyName}</div>
-                      )}
+              let labelDate = formatDisplayDate(lead.displayDate);
+              if (isInstall && lead.installEndDate && lead.installEndDate !== lead.installDate) {
+                labelDate = `${formatDisplayDate(lead.installDate)} – ${formatDisplayDate(lead.installEndDate)}`;
+              }
+              if (isAppt && lead.appointmentTime) {
+                labelDate = `${labelDate} @ ${formatTime12h(lead.appointmentTime)}`;
+              }
+              if (isSC && lead.scheduled_time) {
+                labelDate = `${labelDate} @ ${formatTime12h(lead.scheduled_time)}`;
+              }
+
+              const headerStyle = isInstall
+                ? getInstallBarStyle(lead, crewAssignments)
+                : isAppt
+                ? getApptBarStyle(lead, salesmanMap)
+                : { backgroundColor: "#fb923c" };
+
+              const leadCrews = isInstall ? (crewAssignments[lead.id] || []) : [];
+              const leadSalesman = isAppt && lead.appointmentSalesmanId ? salesmanMap[lead.appointmentSalesmanId] : null;
+
+              return (
+                <div key={idx} className="border rounded-md overflow-hidden">
+                  <div
+                    className="text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md"
+                    style={headerStyle}
+                  >
+                    {isSC
+                      ? `${lead.name}${lead.title ? ` - ${lead.title}` : ""} — ${labelDate}`
+                      : `${labelType} — ${labelDate}`}
+                  </div>
+                  <div className="px-3 pb-3 pt-2 text-sm">
+                    <div className="flex justify-between flex-wrap">
+                      <div className="flex-1">
+                        <span className="font-semibold">
+                          {lead.name}{!isSC && lead.projectType ? ` — ${lead.projectType}` : ""}
+                        </span>
+                        {isSC && lead.title && (
+                          <div className="text-xs text-gray-600 mt-0.5">{lead.title}</div>
+                        )}
+                        {!isSC && lead.buyerType && lead.buyerType !== "Residential" && lead.companyName && (
+                          <div className="text-xs text-gray-700 font-semibold mt-0.5">{lead.companyName}</div>
+                        )}
+                        {leadCrews.length > 0 && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Crew{leadCrews.length > 1 ? "s" : ""}: {leadCrews.map((c) => c.name).join(", ")}
+                          </div>
+                        )}
+                        {leadSalesman && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Salesman: {leadSalesman.name}
+                          </div>
+                        )}
+                      </div>
+                      {!isSC && <span className="text-gray-600">{lead.city}, {lead.state}</span>}
                     </div>
-                    {!isSC && <span className="text-gray-600">{lead.city}, {lead.state}</span>}
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ========= Day View =========
   const DayView = () => {
     const data = groupedByDate[selectedDate] || { appt: [], install: [], sc: [] };
     const dayBlocks = blocksByDate[selectedDate] || [];
-    const hasAny = data.appt.length + data.install.length + data.sc.length + dayBlocks.length > 0;
 
-    // Deduplicate installs (same lead may appear multiple times if multi-day)
+    const filteredAppt = visibleCalendars.appointment ? data.appt : [];
+    const filteredInstall = visibleCalendars.install ? data.install : [];
+    const filteredSc = visibleCalendars.serviceCall ? data.sc : [];
+    const hasAny = filteredAppt.length + filteredInstall.length + filteredSc.length + dayBlocks.length > 0;
+
     const uniqueInstalls = [];
     const seenIds = new Set();
-    data.install.forEach((lead) => {
+    filteredInstall.forEach((lead) => {
       if (!seenIds.has(lead.id)) {
         seenIds.add(lead.id);
         uniqueInstalls.push(lead);
@@ -598,10 +741,9 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
             );
           })}
 
-          {[...uniqueInstalls, ...data.appt].map((lead, i) => {
+          {[...uniqueInstalls, ...filteredAppt].map((lead, i) => {
             const isInstall = uniqueInstalls.includes(lead);
             const isAppt = !isInstall;
-            const barColor = isInstall ? "bg-green-500" : "bg-blue-500";
             const label = isInstall ? "Install" : "Appointment";
 
             let sublabel = "";
@@ -611,13 +753,22 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
               sublabel = ` (${lead.installDurationDays} days, ends ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
             }
 
+            const leadCrews = isInstall ? (crewAssignments[lead.id] || []) : [];
+            const leadSalesman = isAppt && lead.appointmentSalesmanId ? salesmanMap[lead.appointmentSalesmanId] : null;
+            const headerStyle = isInstall
+              ? getInstallBarStyle(lead, crewAssignments)
+              : getApptBarStyle(lead, salesmanMap);
+
             return (
               <div
                 key={i}
                 onClick={() => handleLeadClick(lead, "day", selectedDate)}
                 className="border rounded-md hover:bg-gray-50 cursor-pointer overflow-hidden"
               >
-                <div className={`${barColor} text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md`}>
+                <div
+                  className="text-white text-sm font-semibold h-8 flex items-center justify-center rounded-t-md"
+                  style={headerStyle}
+                >
                   {label}{sublabel}
                 </div>
                 <div className="px-3 pb-3 pt-2 flex justify-between text-sm">
@@ -630,6 +781,16 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
                     )}
                     {isInstall && lead.driveTimeMinutes != null && (
                       <div className="text-xs text-gray-500 mt-0.5">Approx {lead.driveTimeMinutes} min away</div>
+                    )}
+                    {leadCrews.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Crew{leadCrews.length > 1 ? "s" : ""}: {leadCrews.map((c) => c.name).join(", ")}
+                      </div>
+                    )}
+                    {leadSalesman && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Salesman: {leadSalesman.name}
+                      </div>
                     )}
                   </div>
                   <span className="text-gray-600">{lead.city}, {lead.state}</span>
@@ -645,7 +806,8 @@ export default function CalendarView({ leads, serviceCalls = [], holidays = [], 
               </div>
             );
           })}
-          {data.sc.map((sc, i) => {
+
+          {filteredSc.map((sc, i) => {
             const scLead = leads.find((l) => l.id === sc.lead_id);
             return (
               <div

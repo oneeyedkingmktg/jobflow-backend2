@@ -206,6 +206,11 @@ export const CrewsAPI = {
   delete: (id) =>
     apiRequest(`/api/crews/${id}`, { method: "DELETE" }),
 
+  getLeadAssignments: (companyId) => {
+    const url = companyId ? `/api/crews/lead-assignments?company_id=${companyId}` : "/api/crews/lead-assignments";
+    return apiRequest(url);
+  },
+
   addMember: (crewId, userId, isLead = false) =>
     apiRequest(`/api/crews/${crewId}/members`, {
       method: "POST",

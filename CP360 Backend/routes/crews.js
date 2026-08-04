@@ -73,6 +73,37 @@ router.get("/", async (req, res) => {
 });
 
 // ============================================================================
+// GET /api/crews/lead-assignments — crew assignments for all leads (calendar use)
+// Returns { assignments: { [leadId]: [{id, name, color}] } }
+// ============================================================================
+router.get("/lead-assignments", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT la.lead_id, c.id, c.name, c.color
+       FROM lead_assignments la
+       JOIN crews c ON c.id = la.crew_id
+       WHERE la.company_id = $1 AND la.crew_id IS NOT NULL
+       ORDER BY la.lead_id, c.name`,
+      [companyId]
+    );
+
+    const assignments = {};
+    for (const row of result.rows) {
+      if (!assignments[row.lead_id]) assignments[row.lead_id] = [];
+      assignments[row.lead_id].push({ id: row.id, name: row.name, color: row.color });
+    }
+
+    res.json({ assignments });
+  } catch (err) {
+    console.error("Get lead assignments error:", err);
+    res.status(500).json({ error: "Failed to fetch lead assignments" });
+  }
+});
+
+// ============================================================================
 // POST /api/crews — create a crew
 // ============================================================================
 router.post("/", requireRole("admin", "master"), async (req, res) => {

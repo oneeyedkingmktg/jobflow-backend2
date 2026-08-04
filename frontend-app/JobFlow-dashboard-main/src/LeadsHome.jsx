@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { apiRequest, LeadsAPI } from "./api";
+import { apiRequest, LeadsAPI, CrewsAPI, UsersAPI } from "./api";
 
 import LeadModal from "./LeadModal.jsx";
 import CalendarView from "./CalendarView.jsx";
@@ -95,6 +95,8 @@ const convertLeadFromBackend = (lead) => ({
 
   driveTimeMinutes: lead.driveTimeMinutes ?? lead.drive_time_minutes ?? null,
   outOfArea: lead.outOfArea ?? lead.out_of_area ?? false,
+
+  appointmentSalesmanId: lead.appointmentSalesmanId || null,
 });
 
 const convertLeadToBackend = (lead) => ({
@@ -165,6 +167,8 @@ export default function LeadsHome() {
   const [serviceCalls, setServiceCalls] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [blockedTimes, setBlockedTimes] = useState([]);
+  const [salespeople, setSalespeople] = useState([]);
+  const [crewAssignments, setCrewAssignments] = useState({});
 
   // --------------------------------------------------
   // Load leads
@@ -210,6 +214,16 @@ const loadLeads = async () => {
       .catch(() => {});
   };
 
+  const loadCalendarData = () => {
+    if (!currentCompany?.id) return;
+    UsersAPI.getSalespeople(currentCompany.id)
+      .then((data) => setSalespeople(data.salespeople || []))
+      .catch(() => {});
+    CrewsAPI.getLeadAssignments(currentCompany.id)
+      .then((data) => setCrewAssignments(data.assignments || {}))
+      .catch(() => {});
+  };
+
   const handleBlockSave = async (data, id) => {
     if (id) {
       await apiRequest(`/api/blocked-times/${id}`, {
@@ -248,6 +262,7 @@ const loadLeads = async () => {
     refreshServiceCalls();
     loadHolidays();
     loadBlockedTimes();
+    loadCalendarData();
   }, [currentCompany?.id]);
 
   // Open a specific lead when navigating from Messages → Go to Lead
@@ -416,6 +431,8 @@ onAddLead={() => {
       currentUser={user}
       onBlockSave={handleBlockSave}
       onBlockDelete={handleBlockDelete}
+      salespeople={salespeople}
+      crewAssignments={crewAssignments}
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>
