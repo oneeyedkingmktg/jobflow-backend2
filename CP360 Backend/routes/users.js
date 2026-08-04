@@ -41,7 +41,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       if (req.query.company_id) {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions,
+                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -50,7 +51,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       } else {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions,
+                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -59,7 +61,8 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     } else {
       query = `
         SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-               service_calls_enabled, permissions, permission_role_id
+               service_calls_enabled, permissions, permission_role_id,
+               is_salesman, salesman_color, ghl_calendar_id
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -86,7 +89,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
 
 router.post("/", requireRole("admin", "master"), async (req, res) => {
   try {
-    const { email, password, name, phone, role, company_id } = req.body;
+    const { email, password, name, phone, role, company_id, is_salesman, salesman_color } = req.body;
 
     if (!email || !password || !name || !role) {
       return res.status(400).json({
@@ -112,9 +115,9 @@ router.post("/", requireRole("admin", "master"), async (req, res) => {
 
     const result = await db.query(
       `
-      INSERT INTO users (company_id, email, password_hash, name, phone, role)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, company_id, email, name, phone, role, is_active
+      INSERT INTO users (company_id, email, password_hash, name, phone, role, is_salesman, salesman_color)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, company_id, email, name, phone, role, is_active, is_salesman, salesman_color, ghl_calendar_id
       `,
       [
         targetCompanyId,
@@ -123,6 +126,8 @@ router.post("/", requireRole("admin", "master"), async (req, res) => {
         name,
         clean(phone),
         role,
+        is_salesman || false,
+        clean(salesman_color),
       ]
     );
 
@@ -142,7 +147,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id, 10);
-    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permission_role_id } = req.body;
+    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permission_role_id, is_salesman, salesman_color, ghl_calendar_id } = req.body;
 
     // 🔴 BLOCK PASSWORD ATTEMPTS HERE
     if (password !== undefined && password !== "") {
@@ -257,6 +262,38 @@ router.put("/:id", async (req, res) => {
       }
     }
 
+    // is_salesman + salesman_color (admin or master, not self)
+    if (is_salesman !== undefined && !isSelf) {
+      const canSet =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canSet) {
+        updates.push(`is_salesman = $${i++}`);
+        values.push(Boolean(is_salesman));
+      }
+    }
+
+    if (salesman_color !== undefined) {
+      const canSet =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canSet) {
+        updates.push(`salesman_color = $${i++}`);
+        values.push(clean(salesman_color));
+      }
+    }
+
+    // ghl_calendar_id (admin or master)
+    if (ghl_calendar_id !== undefined) {
+      const canSet =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canSet) {
+        updates.push(`ghl_calendar_id = $${i++}`);
+        values.push(clean(ghl_calendar_id));
+      }
+    }
+
     // SIP fields (only master)
     if (req.user.role === "master") {
       if (sip_username !== undefined) {
@@ -283,7 +320,9 @@ router.put("/:id", async (req, res) => {
       `
       UPDATE users SET ${updates.join(", ")}, updated_at = NOW()
       WHERE id = $${i}
-      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
+      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled,
+                service_calls_enabled, permissions, permission_role_id,
+                is_salesman, salesman_color, ghl_calendar_id
       `,
       values
     );

@@ -33,6 +33,11 @@ export default function UserModal({
   const activeCompany = companies?.find(
     (c) => c.id === userCompanyId || c.companyId === userCompanyId
   ) || null;
+  const SALESMAN_COLORS = [
+    "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#3b82f6",
+    "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b",
+  ];
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -44,6 +49,8 @@ export default function UserModal({
     sip_username: "",
     sip_password: "",
     sip_incoming_enabled: false,
+    is_salesman: false,
+    salesman_color: "#6366f1",
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -79,6 +86,8 @@ export default function UserModal({
         sip_password: "",  // never pre-fill password
         sip_incoming_enabled: user.sip_incoming_enabled ?? user.sipIncomingEnabled ?? false,
         service_calls_enabled: user.service_calls_enabled ?? user.serviceCallsEnabled ?? false,
+        is_salesman: user.is_salesman ?? user.isSalesman ?? false,
+        salesman_color: user.salesman_color || user.salesmanColor || "#6366f1",
       });
     }
   }, [mode, user, defaultCompanyId]);
@@ -223,6 +232,54 @@ export default function UserModal({
               <p className="text-xs text-gray-500 mt-1">Cannot change your own role</p>
             )}
           </div>
+
+          {/* SALESMAN TYPE */}
+          {isAdminOrMaster && !isCreate && !isSelf && viewMode === "view" && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-sm font-semibold text-gray-700">Salesman</span>
+              <div className="flex items-center gap-2">
+                {form.is_salesman && form.salesman_color && (
+                  <span className="inline-block w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: form.salesman_color }} />
+                )}
+                <span className="font-medium text-gray-700">{form.is_salesman ? "Yes" : "No"}</span>
+              </div>
+            </div>
+          )}
+          {isAdminOrMaster && !isSelf && viewMode === "edit" && (
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">Salesman</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_salesman}
+                    onChange={(e) => handleChange("is_salesman", e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  <span className="text-sm text-gray-600">Is a salesman</span>
+                </label>
+              </div>
+              {form.is_salesman && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Salesman Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {SALESMAN_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handleChange("salesman_color", c)}
+                        className="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
+                        style={{
+                          backgroundColor: c,
+                          borderColor: form.salesman_color === c ? "#111" : "transparent",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* COMPANY (Master only) */}
           {isMaster && companies && companies.length > 0 && (

@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
     const crews = await db.query(
-      `SELECT id, company_id, name, color, is_active, created_at
+      `SELECT id, company_id, name, color, is_active, ghl_calendar_id, created_at
        FROM crews
        WHERE company_id = $1
        ORDER BY name ASC`,
@@ -80,14 +80,14 @@ router.post("/", requireRole("admin", "master"), async (req, res) => {
     const companyId = resolveCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
-    const { name, color = "#6366f1" } = req.body;
+    const { name, color = "#6366f1", ghl_calendar_id } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: "Crew name is required" });
 
     const result = await db.query(
-      `INSERT INTO crews (company_id, name, color)
-       VALUES ($1, $2, $3)
-       RETURNING id, company_id, name, color, is_active, created_at`,
-      [companyId, name.trim(), color]
+      `INSERT INTO crews (company_id, name, color, ghl_calendar_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, company_id, name, color, is_active, ghl_calendar_id, created_at`,
+      [companyId, name.trim(), color, ghl_calendar_id || null]
     );
 
     res.status(201).json({ crew: { ...result.rows[0], members: [] } });
@@ -115,7 +115,7 @@ router.put("/:id", requireRole("admin", "master"), async (req, res) => {
       return res.status(403).json({ error: "Cannot update crews from other companies" });
     }
 
-    const { name, color, is_active } = req.body;
+    const { name, color, is_active, ghl_calendar_id } = req.body;
     const updates = [];
     const values = [];
     let i = 1;
@@ -123,13 +123,14 @@ router.put("/:id", requireRole("admin", "master"), async (req, res) => {
     if (name !== undefined) { updates.push(`name = $${i++}`); values.push(name.trim()); }
     if (color !== undefined) { updates.push(`color = $${i++}`); values.push(color); }
     if (is_active !== undefined) { updates.push(`is_active = $${i++}`); values.push(is_active); }
+    if (ghl_calendar_id !== undefined) { updates.push(`ghl_calendar_id = $${i++}`); values.push(ghl_calendar_id || null); }
 
     if (!updates.length) return res.status(400).json({ error: "No fields to update" });
 
     values.push(crewId);
     const result = await db.query(
       `UPDATE crews SET ${updates.join(", ")} WHERE id = $${i}
-       RETURNING id, company_id, name, color, is_active, created_at`,
+       RETURNING id, company_id, name, color, is_active, ghl_calendar_id, created_at`,
       values
     );
 

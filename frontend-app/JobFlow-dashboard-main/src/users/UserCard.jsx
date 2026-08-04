@@ -17,9 +17,19 @@ export default function UserCard({ user, onClick }) {
           </p>
         )}
 
-        <p className="text-xs text-gray-500 mt-1">
-          Role: <span className="font-semibold">{user.role}</span>
-        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-gray-500">
+            Role: <span className="font-semibold">{user.role}</span>
+          </p>
+          {(user.isSalesman || user.is_salesman) && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+              style={{ backgroundColor: user.salesmanColor || user.salesman_color || "#6366f1" }}
+            >
+              Salesman
+            </span>
+          )}
+        </div>
 
         {user.is_active === false && (
           <p className="text-xs text-red-600 font-semibold mt-1">

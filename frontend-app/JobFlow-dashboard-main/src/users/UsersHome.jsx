@@ -96,8 +96,9 @@ const canManage = showAllUsers
           role: form.role,
           password: form.password,
           is_active: form.is_active,
-          // Always pass company_id from form (user can select different company)
           company_id: form.company_id || (showAllUsers ? null : activeCompany?.id),
+          is_salesman: form.is_salesman || false,
+          salesman_color: form.salesman_color || null,
         };
 
         console.log("Creating user with payload:", payload);
@@ -122,6 +123,8 @@ const canManage = showAllUsers
           ...(form.sip_username !== undefined && { sip_username: form.sip_username || null }),
           ...(form.sip_password ? { sip_password: form.sip_password } : {}),
           sip_incoming_enabled: form.sip_incoming_enabled,
+          is_salesman: form.is_salesman || false,
+          salesman_color: form.salesman_color || null,
         };
 
         console.log("Updating user with payload:", payload);

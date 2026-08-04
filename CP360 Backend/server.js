@@ -347,6 +347,11 @@ async function runMigrations() {
     )`,
     `CREATE INDEX IF NOT EXISTS lead_assignments_lead_idx ON lead_assignments (lead_id)`,
     `CREATE INDEX IF NOT EXISTS lead_assignments_user_idx ON lead_assignments (user_id, company_id)`,
+    // Phase 1 — salesman user type + GHL calendar IDs
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_salesman BOOLEAN DEFAULT false`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS salesman_color VARCHAR(7)`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT`,
+    `ALTER TABLE crews ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT`,
   ];
   for (const sql of migrations) {
     try {
