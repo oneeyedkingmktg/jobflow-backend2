@@ -125,7 +125,7 @@ if (lead.status === "complete") {
       </div>
 
 {/* CARD BODY */}
-      <div className="p-4 space-y-2">
+      <div className="p-4 flex flex-col gap-2">
         <h3 className="text-base font-bold text-gray-900 truncate">
           {lead.name || "Unnamed Lead"}
         </h3>
@@ -160,12 +160,12 @@ if (lead.status === "complete") {
           </div>
         )}
 
-        <div className="pt-2">
+        <div className="mt-auto pt-1">
           {cityState && (
             <div className="text-xs text-gray-500">{cityState}</div>
           )}
           {(lead.createdAt || lead.created_at) && (
-            <div className="text-gray-400" style={{ fontSize: "0.9rem" }}>
+            <div className="text-xs text-gray-500">
               Added {formatShortDate(lead.createdAt || lead.created_at)}
             </div>
           )}
