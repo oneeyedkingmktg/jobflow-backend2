@@ -91,6 +91,7 @@ const toCamel = (row) => ({
 
   appointmentDate: row.appointment_date,
   appointmentTime: row.appointment_time,
+  appointmentSalesmanId: row.appointment_salesman_id || null,
   appointmentCalendarEventId: row.appointment_calendar_event_id || null,
   lastSyncedAppointmentDate: row.last_synced_appointment_date || null,
   installDate: row.install_date,
@@ -221,6 +222,39 @@ router.get("/appt-slot-check", async (req, res) => {
   } catch (error) {
     console.error("Error checking appointment slot:", error);
     res.status(500).json({ error: "Failed to check appointment slot." });
+  }
+});
+
+// ============================================================================
+// CHECK SALESMAN CONFLICT — blocks double-booking a salesman
+// ============================================================================
+router.get("/salesman-conflict-check", async (req, res) => {
+  try {
+    const { salesman_user_id, date, time, exclude_lead_id } = req.query;
+    if (!salesman_user_id || !date || !time) {
+      return res.status(400).json({ error: "salesman_user_id, date, and time required" });
+    }
+
+    let query = `
+      SELECT id, name FROM leads
+      WHERE appointment_salesman_id = $1
+        AND appointment_date = $2
+        AND appointment_time = $3
+        AND deleted_at IS NULL
+        AND status != 'status_junk'
+    `;
+    const params = [salesman_user_id, date, time];
+
+    if (exclude_lead_id) {
+      query += ` AND id != $4`;
+      params.push(exclude_lead_id);
+    }
+
+    const result = await pool.query(query, params);
+    res.json({ taken: result.rows.length > 0, conflict: result.rows[0] || null });
+  } catch (err) {
+    console.error("Salesman conflict check error:", err);
+    res.status(500).json({ error: "Failed to check salesman conflict" });
   }
 });
 
@@ -788,8 +822,9 @@ const result = await pool.query(
     appointment_calendar_event_id = appointment_calendar_event_id,
     install_calendar_event_id = install_calendar_event_id,
 
+    appointment_salesman_id = $34,
     updated_at = CURRENT_TIMESTAMP
-  WHERE id = $34
+  WHERE id = $35
   RETURNING *`,
 
       [
@@ -826,6 +861,7 @@ const result = await pool.query(
         lead.proceed_with_automation ?? null,
         lead.has_left_review ?? null,
         lead.date_completed || null,
+        lead.appointment_salesman_id ? parseInt(lead.appointment_salesman_id, 10) : null,
         id,
       ]
     );
@@ -858,6 +894,23 @@ if (updatedLead.project_type) {
 
     // Respond immediately after DB save — GHL sync runs in background
     res.json({ lead: toCamel(updatedLead), ghlSynced: !!company.ghl_api_key, calendarConflict: null });
+
+    // Sync salesperson assignment in lead_assignments when appointment_salesman_id changes
+    const incomingSalesmanId = lead.appointment_salesman_id ? parseInt(lead.appointment_salesman_id, 10) : null;
+    if (incomingSalesmanId !== (previousLead.appointment_salesman_id || null)) {
+      await pool.query(
+        `DELETE FROM lead_assignments WHERE lead_id = $1 AND assignment_role = 'salesperson'`,
+        [id]
+      );
+      if (incomingSalesmanId) {
+        await pool.query(
+          `INSERT INTO lead_assignments (lead_id, company_id, user_id, assignment_role)
+           VALUES ($1, $2, $3, 'salesperson')
+           ON CONFLICT (lead_id, user_id) DO UPDATE SET assignment_role = 'salesperson'`,
+          [id, updatedLead.company_id, incomingSalesmanId]
+        );
+      }
+    }
 
     // If the lead name or project type changed, rename the Drive folder in the background
     const nameChanged = previousLead.name !== updatedLead.name;

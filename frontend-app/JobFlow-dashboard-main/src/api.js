@@ -146,6 +146,11 @@ export const UsersAPI = {
     apiRequest(`/users/${id}`, {
       method: "DELETE",
     }),
+
+  getSalespeople: (companyId) => {
+    const url = companyId ? `/users/salespeople?company_id=${companyId}` : "/users/salespeople";
+    return apiRequest(url);
+  },
 };
 
 /* ============================================================================
@@ -315,6 +320,12 @@ export const LeadsAPI = {
     const params = new URLSearchParams({ company_id: companyId, date, time });
     if (excludeLeadId) params.append("exclude_lead_id", excludeLeadId);
     return apiRequest(`/leads/appt-slot-check?${params.toString()}`);
+  },
+
+  checkSalesmanConflict: (salesmanUserId, date, time, excludeLeadId = null) => {
+    const params = new URLSearchParams({ salesman_user_id: salesmanUserId, date, time });
+    if (excludeLeadId) params.append("exclude_lead_id", excludeLeadId);
+    return apiRequest(`/leads/salesman-conflict-check?${params.toString()}`);
   },
 
   getServiceCallsCalendar: (companyId) =>

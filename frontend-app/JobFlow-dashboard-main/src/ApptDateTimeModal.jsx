@@ -1,7 +1,7 @@
 // File: src/ApptDateTimeModal.jsx
 
 import React, { useState, useEffect, useMemo } from "react";
-import { LeadsAPI } from "./api";
+import { LeadsAPI, UsersAPI } from "./api";
 import { useCompany } from "./CompanyContext";
 
 function formatDateKey(date) {
@@ -33,6 +33,7 @@ function shiftDate(dateStr, days) {
 export default function ApptDateTimeModal({
   apptDate,
   apptTime,
+  salesmanId = null,
   onConfirm,
   onClose,
   onRemove,
@@ -65,6 +66,9 @@ export default function ApptDateTimeModal({
   const [dots, setDots] = useState([]);
   const [dotsLoading, setDotsLoading] = useState(true);
   const [slotError, setSlotError] = useState(null);
+  const [selectedSalesmanId, setSelectedSalesmanId] = useState(salesmanId || "");
+  const [salespeople, setSalespeople] = useState([]);
+  const [salesmanError, setSalesmanError] = useState(null);
 
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(
@@ -96,7 +100,15 @@ export default function ApptDateTimeModal({
       .then((res) => setDots(res.dots || []))
       .catch((err) => console.error("[ApptModal] Failed to load calendar dots:", err))
       .finally(() => setDotsLoading(false));
+
+    UsersAPI.getSalespeople(fetchCompanyId)
+      .then((res) => setSalespeople(res.salespeople || []))
+      .catch(() => setSalespeople([]));
   }, [fetchCompanyId]);
+
+  useEffect(() => {
+    setSelectedSalesmanId(salesmanId || "");
+  }, [salesmanId]);
 
   const to24Hour = () => {
     let h = parseInt(hour, 10);
@@ -165,18 +177,28 @@ export default function ApptDateTimeModal({
 
   const handleSave = async () => {
     if (!selectedDate) return;
-    const finalTime24 = to24Hour();
-    if (fetchCompanyId) {
-      try {
-        const check = await LeadsAPI.checkApptSlot(fetchCompanyId, selectedDate, finalTime24, excludeLeadId);
-        if (check.taken) {
-          setSlotError(`Already booked (${check.conflict?.name || "another lead"}). Choose a different time or date.`);
-          return;
-        }
-      } catch { /* allow save on check failure */ }
+
+    // Salesman required
+    if (!selectedSalesmanId) {
+      setSalesmanError("A salesman must be assigned before saving an appointment.");
+      return;
     }
+    setSalesmanError(null);
+
+    const finalTime24 = to24Hour();
+
+    // Check salesman conflict first
+    try {
+      const salesmanCheck = await LeadsAPI.checkSalesmanConflict(selectedSalesmanId, selectedDate, finalTime24, excludeLeadId);
+      if (salesmanCheck.taken) {
+        const name = salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || "This salesman";
+        setSlotError(`${name} already has an appointment at this time (${salesmanCheck.conflict?.name || "another lead"}). Choose a different time.`);
+        return;
+      }
+    } catch { /* allow save if check fails */ }
+
     setSlotError(null);
-    onConfirm(selectedDate, finalTime24);
+    onConfirm(selectedDate, finalTime24, selectedSalesmanId ? parseInt(selectedSalesmanId, 10) : null);
     onClose();
   };
 
@@ -315,6 +337,31 @@ export default function ApptDateTimeModal({
 
   const footerBlock = (
     <>
+      {/* Salesman picker */}
+      <div className="mt-3 mb-2">
+        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+          Salesman <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={selectedSalesmanId}
+          onChange={(e) => { setSelectedSalesmanId(e.target.value); setSalesmanError(null); }}
+          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+        >
+          <option value="">— Select salesman —</option>
+          {salespeople.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        {salespeople.length === 0 && (
+          <p className="text-xs text-amber-600 mt-1">No salespeople set up yet. Mark a user as Salesman in User settings.</p>
+        )}
+        {salesmanError && (
+          <p className="text-xs text-red-600 mt-1">{salesmanError}</p>
+        )}
+      </div>
+
       {/* Time picker */}
       <div className="mt-3 mb-2">
         <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Appointment Time</label>
@@ -349,7 +396,7 @@ export default function ApptDateTimeModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={!selectedDate}
+            disabled={!selectedDate || !selectedSalesmanId}
             className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save

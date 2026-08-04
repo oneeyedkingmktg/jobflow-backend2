@@ -69,13 +69,15 @@ export default function LeadModalsWrapper({
         <ApptDateTimeModal
           apptDate={form.appointmentDate}
           apptTime={form.appointmentTime}
+          salesmanId={form.appointmentSalesmanId || null}
           companyId={form.companyId}
           excludeLeadId={form.id || null}
-          onConfirm={(date, time) => {
+          onConfirm={(date, time, salesmanId) => {
             setForm((prev) => ({
               ...prev,
               appointmentDate: date,
               appointmentTime: time,
+              appointmentSalesmanId: salesmanId || null,
             }));
             setShowApptModal(false);
           }}
@@ -84,6 +86,7 @@ export default function LeadModalsWrapper({
               ...prev,
               appointmentDate: "",
               appointmentTime: "",
+              appointmentSalesmanId: null,
             }));
             setShowApptModal(false);
           }}

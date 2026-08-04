@@ -32,6 +32,33 @@ router.use(authenticateToken);
 // Admin: users from own company only
 // ============================================================================
 
+// ============================================================================
+// GET /api/users/salespeople — returns active salespeople for a company
+// Available to any authenticated user (for salesman picker in appt modal)
+// ============================================================================
+router.get("/salespeople", async (req, res) => {
+  try {
+    const companyId = req.user.role === "master"
+      ? (req.query.company_id ? parseInt(req.query.company_id, 10) : req.user.company_id)
+      : req.user.company_id;
+
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT id, name, salesman_color
+       FROM users
+       WHERE company_id = $1 AND is_salesman = true AND is_active = true AND deleted_at IS NULL
+       ORDER BY name ASC`,
+      [companyId]
+    );
+
+    res.json({ salespeople: result.rows });
+  } catch (err) {
+    console.error("Get salespeople error:", err);
+    res.status(500).json({ error: "Failed to fetch salespeople" });
+  }
+});
+
 router.get("/", requireRole("admin", "master"), async (req, res) => {
   try {
     let query;
