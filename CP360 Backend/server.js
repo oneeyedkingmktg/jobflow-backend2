@@ -56,6 +56,8 @@ const messagesRoutes = require("./routes/messages");
 const sipRoutes = require("./routes/sip");
 const bidderRoutes = require("./routes/bidder");
 const permissionRolesRoutes = require("./routes/permissionRoles");
+const crewsRoutes = require("./routes/crews");
+const leadAssignmentsRoutes = require("./routes/leadAssignments");
 const serviceCallsRoutes = require("./routes/serviceCalls");
 const reportsRoutes = require("./routes/reports");
 const holidaysRoutes = require("./routes/holidays");
@@ -108,6 +110,8 @@ app.use("/api/bidder", bidderRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
 app.use("/api/reports", authenticateToken, reportsRoutes);
 app.use("/api/permission-roles", permissionRolesRoutes);
+app.use("/api/crews", authenticateToken, crewsRoutes);
+app.use("/leads/:leadId/assignments", leadAssignmentsRoutes);
 app.use("/api/holidays", holidaysRoutes);
 app.use("/api/blocked-times", blockedTimesRoutes);
 

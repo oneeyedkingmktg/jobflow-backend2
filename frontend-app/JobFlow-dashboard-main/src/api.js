@@ -177,6 +177,76 @@ export const PermissionRolesAPI = {
 };
 
 /* ============================================================================
+   CREWS
+============================================================================ */
+
+export const CrewsAPI = {
+  getAll: (companyId) => {
+    const url = companyId ? `/api/crews?company_id=${companyId}` : "/api/crews";
+    return apiRequest(url);
+  },
+
+  create: (data) =>
+    apiRequest("/api/crews", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id, data) =>
+    apiRequest(`/api/crews/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id) =>
+    apiRequest(`/api/crews/${id}`, { method: "DELETE" }),
+
+  addMember: (crewId, userId, isLead = false) =>
+    apiRequest(`/api/crews/${crewId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, is_lead: isLead }),
+    }),
+
+  updateMember: (crewId, userId, isLead) =>
+    apiRequest(`/api/crews/${crewId}/members/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify({ is_lead: isLead }),
+    }),
+
+  removeMember: (crewId, userId) =>
+    apiRequest(`/api/crews/${crewId}/members/${userId}`, { method: "DELETE" }),
+};
+
+/* ============================================================================
+   LEAD ASSIGNMENTS
+============================================================================ */
+
+export const LeadAssignmentsAPI = {
+  getAll: (leadId) => apiRequest(`/leads/${leadId}/assignments`),
+
+  addEmployee: (leadId, userId, role = "installer") =>
+    apiRequest(`/leads/${leadId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, role }),
+    }),
+
+  addCrew: (leadId, crewId, role = "installer") =>
+    apiRequest(`/leads/${leadId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify({ crew_id: crewId, role }),
+    }),
+
+  updateRole: (leadId, userId, role) =>
+    apiRequest(`/leads/${leadId}/assignments/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }),
+
+  remove: (leadId, userId) =>
+    apiRequest(`/leads/${leadId}/assignments/${userId}`, { method: "DELETE" }),
+};
+
+/* ============================================================================
    COMPANIES
 ============================================================================ */
 
