@@ -13,6 +13,7 @@ import UsersHome from "./users/UsersHome";
 import UserProfileModal from "./UserProfileModal";
 import NotificationSettings from "./components/NotificationSettings";
 import BidderMasterAdmin from "./components/BidderMasterAdmin";
+import CalendarsSettings from "./components/CalendarsSettings";
 
 export default function SettingsModal({ onClose }) {
   const { logout, isMaster, user } = useAuth();
@@ -37,6 +38,7 @@ export default function SettingsModal({ onClose }) {
   const openNotifications = () => setScreen("notifications");
   const openSuperAdmin = () => setScreen("superadmin");
   const openBidderAdmin = () => setScreen("bidder_admin");
+  const openCalendars = () => setScreen("ghl_calendars");
 
   const handleBack = () => {
     if (screen === "company_details") return setScreen("manage_companies");
@@ -144,6 +146,15 @@ const renderHome = () => (
           </button>
         )}
 
+        {!isMaster() && (
+          <button
+            onClick={openCalendars}
+            className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+          >
+            GHL Calendars
+          </button>
+        )}
+
         <button
           onClick={openMyProfile}
           className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
@@ -226,6 +237,10 @@ const renderHome = () => (
 
     case "notifications":
       content = <NotificationSettings />;
+      break;
+
+    case "ghl_calendars":
+      content = <CalendarsSettings onBack={handleBack} />;
       break;
 
     case "superadmin":

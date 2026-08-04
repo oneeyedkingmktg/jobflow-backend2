@@ -405,3 +405,14 @@ export const BidderAPI = {
   deleteWarranty: (id, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
   sendWarrantyEmail: (id, email) => apiRequest(`/api/bidder/proposal/${id}/send-warranty-email`, { method: 'POST', body: JSON.stringify({ email }) }),
 };
+
+/* ============================================================================
+   GHL
+============================================================================ */
+
+export const GhlAPI = {
+  getCalendars: (companyId) => {
+    const url = companyId ? `/ghl/calendars?company_id=${companyId}` : "/ghl/calendars";
+    return apiRequest(url);
+  },
+};

@@ -354,6 +354,9 @@ async function runMigrations() {
     `ALTER TABLE crews ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT`,
     // Phase 2 — salesman assignment on appointments
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS appointment_salesman_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+    // Phase 5 — salesman/crew secondary GHL calendar event IDs
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS salesman_ghl_event_id TEXT`,
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS crew_ghl_event_id TEXT`,
   ];
   for (const sql of migrations) {
     try {

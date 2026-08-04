@@ -1555,10 +1555,81 @@ async function deleteServiceCallGhlEvent({ company, eventId, contactId }) {
 }
 
 // ----------------------------------------------------------------------------
+// LIST GHL CALENDARS FOR A LOCATION
+// Returns { calendars: [{id, name, calendarType, ...}] }
+// ----------------------------------------------------------------------------
+async function listCalendars(company) {
+  return await ghlRequest(company, "/calendars", {
+    method: "GET",
+    params: { locationId: company.ghl_location_id },
+  });
+}
+
+// ----------------------------------------------------------------------------
+// SYNC A SINGLE EVENT TO A SPECIFIC GHL CALENDAR (salesman/crew secondary)
+// Returns the GHL event ID or null. Does NOT track ID in DB — caller does.
+// ----------------------------------------------------------------------------
+async function syncEventToCalendar(lead, company, calendarId, calendarType, contactId) {
+  const companyTimezone = company.timezone || "America/New_York";
+  let title, startDateTime, endDateTime;
+
+  const leadData = await fetchLeadWithEstimator(lead.id);
+
+  if (calendarType === "appointment") {
+    if (!lead.appointment_date || !lead.appointment_time) return null;
+    const titleTemplate = company.ghl_appt_title_template || "{{full_name}} - Appointment";
+    title = processTemplate(titleTemplate, leadData);
+    const dateOnly = new Date(lead.appointment_date).toISOString().split("T")[0];
+    const time24 = normalizeTimeTo24h(lead.appointment_time);
+    if (!time24) return null;
+    startDateTime = convertToUTC(`${dateOnly}T${time24}:00`, companyTimezone);
+    endDateTime = new Date(startDateTime.getTime() + 15 * 60000);
+  } else if (calendarType === "install") {
+    if (!lead.install_date) return null;
+    const titleTemplate = company.ghl_install_title_template || "{{full_name}} - Install";
+    title = processTemplate(titleTemplate, leadData);
+    if (lead.install_tentative) title += " - Tentative";
+    const dateOnly = new Date(lead.install_date).toISOString().split("T")[0];
+    startDateTime = convertToUTC(`${dateOnly}T13:00:00`, companyTimezone);
+    const endDateOnly = lead.install_end_date
+      ? new Date(lead.install_end_date).toISOString().split("T")[0]
+      : null;
+    endDateTime =
+      endDateOnly && endDateOnly !== dateOnly
+        ? convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone)
+        : convertToUTC(`${dateOnly}T14:00:00`, companyTimezone);
+  } else {
+    return null;
+  }
+
+  const payload = {
+    locationId: company.ghl_location_id,
+    calendarId,
+    contactId: contactId || lead.ghl_contact_id,
+    title,
+    startTime: startDateTime.toISOString(),
+    endTime: endDateTime.toISOString(),
+    ignoreDateRanges: true,
+  };
+
+  try {
+    const created = await ghlCalendarRequestWithRetry(company, "/calendars/events/appointments", {
+      method: "POST",
+      body: payload,
+    });
+    return created?.id || created?.event?.id || created?.appointment?.id || null;
+  } catch (err) {
+    console.warn(`[SECONDARY CALENDAR] Create on calendar ${calendarId} failed (non-fatal):`, err.message);
+    return null;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
 module.exports = {
   syncLeadCalendarEvent,
+  listCalendars,
   deleteGhlContact,
   applyStatusTags,
   removeStatusTags,
@@ -1824,6 +1895,30 @@ if (
       }
 
       // ==========================================
+      // 4b️⃣ SALESMAN CALENDAR SECONDARY SYNC (Phase 5)
+      // Push appointment to salesman's personal GHL calendar if linked
+      // ==========================================
+      if (lead.appointment_salesman_id && lead.appointment_date && lead.appointment_time) {
+        try {
+          const salesmanRow = await db.query(
+            "SELECT ghl_calendar_id FROM users WHERE id = $1",
+            [lead.appointment_salesman_id]
+          );
+          const salesmanCalId = salesmanRow.rows[0]?.ghl_calendar_id;
+          if (salesmanCalId) {
+            if (lead.salesman_ghl_event_id) {
+              try { await deleteCalendarEvent(company, lead.salesman_ghl_event_id, contactId); } catch {}
+            }
+            const newEventId = await syncEventToCalendar(lead, company, salesmanCalId, "appointment", contactId);
+            await db.query("UPDATE leads SET salesman_ghl_event_id = $1 WHERE id = $2", [newEventId || null, lead.id]);
+            if (newEventId) console.log("[SALESMAN CALENDAR] Secondary event created:", newEventId);
+          }
+        } catch (salesmanErr) {
+          console.warn("[SALESMAN CALENDAR] Secondary sync failed (non-fatal):", salesmanErr.message);
+        }
+      }
+
+      // ==========================================
       // 5️⃣ INSTALL CALENDAR SYNC
       // ==========================================
 if (
@@ -1942,6 +2037,33 @@ if (
         } catch (calendarErr) {
           console.error("⚠️ [INSTALL REMOVE - DB ONLY] Failed:", calendarErr.message);
           await applyStatusTags(contactId, "install_sync_fail", company);
+        }
+      }
+
+      // ==========================================
+      // 5b️⃣ CREW CALENDAR SECONDARY SYNC (Phase 5)
+      // Push install to assigned crew's personal GHL calendar if linked
+      // ==========================================
+      if (lead.install_date) {
+        try {
+          const crewRow = await db.query(
+            `SELECT c.ghl_calendar_id FROM lead_assignments la
+             JOIN crews c ON c.id = la.crew_id
+             WHERE la.lead_id = $1 AND la.crew_id IS NOT NULL AND c.ghl_calendar_id IS NOT NULL
+             LIMIT 1`,
+            [lead.id]
+          );
+          const crewCalId = crewRow.rows[0]?.ghl_calendar_id;
+          if (crewCalId) {
+            if (lead.crew_ghl_event_id) {
+              try { await deleteCalendarEvent(company, lead.crew_ghl_event_id, contactId); } catch {}
+            }
+            const newEventId = await syncEventToCalendar(lead, company, crewCalId, "install", contactId);
+            await db.query("UPDATE leads SET crew_ghl_event_id = $1 WHERE id = $2", [newEventId || null, lead.id]);
+            if (newEventId) console.log("[CREW CALENDAR] Secondary event created:", newEventId);
+          }
+        } catch (crewErr) {
+          console.warn("[CREW CALENDAR] Secondary sync failed (non-fatal):", crewErr.message);
         }
       }
 

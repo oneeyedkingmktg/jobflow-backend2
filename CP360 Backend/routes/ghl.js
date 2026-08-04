@@ -10,6 +10,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 const ghl = require("../controllers/ghlAPI");
+const { authenticateToken } = require("../middleware/auth");
 
 // ============================================================================
 // LOAD COMPANY MIDDLEWARE (VALIDATES + PROVIDES GHL CREDS + CALENDARS)
@@ -56,6 +57,34 @@ async function loadCompany(req, res, next) {
     return res.status(500).json({ error: "Database error loading company" });
   }
 }
+
+// ============================================================================
+// LIST GHL CALENDARS FOR A LOCATION
+// GET /ghl/calendars — uses JWT auth, resolves company from token
+// ============================================================================
+
+router.get("/calendars", async (req, res) => {
+  try {
+    const companyId =
+      req.user.role === "master"
+        ? parseInt(req.query.company_id, 10) || req.user.company_id
+        : req.user.company_id;
+
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const companyResult = await db.query(
+      `SELECT id, ghl_api_key, ghl_location_id, timezone FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+      [companyId]
+    );
+    if (!companyResult.rows.length) return res.status(404).json({ error: "Company not found" });
+
+    const result = await ghl.listCalendars(companyResult.rows[0]);
+    return res.json(result);
+  } catch (err) {
+    console.error("GHL calendars error:", err);
+    return res.status(500).json({ error: "Failed to fetch GHL calendars" });
+  }
+});
 
 // ============================================================================
 // SEARCH CONTACT BY PHONE

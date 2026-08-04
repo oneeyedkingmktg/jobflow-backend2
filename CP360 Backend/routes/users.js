@@ -45,7 +45,7 @@ router.get("/salespeople", async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
     const result = await db.query(
-      `SELECT id, name, salesman_color
+      `SELECT id, name, salesman_color, ghl_calendar_id
        FROM users
        WHERE company_id = $1 AND is_salesman = true AND is_active = true AND deleted_at IS NULL
        ORDER BY name ASC`,
