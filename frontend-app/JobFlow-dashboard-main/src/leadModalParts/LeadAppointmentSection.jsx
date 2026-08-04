@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { formatDate, formatTime } from "../utils/formatting.js";
 import { useAuth } from "../AuthContext";
+import { usePermission } from "../utils/usePermission";
 import { apiRequest } from "../api";
 import ServiceCallsModal from "../ServiceCallsModal";
 
@@ -18,7 +19,7 @@ export default function LeadAppointmentSection({
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
-  const serviceCallsEnabled = user?.serviceCallsEnabled === true;
+  const serviceCallsEnabled = usePermission('service_calls') !== 'hide';
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);

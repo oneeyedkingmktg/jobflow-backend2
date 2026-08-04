@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
 import { useAuth } from "./AuthContext";
+import { usePermission } from "./utils/usePermission";
 import { apiRequest } from "./api";
 import ServiceCallsModal from "./ServiceCallsModal";
 
@@ -31,7 +32,7 @@ export default function LeadDetails({
   }, [form?.id, form?.zip]);
 
   const { user } = useAuth();
-  const serviceCallsEnabled = user?.serviceCallsEnabled === true;
+  const serviceCallsEnabled = usePermission('service_calls') !== 'hide';
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);
