@@ -8,6 +8,8 @@
 // ✅ Phase 3: Multi-crew badge indicator on install bars
 // ✅ Phase 3: Crew(s) and Salesman labels in day view + list view cards
 // ✅ Phase 3: Gear icon + filter panel (per-user, localStorage persisted)
+// ✅ Phase 4: Role-based calendar access control (crew member / salesman / admin)
+// ✅ Phase 4: Gear panel adapts to show only accessible calendar types
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
@@ -100,6 +102,15 @@ export default function CalendarView({
     return map;
   }, [salespeople]);
 
+  // ── Phase 4: Access control ──────────────────────────────────────────────
+  const isAdminOrMaster = currentUser?.role === 'admin' || currentUser?.role === 'master';
+  const myCrewIds = useMemo(() => currentUser?.crewIds || [], [currentUser?.crewIds]);
+  const amCrewMember = myCrewIds.length > 0;
+  const amSalesman = currentUser?.isSalesman === true;
+  // restrictedView = true when user is a crew member or salesman (not admin/master)
+  const restrictedView = !isAdminOrMaster && (amCrewMember || amSalesman);
+  // ────────────────────────────────────────────────────────────────────────
+
   const getDaysInMonth = (year, month) => {
     const date = new Date(year, month, 1);
     const days = [];
@@ -142,6 +153,7 @@ export default function CalendarView({
     return `${hour}:${m} ${ampm}`;
   };
 
+  // Full grouped data (all leads, all types)
   const groupedByDate = useMemo(() => {
     const map = {};
     leads.forEach((lead) => {
@@ -190,6 +202,24 @@ export default function CalendarView({
     return map;
   }, [leads, serviceCalls]);
 
+  // Phase 4: Apply access control to groupedByDate
+  const filteredGroupedByDate = useMemo(() => {
+    if (!restrictedView) return groupedByDate;
+
+    const result = {};
+    for (const [date, data] of Object.entries(groupedByDate)) {
+      const filteredAppt = amSalesman
+        ? data.appt.filter((l) => l.appointmentSalesmanId === currentUser?.id)
+        : [];
+      const filteredInstall = data.install.filter((l) => {
+        const leadCrews = crewAssignments[l.id] || [];
+        return leadCrews.some((c) => myCrewIds.includes(c.id));
+      });
+      result[date] = { appt: filteredAppt, install: filteredInstall, sc: [] };
+    }
+    return result;
+  }, [groupedByDate, restrictedView, amSalesman, currentUser?.id, crewAssignments, myCrewIds]);
+
   const blocksByDate = useMemo(() => {
     const map = {};
     blockedTimes.forEach((b) => {
@@ -222,7 +252,7 @@ export default function CalendarView({
     week.forEach((day, colIdx) => {
       if (!day) return;
       const key = formatDateKey(day);
-      (groupedByDate[key]?.install || []).forEach((leadEntry) => {
+      (filteredGroupedByDate[key]?.install || []).forEach((leadEntry) => {
         const id = leadEntry.id;
         if (!installsByLead[id]) installsByLead[id] = { leadEntry, cols: [] };
         installsByLead[id].cols.push(colIdx);
@@ -234,8 +264,8 @@ export default function CalendarView({
       const colEnd = Math.max(...cols);
       const startKey = formatDateKey(week[colStart]);
       const endKey = formatDateKey(week[colEnd]);
-      const startEntry = groupedByDate[startKey]?.install.find((l) => l.id === leadEntry.id);
-      const endEntry = groupedByDate[endKey]?.install.find((l) => l.id === leadEntry.id);
+      const startEntry = filteredGroupedByDate[startKey]?.install.find((l) => l.id === leadEntry.id);
+      const endEntry = filteredGroupedByDate[endKey]?.install.find((l) => l.id === leadEntry.id);
       return {
         id: leadEntry.id,
         lead: leadEntry,
@@ -260,11 +290,12 @@ export default function CalendarView({
   };
 
   const getWeekScBars = (week) => {
+    if (restrictedView) return []; // crew members and salespeople don't see SCs
     const scById = {};
     week.forEach((day, colIdx) => {
       if (!day) return;
       const key = formatDateKey(day);
-      (groupedByDate[key]?.sc || []).filter((sc) => sc._multiDay).forEach((scEntry) => {
+      (filteredGroupedByDate[key]?.sc || []).filter((sc) => sc._multiDay).forEach((scEntry) => {
         const id = scEntry.id;
         if (!scById[id]) scById[id] = { scEntry, cols: [] };
         scById[id].cols.push(colIdx);
@@ -276,8 +307,8 @@ export default function CalendarView({
       const colEnd = Math.max(...cols);
       const startKey = formatDateKey(week[colStart]);
       const endKey = formatDateKey(week[colEnd]);
-      const startEntry = groupedByDate[startKey]?.sc.find((s) => s.id === scEntry.id);
-      const endEntry = groupedByDate[endKey]?.sc.find((s) => s.id === scEntry.id);
+      const startEntry = filteredGroupedByDate[startKey]?.sc.find((s) => s.id === scEntry.id);
+      const endEntry = filteredGroupedByDate[endKey]?.sc.find((s) => s.id === scEntry.id);
       return {
         id: scEntry.id,
         sc: scEntry,
@@ -311,23 +342,32 @@ export default function CalendarView({
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const allLeads = [];
+
     leads.forEach((l) => {
       if (l.appointmentDate && l.appointmentDate.slice(0, 10) >= todayStr) {
+        if (restrictedView && !amSalesman) return; // crew-only can't see appointments
+        if (restrictedView && amSalesman && l.appointmentSalesmanId !== currentUser?.id) return;
         allLeads.push({ ...l, displayDate: l.appointmentDate, displayType: "appointment" });
       }
     });
     leads.forEach((l) => {
       if (l.installDate && l.installDate.slice(0, 10) >= todayStr) {
+        if (restrictedView) {
+          const leadCrews = crewAssignments[l.id] || [];
+          if (!leadCrews.some((c) => myCrewIds.includes(c.id))) return;
+        }
         allLeads.push({ ...l, displayDate: l.installDate, displayType: "install" });
       }
     });
-    serviceCalls.forEach((sc) => {
-      if (sc.scheduled_date && sc.scheduled_date.slice(0, 10) >= todayStr) {
-        allLeads.push({ ...sc, displayDate: sc.scheduled_date, displayType: "serviceCall", name: sc.lead_name });
-      }
-    });
+    if (!restrictedView) {
+      serviceCalls.forEach((sc) => {
+        if (sc.scheduled_date && sc.scheduled_date.slice(0, 10) >= todayStr) {
+          allLeads.push({ ...sc, displayDate: sc.scheduled_date, displayType: "serviceCall", name: sc.lead_name });
+        }
+      });
+    }
     return allLeads.sort((a, b) => new Date(a.displayDate) - new Date(b.displayDate));
-  }, [leads, serviceCalls]);
+  }, [leads, serviceCalls, restrictedView, amSalesman, currentUser?.id, crewAssignments, myCrewIds]);
 
   const handleDayClick = (date) => {
     setSelectedDate(date);
@@ -338,7 +378,23 @@ export default function CalendarView({
     onSelectLead(lead, subView, date);
   };
 
-  // Gear button + dropdown filter panel — shared across MonthView and ListView
+  // Phase 4: Which calendar options does this user see in the gear panel?
+  const gearFilterOptions = useMemo(() => {
+    const all = [
+      { key: "appointment", label: "Appointments", color: "#3b82f6" },
+      { key: "install", label: "Installs", color: "#22c55e" },
+      { key: "serviceCall", label: "Service Calls", color: "#fb923c" },
+    ];
+    if (!restrictedView) return all;
+    return all.filter((opt) => {
+      if (opt.key === "appointment") return amSalesman;
+      if (opt.key === "install") return true;
+      if (opt.key === "serviceCall") return false;
+      return true;
+    });
+  }, [restrictedView, amSalesman]);
+
+  // Gear button + dropdown filter panel
   const GearPanel = () => (
     <div className="relative" ref={filterRef}>
       <button
@@ -355,11 +411,7 @@ export default function CalendarView({
       {showFilter && (
         <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[190px]">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Show Calendars</div>
-          {[
-            { key: "appointment", label: "Appointments", color: "#3b82f6" },
-            { key: "install", label: "Installs", color: "#22c55e" },
-            { key: "serviceCall", label: "Service Calls", color: "#fb923c" },
-          ].map(({ key, label, color }) => (
+          {gearFilterOptions.map(({ key, label, color }) => (
             <label key={key} className="flex items-center gap-2 py-1 cursor-pointer select-none">
               <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
               <span className="text-sm text-gray-700 flex-1">{label}</span>
@@ -436,7 +488,7 @@ export default function CalendarView({
               {week.map((day, dIdx) => {
                 if (!day) return <div key={`e-${wIdx}-${dIdx}`} className="min-h-[60px]" />;
                 const key = formatDateKey(day);
-                const data = groupedByDate[key] || { appt: [], install: [], sc: [] };
+                const data = filteredGroupedByDate[key] || { appt: [], install: [], sc: [] };
                 const isToday = key === formatDateKey(today);
                 const singleDayScs = data.sc.filter((sc) => !sc._multiDay);
                 const holidayName = holidayMap[key];
@@ -468,7 +520,7 @@ export default function CalendarView({
                         ))}
                       </div>
                     )}
-                    {visibleCalendars.serviceCall && singleDayScs.length > 0 && (
+                    {visibleCalendars.serviceCall && !restrictedView && singleDayScs.length > 0 && (
                       <div className="flex flex-col gap-0.5 w-full mt-0.5">
                         {singleDayScs.map((sc, i) => (
                           <div key={`sc-${i}`} className="w-full h-6 bg-orange-400 rounded-sm overflow-hidden flex items-center px-1">
@@ -527,7 +579,7 @@ export default function CalendarView({
               </div>
             )}
 
-            {/* Service call bar overlay (multi-day SCs) */}
+            {/* Service call bar overlay (multi-day SCs, admin/master only) */}
             {scBarAreaHeight > 0 && (
               <div className="relative grid grid-cols-7 gap-x-2 mt-0.5" style={{ height: `${scBarAreaHeight}px` }}>
                 {weekScBars.map((bar) => {
@@ -671,12 +723,12 @@ export default function CalendarView({
 
   // ========= Day View =========
   const DayView = () => {
-    const data = groupedByDate[selectedDate] || { appt: [], install: [], sc: [] };
+    const data = filteredGroupedByDate[selectedDate] || { appt: [], install: [], sc: [] };
     const dayBlocks = blocksByDate[selectedDate] || [];
 
     const filteredAppt = visibleCalendars.appointment ? data.appt : [];
     const filteredInstall = visibleCalendars.install ? data.install : [];
-    const filteredSc = visibleCalendars.serviceCall ? data.sc : [];
+    const filteredSc = visibleCalendars.serviceCall && !restrictedView ? data.sc : [];
     const hasAny = filteredAppt.length + filteredInstall.length + filteredSc.length + dayBlocks.length > 0;
 
     const uniqueInstalls = [];
@@ -700,18 +752,20 @@ export default function CalendarView({
           <div className="text-lg font-semibold flex-1">
             {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </div>
-          <button
-            onClick={() => setBlockModal({ open: true, date: selectedDate, block: null })}
-            className="px-3 py-1 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 whitespace-nowrap"
-          >
-            + Block Time
-          </button>
+          {isAdminOrMaster && (
+            <button
+              onClick={() => setBlockModal({ open: true, date: selectedDate, block: null })}
+              className="px-3 py-1 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 whitespace-nowrap"
+            >
+              + Block Time
+            </button>
+          )}
         </div>
 
         {!hasAny && <p className="text-gray-500 italic">No events for this day.</p>}
 
         <div className="space-y-3">
-          {dayBlocks.map((blk, i) => {
+          {isAdminOrMaster && dayBlocks.map((blk, i) => {
             const appliesToLabel =
               blk.applies_to === "appointment" ? "Appointment Calendar"
               : blk.applies_to === "install" ? "Install Calendar"

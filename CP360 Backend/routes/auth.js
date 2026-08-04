@@ -86,18 +86,20 @@ router.post('/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT 
-        u.id, 
-        u.email, 
+      `SELECT
+        u.id,
+        u.email,
         u.name,
         u.phone,
-        u.password_hash, 
+        u.password_hash,
         u.company_id,
         c.company_name,
         c.suspended,
         c.plan_type,
         c.reports_enabled,
         u.role,
+        u.is_salesman,
+        ARRAY(SELECT cm.crew_id FROM crew_members cm WHERE cm.user_id = u.id) AS crew_ids,
         c.ghl_location_id,
         u.service_calls_enabled,
         u.permissions
@@ -139,6 +141,8 @@ router.post('/login', async (req, res) => {
         companyId: user.company_id,
         companyName: user.company_name,
         role: user.role,
+        isSalesman: user.is_salesman || false,
+        crewIds: user.crew_ids || [],
         ghlLocationId: user.ghl_location_id,
         planType: user.plan_type || 'pro',
         reportsEnabled: user.reports_enabled ?? false,
@@ -164,14 +168,16 @@ router.get('/verify', async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const result = await pool.query(
-      `SELECT 
-        u.id, 
+      `SELECT
+        u.id,
         u.email,
         u.name,
         u.phone,
         u.company_id,
         c.company_name,
         u.role,
+        u.is_salesman,
+        ARRAY(SELECT cm.crew_id FROM crew_members cm WHERE cm.user_id = u.id) AS crew_ids,
         c.ghl_location_id,
         c.plan_type,
         c.reports_enabled,

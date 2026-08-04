@@ -40,6 +40,10 @@ const normalizeUser = (u) => {
     // Per-user permissions
     permissions: u.permissions ?? {},
 
+    // Crew & salesman fields (Phase 4)
+    isSalesman: u.is_salesman ?? u.isSalesman ?? false,
+    crewIds: u.crew_ids ?? u.crewIds ?? [],
+
     // Meta fields
     created_at: u.created_at,
     updated_at: u.updated_at,
