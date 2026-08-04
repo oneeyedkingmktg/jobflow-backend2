@@ -27,6 +27,12 @@ export default function UserModal({
 }) {
   const { companies } = useCompany();
   const [viewMode, setViewMode] = useState(mode === "create" ? "edit" : "view");
+
+  // Resolve the active company object for feature-flag filtering in permissions
+  const userCompanyId = user?.companyId || user?.company_id || defaultCompanyId;
+  const activeCompany = companies?.find(
+    (c) => c.id === userCompanyId || c.companyId === userCompanyId
+  ) || null;
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -43,6 +49,9 @@ export default function UserModal({
   const [saving, setSaving] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
   const [localPermissions, setLocalPermissions] = useState(user?.permissions || {});
+  const [localPermissionRoleId, setLocalPermissionRoleId] = useState(
+    user?.permissionRoleId ?? user?.permission_role_id ?? null
+  );
 
   useEffect(() => {
     if (mode === "create") {
@@ -418,9 +427,14 @@ export default function UserModal({
 
       {showPermissions && user && (
         <UserPermissionsModal
-          user={{ ...user, permissions: localPermissions }}
+          user={{ ...user, permissions: localPermissions, permissionRoleId: localPermissionRoleId }}
+          company={activeCompany}
+          companyId={userCompanyId}
           onClose={() => setShowPermissions(false)}
-          onSaved={(perms) => setLocalPermissions(perms)}
+          onSaved={(perms, roleId) => {
+            setLocalPermissions(perms);
+            setLocalPermissionRoleId(roleId ?? null);
+          }}
         />
       )}
     </div>
