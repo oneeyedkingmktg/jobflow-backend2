@@ -9,6 +9,7 @@ import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import UserCard from "./UserCard.jsx";
 import UserModal from "./UserModal.jsx";
+import PermissionRolesManager from "./PermissionRolesManager.jsx";
 
 export default function UsersHome({ onBack, scopedCompany, showAllUsers = false }) {
   const { user, isAuthenticated } = useAuth();
@@ -25,6 +26,7 @@ export default function UsersHome({ onBack, scopedCompany, showAllUsers = false 
   const [showModal, setShowModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalMode, setModalMode] = useState("view"); // view | edit | create
+  const [showRolesManager, setShowRolesManager] = useState(false);
 
   // For "All Users" mode, only require master role
   // For scoped mode, require master role AND a company
@@ -195,13 +197,21 @@ const canManage = showAllUsers
       {/* HEADER */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">
-          {showAllUsers 
-            ? "All System Users" 
-            : activeCompany 
+          {showAllUsers
+            ? "All System Users"
+            : activeCompany
               ? `${activeCompany.name || activeCompany.companyName || 'Company'} Users`
               : "Users"
           }
         </h1>
+        {!showAllUsers && activeCompany && (
+          <button
+            onClick={() => setShowRolesManager(true)}
+            className="px-4 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition"
+          >
+            Permission Roles
+          </button>
+        )}
       </div>
 
       {/* SEARCH */}
@@ -261,6 +271,14 @@ const canManage = showAllUsers
             />
           ))}
         </div>
+      )}
+
+      {showRolesManager && (
+        <PermissionRolesManager
+          company={activeCompany}
+          companyId={activeCompany?.id}
+          onClose={() => setShowRolesManager(false)}
+        />
       )}
 
       {showModal && (

@@ -149,6 +149,34 @@ export const UsersAPI = {
 };
 
 /* ============================================================================
+   PERMISSION ROLES
+============================================================================ */
+
+export const PermissionRolesAPI = {
+  getAll: (companyId) => {
+    const url = companyId ? `/api/permission-roles?company_id=${companyId}` : "/api/permission-roles";
+    return apiRequest(url);
+  },
+
+  create: (data) =>
+    apiRequest("/api/permission-roles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id, data) =>
+    apiRequest(`/api/permission-roles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id) =>
+    apiRequest(`/api/permission-roles/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+/* ============================================================================
    COMPANIES
 ============================================================================ */
 
