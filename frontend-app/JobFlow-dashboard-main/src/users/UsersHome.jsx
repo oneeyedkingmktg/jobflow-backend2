@@ -10,6 +10,7 @@ import { useCompany } from "../CompanyContext";
 import UserCard from "./UserCard.jsx";
 import UserModal from "./UserModal.jsx";
 import PermissionRolesManager from "./PermissionRolesManager.jsx";
+import CrewsManager from "./CrewsManager.jsx";
 
 export default function UsersHome({ onBack, scopedCompany, showAllUsers = false }) {
   const { user, isAuthenticated } = useAuth();
@@ -27,6 +28,7 @@ export default function UsersHome({ onBack, scopedCompany, showAllUsers = false 
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalMode, setModalMode] = useState("view"); // view | edit | create
   const [showRolesManager, setShowRolesManager] = useState(false);
+  const [showCrewsManager, setShowCrewsManager] = useState(false);
 
   // For "All Users" mode, only require master role
   // For scoped mode, require master role AND a company
@@ -205,12 +207,20 @@ const canManage = showAllUsers
           }
         </h1>
         {!showAllUsers && activeCompany && (
-          <button
-            onClick={() => setShowRolesManager(true)}
-            className="px-4 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition"
-          >
-            Permission Roles
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCrewsManager(true)}
+              className="px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-100 transition"
+            >
+              Crews
+            </button>
+            <button
+              onClick={() => setShowRolesManager(true)}
+              className="px-4 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition"
+            >
+              Permission Roles
+            </button>
+          </div>
         )}
       </div>
 
@@ -271,6 +281,13 @@ const canManage = showAllUsers
             />
           ))}
         </div>
+      )}
+
+      {showCrewsManager && (
+        <CrewsManager
+          companyId={activeCompany?.id}
+          onClose={() => setShowCrewsManager(false)}
+        />
       )}
 
       {showRolesManager && (
