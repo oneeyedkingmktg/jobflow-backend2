@@ -55,6 +55,7 @@ const ghlRoutes = require("./routes/ghl");
 const messagesRoutes = require("./routes/messages");
 const sipRoutes = require("./routes/sip");
 const bidderRoutes = require("./routes/bidder");
+const permissionRolesRoutes = require("./routes/permissionRoles");
 const serviceCallsRoutes = require("./routes/serviceCalls");
 const reportsRoutes = require("./routes/reports");
 const holidaysRoutes = require("./routes/holidays");
@@ -106,6 +107,7 @@ app.use("/google-drive", googleDriveRoutes);
 app.use("/api/bidder", bidderRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
 app.use("/api/reports", authenticateToken, reportsRoutes);
+app.use("/api/permission-roles", permissionRolesRoutes);
 app.use("/api/holidays", holidaysRoutes);
 app.use("/api/blocked-times", blockedTimesRoutes);
 

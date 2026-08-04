@@ -41,7 +41,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       if (req.query.company_id) {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -50,7 +50,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       } else {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions
+                 sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -59,7 +59,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
     } else {
       query = `
         SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
-               service_calls_enabled, permissions
+               service_calls_enabled, permissions, permission_role_id
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
@@ -142,7 +142,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id, 10);
-    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled } = req.body;
+    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permission_role_id } = req.body;
 
     // 🔴 BLOCK PASSWORD ATTEMPTS HERE
     if (password !== undefined && password !== "") {
@@ -246,6 +246,17 @@ router.put("/:id", async (req, res) => {
       }
     }
 
+    // permission_role_id (admin or master can set for users in their company)
+    if (permission_role_id !== undefined) {
+      const canSet =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canSet) {
+        updates.push(`permission_role_id = $${i++}`);
+        values.push(permission_role_id === null ? null : parseInt(permission_role_id, 10));
+      }
+    }
+
     // SIP fields (only master)
     if (req.user.role === "master") {
       if (sip_username !== undefined) {
@@ -272,7 +283,7 @@ router.put("/:id", async (req, res) => {
       `
       UPDATE users SET ${updates.join(", ")}, updated_at = NOW()
       WHERE id = $${i}
-      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled, permissions
+      RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled, service_calls_enabled, permissions, permission_role_id
       `,
       values
     );
