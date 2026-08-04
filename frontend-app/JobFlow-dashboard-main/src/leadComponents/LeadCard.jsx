@@ -165,7 +165,7 @@ if (lead.status === "complete") {
             <div className="text-xs text-gray-500">{cityState}</div>
           )}
           {(lead.createdAt || lead.created_at) && (
-            <div className="text-gray-400" style={{ fontSize: "0.45rem" }}>
+            <div className="text-gray-400" style={{ fontSize: "0.9rem" }}>
               Added {formatShortDate(lead.createdAt || lead.created_at)}
             </div>
           )}
