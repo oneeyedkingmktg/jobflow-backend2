@@ -311,6 +311,38 @@ async function runMigrations() {
     )`,
     // users — link to a permission role (null = individual/custom permissions)
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS permission_role_id INTEGER REFERENCES permission_roles(id) ON DELETE SET NULL`,
+    // crews — named teams of employees per company
+    `CREATE TABLE IF NOT EXISTS crews (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      color VARCHAR(7) DEFAULT '#6366f1',
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    )`,
+    // crew_members — which users belong to which crew
+    `CREATE TABLE IF NOT EXISTS crew_members (
+      id SERIAL PRIMARY KEY,
+      crew_id INTEGER REFERENCES crews(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      is_lead BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(crew_id, user_id)
+    )`,
+    // lead_assignments — employees assigned to a specific job
+    `CREATE TABLE IF NOT EXISTS lead_assignments (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE CASCADE,
+      company_id INTEGER REFERENCES companies(id),
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      crew_id INTEGER REFERENCES crews(id) ON DELETE SET NULL,
+      assignment_role VARCHAR(50) DEFAULT 'installer',
+      assigned_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(lead_id, user_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS lead_assignments_lead_idx ON lead_assignments (lead_id)`,
+    `CREATE INDEX IF NOT EXISTS lead_assignments_user_idx ON lead_assignments (user_id, company_id)`,
   ];
   for (const sql of migrations) {
     try {
