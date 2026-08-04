@@ -297,6 +297,18 @@ async function runMigrations() {
      WHERE status = 'complete'
        AND sold_at IS NULL
        AND deleted_at IS NULL`,
+    // permission_roles — company-defined role presets for user permissions
+    `CREATE TABLE IF NOT EXISTS permission_roles (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      is_custom BOOLEAN DEFAULT false,
+      permissions JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    )`,
+    // users — link to a permission role (null = individual/custom permissions)
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS permission_role_id INTEGER REFERENCES permission_roles(id) ON DELETE SET NULL`,
   ];
   for (const sql of migrations) {
     try {
