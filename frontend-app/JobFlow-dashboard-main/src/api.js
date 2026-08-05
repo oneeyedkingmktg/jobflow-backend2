@@ -470,3 +470,58 @@ export const TimeAPI = {
     return apiRequest(`/api/time/company${qs ? `?${qs}` : ""}`);
   },
 };
+
+function cqUrl(url, companyId) {
+  if (!companyId) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}company_id=${companyId}`;
+}
+
+export const JobReportsAPI = {
+  getSummary: (leadId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/summary`, companyId)),
+
+  setLaborOverride: (leadId, userId, wage, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/labor-override`, companyId), {
+      method: "PUT",
+      body: JSON.stringify({ user_id: userId, wage }),
+    }),
+
+  getMaterials: (leadId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/materials`, companyId)),
+
+  addMaterial: (leadId, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/materials`, companyId), {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteMaterial: (leadId, itemId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/materials/${itemId}`, companyId), {
+      method: "DELETE",
+    }),
+
+  getLibrary: (companyId) =>
+    apiRequest(cqUrl("/api/job-reports/library", companyId)),
+
+  createCategory: (data, companyId) =>
+    apiRequest(cqUrl("/api/job-reports/library/categories", companyId), {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  createItem: (data, companyId) =>
+    apiRequest(cqUrl("/api/job-reports/library/items", companyId), {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteCategory: (id, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/library/categories/${id}`, companyId), {
+      method: "DELETE",
+    }),
+
+  deleteItem: (id, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/library/items/${id}`, companyId), {
+      method: "DELETE",
+    }),
+};

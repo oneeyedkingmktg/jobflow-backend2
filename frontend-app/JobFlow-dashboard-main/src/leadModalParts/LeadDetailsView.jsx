@@ -8,6 +8,7 @@ import ConversationModal from "./ConversationModal.jsx";
 import LeadFilesPanel from "./LeadFilesPanel.jsx";
 import BidderPanel from "./BidderPanel.jsx";
 import LeadTeamPanel from "./LeadTeamPanel.jsx";
+import JobReportsPanel from "./JobReportsPanel.jsx";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import { BidderAPI } from "../api";
@@ -36,6 +37,7 @@ const hasEstimate = form?.hasEstimate === true;
   const [showBidderPanel, setShowBidderPanel] = useState(false);
   const [bidCount, setBidCount] = useState(null);
   const [showTeamPanel, setShowTeamPanel] = useState(false);
+  const [showJobReports, setShowJobReports] = useState(false);
 
   useEffect(() => {
     if (form?.id && !isEstimatorOnly && bidderEnabled) {
@@ -297,6 +299,17 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
+        {/* Job Report */}
+        {!isEstimatorOnly && (user?.role === "admin" || user?.role === "master") && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowJobReports(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            Job Report
+          </button>
+        )}
+
       </div>
 
       {/* FILES MODAL */}
@@ -333,6 +346,14 @@ const hasEstimate = form?.hasEstimate === true;
           lead={form}
           companyId={currentCompany?.id || currentCompany?.companyId}
           onClose={() => setShowTeamPanel(false)}
+        />
+      )}
+
+      {/* JOB REPORTS PANEL */}
+      {showJobReports && (
+        <JobReportsPanel
+          lead={form}
+          onClose={() => setShowJobReports(false)}
         />
       )}
     </>

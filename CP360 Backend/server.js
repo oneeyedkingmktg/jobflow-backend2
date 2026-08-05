@@ -63,6 +63,7 @@ const reportsRoutes = require("./routes/reports");
 const holidaysRoutes = require("./routes/holidays");
 const blockedTimesRoutes = require("./routes/blockedTimes");
 const timeTrackingRoutes = require("./routes/timeTracking");
+const jobReportsRoutes = require("./routes/jobReports");
 
 
 
@@ -116,6 +117,7 @@ app.use("/leads/:leadId/assignments", leadAssignmentsRoutes);
 app.use("/api/holidays", holidaysRoutes);
 app.use("/api/blocked-times", blockedTimesRoutes);
 app.use("/api/time", timeTrackingRoutes);
+app.use("/api/job-reports", authenticateToken, jobReportsRoutes);
 
 
 
@@ -386,6 +388,51 @@ async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS time_entries_user_company_idx ON time_entries (user_id, company_id, clock_in)`,
     `CREATE INDEX IF NOT EXISTS time_entries_lead_idx ON time_entries (lead_id)`,
     `CREATE INDEX IF NOT EXISTS time_entries_company_date_idx ON time_entries (company_id, clock_in)`,
+    // Job costing — materials library
+    `CREATE TABLE IF NOT EXISTS material_categories (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER,
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS material_items (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER,
+      category_id INTEGER,
+      name TEXT NOT NULL,
+      unit TEXT,
+      default_cost DECIMAL(10,2) DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // Job costing — material entries per lead
+    `CREATE TABLE IF NOT EXISTS job_cost_entries (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER,
+      company_id INTEGER,
+      material_item_id INTEGER,
+      name TEXT NOT NULL,
+      qty DECIMAL(10,3) DEFAULT 1,
+      unit TEXT,
+      unit_cost DECIMAL(10,2) DEFAULT 0,
+      total DECIMAL(10,2) DEFAULT 0,
+      notes TEXT,
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS job_cost_entries_lead_idx ON job_cost_entries (lead_id, company_id)`,
+    // Job costing — per-job wage overrides (one row per user per lead)
+    `CREATE TABLE IF NOT EXISTS job_cost_labor_overrides (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER,
+      company_id INTEGER,
+      user_id INTEGER,
+      wage_override DECIMAL(8,2) NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS job_cost_labor_overrides_lead_user_idx ON job_cost_labor_overrides (lead_id, user_id)`,
   ];
   for (const sql of migrations) {
     try {
