@@ -368,12 +368,13 @@ async function runMigrations() {
     // Time tracking — internal labor cost rate per employee (admin-visible, not employee-visible)
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_cost DECIMAL(8,2)`,
     // Time tracking — one row per clock-in/clock-out per employee per job
+    // Note: service_call_id is a plain INTEGER (no FK) to avoid dependency on service_calls table at migration time
     `CREATE TABLE IF NOT EXISTS time_entries (
       id SERIAL PRIMARY KEY,
       company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
-      service_call_id INTEGER REFERENCES service_calls(id) ON DELETE SET NULL,
+      service_call_id INTEGER,
       work_type VARCHAR(20) NOT NULL DEFAULT 'job',
       clock_in TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       clock_out TIMESTAMPTZ,
@@ -381,6 +382,8 @@ async function runMigrations() {
       notes TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+    // Safety: ensure service_call_id column exists if table was created by a prior migration without it
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS service_call_id INTEGER`,
     `CREATE INDEX IF NOT EXISTS time_entries_user_company_idx ON time_entries (user_id, company_id, clock_in)`,
     `CREATE INDEX IF NOT EXISTS time_entries_lead_idx ON time_entries (lead_id)`,
     `CREATE INDEX IF NOT EXISTS time_entries_company_date_idx ON time_entries (company_id, clock_in)`,
