@@ -100,7 +100,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                  sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions,
-                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id
+                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id, hourly_cost
           FROM users
           WHERE company_id = $1 AND deleted_at IS NULL
           ORDER BY created_at DESC
@@ -110,7 +110,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
         query = `
           SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                  sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permissions,
-                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id
+                 permission_role_id, is_salesman, salesman_color, ghl_calendar_id, hourly_cost
           FROM users
           WHERE deleted_at IS NULL
           ORDER BY created_at DESC
@@ -205,7 +205,7 @@ router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const userId = parseInt(id, 10);
-    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permission_role_id, is_salesman, salesman_color, ghl_calendar_id } = req.body;
+    const { name, phone, role, is_active, company_id, password, sip_username, sip_password, sip_incoming_enabled, service_calls_enabled, permission_role_id, is_salesman, salesman_color, ghl_calendar_id, hourly_cost } = req.body;
 
     // 🔴 BLOCK PASSWORD ATTEMPTS HERE
     if (password !== undefined && password !== "") {
@@ -352,6 +352,17 @@ router.put("/:id", async (req, res) => {
       }
     }
 
+    // hourly_cost — internal labor rate for job costing (admin/master only, never self-settable)
+    if (hourly_cost !== undefined && !isSelf) {
+      const canSet =
+        req.user.role === "master" ||
+        (req.user.role === "admin" && targetUser.company_id === req.user.company_id);
+      if (canSet) {
+        updates.push(`hourly_cost = $${i++}`);
+        values.push(hourly_cost === null ? null : parseFloat(hourly_cost));
+      }
+    }
+
     // SIP fields (only master)
     if (req.user.role === "master") {
       if (sip_username !== undefined) {
@@ -380,7 +391,7 @@ router.put("/:id", async (req, res) => {
       WHERE id = $${i}
       RETURNING id, company_id, email, name, phone, role, is_active, sip_username, sip_incoming_enabled,
                 service_calls_enabled, permissions, permission_role_id,
-                is_salesman, salesman_color, ghl_calendar_id
+                is_salesman, salesman_color, ghl_calendar_id, hourly_cost
       `,
       values
     );

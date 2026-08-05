@@ -62,6 +62,7 @@ const serviceCallsRoutes = require("./routes/serviceCalls");
 const reportsRoutes = require("./routes/reports");
 const holidaysRoutes = require("./routes/holidays");
 const blockedTimesRoutes = require("./routes/blockedTimes");
+const timeTrackingRoutes = require("./routes/timeTracking");
 
 
 
@@ -114,6 +115,7 @@ app.use("/api/crews", authenticateToken, crewsRoutes);
 app.use("/leads/:leadId/assignments", leadAssignmentsRoutes);
 app.use("/api/holidays", holidaysRoutes);
 app.use("/api/blocked-times", blockedTimesRoutes);
+app.use("/api/time", timeTrackingRoutes);
 
 
 
@@ -361,6 +363,27 @@ async function runMigrations() {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_filter_prefs JSONB`,
     // Bidder — track when final invoice is paid
     `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS final_paid_at TIMESTAMP`,
+    // Time tracking — master-only company toggle
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS time_tracking_enabled BOOLEAN DEFAULT false`,
+    // Time tracking — internal labor cost rate per employee (admin-visible, not employee-visible)
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_cost DECIMAL(8,2)`,
+    // Time tracking — one row per clock-in/clock-out per employee per job
+    `CREATE TABLE IF NOT EXISTS time_entries (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
+      service_call_id INTEGER REFERENCES service_calls(id) ON DELETE SET NULL,
+      work_type VARCHAR(20) NOT NULL DEFAULT 'job',
+      clock_in TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      clock_out TIMESTAMPTZ,
+      duration_minutes INTEGER,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS time_entries_user_company_idx ON time_entries (user_id, company_id, clock_in)`,
+    `CREATE INDEX IF NOT EXISTS time_entries_lead_idx ON time_entries (lead_id)`,
+    `CREATE INDEX IF NOT EXISTS time_entries_company_date_idx ON time_entries (company_id, clock_in)`,
   ];
   for (const sql of migrations) {
     try {
