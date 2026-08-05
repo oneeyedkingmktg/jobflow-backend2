@@ -3,6 +3,9 @@ import { JobReportsAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 
+const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300";
+const labelCls = "block text-xs font-semibold text-gray-500 uppercase mb-1";
+
 export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId }) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
@@ -14,29 +17,32 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedCats, setExpandedCats] = useState({});
 
   // New category
   const [newCatName, setNewCatName] = useState("");
-  const [savingCat, setSavingCat] = useState(false);
+  const [addingCat, setAddingCat] = useState(false);
 
   // Edit category
   const [editCatId, setEditCatId] = useState(null);
   const [editCatName, setEditCatName] = useState("");
 
   // New item — keyed by category id
-  const [addingItemCatId, setAddingItemCatId] = useState(null);
-  const [newItem, setNewItem] = useState({ name: "", unit: "", default_cost: "" });
+  const [newItemCatId, setNewItemCatId] = useState(null);
+  const [newItemForm, setNewItemForm] = useState({ name: "", unit: "", default_cost: "" });
   const [savingItem, setSavingItem] = useState(false);
 
   // Edit item
   const [editItemId, setEditItemId] = useState(null);
-  const [editItem, setEditItem] = useState({ name: "", unit: "", default_cost: "" });
+  const [editItemForm, setEditItemForm] = useState({ name: "", unit: "", default_cost: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await JobReportsAPI.getLibrary(companyId);
-      setCategories(data.categories || []);
+      const cats = data.categories || [];
+      setCategories(cats);
+      if (cats.length > 0) setExpandedCats({ [cats[0].id]: true });
     } catch (err) {
       console.error("Library load error:", err);
     } finally {
@@ -46,11 +52,14 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
 
   useEffect(() => { load(); }, [load]);
 
+  const toggleCat = (id) =>
+    setExpandedCats((p) => ({ ...p, [id]: !p[id] }));
+
   // ── Category actions ──────────────────────────────────────────────────────
 
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
-    setSavingCat(true);
+    setAddingCat(true);
     try {
       await JobReportsAPI.createCategory({ name: newCatName.trim() }, companyId);
       setNewCatName("");
@@ -58,7 +67,7 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
     } catch (err) {
       alert(err.message || "Failed to add category.");
     } finally {
-      setSavingCat(false);
+      setAddingCat(false);
     }
   };
 
@@ -85,23 +94,23 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
 
   // ── Item actions ──────────────────────────────────────────────────────────
 
-  const openAddItem = (catId) => {
-    setAddingItemCatId(catId);
-    setNewItem({ name: "", unit: "", default_cost: "" });
+  const startAddItem = (catId) => {
+    setNewItemCatId(catId);
+    setNewItemForm({ name: "", unit: "", default_cost: "" });
     setEditItemId(null);
   };
 
   const handleAddItem = async (catId) => {
-    if (!newItem.name.trim()) return;
+    if (!newItemForm.name.trim()) return;
     setSavingItem(true);
     try {
       await JobReportsAPI.createItem({
         category_id: catId,
-        name: newItem.name.trim(),
-        unit: newItem.unit.trim() || null,
-        default_cost: parseFloat(newItem.default_cost) || 0,
+        name: newItemForm.name.trim(),
+        unit: newItemForm.unit.trim() || null,
+        default_cost: parseFloat(newItemForm.default_cost) || 0,
       }, companyId);
-      setAddingItemCatId(null);
+      setNewItemCatId(null);
       await load();
     } catch (err) {
       alert(err.message || "Failed to add item.");
@@ -110,23 +119,23 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
     }
   };
 
-  const openEditItem = (item) => {
+  const startEditItem = (item) => {
     setEditItemId(item.id);
-    setEditItem({
+    setEditItemForm({
       name: item.name,
       unit: item.unit || "",
       default_cost: item.default_cost != null ? String(item.default_cost) : "",
     });
-    setAddingItemCatId(null);
+    setNewItemCatId(null);
   };
 
   const handleSaveItem = async (id) => {
-    if (!editItem.name.trim()) return;
+    if (!editItemForm.name.trim()) return;
     try {
       await JobReportsAPI.updateItem(id, {
-        name: editItem.name.trim(),
-        unit: editItem.unit.trim() || null,
-        default_cost: parseFloat(editItem.default_cost) || 0,
+        name: editItemForm.name.trim(),
+        unit: editItemForm.unit.trim() || null,
+        default_cost: parseFloat(editItemForm.default_cost) || 0,
       }, companyId);
       setEditItemId(null);
       await load();
@@ -149,7 +158,6 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — only shown when used as standalone screen */}
       {onBack && (
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-white shrink-0">
           <button onClick={onBack} className="text-gray-500 hover:text-gray-700 p-1">
@@ -161,10 +169,9 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
         </div>
       )}
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+      <div className="flex-1 overflow-y-auto px-1 py-4 space-y-4">
         {loading ? (
-          <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
+          <p className="text-sm text-gray-500 text-center py-8">Loading library…</p>
         ) : (
           <>
             {categories.length === 0 && (
@@ -172,174 +179,145 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
             )}
 
             {categories.map((cat) => (
-              <div key={cat.id} className="border border-gray-200 rounded-2xl overflow-hidden">
+              <div key={cat.id} className="border border-gray-200 rounded-xl overflow-hidden">
                 {/* Category header */}
-                <div className="bg-gray-50 px-4 py-3 flex items-center gap-2">
+                <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
                   {editCatId === cat.id ? (
                     <>
                       <input
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold"
+                        className="flex-1 px-2 py-1 border rounded text-sm"
                         value={editCatName}
                         onChange={(e) => setEditCatName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSaveCategory(cat.id)}
                         autoFocus
                       />
                       <button onClick={() => handleSaveCategory(cat.id)}
-                        className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700">
-                        Save
-                      </button>
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg">Save</button>
                       <button onClick={() => setEditCatId(null)}
-                        className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300">
-                        Cancel
-                      </button>
+                        className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg">Cancel</button>
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 text-sm font-bold text-gray-800">{cat.name}</span>
+                      <button
+                        onClick={() => toggleCat(cat.id)}
+                        className="flex-1 text-left font-semibold text-gray-800 text-sm flex items-center gap-2"
+                      >
+                        <span className={`transition-transform text-gray-400 text-xs ${expandedCats[cat.id] ? "rotate-90" : ""}`}>▶</span>
+                        {cat.name}
+                        <span className="text-gray-400 font-normal text-xs">({cat.items?.length || 0} items)</span>
+                      </button>
                       <button onClick={() => { setEditCatId(cat.id); setEditCatName(cat.name); }}
-                        className="text-blue-500 hover:text-blue-700 text-xs font-medium px-2">
-                        Edit
-                      </button>
+                        className="text-xs text-blue-600 hover:underline px-2">Rename</button>
                       <button onClick={() => handleDeleteCategory(cat.id)}
-                        className="text-red-400 hover:text-red-600 text-xs font-medium px-2">
-                        Delete
-                      </button>
+                        className="text-xs text-red-500 hover:underline px-2">Delete</button>
                     </>
                   )}
                 </div>
 
-                {/* Items */}
-                <div className="divide-y divide-gray-100">
-                  {cat.items.length === 0 && addingItemCatId !== cat.id && (
-                    <div className="px-4 py-3 text-xs text-gray-400 italic">No items yet.</div>
-                  )}
-
-                  {cat.items.map((item) => (
-                    <div key={item.id} className="px-4 py-3">
-                      {editItemId === item.id ? (
-                        <div className="space-y-2">
-                          <input
-                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                            placeholder="Item name"
-                            value={editItem.name}
-                            onChange={(e) => setEditItem((f) => ({ ...f, name: e.target.value }))}
-                          />
-                          <div className="flex gap-2">
-                            <input
-                              className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                              placeholder="Unit (ea)"
-                              value={editItem.unit}
-                              onChange={(e) => setEditItem((f) => ({ ...f, unit: e.target.value }))}
-                            />
-                            <input
-                              className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                              placeholder="Default cost"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={editItem.default_cost}
-                              onChange={(e) => setEditItem((f) => ({ ...f, default_cost: e.target.value }))}
-                            />
+                {/* Items — only when expanded */}
+                {expandedCats[cat.id] && (
+                  <div className="divide-y divide-gray-100">
+                    {cat.items.map((item) => (
+                      <div key={item.id} className="px-4 py-3">
+                        {editItemId === item.id ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className={labelCls}>Name *</label>
+                                <input className={inputCls} value={editItemForm.name}
+                                  onChange={(e) => setEditItemForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Default Cost</label>
+                                <input className={inputCls} type="number" min="0" step="0.01"
+                                  value={editItemForm.default_cost}
+                                  onChange={(e) => setEditItemForm((f) => ({ ...f, default_cost: e.target.value }))} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className={labelCls}>Unit</label>
+                              <input className={inputCls} placeholder="ea, sqft, bag…" value={editItemForm.unit}
+                                onChange={(e) => setEditItemForm((f) => ({ ...f, unit: e.target.value }))} />
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleSaveItem(item.id)}
+                                className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Save</button>
+                              <button onClick={() => setEditItemId(null)}
+                                className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveItem(item.id)}
-                              className="flex-1 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700">
-                              Save
-                            </button>
-                            <button onClick={() => setEditItemId(null)}
-                              className="flex-1 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-gray-800 font-medium">{item.name}</span>
-                            <span className="text-xs text-gray-400 ml-2">
-                              {item.unit || "ea"}
-                              {item.default_cost > 0 && ` · $${parseFloat(item.default_cost).toFixed(2)}`}
-                            </span>
-                          </div>
-                          <div className="flex gap-3 shrink-0">
-                            <button onClick={() => openEditItem(item)}
-                              className="text-blue-500 hover:text-blue-700 text-xs font-medium">
-                              Edit
-                            </button>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium text-sm text-gray-800">{item.name}</span>
+                              <span className="text-xs text-gray-400 ml-2">
+                                {item.unit || "ea"}
+                                {parseFloat(item.default_cost) > 0 && ` · $${parseFloat(item.default_cost).toFixed(2)}`}
+                              </span>
+                            </div>
+                            <button onClick={() => startEditItem(item)}
+                              className="text-xs text-blue-600 hover:underline px-2">Edit</button>
                             <button onClick={() => handleDeleteItem(item.id)}
-                              className="text-red-400 hover:text-red-600 text-xs font-medium">
-                              Delete
-                            </button>
+                              className="text-xs text-red-500 hover:underline px-2">Delete</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Add item row */}
+                    {newItemCatId === cat.id ? (
+                      <div className="px-4 py-3 bg-blue-50 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className={labelCls}>Name *</label>
+                            <input className={inputCls} value={newItemForm.name}
+                              onChange={(e) => setNewItemForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Default Cost</label>
+                            <input className={inputCls} type="number" min="0" step="0.01"
+                              value={newItemForm.default_cost}
+                              onChange={(e) => setNewItemForm((f) => ({ ...f, default_cost: e.target.value }))} />
                           </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-
-                  {/* Add item inline form */}
-                  {addingItemCatId === cat.id ? (
-                    <div className="px-4 py-3 space-y-2 bg-blue-50">
-                      <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                        placeholder="Item name"
-                        value={newItem.name}
-                        onChange={(e) => setNewItem((f) => ({ ...f, name: e.target.value }))}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          placeholder="Unit (ea)"
-                          value={newItem.unit}
-                          onChange={(e) => setNewItem((f) => ({ ...f, unit: e.target.value }))}
-                        />
-                        <input
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          placeholder="Default cost"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newItem.default_cost}
-                          onChange={(e) => setNewItem((f) => ({ ...f, default_cost: e.target.value }))}
-                        />
+                        <div>
+                          <label className={labelCls}>Unit</label>
+                          <input className={inputCls} placeholder="ea, sqft, bag…" value={newItemForm.unit}
+                            onChange={(e) => setNewItemForm((f) => ({ ...f, unit: e.target.value }))} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleAddItem(cat.id)} disabled={savingItem || !newItemForm.name.trim()}
+                            className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg disabled:opacity-50">
+                            {savingItem ? "Saving…" : "Add Item"}
+                          </button>
+                          <button onClick={() => setNewItemCatId(null)}
+                            className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleAddItem(cat.id)} disabled={savingItem || !newItem.name.trim()}
-                          className="flex-1 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                          {savingItem ? "Saving…" : "Add Item"}
-                        </button>
-                        <button onClick={() => setAddingItemCatId(null)}
-                          className="flex-1 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300">
-                          Cancel
-                        </button>
+                    ) : (
+                      <div className="px-4 py-2">
+                        <button onClick={() => startAddItem(cat.id)}
+                          className="text-sm text-blue-600 hover:underline">+ Add Item</button>
                       </div>
-                    </div>
-                  ) : (
-                    <button onClick={() => openAddItem(cat.id)}
-                      className="w-full px-4 py-2.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 text-left transition">
-                      + Add Item
-                    </button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
 
             {/* Add category */}
-            <div className="border-2 border-dashed border-gray-300 rounded-2xl p-4">
-              <div className="text-xs font-semibold text-gray-500 mb-2">New Category</div>
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  placeholder="Category name…"
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
-                />
-                <button onClick={handleAddCategory} disabled={savingCat || !newCatName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {savingCat ? "…" : "Add"}
-                </button>
-              </div>
+            <div className="flex gap-2 pt-2">
+              <input
+                className={`${inputCls} flex-1`}
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="New category name…"
+                onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+              />
+              <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50">
+                {addingCat ? "Adding…" : "+ Category"}
+              </button>
             </div>
           </>
         )}
