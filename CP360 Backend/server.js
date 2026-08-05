@@ -367,23 +367,18 @@ async function runMigrations() {
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS time_tracking_enabled BOOLEAN DEFAULT false`,
     // Time tracking — internal labor cost rate per employee (admin-visible, not employee-visible)
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_cost DECIMAL(8,2)`,
-    // Time tracking — one row per clock-in/clock-out per employee per job
-    // Note: service_call_id is a plain INTEGER (no FK) to avoid dependency on service_calls table at migration time
-    `CREATE TABLE IF NOT EXISTS time_entries (
-      id SERIAL PRIMARY KEY,
-      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
-      service_call_id INTEGER,
-      work_type VARCHAR(20) NOT NULL DEFAULT 'job',
-      clock_in TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      clock_out TIMESTAMPTZ,
-      duration_minutes INTEGER,
-      notes TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )`,
-    // Safety: ensure service_call_id column exists if table was created by a prior migration without it
+    // Time tracking — ensure table exists (no FK constraints to avoid any cross-table dependency at migration time)
+    `CREATE TABLE IF NOT EXISTS time_entries (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT NOW())`,
+    // Add every column individually so this is fully idempotent regardless of prior migration state
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS company_id INTEGER`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS user_id INTEGER`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS lead_id INTEGER`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS service_call_id INTEGER`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS work_type VARCHAR(20) NOT NULL DEFAULT 'job'`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out TIMESTAMPTZ`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS notes TEXT`,
     `CREATE INDEX IF NOT EXISTS time_entries_user_company_idx ON time_entries (user_id, company_id, clock_in)`,
     `CREATE INDEX IF NOT EXISTS time_entries_lead_idx ON time_entries (lead_id)`,
     `CREATE INDEX IF NOT EXISTS time_entries_company_date_idx ON time_entries (company_id, clock_in)`,
