@@ -42,10 +42,16 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
     employees.map((e) => ({ ...e, wageInput: e.effective_wage > 0 ? String(e.effective_wage) : "" }))
   );
   const [saving, setSaving] = useState({});
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [companyUsers, setCompanyUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "",
+  });
+  const [savingManual, setSavingManual] = useState(false);
 
   const handleWageBlur = async (emp, idx) => {
-    const raw = rows[idx].wageInput;
-    const newWage = parseFloat(raw);
+    const newWage = parseFloat(rows[idx].wageInput);
     if (isNaN(newWage) || newWage < 0) return;
     if (newWage === emp.effective_wage && emp.has_override) return;
 
@@ -63,16 +69,52 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
   const setWageInput = (idx, val) =>
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, wageInput: val } : r)));
 
+  const openManualForm = async () => {
+    setShowManualForm(true);
+    if (companyUsers.length > 0) return;
+    setLoadingUsers(true);
+    try {
+      const data = await JobReportsAPI.getUsers(companyId);
+      setCompanyUsers(data.users || []);
+    } catch (err) {
+      console.error("Load users error:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    if (!manualForm.user_id || (!manualForm.hours && !manualForm.minutes)) return;
+    setSavingManual(true);
+    try {
+      await JobReportsAPI.addManualTime(leadId, {
+        user_id: parseInt(manualForm.user_id, 10),
+        date: manualForm.date,
+        hours: parseInt(manualForm.hours, 10) || 0,
+        minutes: parseInt(manualForm.minutes, 10) || 0,
+        notes: manualForm.notes || null,
+      }, companyId);
+      setShowManualForm(false);
+      setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "" });
+      onWageChange(); // closes modal + refreshes summary
+    } catch (err) {
+      console.error("Manual entry error:", err);
+      alert("Failed to add time entry. Please try again.");
+    } finally {
+      setSavingManual(false);
+    }
+  };
+
   const computedTotal = rows.reduce((sum, e) => {
     const wage = parseFloat(e.wageInput) || 0;
     return sum + ((parseInt(e.total_minutes, 10) || 0) / 60) * wage;
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl"
-        style={{ maxHeight: "80vh", overflowY: "auto" }}
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
+        style={{ maxHeight: "85vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
@@ -80,9 +122,9 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
         </div>
 
-        <div className="px-5 pb-8 pt-3">
+        <div className="px-5 pb-6 pt-3">
           {rows.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">
+            <p className="text-gray-500 text-sm text-center py-6">
               No clocked time entries for this job yet.
             </p>
           ) : (
@@ -95,14 +137,11 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
               </div>
 
               {rows.map((emp, idx) => {
-                const hours = (parseInt(emp.total_minutes, 10) || 0) / 60;
+                const hrs = (parseInt(emp.total_minutes, 10) || 0) / 60;
                 const wage = parseFloat(emp.wageInput) || 0;
-                const subtotal = hours * wage;
                 return (
                   <div key={emp.user_id} className="grid grid-cols-4 gap-2 items-center py-3 border-b border-gray-50">
-                    <span className="text-sm text-gray-800 font-medium truncate col-span-1">
-                      {emp.user_name}
-                    </span>
+                    <span className="text-sm text-gray-800 font-medium truncate col-span-1">{emp.user_name}</span>
                     <span className="text-sm text-gray-700 text-center">{fmtHours(emp.total_minutes)}</span>
                     <div className="flex items-center justify-center">
                       <span className="text-gray-400 text-xs mr-0.5">$</span>
@@ -118,16 +157,115 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
                         placeholder="0"
                       />
                     </div>
-                    <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(subtotal)}</span>
+                    <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
                   </div>
                 );
               })}
 
-              <div className="flex justify-between items-center pt-3 mt-1">
+              <div className="flex justify-between items-center pt-3 mt-1 mb-4">
                 <span className="font-semibold text-gray-700 text-sm">Total Labor Cost</span>
                 <span className="font-bold text-gray-900">{fmtMoney(computedTotal)}</span>
               </div>
             </>
+          )}
+
+          {/* Manual time entry */}
+          {showManualForm ? (
+            <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-3">
+              <div className="font-semibold text-sm text-gray-800">Add Manual Entry</div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Employee</label>
+                {loadingUsers ? (
+                  <div className="text-xs text-gray-400 py-2">Loading employees…</div>
+                ) : (
+                  <select
+                    value={manualForm.user_id}
+                    onChange={(e) => setManualForm((f) => ({ ...f, user_id: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">Select employee…</option>
+                    {companyUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Date</label>
+                <input
+                  type="date"
+                  value={manualForm.date}
+                  onChange={(e) => setManualForm((f) => ({ ...f, date: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    placeholder="0"
+                    value={manualForm.hours}
+                    onChange={(e) => setManualForm((f) => ({ ...f, hours: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Minutes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="0"
+                    value={manualForm.minutes}
+                    onChange={(e) => setManualForm((f) => ({ ...f, minutes: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Notes (optional)</label>
+                <input
+                  type="text"
+                  placeholder="Description of work…"
+                  value={manualForm.notes}
+                  onChange={(e) => setManualForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowManualForm(false); setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "" }); }}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManualSubmit}
+                  disabled={savingManual || !manualForm.user_id || (!manualForm.hours && !manualForm.minutes)}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingManual ? "Saving…" : "Add Entry"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openManualForm}
+              className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition"
+            >
+              + Add Manual Entry
+            </button>
           )}
         </div>
       </div>
@@ -249,9 +387,9 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
     : [];
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
         style={{ maxHeight: "88vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -581,7 +719,8 @@ export default function JobReportsPanel({ lead, onClose }) {
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/50 md:p-6">
+      <div className="flex-1 md:flex-none bg-white flex flex-col overflow-hidden md:max-w-2xl md:w-full md:max-h-[90vh] md:rounded-2xl md:shadow-2xl">
       {/* Header */}
       <div className="bg-[#1a2e5a] text-white px-4 py-4 flex items-center gap-3 shrink-0">
         <button
@@ -694,6 +833,8 @@ export default function JobReportsPanel({ lead, onClose }) {
           </>
         ) : null}
       </div>
+
+      </div>{/* end inner panel */}
 
       {/* Time Entries Modal */}
       {showTimeEntries && summary?.labor?.employees && (

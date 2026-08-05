@@ -524,4 +524,13 @@ export const JobReportsAPI = {
     apiRequest(cqUrl(`/api/job-reports/library/items/${id}`, companyId), {
       method: "DELETE",
     }),
+
+  getUsers: (companyId) =>
+    apiRequest(cqUrl("/users", companyId)),
+
+  addManualTime: (leadId, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/manual-time`, companyId), {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

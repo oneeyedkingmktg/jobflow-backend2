@@ -385,4 +385,52 @@ router.delete("/:leadId/materials/:itemId", async (req, res) => {
   }
 });
 
+// ============================================================================
+// PER-JOB: MANUAL TIME ENTRY (admin/master only, not gated by time_tracking_enabled)
+// Body: { user_id, date (YYYY-MM-DD), hours, minutes, notes }
+// ============================================================================
+router.post("/:leadId/manual-time", async (req, res) => {
+  try {
+    const leadId = parseInt(req.params.leadId, 10);
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const { user_id, date, hours = 0, minutes = 0, notes } = req.body;
+    if (!user_id) return res.status(400).json({ error: "user_id required" });
+
+    const totalMinutes = (parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0);
+    if (totalMinutes <= 0) return res.status(400).json({ error: "Duration must be greater than 0" });
+
+    const leadCheck = await db.query(
+      "SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL",
+      [leadId, companyId]
+    );
+    if (!leadCheck.rows.length) return res.status(404).json({ error: "Lead not found" });
+
+    const userCheck = await db.query(
+      "SELECT id FROM users WHERE id = $1 AND company_id = $2",
+      [parseInt(user_id, 10), companyId]
+    );
+    if (!userCheck.rows.length) return res.status(404).json({ error: "User not found" });
+
+    // Use noon as clock-in anchor to avoid timezone shifts bleeding across day boundaries
+    const entryDate = date || new Date().toISOString().slice(0, 10);
+    const clockIn = `${entryDate}T12:00:00`;
+    const clockOut = new Date(new Date(clockIn).getTime() + totalMinutes * 60000).toISOString();
+
+    const result = await db.query(
+      `INSERT INTO time_entries
+         (company_id, user_id, lead_id, work_type, clock_in, clock_out, duration_minutes, notes)
+       VALUES ($1, $2, $3, 'job', $4, $5, $6, $7)
+       RETURNING *`,
+      [companyId, parseInt(user_id, 10), leadId, clockIn, clockOut, totalMinutes, notes || null]
+    );
+
+    res.status(201).json({ entry: result.rows[0] });
+  } catch (err) {
+    console.error("Manual time entry error:", err);
+    res.status(500).json({ error: "Failed to add manual time entry" });
+  }
+});
+
 module.exports = router;
