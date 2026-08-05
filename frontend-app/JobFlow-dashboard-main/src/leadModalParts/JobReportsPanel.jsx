@@ -565,6 +565,10 @@ export default function JobReportsPanel({ lead, onClose }) {
       setLoading(true);
       setError(null);
       const data = await JobReportsAPI.getSummary(lead.id, companyId);
+      if (!data?.job || !data?.labor || !data?.materials || !data?.summary) {
+        setError("Failed to load job report — please try again.");
+        return;
+      }
       setSummary(data);
     } catch (err) {
       console.error("Job reports load error:", err);
@@ -601,8 +605,16 @@ export default function JobReportsPanel({ lead, onClose }) {
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
           </div>
         ) : error ? (
-          <div className="text-center text-red-500 py-10 text-sm">{error}</div>
-        ) : summary && (
+          <div className="text-center py-10 space-y-3">
+            <p className="text-red-500 text-sm">{error}</p>
+            <button
+              onClick={loadSummary}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold"
+            >
+              Retry
+            </button>
+          </div>
+        ) : summary?.job && summary?.labor && summary?.materials && summary?.summary ? (
           <>
             {/* Job Details */}
             <div className="bg-gray-50 rounded-2xl border border-gray-200 px-4 py-4">
@@ -680,11 +692,11 @@ export default function JobReportsPanel({ lead, onClose }) {
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Time Entries Modal */}
-      {showTimeEntries && summary && (
+      {showTimeEntries && summary?.labor?.employees && (
         <TimeEntriesModal
           leadId={lead.id}
           companyId={companyId}
