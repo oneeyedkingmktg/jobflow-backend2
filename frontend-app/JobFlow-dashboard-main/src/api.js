@@ -539,4 +539,18 @@ export const JobReportsAPI = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  getTimeEntries: (leadId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/time-entries`, companyId)),
+
+  updateTimeEntry: (leadId, entryId, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/time-entries/${entryId}`, companyId), {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteTimeEntry: (leadId, entryId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/time-entries/${entryId}`, companyId), {
+      method: "DELETE",
+    }),
 };

@@ -50,6 +50,69 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
   });
   const [savingManual, setSavingManual] = useState(false);
 
+  // Individual entry list
+  const [entries, setEntries] = useState([]);
+  const [loadingEntries, setLoadingEntries] = useState(true);
+  const [editEntryId, setEditEntryId] = useState(null);
+  const [editEntryForm, setEditEntryForm] = useState({ date: "", hours: "", minutes: "", notes: "" });
+  const [savingEntry, setSavingEntry] = useState(false);
+
+  const loadEntries = useCallback(async () => {
+    try {
+      const data = await JobReportsAPI.getTimeEntries(leadId, companyId);
+      setEntries(data.entries || []);
+    } catch (err) {
+      console.error("Load entries error:", err);
+    } finally {
+      setLoadingEntries(false);
+    }
+  }, [leadId, companyId]);
+
+  useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const startEditEntry = (e) => {
+    const d = new Date(e.clock_in);
+    const dateStr = d.toISOString().slice(0, 10);
+    const totalMin = e.duration_minutes || 0;
+    setEditEntryId(e.id);
+    setEditEntryForm({
+      date: dateStr,
+      hours: String(Math.floor(totalMin / 60)),
+      minutes: String(totalMin % 60),
+      notes: e.notes || "",
+    });
+  };
+
+  const handleSaveEntry = async (entryId) => {
+    const h = parseInt(editEntryForm.hours, 10) || 0;
+    const m = parseInt(editEntryForm.minutes, 10) || 0;
+    if (h + m === 0) { alert("Duration must be greater than 0."); return; }
+    setSavingEntry(true);
+    try {
+      await JobReportsAPI.updateTimeEntry(leadId, entryId, {
+        hours: h, minutes: m, date: editEntryForm.date, notes: editEntryForm.notes || null,
+      }, companyId);
+      setEditEntryId(null);
+      await loadEntries();
+      onWageChange();
+    } catch (err) {
+      alert(err.message || "Failed to save entry.");
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+
+  const handleDeleteEntry = async (entryId) => {
+    if (!window.confirm("Delete this time entry?")) return;
+    try {
+      await JobReportsAPI.deleteTimeEntry(leadId, entryId, companyId);
+      await loadEntries();
+      onWageChange();
+    } catch (err) {
+      alert(err.message || "Failed to delete entry.");
+    }
+  };
+
   const handleWageBlur = async (emp, idx) => {
     const newWage = parseFloat(rows[idx].wageInput);
     if (isNaN(newWage) || newWage < 0) return;
@@ -97,6 +160,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
       }, companyId);
       setShowManualForm(false);
       setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "" });
+      await loadEntries();
       onWageChange(); // closes modal + refreshes summary
     } catch (err) {
       console.error("Manual entry error:", err);
@@ -169,6 +233,71 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
               </div>
             </>
           )}
+
+          {/* Individual entries list */}
+          <div className="mb-4">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">All Entries</div>
+            {loadingEntries ? (
+              <div className="text-xs text-gray-400 py-2 text-center">Loading…</div>
+            ) : entries.length === 0 ? (
+              <div className="text-xs text-gray-400 py-2 text-center">No entries yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {entries.map((e) => {
+                  const dateLabel = new Date(e.clock_in).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  return (
+                    <div key={e.id} className="bg-gray-50 rounded-xl px-3 py-2.5">
+                      {editEntryId === e.id ? (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <input type="date" value={editEntryForm.date}
+                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, date: ev.target.value }))}
+                              className="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+                            <input type="number" min="0" placeholder="hrs" value={editEntryForm.hours}
+                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, hours: ev.target.value }))}
+                              className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center" />
+                            <input type="number" min="0" max="59" placeholder="min" value={editEntryForm.minutes}
+                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, minutes: ev.target.value }))}
+                              className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center" />
+                          </div>
+                          <input type="text" placeholder="Notes (optional)" value={editEntryForm.notes}
+                            onChange={(ev) => setEditEntryForm((f) => ({ ...f, notes: ev.target.value }))}
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs" />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleSaveEntry(e.id)} disabled={savingEntry}
+                              className="flex-1 py-1 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
+                              {savingEntry ? "Saving…" : "Save"}
+                            </button>
+                            <button onClick={() => setEditEntryId(null)}
+                              className="flex-1 py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-gray-800">{e.user_name}</span>
+                            <span className="text-xs text-gray-400 mx-1.5">·</span>
+                            <span className="text-xs text-gray-500">{dateLabel}</span>
+                            <span className="text-xs text-gray-400 mx-1.5">·</span>
+                            <span className="text-xs text-gray-700">{fmtHours(e.duration_minutes)}</span>
+                            {e.notes && <div className="text-xs text-gray-400 italic mt-0.5 truncate">{e.notes}</div>}
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <button onClick={() => startEditEntry(e)}
+                              className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                            <button onClick={() => handleDeleteEntry(e.id)}
+                              className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Manual time entry */}
           {showManualForm ? (

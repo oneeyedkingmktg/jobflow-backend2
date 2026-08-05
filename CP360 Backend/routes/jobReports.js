@@ -386,6 +386,85 @@ router.delete("/:leadId/materials/:itemId", async (req, res) => {
 });
 
 // ============================================================================
+// PER-JOB: LIST INDIVIDUAL TIME ENTRIES
+// ============================================================================
+router.get("/:leadId/time-entries", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    const leadId = parseInt(req.params.leadId, 10);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT te.id, te.user_id, te.clock_in, te.duration_minutes, te.notes,
+              u.name AS user_name
+       FROM time_entries te
+       JOIN users u ON u.id = te.user_id
+       WHERE te.lead_id = $1 AND te.company_id = $2
+       ORDER BY te.clock_in ASC`,
+      [leadId, companyId]
+    );
+    res.json({ entries: result.rows });
+  } catch (err) {
+    console.error("Get time entries error:", err);
+    res.status(500).json({ error: "Failed to fetch time entries" });
+  }
+});
+
+// ============================================================================
+// PER-JOB: EDIT A TIME ENTRY
+// Body: { hours, minutes, date (YYYY-MM-DD), notes }
+// ============================================================================
+router.put("/:leadId/time-entries/:entryId", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    const entryId = parseInt(req.params.entryId, 10);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const { hours = 0, minutes = 0, date, notes } = req.body;
+    const totalMinutes = (parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0);
+    if (totalMinutes <= 0) return res.status(400).json({ error: "Duration must be greater than 0" });
+
+    const entryDate = date || new Date().toISOString().slice(0, 10);
+    const clockIn = `${entryDate}T12:00:00`;
+    const clockOut = new Date(new Date(clockIn).getTime() + totalMinutes * 60000).toISOString();
+
+    const result = await db.query(
+      `UPDATE time_entries
+       SET clock_in = $1, clock_out = $2, duration_minutes = $3, notes = $4
+       WHERE id = $5 AND company_id = $6
+       RETURNING id`,
+      [clockIn, clockOut, totalMinutes, notes || null, entryId, companyId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: "Entry not found" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Update time entry error:", err);
+    res.status(500).json({ error: "Failed to update time entry" });
+  }
+});
+
+// ============================================================================
+// PER-JOB: DELETE A TIME ENTRY
+// ============================================================================
+router.delete("/:leadId/time-entries/:entryId", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    const entryId = parseInt(req.params.entryId, 10);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `DELETE FROM time_entries WHERE id = $1 AND company_id = $2 RETURNING id`,
+      [entryId, companyId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: "Entry not found" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete time entry error:", err);
+    res.status(500).json({ error: "Failed to delete time entry" });
+  }
+});
+
+// ============================================================================
 // PER-JOB: MANUAL TIME ENTRY (admin/master only, not gated by time_tracking_enabled)
 // Body: { user_id, date (YYYY-MM-DD), hours, minutes, notes }
 // ============================================================================
