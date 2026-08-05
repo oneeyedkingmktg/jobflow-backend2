@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { apiRequest } from "../api";
+import { useCompany } from "../CompanyContext";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,11 @@ function liveDuration(clockInTs) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function TimeTrackingPage({ onBack }) {
+  const { currentCompany } = useCompany();
+  // Appends ?company_id=X when present — needed for master who has no company_id on their JWT
+  const cq = currentCompany?.id ? `company_id=${currentCompany.id}` : "";
+  const withCq = (url) => cq ? `${url}${url.includes("?") ? "&" : "?"}${cq}` : url;
+
   const [jobs, setJobs] = useState([]);
   const [serviceCalls, setServiceCalls] = useState([]);
   const [todayEntries, setTodayEntries] = useState([]);
@@ -61,8 +67,8 @@ export default function TimeTrackingPage({ onBack }) {
       setLoading(true);
       try {
         const [jobsRes, todayRes] = await Promise.all([
-          apiRequest("/api/time/jobs"),
-          apiRequest("/api/time/today"),
+          apiRequest(withCq("/api/time/jobs")),
+          apiRequest(withCq("/api/time/today")),
         ]);
         setJobs(jobsRes.jobs || []);
         setServiceCalls(jobsRes.serviceCalls || []);
@@ -90,7 +96,7 @@ export default function TimeTrackingPage({ onBack }) {
     if (!term.trim()) { setSearchResults([]); return; }
     searchTimer.current = setTimeout(async () => {
       try {
-        const data = await apiRequest(`/api/time/jobs?search=${encodeURIComponent(term.trim())}`);
+        const data = await apiRequest(withCq(`/api/time/jobs?search=${encodeURIComponent(term.trim())}`));
         setSearchResults(data.jobs || []);
       } catch {}
     }, 350);
@@ -108,7 +114,7 @@ export default function TimeTrackingPage({ onBack }) {
         ...(selected.leadId ? { lead_id: selected.leadId } : {}),
         ...(selected.serviceCallId ? { service_call_id: selected.serviceCallId } : {}),
       };
-      const data = await apiRequest("/api/time/clock-in", {
+      const data = await apiRequest(withCq("/api/time/clock-in"), {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -127,7 +133,7 @@ export default function TimeTrackingPage({ onBack }) {
     setClockLoading(true);
     setError("");
     try {
-      const data = await apiRequest(`/api/time/clock-out/${activeEntry.id}`, {
+      const data = await apiRequest(withCq(`/api/time/clock-out/${activeEntry.id}`), {
         method: "PUT",
         body: JSON.stringify({}),
       });
@@ -143,7 +149,7 @@ export default function TimeTrackingPage({ onBack }) {
 
   const loadWeek = async () => {
     try {
-      const data = await apiRequest("/api/time/week");
+      const data = await apiRequest(withCq("/api/time/week"));
       setWeekData(data);
       setShowWeek(true);
     } catch {}

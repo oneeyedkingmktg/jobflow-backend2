@@ -274,6 +274,7 @@ router.put("/clock-out/:entryId", async (req, res) => {
 router.get("/today", async (req, res) => {
   try {
     const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
     const userId = req.user.id;
 
     const result = await db.query(
@@ -303,6 +304,7 @@ router.get("/today", async (req, res) => {
 router.get("/week", async (req, res) => {
   try {
     const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
     const userId = req.user.id;
 
     const result = await db.query(
