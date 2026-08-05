@@ -395,7 +395,7 @@ router.post("/:leadId/manual-time", async (req, res) => {
     const companyId = resolveCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
-    const { user_id, date, hours = 0, minutes = 0, notes } = req.body;
+    const { user_id, date, hours = 0, minutes = 0, notes, wage } = req.body;
     if (!user_id) return res.status(400).json({ error: "user_id required" });
 
     const totalMinutes = (parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0);
@@ -425,6 +425,17 @@ router.post("/:leadId/manual-time", async (req, res) => {
        RETURNING *`,
       [companyId, parseInt(user_id, 10), leadId, clockIn, clockOut, totalMinutes, notes || null]
     );
+
+    // If a wage was provided, upsert the labor override for this lead+user
+    const wageNum = parseFloat(wage);
+    if (!isNaN(wageNum) && wageNum >= 0) {
+      await db.query(
+        `INSERT INTO job_cost_labor_overrides (lead_id, company_id, user_id, wage_override)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (lead_id, user_id) DO UPDATE SET wage_override = EXCLUDED.wage_override, updated_at = NOW()`,
+        [leadId, companyId, parseInt(user_id, 10), wageNum]
+      );
+    }
 
     res.status(201).json({ entry: result.rows[0] });
   } catch (err) {

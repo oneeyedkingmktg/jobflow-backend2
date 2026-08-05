@@ -46,7 +46,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
   const [companyUsers, setCompanyUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [manualForm, setManualForm] = useState({
-    user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "",
+    user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "",
   });
   const [savingManual, setSavingManual] = useState(false);
 
@@ -93,9 +93,10 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
         hours: parseInt(manualForm.hours, 10) || 0,
         minutes: parseInt(manualForm.minutes, 10) || 0,
         notes: manualForm.notes || null,
+        wage: manualForm.wage !== "" ? parseFloat(manualForm.wage) : undefined,
       }, companyId);
       setShowManualForm(false);
-      setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "" });
+      setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "" });
       onWageChange(); // closes modal + refreshes summary
     } catch (err) {
       console.error("Manual entry error:", err);
@@ -181,7 +182,15 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
                 ) : (
                   <select
                     value={manualForm.user_id}
-                    onChange={(e) => setManualForm((f) => ({ ...f, user_id: e.target.value }))}
+                    onChange={(e) => {
+                      const uid = e.target.value;
+                      const selected = companyUsers.find((u) => String(u.id) === uid);
+                      setManualForm((f) => ({
+                        ...f,
+                        user_id: uid,
+                        wage: selected?.hourly_cost ? String(selected.hourly_cost) : f.wage,
+                      }));
+                    }}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
                   >
                     <option value="">Select employee…</option>
@@ -230,6 +239,19 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
               </div>
 
               <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">Wage / hr ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={manualForm.wage}
+                  onChange={(e) => setManualForm((f) => ({ ...f, wage: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                />
+              </div>
+
+              <div>
                 <label className="text-xs font-semibold text-gray-600 block mb-1">Notes (optional)</label>
                 <input
                   type="text"
@@ -243,7 +265,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => { setShowManualForm(false); setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "" }); }}
+                  onClick={() => { setShowManualForm(false); setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "" }); }}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100"
                 >
                   Cancel
