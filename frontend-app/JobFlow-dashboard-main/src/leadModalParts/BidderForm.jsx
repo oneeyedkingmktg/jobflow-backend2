@@ -977,12 +977,33 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             )}
           </div>
           <div className="mt-3 bg-gray-50 rounded-xl px-4 py-3 space-y-1 text-sm">
-            {paySchedule.map((ps, idx) => (
-              <div key={ps.id} className="flex justify-between text-gray-600">
-                <span>{ps._desc || `Payment ${idx + 1}`}</span>
-                <span className="font-semibold">{fmt(calcPayAmt(ps))}</span>
-              </div>
-            ))}
+            {(() => {
+              const paidNums = new Set(
+                (proposal?.paid_invoice_nums || '').split(',').map(s => s.trim()).filter(Boolean)
+              );
+              return paySchedule.map((ps, idx) => {
+                const invNum = String(idx + 1);
+                const isPaid = paidNums.has(invNum);
+                return (
+                  <div key={ps.id} className="flex justify-between items-center text-gray-600">
+                    <span className="flex items-center gap-1.5">
+                      {ps._desc || `Payment ${idx + 1}`}
+                      {isPaid && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Paid
+                        </span>
+                      )}
+                    </span>
+                    <span className={`font-semibold ${isPaid ? 'line-through text-gray-400' : ''}`}>
+                      {fmt(calcPayAmt(ps))}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
             <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-2 mt-1">
               <span>Balance Due</span><span>{fmt(balanceDue)}</span>
             </div>
