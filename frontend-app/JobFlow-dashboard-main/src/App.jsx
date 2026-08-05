@@ -117,7 +117,7 @@ function AppContent() {
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const reportsEnabled = currentCompany?.reports_enabled === true || currentCompany?.reportsEnabled === true;
   const reportsPermission = usePermission('reports');
-  const timeTrackingEnabled = currentCompany?.timeTrackingEnabled === true || currentCompany?.time_tracking_enabled === true;
+  const timeTrackingEnabled = user?.role === 'master' || currentCompany?.timeTrackingEnabled === true || currentCompany?.time_tracking_enabled === true;
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
