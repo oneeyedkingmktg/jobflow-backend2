@@ -59,6 +59,37 @@ router.get("/salespeople", async (req, res) => {
   }
 });
 
+// ============================================================================
+// GET /users/me/calendar-prefs — get current user's saved gear filter prefs
+// PUT /users/me/calendar-prefs — save gear filter prefs for all-device sync
+// ============================================================================
+router.get("/me/calendar-prefs", async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT calendar_filter_prefs FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    res.json({ prefs: result.rows[0]?.calendar_filter_prefs || null });
+  } catch (err) {
+    console.error("Get calendar prefs error:", err);
+    res.status(500).json({ error: "Failed to fetch calendar prefs" });
+  }
+});
+
+router.put("/me/calendar-prefs", async (req, res) => {
+  try {
+    const { prefs } = req.body;
+    await db.query(
+      "UPDATE users SET calendar_filter_prefs = $1 WHERE id = $2",
+      [JSON.stringify(prefs), req.user.id]
+    );
+    res.json({ prefs });
+  } catch (err) {
+    console.error("Update calendar prefs error:", err);
+    res.status(500).json({ error: "Failed to update calendar prefs" });
+  }
+});
+
 router.get("/", requireRole("admin", "master"), async (req, res) => {
   try {
     let query;

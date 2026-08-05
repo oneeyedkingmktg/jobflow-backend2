@@ -8,6 +8,14 @@ import { PermissionRolesAPI } from "../api";
 
 const LEVELS = ["hide", "view", "edit"];
 
+const CALENDAR_PERMS = [
+  { key: "calendar_mine", label: "My Calendar", description: "Own appointments and installs I'm assigned to" },
+  { key: "calendar_appointment", label: "Appointments", description: "All appointment events for the company" },
+  { key: "calendar_install", label: "Installs", description: "All install events for the company" },
+  { key: "calendar_service_call", label: "Service Calls", description: "Service call events" },
+  { key: "calendar_other_crews", label: "Other Crews", description: "Jobs assigned to other crews" },
+];
+
 const CATEGORIES = [
   {
     key: "financial_information",
@@ -119,6 +127,13 @@ export default function PermissionRolesManager({ company, companyId, onClose }) 
     setForm((prev) => ({
       ...prev,
       permissions: { ...prev.permissions, [key]: level },
+    }));
+  };
+
+  const setBool = (key, val) => {
+    setForm((prev) => ({
+      ...prev,
+      permissions: { ...prev.permissions, [key]: val },
     }));
   };
 
@@ -327,6 +342,30 @@ export default function PermissionRolesManager({ company, companyId, onClose }) 
                       </div>
                     );
                   })}
+
+                  {/* Calendar access — checkboxes, defaults all ON */}
+                  <div className="text-sm font-semibold text-gray-700 pt-2">
+                    Calendar Access
+                  </div>
+                  <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                    {CALENDAR_PERMS.map((cp) => {
+                      const val = form.permissions[cp.key] !== false;
+                      return (
+                        <label key={cp.key} className="flex items-center justify-between gap-3 cursor-pointer select-none">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-900 text-sm">{cp.label}</div>
+                            <div className="text-xs text-gray-500">{cp.description}</div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={val}
+                            onChange={() => setBool(cp.key, !val)}
+                            className="w-4 h-4 accent-emerald-600 shrink-0"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

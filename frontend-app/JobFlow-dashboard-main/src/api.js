@@ -151,6 +151,14 @@ export const UsersAPI = {
     const url = companyId ? `/users/salespeople?company_id=${companyId}` : "/users/salespeople";
     return apiRequest(url);
   },
+
+  getCalendarPrefs: () => apiRequest("/users/me/calendar-prefs"),
+
+  updateCalendarPrefs: (prefs) =>
+    apiRequest("/users/me/calendar-prefs", {
+      method: "PUT",
+      body: JSON.stringify({ prefs }),
+    }),
 };
 
 /* ============================================================================

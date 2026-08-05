@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { apiRequest, LeadsAPI, CrewsAPI, UsersAPI } from "./api";
+import { apiRequest, LeadsAPI, CrewsAPI, UsersAPI, PermissionRolesAPI } from "./api";
 
 import LeadModal from "./LeadModal.jsx";
 import CalendarView from "./CalendarView.jsx";
@@ -170,6 +170,7 @@ export default function LeadsHome() {
   const [salespeople, setSalespeople] = useState([]);
   const [crewAssignments, setCrewAssignments] = useState({});
   const [individualAssignments, setIndividualAssignments] = useState({});
+  const [calendarRolePerms, setCalendarRolePerms] = useState(null);
 
   // --------------------------------------------------
   // Load leads
@@ -226,6 +227,16 @@ const loadLeads = async () => {
     CrewsAPI.getLeadIndividualAssignments(currentCompany.id)
       .then((data) => setIndividualAssignments(data.assignments || {}))
       .catch(() => {});
+    // Load calendar role permissions for gear panel filtering
+    if (user?.role === "user" && (user?.permissionRoleId || user?.permission_role_id)) {
+      const roleId = user.permissionRoleId || user.permission_role_id;
+      PermissionRolesAPI.getAll(currentCompany.id)
+        .then((data) => {
+          const myRole = (data.roles || []).find((r) => r.id === roleId);
+          setCalendarRolePerms(myRole?.permissions || null);
+        })
+        .catch(() => {});
+    }
   };
 
   const handleBlockSave = async (data, id) => {
@@ -438,6 +449,7 @@ onAddLead={() => {
       salespeople={salespeople}
       crewAssignments={crewAssignments}
       individualAssignments={individualAssignments}
+      calendarRolePerms={calendarRolePerms}
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>

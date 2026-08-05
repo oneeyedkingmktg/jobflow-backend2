@@ -357,6 +357,8 @@ async function runMigrations() {
     // Phase 5 — salesman/crew secondary GHL calendar event IDs
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS salesman_ghl_event_id TEXT`,
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS crew_ghl_event_id TEXT`,
+    // Calendar prefs — per-user gear panel selections, stored in DB for all-device sync
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_filter_prefs JSONB`,
   ];
   for (const sql of migrations) {
     try {

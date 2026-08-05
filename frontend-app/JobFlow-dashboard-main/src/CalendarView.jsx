@@ -14,6 +14,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { formatDate, formatTime } from "./utils/formatting.js";
 import BlockTimeModal from "./BlockTimeModal.jsx";
+import { UsersAPI } from "./api";
 
 const GAP_PX = 8;
 const COLS = 7;
@@ -58,6 +59,7 @@ export default function CalendarView({
   salespeople = [],
   crewAssignments = {},
   individualAssignments = {},
+  calendarRolePerms = null,
 }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
@@ -69,22 +71,21 @@ export default function CalendarView({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
 
-  const filterKey = `calendarFilters_${currentUser?.id || "default"}`;
+  const [visibleCalendars, setVisibleCalendars] = useState({ appointment: true, install: true, serviceCall: true });
 
-  const [visibleCalendars, setVisibleCalendars] = useState(() => {
-    try {
-      const stored = localStorage.getItem(`calendarFilters_${currentUser?.id || "default"}`);
-      return stored
-        ? { appointment: true, install: true, serviceCall: true, ...JSON.parse(stored) }
-        : { appointment: true, install: true, serviceCall: true };
-    } catch {
-      return { appointment: true, install: true, serviceCall: true };
-    }
-  });
-
+  // Load gear filter prefs from DB on mount (all-device sync)
   useEffect(() => {
-    try { localStorage.setItem(filterKey, JSON.stringify(visibleCalendars)); } catch {}
-  }, [visibleCalendars, filterKey]);
+    UsersAPI.getCalendarPrefs()
+      .then(({ prefs }) => {
+        if (prefs) setVisibleCalendars((prev) => ({ ...prev, ...prefs }));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Save gear filter prefs to DB whenever they change
+  useEffect(() => {
+    UsersAPI.updateCalendarPrefs(visibleCalendars).catch(() => {});
+  }, [visibleCalendars]);
 
   useEffect(() => {
     if (!showFilter) return;
@@ -379,13 +380,27 @@ export default function CalendarView({
     onSelectLead(lead, subView, date);
   };
 
-  // Phase 4: Which calendar options does this user see in the gear panel?
+  // Which calendar options appear in the gear panel?
+  // Admin/master → all three. Role with calendar perms → filtered by role. Fallback → restrictedView logic.
   const gearFilterOptions = useMemo(() => {
     const all = [
       { key: "appointment", label: "Appointments", color: "#3b82f6" },
       { key: "install", label: "Installs", color: "#22c55e" },
       { key: "serviceCall", label: "Service Calls", color: "#fb923c" },
     ];
+    if (isAdminOrMaster) return all;
+
+    const hasCalendarRolePerms = calendarRolePerms &&
+      Object.keys(calendarRolePerms).some((k) => k.startsWith("calendar_"));
+    if (hasCalendarRolePerms) {
+      return all.filter((opt) => {
+        if (opt.key === "appointment") return calendarRolePerms.calendar_appointment !== false;
+        if (opt.key === "install") return calendarRolePerms.calendar_install !== false;
+        if (opt.key === "serviceCall") return calendarRolePerms.calendar_service_call !== false;
+        return true;
+      });
+    }
+
     if (!restrictedView) return all;
     return all.filter((opt) => {
       if (opt.key === "appointment") return amSalesman;
@@ -393,7 +408,7 @@ export default function CalendarView({
       if (opt.key === "serviceCall") return false;
       return true;
     });
-  }, [restrictedView, amSalesman]);
+  }, [isAdminOrMaster, calendarRolePerms, restrictedView, amSalesman]);
 
   // Gear button + dropdown filter panel
   const GearPanel = () => (
