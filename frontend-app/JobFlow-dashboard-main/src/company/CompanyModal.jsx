@@ -119,6 +119,7 @@ setForm({
   bidder_enabled: false,
   service_calls_enabled: false,
   estimator_enabled: false,
+  time_tracking_enabled: false,
   service_area_zips: "",
   est_push_title: "",
   est_push_body: "",
@@ -172,6 +173,7 @@ zip: company.zip || "",
   bidder_enabled: company.bidderEnabled ?? company.bidder_enabled ?? false,
   service_calls_enabled: company.serviceCallsEnabled ?? company.service_calls_enabled ?? false,
   estimator_enabled: company.estimatorEnabled ?? company.estimator_enabled ?? false,
+  time_tracking_enabled: company.timeTrackingEnabled ?? company.time_tracking_enabled ?? false,
   est_push_title: company.est_push_title || company.estPushTitle || "",
   est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
@@ -274,6 +276,7 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         bidder_enabled: form.bidder_enabled,
         service_calls_enabled: form.service_calls_enabled,
         estimator_enabled: form.estimator_enabled,
+        time_tracking_enabled: form.time_tracking_enabled,
         est_push_title: form.est_push_title || null,
         est_push_body: form.est_push_body || null,
         timezone: form.timezone,
@@ -1353,6 +1356,21 @@ const handleSaveTracking = async () => {
                 <div className="text-sm text-gray-600">Enable the embeddable estimator widget for this company</div>
               </div>
             </label>
+
+            {isMasterUser && (
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.time_tracking_enabled}
+                  onChange={(e) => handleChange("time_tracking_enabled", e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">Time Tracking</div>
+                  <div className="text-sm text-gray-600">Enable employee clock-in/out for job costing</div>
+                </div>
+              </label>
+            )}
 
             {form.plan_type === "estimator_only" && (
               <div className="pt-2 space-y-3">

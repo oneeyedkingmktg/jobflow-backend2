@@ -11,6 +11,7 @@ import LeadsHome from "./LeadsHome.jsx";
 import CompaniesHome from "./company/CompaniesHome.jsx";
 import MessagesPage from "./pages/MessagesPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
+import TimeTrackingPage from "./pages/TimeTrackingPage.jsx";
 import PublicProposal from "./pages/PublicProposal.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import "./index.css";
@@ -116,6 +117,7 @@ function AppContent() {
   const isEstimatorOnly = user?.planType === 'estimator_only';
   const reportsEnabled = currentCompany?.reports_enabled === true || currentCompany?.reportsEnabled === true;
   const reportsPermission = usePermission('reports');
+  const timeTrackingEnabled = currentCompany?.timeTrackingEnabled === true || currentCompany?.time_tracking_enabled === true;
 
   // Detect reset token in URL and show reset password screen
   useEffect(() => {
@@ -223,6 +225,8 @@ function AppContent() {
         )
       ) : activeScreen === "reports" ? (
         <ReportsPage />
+      ) : activeScreen === "time" ? (
+        <TimeTrackingPage onBack={() => setActiveScreen("leads")} />
       ) : (
         <LeadsHome currentUser={user} />
       )}
@@ -306,6 +310,31 @@ function AppContent() {
               />
             </svg>
             Reports
+          </button>
+        )}
+
+        {timeTrackingEnabled && (
+          <button
+            onClick={() => setActiveScreen("time")}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition-colors ${
+              activeScreen === "time" ? "text-blue-600" : "text-gray-500"
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={activeScreen === "time" ? 2.5 : 1.8}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            Time
           </button>
         )}
       </nav>

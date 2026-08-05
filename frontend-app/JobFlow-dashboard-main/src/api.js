@@ -432,3 +432,41 @@ export const GhlAPI = {
     return apiRequest(url);
   },
 };
+
+/* ============================================================================
+   TIME TRACKING
+============================================================================ */
+
+export const TimeAPI = {
+  getJobs: (search) => {
+    const url = search ? `/api/time/jobs?search=${encodeURIComponent(search)}` : "/api/time/jobs";
+    return apiRequest(url);
+  },
+
+  clockIn: (data) =>
+    apiRequest("/api/time/clock-in", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  clockOut: (entryId, notes) =>
+    apiRequest(`/api/time/clock-out/${entryId}`, {
+      method: "PUT",
+      body: JSON.stringify(notes ? { notes } : {}),
+    }),
+
+  getToday: () => apiRequest("/api/time/today"),
+
+  getWeek: () => apiRequest("/api/time/week"),
+
+  getLeadEntries: (leadId) => apiRequest(`/api/time/lead/${leadId}`),
+
+  getCompanyEntries: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.userId) q.set("user_id", params.userId);
+    if (params.start) q.set("start", params.start);
+    if (params.end) q.set("end", params.end);
+    const qs = q.toString();
+    return apiRequest(`/api/time/company${qs ? `?${qs}` : ""}`);
+  },
+};

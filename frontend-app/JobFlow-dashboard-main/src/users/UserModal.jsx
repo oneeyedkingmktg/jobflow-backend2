@@ -51,6 +51,7 @@ export default function UserModal({
     sip_incoming_enabled: false,
     is_salesman: false,
     salesman_color: "#6366f1",
+    hourly_cost: "",
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -88,6 +89,7 @@ export default function UserModal({
         service_calls_enabled: user.service_calls_enabled ?? user.serviceCallsEnabled ?? false,
         is_salesman: user.is_salesman ?? user.isSalesman ?? false,
         salesman_color: user.salesman_color || user.salesmanColor || "#6366f1",
+        hourly_cost: user.hourly_cost ?? user.hourlyCost ?? "",
       });
     }
   }, [mode, user, defaultCompanyId]);
@@ -278,6 +280,36 @@ export default function UserModal({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* HOURLY COST (admin/master only, not self) — for job costing only */}
+          {isAdminOrMaster && !isSelf && !isCreate && viewMode === "view" && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-sm font-semibold text-gray-700">Hourly Cost Rate</span>
+              <span className="font-medium text-gray-700">
+                {form.hourly_cost ? `$${parseFloat(form.hourly_cost).toFixed(2)}/hr` : "Not set"}
+              </span>
+            </div>
+          )}
+          {isAdminOrMaster && !isSelf && viewMode === "edit" && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Hourly Cost Rate
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.hourly_cost}
+                  onChange={(e) => handleChange("hourly_cost", e.target.value)}
+                  className="w-full rounded-lg border px-4 py-3 pl-7"
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Internal only — used for job cost calculations. Not visible to this user.</p>
             </div>
           )}
 
