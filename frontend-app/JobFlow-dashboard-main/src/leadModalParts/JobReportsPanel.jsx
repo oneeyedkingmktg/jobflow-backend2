@@ -37,87 +37,250 @@ function fmtHours(minutes) {
 // ============================================================================
 // TIME ENTRIES MODAL
 // ============================================================================
+// ============================================================================
+// TIME ENTRY FORM MODAL — add or edit a single entry (z-[80])
+// ============================================================================
+function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUsers, onSave, onClose }) {
+  const isEdit = !!entry;
+  const totalMin = entry?.duration_minutes || 0;
+  const [form, setForm] = useState({
+    user_id: entry?.user_id ? String(entry.user_id) : "",
+    date: entry ? new Date(entry.clock_in).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    hours: isEdit ? String(Math.floor(totalMin / 60)) : "",
+    minutes: isEdit ? String(totalMin % 60) : "",
+    notes: entry?.notes || "",
+    wage: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    const h = parseInt(form.hours, 10) || 0;
+    const m = parseInt(form.minutes, 10) || 0;
+    if (!isEdit && !form.user_id) { alert("Please select an employee."); return; }
+    if (h + m === 0) { alert("Duration must be greater than 0."); return; }
+    setSaving(true);
+    try {
+      if (isEdit) {
+        await JobReportsAPI.updateTimeEntry(leadId, entry.id, {
+          hours: h, minutes: m, date: form.date, notes: form.notes || null,
+        }, companyId);
+      } else {
+        await JobReportsAPI.addManualTime(leadId, {
+          user_id: parseInt(form.user_id, 10),
+          date: form.date,
+          hours: h,
+          minutes: m,
+          notes: form.notes || null,
+          wage: form.wage !== "" ? parseFloat(form.wage) : undefined,
+        }, companyId);
+      }
+      onSave();
+    } catch (err) {
+      alert(err.message || "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900 text-base">{isEdit ? "Edit Time Entry" : "Add Time Entry"}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+
+        {/* Employee */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">Employee</label>
+          {isEdit ? (
+            <div className="text-sm font-semibold text-gray-800 px-3 py-2 bg-gray-50 rounded-xl">{entry.user_name}</div>
+          ) : loadingUsers ? (
+            <div className="text-xs text-gray-400 py-2">Loading…</div>
+          ) : (
+            <select value={form.user_id} onChange={(e) => {
+              const uid = e.target.value;
+              const sel = companyUsers.find((u) => String(u.id) === uid);
+              setForm((f) => ({ ...f, user_id: uid, wage: sel?.hourly_cost ? String(sel.hourly_cost) : f.wage }));
+            }} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
+              <option value="">Select employee…</option>
+              {companyUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* Date */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">Date</label>
+          <input type="date" value={form.date}
+            onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+        </div>
+
+        {/* Hours + Minutes */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Hours</label>
+            <input type="number" min="0" placeholder="0" value={form.hours}
+              onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Minutes</label>
+            <input type="number" min="0" max="59" placeholder="0" value={form.minutes}
+              onChange={(e) => setForm((f) => ({ ...f, minutes: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+          </div>
+        </div>
+
+        {/* Wage (add only) */}
+        {!isEdit && (
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Wage / hr ($)</label>
+            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.wage}
+              onChange={(e) => setForm((f) => ({ ...f, wage: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+          </div>
+        )}
+
+        {/* Notes */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 block mb-1">Notes (optional)</label>
+          <input type="text" placeholder="Description of work…" value={form.notes}
+            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100">
+            Cancel
+          </button>
+          <button type="button" onClick={handleSubmit} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 disabled:opacity-50">
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Entry"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// TIME LOG MODAL — full entry list with edit/delete (z-[80])
+// ============================================================================
+function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, onClose, onUpdate }) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editEntry, setEditEntry] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await JobReportsAPI.getTimeEntries(leadId, companyId);
+      setEntries(data.entries || []);
+    } catch (err) {
+      console.error("Load time log error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [leadId, companyId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this time entry?")) return;
+    try {
+      await JobReportsAPI.deleteTimeEntry(leadId, id, companyId);
+      await load();
+      onUpdate();
+    } catch (err) {
+      alert(err.message || "Failed to delete.");
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
+          style={{ maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-900 text-base">Time Log</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+          </div>
+          <div className="px-5 pb-6 pt-3">
+            {loading ? (
+              <div className="text-center py-6 text-gray-400 text-sm">Loading…</div>
+            ) : entries.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-6">No time entries yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {entries.map((e) => {
+                  const dateLabel = new Date(e.clock_in).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                  return (
+                    <div key={e.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-800">{e.user_name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{dateLabel} · {fmtHours(e.duration_minutes)}</div>
+                        {e.notes && <div className="text-xs text-gray-400 italic mt-0.5 truncate">{e.notes}</div>}
+                      </div>
+                      <div className="flex gap-3 shrink-0 mt-0.5">
+                        <button onClick={() => setEditEntry(e)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                        <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button type="button" onClick={() => setShowAdd(true)}
+              className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition">
+              + Add Entry
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {(editEntry || showAdd) && (
+        <TimeEntryFormModal
+          leadId={leadId}
+          companyId={companyId}
+          entry={editEntry || null}
+          companyUsers={companyUsers}
+          loadingUsers={loadingUsers}
+          onSave={async () => { setEditEntry(null); setShowAdd(false); await load(); onUpdate(); }}
+          onClose={() => { setEditEntry(null); setShowAdd(false); }}
+        />
+      )}
+    </>
+  );
+}
+
+// ============================================================================
+// TIME ENTRIES MODAL — clean aggregate view (z-[70])
+// ============================================================================
 function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange }) {
   const [rows, setRows] = useState(
     employees.map((e) => ({ ...e, wageInput: e.effective_wage > 0 ? String(e.effective_wage) : "" }))
   );
   const [saving, setSaving] = useState({});
-  const [showManualForm, setShowManualForm] = useState(false);
   const [companyUsers, setCompanyUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [manualForm, setManualForm] = useState({
-    user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "",
-  });
-  const [savingManual, setSavingManual] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
 
-  // Individual entry list
-  const [entries, setEntries] = useState([]);
-  const [loadingEntries, setLoadingEntries] = useState(true);
-  const [editEntryId, setEditEntryId] = useState(null);
-  const [editEntryForm, setEditEntryForm] = useState({ date: "", hours: "", minutes: "", notes: "" });
-  const [savingEntry, setSavingEntry] = useState(false);
-
-  const loadEntries = useCallback(async () => {
-    try {
-      const data = await JobReportsAPI.getTimeEntries(leadId, companyId);
-      setEntries(data.entries || []);
-    } catch (err) {
-      console.error("Load entries error:", err);
-    } finally {
-      setLoadingEntries(false);
-    }
-  }, [leadId, companyId]);
-
-  useEffect(() => { loadEntries(); }, [loadEntries]);
-
-  const startEditEntry = (e) => {
-    const d = new Date(e.clock_in);
-    const dateStr = d.toISOString().slice(0, 10);
-    const totalMin = e.duration_minutes || 0;
-    setEditEntryId(e.id);
-    setEditEntryForm({
-      date: dateStr,
-      hours: String(Math.floor(totalMin / 60)),
-      minutes: String(totalMin % 60),
-      notes: e.notes || "",
-    });
-  };
-
-  const handleSaveEntry = async (entryId) => {
-    const h = parseInt(editEntryForm.hours, 10) || 0;
-    const m = parseInt(editEntryForm.minutes, 10) || 0;
-    if (h + m === 0) { alert("Duration must be greater than 0."); return; }
-    setSavingEntry(true);
-    try {
-      await JobReportsAPI.updateTimeEntry(leadId, entryId, {
-        hours: h, minutes: m, date: editEntryForm.date, notes: editEntryForm.notes || null,
-      }, companyId);
-      setEditEntryId(null);
-      await loadEntries();
-      onWageChange();
-    } catch (err) {
-      alert(err.message || "Failed to save entry.");
-    } finally {
-      setSavingEntry(false);
-    }
-  };
-
-  const handleDeleteEntry = async (entryId) => {
-    if (!window.confirm("Delete this time entry?")) return;
-    try {
-      await JobReportsAPI.deleteTimeEntry(leadId, entryId, companyId);
-      await loadEntries();
-      onWageChange();
-    } catch (err) {
-      alert(err.message || "Failed to delete entry.");
-    }
-  };
+  useEffect(() => {
+    setLoadingUsers(true);
+    JobReportsAPI.getUsers(companyId)
+      .then((data) => setCompanyUsers(data.users || []))
+      .catch(() => {})
+      .finally(() => setLoadingUsers(false));
+  }, [companyId]);
 
   const handleWageBlur = async (emp, idx) => {
     const newWage = parseFloat(rows[idx].wageInput);
     if (isNaN(newWage) || newWage < 0) return;
     if (newWage === emp.effective_wage && emp.has_override) return;
-
     setSaving((s) => ({ ...s, [emp.user_id]: true }));
     try {
       await JobReportsAPI.setLaborOverride(leadId, emp.user_id, newWage, companyId);
@@ -132,295 +295,95 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
   const setWageInput = (idx, val) =>
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, wageInput: val } : r)));
 
-  const openManualForm = async () => {
-    setShowManualForm(true);
-    if (companyUsers.length > 0) return;
-    setLoadingUsers(true);
-    try {
-      const data = await JobReportsAPI.getUsers(companyId);
-      setCompanyUsers(data.users || []);
-    } catch (err) {
-      console.error("Load users error:", err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    if (!manualForm.user_id || (!manualForm.hours && !manualForm.minutes)) return;
-    setSavingManual(true);
-    try {
-      await JobReportsAPI.addManualTime(leadId, {
-        user_id: parseInt(manualForm.user_id, 10),
-        date: manualForm.date,
-        hours: parseInt(manualForm.hours, 10) || 0,
-        minutes: parseInt(manualForm.minutes, 10) || 0,
-        notes: manualForm.notes || null,
-        wage: manualForm.wage !== "" ? parseFloat(manualForm.wage) : undefined,
-      }, companyId);
-      setShowManualForm(false);
-      setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "" });
-      await loadEntries();
-      onWageChange(); // closes modal + refreshes summary
-    } catch (err) {
-      console.error("Manual entry error:", err);
-      alert(err.message || "Failed to add time entry. Please try again.");
-    } finally {
-      setSavingManual(false);
-    }
-  };
-
   const computedTotal = rows.reduce((sum, e) => {
     const wage = parseFloat(e.wageInput) || 0;
     return sum + ((parseInt(e.total_minutes, 10) || 0) / 60) * wage;
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
-        style={{ maxHeight: "85vh", overflowY: "auto" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900 text-base">Time Entries by Employee</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-        </div>
+    <>
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
+          style={{ maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-bold text-gray-900 text-base">Time Entries by Employee</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+          </div>
 
-        <div className="px-5 pb-6 pt-3">
-          {rows.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-6">
-              No clocked time entries for this job yet.
-            </p>
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-gray-400 pb-2 mb-1">
-                <span className="col-span-1">Employee</span>
-                <span className="text-center">Hours</span>
-                <span className="text-center">Wage/hr</span>
-                <span className="text-right">Subtotal</span>
-              </div>
-
-              {rows.map((emp, idx) => {
-                const hrs = (parseInt(emp.total_minutes, 10) || 0) / 60;
-                const wage = parseFloat(emp.wageInput) || 0;
-                return (
-                  <div key={emp.user_id} className="grid grid-cols-4 gap-2 items-center py-3 border-b border-gray-50">
-                    <span className="text-sm text-gray-800 font-medium truncate col-span-1">{emp.user_name}</span>
-                    <span className="text-sm text-gray-700 text-center">{fmtHours(emp.total_minutes)}</span>
-                    <div className="flex items-center justify-center">
-                      <span className="text-gray-400 text-xs mr-0.5">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={emp.wageInput}
-                        onChange={(e) => setWageInput(idx, e.target.value)}
-                        onBlur={() => handleWageBlur(emp, idx)}
-                        className="w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400"
-                        disabled={!!saving[emp.user_id]}
-                        placeholder="0"
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
-                  </div>
-                );
-              })}
-
-              <div className="flex justify-between items-center pt-3 mt-1 mb-4">
-                <span className="font-semibold text-gray-700 text-sm">Total Labor Cost</span>
-                <span className="font-bold text-gray-900">{fmtMoney(computedTotal)}</span>
-              </div>
-            </>
-          )}
-
-          {/* Individual entries list */}
-          <div className="mb-4">
-            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">All Entries</div>
-            {loadingEntries ? (
-              <div className="text-xs text-gray-400 py-2 text-center">Loading…</div>
-            ) : entries.length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">No entries yet.</div>
+          <div className="px-5 pb-6 pt-3">
+            {rows.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-6">No time entries for this job yet.</p>
             ) : (
-              <div className="space-y-2">
-                {entries.map((e) => {
-                  const dateLabel = new Date(e.clock_in).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              <>
+                <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-gray-400 pb-2 mb-1">
+                  <span className="col-span-1">Employee</span>
+                  <span className="text-center">Hours</span>
+                  <span className="text-center">Wage/hr</span>
+                  <span className="text-right">Subtotal</span>
+                </div>
+                {rows.map((emp, idx) => {
+                  const hrs = (parseInt(emp.total_minutes, 10) || 0) / 60;
+                  const wage = parseFloat(emp.wageInput) || 0;
                   return (
-                    <div key={e.id} className="bg-gray-50 rounded-xl px-3 py-2.5">
-                      {editEntryId === e.id ? (
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
-                            <input type="date" value={editEntryForm.date}
-                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, date: ev.target.value }))}
-                              className="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs" />
-                            <input type="number" min="0" placeholder="hrs" value={editEntryForm.hours}
-                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, hours: ev.target.value }))}
-                              className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center" />
-                            <input type="number" min="0" max="59" placeholder="min" value={editEntryForm.minutes}
-                              onChange={(ev) => setEditEntryForm((f) => ({ ...f, minutes: ev.target.value }))}
-                              className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center" />
-                          </div>
-                          <input type="text" placeholder="Notes (optional)" value={editEntryForm.notes}
-                            onChange={(ev) => setEditEntryForm((f) => ({ ...f, notes: ev.target.value }))}
-                            className="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs" />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveEntry(e.id)} disabled={savingEntry}
-                              className="flex-1 py-1 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
-                              {savingEntry ? "Saving…" : "Save"}
-                            </button>
-                            <button onClick={() => setEditEntryId(null)}
-                              className="flex-1 py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-300">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-semibold text-gray-800">{e.user_name}</span>
-                            <span className="text-xs text-gray-400 mx-1.5">·</span>
-                            <span className="text-xs text-gray-500">{dateLabel}</span>
-                            <span className="text-xs text-gray-400 mx-1.5">·</span>
-                            <span className="text-xs text-gray-700">{fmtHours(e.duration_minutes)}</span>
-                            {e.notes && <div className="text-xs text-gray-400 italic mt-0.5 truncate">{e.notes}</div>}
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <button onClick={() => startEditEntry(e)}
-                              className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
-                            <button onClick={() => handleDeleteEntry(e.id)}
-                              className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
-                          </div>
-                        </div>
-                      )}
+                    <div key={emp.user_id} className="grid grid-cols-4 gap-2 items-center py-3 border-b border-gray-50">
+                      <span className="text-sm text-gray-800 font-medium truncate col-span-1">{emp.user_name}</span>
+                      <span className="text-sm text-gray-700 text-center">{fmtHours(emp.total_minutes)}</span>
+                      <div className="flex items-center justify-center">
+                        <span className="text-gray-400 text-xs mr-0.5">$</span>
+                        <input type="number" min="0" step="0.01" value={emp.wageInput} placeholder="0"
+                          onChange={(e) => setWageInput(idx, e.target.value)}
+                          onBlur={() => handleWageBlur(emp, idx)}
+                          className="w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400"
+                          disabled={!!saving[emp.user_id]} />
+                      </div>
+                      <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
                     </div>
                   );
                 })}
-              </div>
+                <div className="flex justify-between items-center pt-3 mt-1">
+                  <span className="font-semibold text-gray-700 text-sm">Total Labor Cost</span>
+                  <span className="font-bold text-gray-900">{fmtMoney(computedTotal)}</span>
+                </div>
+              </>
             )}
-          </div>
 
-          {/* Manual time entry */}
-          {showManualForm ? (
-            <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-3">
-              <div className="font-semibold text-sm text-gray-800">Add Manual Entry</div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Employee</label>
-                {loadingUsers ? (
-                  <div className="text-xs text-gray-400 py-2">Loading employees…</div>
-                ) : (
-                  <select
-                    value={manualForm.user_id}
-                    onChange={(e) => {
-                      const uid = e.target.value;
-                      const selected = companyUsers.find((u) => String(u.id) === uid);
-                      setManualForm((f) => ({
-                        ...f,
-                        user_id: uid,
-                        wage: selected?.hourly_cost ? String(selected.hourly_cost) : f.wage,
-                      }));
-                    }}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  >
-                    <option value="">Select employee…</option>
-                    {companyUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={manualForm.date}
-                  onChange={(e) => setManualForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Hours</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="23"
-                    placeholder="0"
-                    value={manualForm.hours}
-                    onChange={(e) => setManualForm((f) => ({ ...f, hours: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Minutes</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="59"
-                    placeholder="0"
-                    value={manualForm.minutes}
-                    onChange={(e) => setManualForm((f) => ({ ...f, minutes: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Wage / hr ($)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={manualForm.wage}
-                  onChange={(e) => setManualForm((f) => ({ ...f, wage: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  placeholder="Description of work…"
-                  value={manualForm.notes}
-                  onChange={(e) => setManualForm((f) => ({ ...f, notes: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => { setShowManualForm(false); setManualForm({ user_id: "", date: new Date().toISOString().slice(0, 10), hours: "", minutes: "", notes: "", wage: "" }); }}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleManualSubmit}
-                  disabled={savingManual || !manualForm.user_id || (parseInt(manualForm.hours) || 0) + (parseInt(manualForm.minutes) || 0) === 0}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {savingManual ? "Saving…" : "Add Entry"}
-                </button>
-              </div>
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowAddModal(true)}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">
+                + Add Entry
+              </button>
+              <button type="button" onClick={() => setShowLogModal(true)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition">
+                View Time Log
+              </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={openManualForm}
-              className="w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition"
-            >
-              + Add Manual Entry
-            </button>
-          )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {showAddModal && (
+        <TimeEntryFormModal
+          leadId={leadId}
+          companyId={companyId}
+          entry={null}
+          companyUsers={companyUsers}
+          loadingUsers={loadingUsers}
+          onSave={() => { setShowAddModal(false); onWageChange(); }}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {showLogModal && (
+        <TimeLogModal
+          leadId={leadId}
+          companyId={companyId}
+          companyUsers={companyUsers}
+          loadingUsers={loadingUsers}
+          onClose={() => setShowLogModal(false)}
+          onUpdate={onWageChange}
+        />
+      )}
+    </>
   );
 }
 
