@@ -607,8 +607,8 @@ export default function JobReportsPanel({ lead, onClose }) {
             {/* Job Details */}
             <div className="bg-gray-50 rounded-2xl border border-gray-200 px-4 py-4">
               <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2">Job Details</div>
-              <div className="font-bold text-gray-900 text-base">{summary.lead.name}</div>
-              <div className="text-sm text-gray-500 mt-0.5">{formatProjectType(summary.lead.project_type)}</div>
+              <div className="font-bold text-gray-900 text-base">{summary.job.name}</div>
+              <div className="text-sm text-gray-500 mt-0.5">{formatProjectType(summary.job.project_type)}</div>
             </div>
 
             {/* Labor */}

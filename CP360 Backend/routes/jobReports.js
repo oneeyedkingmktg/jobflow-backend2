@@ -217,7 +217,7 @@ router.get("/:leadId/summary", async (req, res) => {
     const marginPct = contractPrice > 0 ? (grossProfit / contractPrice) * 100 : 0;
 
     res.json({
-      lead: {
+      job: {
         id: lead.id,
         name: lead.name,
         project_type: lead.project_type,
