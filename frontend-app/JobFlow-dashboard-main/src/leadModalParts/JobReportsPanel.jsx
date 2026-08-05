@@ -413,13 +413,17 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
   };
 
   const handleSaveEdit = async (itemId) => {
+    const qtyNum = parseFloat(editForm.qty);
+    const costNum = parseFloat(editForm.unit_cost);
+    if (isNaN(qtyNum) || qtyNum <= 0) { alert("Qty must be a number greater than 0."); return; }
+    if (isNaN(costNum) || costNum < 0) { alert("Unit cost must be a valid number."); return; }
     setSavingEdit(true);
     try {
       await JobReportsAPI.updateMaterial(leadId, itemId, {
         name: editForm.name.trim() || undefined,
-        qty: parseFloat(editForm.qty) || undefined,
+        qty: qtyNum,
         unit: editForm.unit || undefined,
-        unit_cost: parseFloat(editForm.unit_cost) !== undefined ? parseFloat(editForm.unit_cost) : undefined,
+        unit_cost: costNum,
         notes: editForm.notes || undefined,
       }, companyId);
       setEditingId(null);
@@ -427,6 +431,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
       onUpdate();
     } catch (err) {
       console.error("Edit material error:", err);
+      alert(err.message || "Failed to save changes.");
     } finally {
       setSavingEdit(false);
     }
