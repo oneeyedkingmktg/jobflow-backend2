@@ -495,6 +495,12 @@ export const JobReportsAPI = {
       body: JSON.stringify(data),
     }),
 
+  updateMaterial: (leadId, itemId, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/materials/${itemId}`, companyId), {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   deleteMaterial: (leadId, itemId, companyId) =>
     apiRequest(cqUrl(`/api/job-reports/${leadId}/materials/${itemId}`, companyId), {
       method: "DELETE",
