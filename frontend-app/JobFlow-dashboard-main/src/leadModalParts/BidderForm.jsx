@@ -1207,7 +1207,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     </div>
                   );
                 })()}
-                )}
               </div>
               <div className="px-6 pb-4 border-t pt-3">
                 <p className="text-xs text-gray-400 text-center">Opens in a new tab — use browser Print → Save as PDF</p>
