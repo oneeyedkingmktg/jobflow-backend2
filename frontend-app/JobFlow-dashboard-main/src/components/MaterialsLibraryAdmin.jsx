@@ -3,12 +3,14 @@ import { JobReportsAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 
-export default function MaterialsLibraryAdmin({ onBack }) {
+export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId }) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
-  const companyId = user?.role === "master"
-    ? (currentCompany?.id || currentCompany?.companyId || null)
-    : null;
+  const companyId = propCompanyId != null
+    ? propCompanyId
+    : user?.role === "master"
+      ? (currentCompany?.id || currentCompany?.companyId || null)
+      : null;
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,15 +149,17 @@ export default function MaterialsLibraryAdmin({ onBack }) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-white shrink-0">
-        <button onClick={onBack} className="text-gray-500 hover:text-gray-700 p-1">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <h2 className="text-lg font-bold text-gray-900">Materials Library</h2>
-      </div>
+      {/* Header — only shown when used as standalone screen */}
+      {onBack && (
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 bg-white shrink-0">
+          <button onClick={onBack} className="text-gray-500 hover:text-gray-700 p-1">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 className="text-lg font-bold text-gray-900">Materials Library</h2>
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">

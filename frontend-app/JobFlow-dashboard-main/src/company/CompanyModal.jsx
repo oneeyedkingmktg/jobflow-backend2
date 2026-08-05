@@ -12,6 +12,7 @@ import UsersHome from "../users/UsersHome";
 import EstimatorPricingModal from "./EstimatorPricingModal";
 import EstimatorMasterModal from "./EstimatorMasterModal";
 import BidderAdminSettings from "./BidderAdminSettings";
+import MaterialsLibraryAdmin from "../components/MaterialsLibraryAdmin";
 
 // Phone formatter utility
 const formatPhoneNumber = (value) => {
@@ -1728,6 +1729,18 @@ setTrackingForm({
                 Bidder
               </button>
             )}
+
+            {(isMasterUser || isAdminUser) && !isCreate && (
+              <button
+                className={sectionBtn(activeSection === "job_reports")}
+                onClick={() => {
+                  setActiveSection("job_reports");
+                  setSectionMode("view");
+                }}
+              >
+                Job Reports
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -1743,6 +1756,10 @@ setTrackingForm({
 
 {activeSection === "bidder" && (
   <BidderAdminSettings companyId={company?.id} />
+)}
+
+{activeSection === "job_reports" && (
+  <MaterialsLibraryAdmin companyId={company?.id} />
 )}
 
 {activeSection === "reports" && renderReports()}
