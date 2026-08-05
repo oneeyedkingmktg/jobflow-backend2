@@ -99,14 +99,8 @@ router.get("/jobs", async (req, res) => {
            AND l.deleted_at IS NULL
            AND l.status NOT IN ('lost')
            ${assignmentFilter}
-           AND (
-             l.appointment_date BETWEEN CURRENT_DATE - 7 AND CURRENT_DATE + 3
-             OR l.install_date BETWEEN CURRENT_DATE - 7 AND CURRENT_DATE + 3
-           )
-         ORDER BY LEAST(
-           COALESCE(l.appointment_date, '9999-12-31'),
-           COALESCE(l.install_date, '9999-12-31')
-         ) ASC`,
+           AND l.install_date BETWEEN CURRENT_DATE - 7 AND CURRENT_DATE + 3
+         ORDER BY l.install_date ASC`,
         params
       );
       jobs = jobResult.rows;

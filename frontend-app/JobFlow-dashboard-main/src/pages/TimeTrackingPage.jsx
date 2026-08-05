@@ -311,11 +311,7 @@ export default function TimeTrackingPage({ onBack }) {
                   <>
                     <SectionLabel>Jobs on Your Schedule</SectionLabel>
                     {jobs.map((j) => {
-                      const datePart = j.appointment_date
-                        ? `Appt ${fmtDate(j.appointment_date)}`
-                        : j.install_date
-                        ? `Install ${fmtDate(j.install_date)}`
-                        : "";
+                      const datePart = j.install_date ? `Install ${fmtDate(j.install_date)}` : "";
                       return (
                         <JobRow
                           key={j.id}
