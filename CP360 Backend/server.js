@@ -369,13 +369,15 @@ async function runMigrations() {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_cost DECIMAL(8,2)`,
     // Time tracking — ensure table exists (no FK constraints to avoid any cross-table dependency at migration time)
     `CREATE TABLE IF NOT EXISTS time_entries (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT NOW())`,
+    // Drop any stray/wrongly-named columns from failed prior migrations
+    `ALTER TABLE time_entries DROP COLUMN IF EXISTS job_id`,
     // Add every column individually so this is fully idempotent regardless of prior migration state
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS company_id INTEGER`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS user_id INTEGER`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS lead_id INTEGER`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS service_call_id INTEGER`,
-    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS work_type VARCHAR(20) NOT NULL DEFAULT 'job'`,
-    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS work_type VARCHAR(20) DEFAULT 'job'`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ DEFAULT NOW()`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out TIMESTAMPTZ`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS notes TEXT`,
