@@ -189,8 +189,8 @@ router.post("/clock-in", async (req, res) => {
     }
 
     const result = await db.query(
-      `INSERT INTO time_entries (company_id, user_id, lead_id, service_call_id, work_type, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO time_entries (company_id, user_id, lead_id, service_call_id, work_type, clock_in, notes)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6)
        RETURNING id, company_id, user_id, lead_id, service_call_id, work_type, clock_in, clock_out, duration_minutes, notes`,
       [companyId, userId, lead_id || null, service_call_id || null, work_type, notes || null]
     );
