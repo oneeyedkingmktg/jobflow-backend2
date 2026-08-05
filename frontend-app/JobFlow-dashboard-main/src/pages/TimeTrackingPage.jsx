@@ -22,7 +22,8 @@ function fmtTime(ts) {
 
 function fmtDate(dateStr) {
   if (!dateStr) return "";
-  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const d = String(dateStr).slice(0, 10);
+  return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function fmtDay(ts) {
