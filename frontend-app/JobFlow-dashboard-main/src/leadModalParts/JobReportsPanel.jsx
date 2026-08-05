@@ -408,6 +408,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: "", qty: "", unit: "", unit_cost: "", notes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [libSearch, setLibSearch] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -479,6 +480,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
       setSelectedCatId("");
       setSelectedItemId("");
       setAddMode("library");
+      setLibSearch("");
       await load();
       onUpdate();
     } catch (err) {
@@ -529,9 +531,12 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
     }
   };
 
-  const catItems = selectedCatId
-    ? (library.categories.find((c) => String(c.id) === String(selectedCatId))?.items || [])
-    : [];
+  const filteredCats = (() => {
+    const q = libSearch.trim().toLowerCase();
+    return library.categories
+      .map((c) => ({ ...c, filteredItems: (c.items || []).filter((i) => !q || i.name.toLowerCase().includes(q)) }))
+      .filter((c) => c.filteredItems.length > 0);
+  })();
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -671,6 +676,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                     setForm((f) => ({ ...f, name: "", unit: "", unit_cost: "" }));
                     setSelectedCatId("");
                     setSelectedItemId("");
+                    setLibSearch("");
                   }}
                   className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition ${
                     addMode === "custom"
@@ -707,39 +713,43 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                     </div>
                   ) : (
                     <>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600 block mb-1">Category</label>
-                        <select
-                          value={selectedCatId}
-                          onChange={(e) => {
-                            setSelectedCatId(e.target.value);
-                            setSelectedItemId("");
-                            setForm((f) => ({ ...f, name: "", unit: "", unit_cost: "" }));
-                          }}
-                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                        >
-                          <option value="">Select category…</option>
-                          {library.categories.map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {selectedCatId && (
-                        <div>
-                          <label className="text-xs font-semibold text-gray-600 block mb-1">Item</label>
-                          <select
-                            value={selectedItemId}
-                            onChange={(e) => handleLibraryItemSelect(e.target.value)}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                          >
-                            <option value="">Select item…</option>
-                            {catItems.map((i) => (
-                              <option key={i.id} value={i.id}>
-                                {i.name}{i.unit ? ` (${i.unit})` : ""}
-                              </option>
+                      <input
+                        type="text"
+                        placeholder="Search items…"
+                        value={libSearch}
+                        onChange={(e) => setLibSearch(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                      />
+                      <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white">
+                        {filteredCats.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-4">No items match.</p>
+                        ) : filteredCats.map((cat) => (
+                          <div key={cat.id}>
+                            <div className="px-3 py-1.5 bg-gray-50 text-xs font-semibold text-gray-400 uppercase tracking-wide sticky top-0 border-b border-gray-100">
+                              {cat.name}
+                            </div>
+                            {cat.filteredItems.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleLibraryItemSelect(String(item.id))}
+                                className={`w-full text-left px-4 py-2.5 flex justify-between items-center border-b border-gray-50 last:border-0 transition ${
+                                  String(item.id) === selectedItemId
+                                    ? "bg-blue-50 text-blue-700"
+                                    : "hover:bg-gray-50 text-gray-800"
+                                }`}
+                              >
+                                <span className="text-sm font-medium">{item.name}</span>
+                                <span className="text-xs text-gray-400 shrink-0 ml-2">
+                                  {item.unit || "ea"}{parseFloat(item.default_cost) > 0 ? ` · $${parseFloat(item.default_cost).toFixed(2)}` : ""}
+                                </span>
+                              </button>
                             ))}
-                          </select>
-                        </div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedItemId && (
+                        <p className="text-xs text-blue-600 font-medium -mt-1">✓ {form.name} selected</p>
                       )}
                     </>
                   )}
@@ -868,6 +878,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                     setSelectedCatId("");
                     setSelectedItemId("");
                     setAddMode("library");
+                    setLibSearch("");
                   }}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100"
                 >
