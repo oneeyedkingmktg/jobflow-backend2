@@ -99,7 +99,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
       onWageChange(); // closes modal + refreshes summary
     } catch (err) {
       console.error("Manual entry error:", err);
-      alert("Failed to add time entry. Please try again.");
+      alert(err.message || "Failed to add time entry. Please try again.");
     } finally {
       setSavingManual(false);
     }
@@ -251,7 +251,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
                 <button
                   type="button"
                   onClick={handleManualSubmit}
-                  disabled={savingManual || !manualForm.user_id || (!manualForm.hours && !manualForm.minutes)}
+                  disabled={savingManual || !manualForm.user_id || (parseInt(manualForm.hours) || 0) + (parseInt(manualForm.minutes) || 0) === 0}
                   className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
                   {savingManual ? "Saving…" : "Add Entry"}
@@ -291,6 +291,9 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
   const [newCatName, setNewCatName] = useState("");
   const [addingCat, setAddingCat] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", qty: "", unit: "", unit_cost: "", notes: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -382,6 +385,31 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
     }
   };
 
+  const startEdit = (m) => {
+    setEditingId(m.id);
+    setEditForm({ name: m.name, qty: String(parseFloat(m.qty)), unit: m.unit || "", unit_cost: String(parseFloat(m.unit_cost)), notes: m.notes || "" });
+  };
+
+  const handleSaveEdit = async (itemId) => {
+    setSavingEdit(true);
+    try {
+      await JobReportsAPI.updateMaterial(leadId, itemId, {
+        name: editForm.name.trim() || undefined,
+        qty: parseFloat(editForm.qty) || undefined,
+        unit: editForm.unit || undefined,
+        unit_cost: parseFloat(editForm.unit_cost) !== undefined ? parseFloat(editForm.unit_cost) : undefined,
+        notes: editForm.notes || undefined,
+      }, companyId);
+      setEditingId(null);
+      await load();
+      onUpdate();
+    } catch (err) {
+      console.error("Edit material error:", err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const catItems = selectedCatId
     ? (library.categories.find((c) => String(c.id) === String(selectedCatId))?.items || [])
     : [];
@@ -405,24 +433,91 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
           ) : materials.length > 0 ? (
             <div className="space-y-2">
               {materials.map((m) => (
-                <div key={m.id} className="bg-gray-50 rounded-xl px-4 py-3 flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-gray-900">{m.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {parseFloat(m.qty)} {m.unit || "ea"} ×{" "}
-                      {fmtMoney(m.unit_cost)} ={" "}
-                      <span className="font-semibold text-gray-700">{fmtMoney(m.total)}</span>
+                <div key={m.id} className="bg-gray-50 rounded-xl px-4 py-3">
+                  {editingId === m.id ? (
+                    <div className="space-y-2">
+                      <input
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                        placeholder="Item name"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                          placeholder="Qty"
+                          type="number"
+                          min="0"
+                          value={editForm.qty}
+                          onChange={(e) => setEditForm((f) => ({ ...f, qty: e.target.value }))}
+                        />
+                        <input
+                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                          placeholder="Unit"
+                          value={editForm.unit}
+                          onChange={(e) => setEditForm((f) => ({ ...f, unit: e.target.value }))}
+                        />
+                        <input
+                          className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                          placeholder="Unit cost"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editForm.unit_cost}
+                          onChange={(e) => setEditForm((f) => ({ ...f, unit_cost: e.target.value }))}
+                        />
+                      </div>
+                      <input
+                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                        placeholder="Notes (optional)"
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleSaveEdit(m.id)}
+                          disabled={savingEdit}
+                          className="flex-1 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {savingEdit ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="flex-1 py-1.5 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    {m.notes && (
-                      <div className="text-xs text-gray-400 mt-0.5 italic">{m.notes}</div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDelete(m.id)}
-                    className="text-red-400 hover:text-red-600 text-xs shrink-0 mt-0.5 font-medium"
-                  >
-                    Remove
-                  </button>
+                  ) : (
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-gray-900">{m.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {parseFloat(m.qty)} {m.unit || "ea"} ×{" "}
+                          {fmtMoney(m.unit_cost)} ={" "}
+                          <span className="font-semibold text-gray-700">{fmtMoney(m.total)}</span>
+                        </div>
+                        {m.notes && (
+                          <div className="text-xs text-gray-400 mt-0.5 italic">{m.notes}</div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 shrink-0 mt-0.5">
+                        <button
+                          onClick={() => startEdit(m)}
+                          className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          className="text-red-400 hover:text-red-600 text-xs font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
