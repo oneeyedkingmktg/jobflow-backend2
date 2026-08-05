@@ -14,6 +14,7 @@ import UserProfileModal from "./UserProfileModal";
 import NotificationSettings from "./components/NotificationSettings";
 import BidderMasterAdmin from "./components/BidderMasterAdmin";
 import CalendarsSettings from "./components/CalendarsSettings";
+import MaterialsLibraryAdmin from "./components/MaterialsLibraryAdmin";
 
 export default function SettingsModal({ onClose }) {
   const { logout, isMaster, user } = useAuth();
@@ -39,6 +40,7 @@ export default function SettingsModal({ onClose }) {
   const openSuperAdmin = () => setScreen("superadmin");
   const openBidderAdmin = () => setScreen("bidder_admin");
   const openCalendars = () => setScreen("ghl_calendars");
+  const openMaterialsLibrary = () => setScreen("materials_library");
 
   const handleBack = () => {
     if (screen === "company_details") return setScreen("manage_companies");
@@ -133,6 +135,15 @@ const renderHome = () => (
             className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
           >
             Bidder Admin
+          </button>
+        )}
+
+        {(isMaster() || user?.role === "admin") && (
+          <button
+            onClick={openMaterialsLibrary}
+            className="w-full px-6 py-4 bg-gray-100 border border-gray-300 text-gray-900 font-medium rounded-xl hover:bg-gray-200"
+          >
+            Materials Library
           </button>
         )}
 
@@ -259,6 +270,10 @@ const renderHome = () => (
 
     case "bidder_admin":
       content = <BidderMasterAdmin onBack={handleBack} />;
+      break;
+
+    case "materials_library":
+      content = <MaterialsLibraryAdmin onBack={handleBack} />;
       break;
 
     default:

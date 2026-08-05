@@ -521,9 +521,21 @@ export const JobReportsAPI = {
       body: JSON.stringify(data),
     }),
 
+  updateCategory: (id, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/library/categories/${id}`, companyId), {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   deleteCategory: (id, companyId) =>
     apiRequest(cqUrl(`/api/job-reports/library/categories/${id}`, companyId), {
       method: "DELETE",
+    }),
+
+  updateItem: (id, data, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/library/items/${id}`, companyId), {
+      method: "PUT",
+      body: JSON.stringify(data),
     }),
 
   deleteItem: (id, companyId) =>
