@@ -531,6 +531,21 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
     }
   };
 
+  const groupedMaterials = (() => {
+    const groups = {};
+    for (const m of materials) {
+      const key = m.category_name || null;
+      if (!groups[key]) groups[key] = { category: key, items: [] };
+      groups[key].items.push(m);
+    }
+    return Object.values(groups).sort((a, b) => {
+      if (!a.category && b.category) return 1;
+      if (a.category && !b.category) return -1;
+      return (a.category || "").localeCompare(b.category || "");
+    });
+  })();
+  const showCatHeaders = groupedMaterials.length > 1;
+
   const filteredCats = (() => {
     const q = libSearch.trim().toLowerCase();
     return library.categories
@@ -556,7 +571,15 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
             <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
           ) : materials.length > 0 ? (
             <div className="space-y-2">
-              {materials.map((m) => (
+              {groupedMaterials.map(({ category, items }) => (
+                <div key={category || "__custom__"}>
+                  {showCatHeaders && (
+                    <div className="px-1 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                      {category || "Custom"}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                  {items.map((m) => (
                 <div key={m.id} className="bg-gray-50 rounded-xl px-4 py-3">
                   {editingId === m.id ? (
                     <div className="space-y-2">
@@ -644,6 +667,9 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                   )}
                 </div>
               ))}
+              </div>
+            </div>
+          ))}
             </div>
           ) : !showAddForm ? (
             <p className="text-gray-400 text-sm text-center py-4">No materials added yet.</p>

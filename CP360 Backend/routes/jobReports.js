@@ -290,10 +290,13 @@ router.get("/:leadId/materials", async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
     const result = await db.query(
-      `SELECT id, material_item_id, name, qty, unit, unit_cost, total, notes, created_at
-       FROM job_cost_entries
-       WHERE lead_id = $1 AND company_id = $2
-       ORDER BY created_at ASC`,
+      `SELECT jce.id, jce.material_item_id, jce.name, jce.qty, jce.unit, jce.unit_cost, jce.total, jce.notes, jce.created_at,
+              mc.id AS category_id, mc.name AS category_name
+       FROM job_cost_entries jce
+       LEFT JOIN material_items mi ON mi.id = jce.material_item_id
+       LEFT JOIN material_categories mc ON mc.id = mi.category_id
+       WHERE jce.lead_id = $1 AND jce.company_id = $2
+       ORDER BY COALESCE(mc.name, 'zzzzz') ASC, jce.created_at ASC`,
       [leadId, companyId]
     );
     res.json({ materials: result.rows });
