@@ -359,6 +359,8 @@ async function runMigrations() {
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS crew_ghl_event_id TEXT`,
     // Calendar prefs — per-user gear panel selections, stored in DB for all-device sync
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_filter_prefs JSONB`,
+    // Bidder — track when final invoice is paid
+    `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS final_paid_at TIMESTAMP`,
   ];
   for (const sql of migrations) {
     try {

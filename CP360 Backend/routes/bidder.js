@@ -118,7 +118,7 @@ router.get('/proposals/:leadId', async (req, res) => {
 
     const result = await pool.query(
       `SELECT id, bid_name, bid_description, status, presented_date, accepted_date,
-              bid_total, created_at, updated_at
+              bid_total, created_at, updated_at, paid_at, final_paid_at
        FROM bidder_proposals
        WHERE lead_id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)
        ORDER BY
@@ -1473,10 +1473,13 @@ router.post('/public/:id/accept', async (req, res) => {
       return res.status(409).json({ error: 'This proposal has already been signed' });
     }
 
-    // Save signature
+    // Save signature, auto-accept, and stamp accepted_date if not already set
     await pool.query(
-      'UPDATE bidder_proposals SET signature_name = $1, signed_at = $2, signature_ip = $3 WHERE id = $4',
-      [signature_name.trim(), signedAt, ip, proposal.id]
+      `UPDATE bidder_proposals
+       SET signature_name = $1, signed_at = $2, signature_ip = $3,
+           status = 'accepted', accepted_date = COALESCE(accepted_date, $5)
+       WHERE id = $4`,
+      [signature_name.trim(), signedAt, ip, proposal.id, signedAt]
     );
 
     const contractorEmail = proposal.notification_emails ? proposal.notification_emails.trim() : null;
@@ -1736,6 +1739,8 @@ router.post('/public/:id/payment-received', async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
+    const proposalId = result.rows[0].id;
+
     // Stamp paid_at on first payment; append invoice_num to paid_invoice_nums
     await pool.query(
       `UPDATE bidder_proposals
@@ -1746,8 +1751,24 @@ router.post('/public/:id/payment-received', async (req, res) => {
              ELSE paid_invoice_nums
            END
        WHERE id = $1`,
-      [result.rows[0].id, String(invoice_num)]
+      [proposalId, String(invoice_num)]
     );
+
+    // Check if all invoices are now paid → stamp final_paid_at
+    const [scheduleRes, propRes] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM bidder_payment_schedules WHERE proposal_id = $1', [proposalId]),
+      pool.query('SELECT paid_invoice_nums, balance_due FROM bidder_proposals WHERE id = $1', [proposalId]),
+    ]);
+    const scheduleCount = parseInt(scheduleRes.rows[0].count, 10);
+    const balanceDue = parseFloat(propRes.rows[0].balance_due) || 0;
+    const totalExpected = scheduleCount + (balanceDue > 0.009 ? 1 : 0);
+    const paidNums = (propRes.rows[0].paid_invoice_nums || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (totalExpected > 0 && paidNums.length >= totalExpected) {
+      await pool.query(
+        'UPDATE bidder_proposals SET final_paid_at = COALESCE(final_paid_at, NOW()) WHERE id = $1',
+        [proposalId]
+      );
+    }
 
     const row = result.rows[0];
     const companyName   = row.ghl_company_from_name || row.company_db_name || '';
