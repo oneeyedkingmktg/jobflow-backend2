@@ -1004,8 +1004,19 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 );
               });
             })()}
-            <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-2 mt-1">
-              <span>Balance Due</span><span>{fmt(balanceDue)}</span>
+            <div className="flex justify-between items-center text-gray-900 font-bold border-t border-gray-200 pt-2 mt-1">
+              <span className="flex items-center gap-1.5">
+                Balance Due
+                {proposal?.final_paid_at && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Paid in Full
+                  </span>
+                )}
+              </span>
+              <span className={proposal?.final_paid_at ? 'line-through text-gray-400' : ''}>{fmt(balanceDue)}</span>
             </div>
           </div>
           <div className="mt-3">

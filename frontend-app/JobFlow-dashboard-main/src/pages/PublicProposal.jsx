@@ -751,7 +751,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                 </div>
                 {paymentSchedules.map((ps, i) => (
                   <div key={ps.id} className="flex justify-between items-center py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    <span className="text-sm text-gray-400">{ps.description || `Payment ${i + 1}`}</span>
+                    <span className="text-sm text-gray-300 font-bold uppercase tracking-wider">{ps.description || `Payment ${i + 1}`}</span>
                     <span className="font-bold text-base" style={{ color: AC }}>{fmt(calcAmt(ps, bidTotal))}</span>
                   </div>
                 ))}
@@ -1081,9 +1081,9 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Payment Schedule</p>
             <div className="space-y-2">
               {paymentSchedules.map((ps, i) => (
-                <div key={ps.id} className="flex justify-between text-sm">
-                  <span className="text-gray-700">{ps.description || `Payment ${i + 1}`}</span>
-                  <span className="font-semibold text-gray-900">{fmt(calcAmt(ps, bidTotal))}</span>
+                <div key={ps.id} className="flex justify-between font-bold">
+                  <span>{ps.description || `Payment ${i + 1}`}</span>
+                  <span>{fmt(calcAmt(ps, bidTotal))}</span>
                 </div>
               ))}
               <div className="flex justify-between font-bold border-t border-gray-200 pt-2">
