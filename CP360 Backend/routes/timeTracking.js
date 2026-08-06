@@ -278,7 +278,7 @@ router.get("/today", async (req, res) => {
        FROM time_entries te
        LEFT JOIN leads l ON l.id = te.lead_id
        WHERE te.user_id = $1 AND te.company_id = $2
-         AND te.clock_in::date = CURRENT_DATE
+         AND (te.clock_in::date = CURRENT_DATE OR te.clock_out IS NULL)
        ORDER BY te.clock_in ASC`,
       [userId, companyId]
     );
