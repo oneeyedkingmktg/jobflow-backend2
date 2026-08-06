@@ -475,4 +475,79 @@ router.get("/company", requireRole("admin", "master"), async (req, res) => {
   }
 });
 
+// ============================================================================
+// GET /api/time/active
+// All currently clocked-in users for the company. Admin/master only.
+// Used by admin roster view and crew clock-in modal.
+// ============================================================================
+router.get("/active", requireRole("admin", "master"), async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT te.id, te.user_id, te.lead_id, te.service_call_id, te.work_type, te.clock_in, te.notes,
+              u.name AS user_name,
+              l.name AS lead_name, l.address AS lead_address
+       FROM time_entries te
+       JOIN users u ON u.id = te.user_id
+       LEFT JOIN leads l ON l.id = te.lead_id
+       WHERE te.company_id = $1
+         AND te.clock_out IS NULL
+       ORDER BY te.clock_in ASC`,
+      [companyId]
+    );
+
+    res.json({ active: result.rows });
+  } catch (err) {
+    console.error("Get active entries error:", err);
+    res.status(500).json({ error: "Failed to fetch active entries" });
+  }
+});
+
+// ============================================================================
+// POST /api/time/crew-clock-out
+// Admin/master-initiated: clocks out a list of users by user_id.
+// Body: { user_ids: [1,2,3] }
+// Skips users with no open entry (non-fatal).
+// ============================================================================
+router.post("/crew-clock-out", requireRole("admin", "master"), async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const { user_ids } = req.body;
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.status(400).json({ error: "user_ids[] is required" });
+    }
+
+    const results = [];
+    for (const uid of user_ids) {
+      const userId = parseInt(uid, 10);
+      if (!userId) continue;
+      const open = await db.query(
+        "SELECT id FROM time_entries WHERE user_id = $1 AND company_id = $2 AND clock_out IS NULL",
+        [userId, companyId]
+      );
+      if (!open.rows.length) {
+        results.push({ user_id: userId, status: "not_clocked_in" });
+        continue;
+      }
+      const entryId = open.rows[0].id;
+      await db.query(
+        `UPDATE time_entries
+         SET clock_out = NOW(), duration_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in)) / 60)
+         WHERE id = $1`,
+        [entryId]
+      );
+      results.push({ user_id: userId, status: "clocked_out", entry_id: entryId });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error("Crew clock-out error:", err);
+    res.status(500).json({ error: "Failed to clock out crew" });
+  }
+});
+
 module.exports = router;

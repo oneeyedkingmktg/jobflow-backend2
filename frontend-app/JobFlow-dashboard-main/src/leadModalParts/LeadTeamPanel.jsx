@@ -24,9 +24,15 @@ const ROLE_COLORS = {
   subcontractor: "bg-gray-100 text-gray-600",
 };
 
+function fmtTime(ts) {
+  if (!ts) return "";
+  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
 export default function LeadTeamPanel({ lead, companyId, currentUser, onClose }) {
   const leadId = lead?.id;
   const canClockIn = currentUser?.role === "admin" || currentUser?.role === "master";
+  const cq = companyId ? `?company_id=${companyId}` : "";
 
   const [assignments, setAssignments] = useState([]);
   const [crews, setCrews] = useState([]);
@@ -51,6 +57,11 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   const [clockInChecked, setClockInChecked] = useState(new Set());
   const [clockingIn, setClockingIn] = useState(false);
   const [clockInResults, setClockInResults] = useState(null);
+  // Active entries: userId → { id, lead_name, clock_in }
+  const [activeEntries, setActiveEntries] = useState(new Map());
+  const [activeEntriesLoading, setActiveEntriesLoading] = useState(false);
+  // Clock-out: Set of userIds currently being clocked out
+  const [clockOutLoading, setClockOutLoading] = useState(new Set());
 
   useEffect(() => {
     loadAll();
@@ -177,17 +188,39 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     }
   };
 
-  // Clock-in sub-modal handlers
-  const handleClockInOpen = (group) => {
+  // ── Clock-in sub-modal handlers ──────────────────────────────────────────
+
+  const handleClockInOpen = async (group) => {
     setClockInModal(group);
-    setClockInChecked(new Set(group.members.map((m) => m.userId)));
     setClockInResults(null);
     setError("");
+    setActiveEntries(new Map());
+    setActiveEntriesLoading(true);
+
+    // Fetch who is currently clocked in across the whole company
+    try {
+      const data = await apiRequest(`/api/time/active${cq}`);
+      const map = new Map();
+      (data.active || []).forEach((e) => {
+        map.set(e.user_id, { id: e.id, lead_name: e.lead_name, clock_in: e.clock_in });
+      });
+      setActiveEntries(map);
+      // Pre-select only members NOT currently clocked in
+      setClockInChecked(
+        new Set(group.members.map((m) => m.userId).filter((uid) => !map.has(uid)))
+      );
+    } catch {
+      // Non-fatal: default to all selected
+      setClockInChecked(new Set(group.members.map((m) => m.userId)));
+    } finally {
+      setActiveEntriesLoading(false);
+    }
   };
 
   const handleClockInClose = () => {
     setClockInModal(null);
     setClockInResults(null);
+    setActiveEntries(new Map());
     setError("");
   };
 
@@ -205,7 +238,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     setClockingIn(true);
     setError("");
     try {
-      const cq = companyId ? `?company_id=${companyId}` : "";
       const data = await apiRequest(`/api/time/crew-clock-in${cq}`, {
         method: "POST",
         body: JSON.stringify({ lead_id: leadId, user_ids: [...clockInChecked] }),
@@ -215,6 +247,32 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
       setError(err.message || "Failed to clock in crew");
     } finally {
       setClockingIn(false);
+    }
+  };
+
+  const handleClockOutFromModal = async (userId, entryId) => {
+    setClockOutLoading((prev) => new Set([...prev, userId]));
+    setError("");
+    try {
+      await apiRequest(`/api/time/clock-out/${entryId}${cq}`, {
+        method: "PUT",
+        body: JSON.stringify({}),
+      });
+      // Remove from active entries and auto-select them to clock in here
+      setActiveEntries((prev) => {
+        const next = new Map(prev);
+        next.delete(userId);
+        return next;
+      });
+      setClockInChecked((prev) => new Set([...prev, userId]));
+    } catch (err) {
+      setError(err.message || "Failed to clock out");
+    } finally {
+      setClockOutLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   };
 
@@ -260,7 +318,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Crew blocks — one block per crew */}
+                {/* Crew blocks */}
                 {crewGroups.map((group) => (
                   <div
                     key={`crew-${group.crewId}`}
@@ -299,7 +357,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                   </div>
                 ))}
 
-                {/* Individual assignments — with role selector and individual remove button */}
+                {/* Individual assignments */}
                 {individuals.map((a) => (
                   <div
                     key={a.userId}
@@ -341,7 +399,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
           <div>
             <div className="text-sm font-semibold text-gray-700 mb-2">Add to Team</div>
 
-            {/* Tab switcher */}
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-3">
               {["crew", "employee"].map((tab) => (
                 <button
@@ -358,7 +415,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               ))}
             </div>
 
-            {/* Add by crew */}
             {addTab === "crew" && (
               <div className="space-y-3">
                 {crews.length === 0 ? (
@@ -406,7 +462,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               </div>
             )}
 
-            {/* Add individual employee */}
             {addTab === "employee" && (
               <div className="space-y-3">
                 <p className="text-xs text-gray-500">
@@ -468,15 +523,14 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
         </div>
       </div>
 
-      {/* CLOCK IN SUB-MODAL */}
+      {/* CLOCK IN / OUT SUB-MODAL */}
       {clockInModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
 
-            {/* Sub-modal header */}
             <div className="bg-emerald-700 text-white px-5 py-4 flex items-center justify-between">
               <div>
-                <div className="font-bold text-base">Clock In Crew</div>
+                <div className="font-bold text-base">Clock In / Out</div>
                 <div className="text-emerald-200 text-sm mt-0.5">{clockInModal.crewName}</div>
               </div>
               <button
@@ -487,43 +541,73 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               </button>
             </div>
 
-            {/* Member list */}
             <div className="p-5 space-y-2">
-              {clockInModal.members.map((m) => {
-                const isChecked = clockInChecked.has(m.userId);
-                const result = clockInResults?.find((r) => r.user_id === m.userId);
-                return (
-                  <label
-                    key={m.userId}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
-                      result?.status === "clocked_in"
-                        ? "border-emerald-400 bg-emerald-50 cursor-default"
-                        : result?.status === "already_clocked_in"
-                        ? "border-gray-200 bg-gray-50 cursor-default opacity-60"
-                        : isChecked
-                        ? "border-emerald-500 bg-emerald-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!isChecked}
-                      disabled={!!result}
-                      onChange={() => !result && handleClockInToggle(m.userId)}
-                      className="w-4 h-4 rounded accent-emerald-600"
-                    />
-                    <span className="text-sm font-semibold text-gray-900 flex-1">
-                      {m.userName}
-                    </span>
-                    {result?.status === "clocked_in" && (
-                      <span className="text-xs text-emerald-600 font-semibold">Clocked In</span>
-                    )}
-                    {result?.status === "already_clocked_in" && (
-                      <span className="text-xs text-gray-400">Already In</span>
-                    )}
-                  </label>
-                );
-              })}
+              {activeEntriesLoading ? (
+                <div className="text-center py-6 text-gray-400 text-sm">Checking clock-in status…</div>
+              ) : (
+                clockInModal.members.map((m) => {
+                  const active = activeEntries.get(m.userId);
+                  const isChecked = clockInChecked.has(m.userId);
+                  const result = clockInResults?.find((r) => r.user_id === m.userId);
+
+                  if (active && !result) {
+                    // Already clocked in somewhere — show clock-out option
+                    return (
+                      <div
+                        key={m.userId}
+                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-amber-200 bg-amber-50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-900">{m.userName}</div>
+                          <div className="text-xs text-amber-700 truncate">
+                            On: {active.lead_name || "Non-Job Work"} · since {fmtTime(active.clock_in)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleClockOutFromModal(m.userId, active.id)}
+                          disabled={clockOutLoading.has(m.userId)}
+                          className="text-xs font-bold text-red-600 bg-red-100 hover:bg-red-200 disabled:opacity-50 px-2 py-1 rounded-md shrink-0 transition"
+                        >
+                          {clockOutLoading.has(m.userId) ? "…" : "Clock Out"}
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  // Not clocked in (or just clocked out) — show checkbox
+                  return (
+                    <label
+                      key={m.userId}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+                        result?.status === "clocked_in"
+                          ? "border-emerald-400 bg-emerald-50 cursor-default"
+                          : result?.status === "already_clocked_in"
+                          ? "border-gray-200 bg-gray-50 cursor-default opacity-60"
+                          : isChecked
+                          ? "border-emerald-500 bg-emerald-50"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!isChecked}
+                        disabled={!!result}
+                        onChange={() => !result && handleClockInToggle(m.userId)}
+                        className="w-4 h-4 rounded accent-emerald-600"
+                      />
+                      <span className="text-sm font-semibold text-gray-900 flex-1">
+                        {m.userName}
+                      </span>
+                      {result?.status === "clocked_in" && (
+                        <span className="text-xs text-emerald-600 font-semibold">Clocked In</span>
+                      )}
+                      {result?.status === "already_clocked_in" && (
+                        <span className="text-xs text-gray-400">Already In</span>
+                      )}
+                    </label>
+                  );
+                })
+              )}
             </div>
 
             {error && (
@@ -532,7 +616,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               </div>
             )}
 
-            {/* Submit button */}
             <div className="px-5 pb-5">
               {clockInResults ? (
                 <button
@@ -544,14 +627,14 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               ) : (
                 <button
                   onClick={handleClockInSubmit}
-                  disabled={!clockInChecked.size || clockingIn}
+                  disabled={!clockInChecked.size || clockingIn || activeEntriesLoading}
                   className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-xl text-sm transition"
                 >
                   {clockingIn
                     ? "Clocking In…"
                     : clockInChecked.size > 0
                     ? `Clock In ${clockInChecked.size} Member${clockInChecked.size !== 1 ? "s" : ""}`
-                    : "Select Members"}
+                    : "No Members Selected"}
                 </button>
               )}
             </div>

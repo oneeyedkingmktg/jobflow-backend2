@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { apiRequest } from "../api";
 import { useCompany } from "../CompanyContext";
+import { useAuth } from "../AuthContext";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,8 @@ function liveDuration(clockInTs) {
 
 export default function TimeTrackingPage({ onBack }) {
   const { currentCompany } = useCompany();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "master";
   // Appends ?company_id=X when present — needed for master who has no company_id on their JWT
   const cq = currentCompany?.id ? `company_id=${currentCompany.id}` : "";
   const withCq = (url) => cq ? `${url}${url.includes("?") ? "&" : "?"}${cq}` : url;
@@ -52,6 +55,10 @@ export default function TimeTrackingPage({ onBack }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [showWeek, setShowWeek] = useState(false);
+  const [showActive, setShowActive] = useState(false);
+  const [activeRoster, setActiveRoster] = useState([]);
+  const [activeLoading, setActiveLoading] = useState(false);
+  const [clockingOutId, setClockingOutId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [clockLoading, setClockLoading] = useState(false);
   const [error, setError] = useState("");
@@ -156,6 +163,33 @@ export default function TimeTrackingPage({ onBack }) {
     } catch {}
   };
 
+  const loadActiveRoster = async () => {
+    setActiveLoading(true);
+    try {
+      const data = await apiRequest(withCq("/api/time/active"));
+      setActiveRoster(data.active || []);
+    } catch {
+      setActiveRoster([]);
+    } finally {
+      setActiveLoading(false);
+    }
+  };
+
+  const handleAdminClockOut = async (entryId) => {
+    if (clockingOutId) return;
+    setClockingOutId(entryId);
+    try {
+      await apiRequest(withCq(`/api/time/clock-out/${entryId}`), {
+        method: "PUT",
+        body: JSON.stringify({}),
+      });
+      setActiveRoster((prev) => prev.filter((e) => e.id !== entryId));
+    } catch {}
+    finally {
+      setClockingOutId(null);
+    }
+  };
+
   // ── Selection helpers ─────────────────────────────────────────────────────
 
   const pick = (type, leadId, label, serviceCallId = null) => {
@@ -227,12 +261,22 @@ export default function TimeTrackingPage({ onBack }) {
           </svg>
         </button>
         <h1 className="text-lg font-bold text-gray-900">Time Tracking</h1>
-        <button
-          onClick={loadWeek}
-          className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-        >
-          This Week
-        </button>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => { setShowActive(true); loadActiveRoster(); }}
+              className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+            >
+              Team
+            </button>
+          )}
+          <button
+            onClick={loadWeek}
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+          >
+            This Week
+          </button>
+        </div>
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
@@ -411,6 +455,71 @@ export default function TimeTrackingPage({ onBack }) {
           </div>
         )}
       </div>
+
+      {/* ── Active Roster Modal (admin/master) ───────────────────────── */}
+      {showActive && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 md:p-6">
+          <div className="w-full bg-white rounded-2xl max-h-[85vh] md:max-w-lg flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Who's Clocked In</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={loadActiveRoster}
+                  disabled={activeLoading}
+                  className="text-sm text-blue-600 font-semibold disabled:opacity-40"
+                >
+                  {activeLoading ? "Refreshing…" : "Refresh"}
+                </button>
+                <button onClick={() => setShowActive(false)} className="text-gray-500 hover:text-gray-700">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
+              {activeLoading && activeRoster.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-sm">Loading…</div>
+              ) : activeRoster.length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-sm">Nobody is clocked in right now</div>
+              ) : (
+                activeRoster.map((e) => {
+                  const elapsedMins = Math.floor((Date.now() - new Date(e.clock_in).getTime()) / 60000);
+                  return (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm">{e.user_name}</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {e.lead_name || "Non-Job Work"} · since {fmtTime(e.clock_in)}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-emerald-700 font-mono">
+                          {fmtDuration(elapsedMins)}
+                        </div>
+                        <button
+                          onClick={() => handleAdminClockOut(e.id)}
+                          disabled={clockingOutId === e.id}
+                          className="text-xs text-red-500 hover:text-red-700 font-semibold mt-0.5 disabled:opacity-40"
+                        >
+                          {clockingOutId === e.id ? "…" : "Clock Out"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400 text-center">
+              {activeRoster.length > 0 && `${activeRoster.length} employee${activeRoster.length !== 1 ? "s" : ""} currently clocked in`}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Week Modal ────────────────────────────────────────────────── */}
       {showWeek && weekData && (
