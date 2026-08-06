@@ -206,6 +206,57 @@ router.post("/clock-in", async (req, res) => {
 });
 
 // ============================================================================
+// POST /api/time/crew-clock-in
+// Admin/master-initiated: clocks in a list of users for a specific lead.
+// Body: { lead_id, user_ids: [1,2,3] }
+// Skips users already clocked in (non-fatal).
+// ============================================================================
+router.post("/crew-clock-in", requireRole("admin", "master"), async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const { lead_id, user_ids } = req.body;
+    if (!lead_id || !Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.status(400).json({ error: "lead_id and user_ids[] are required" });
+    }
+
+    // Verify lead belongs to company
+    const leadCheck = await db.query(
+      "SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL",
+      [lead_id, companyId]
+    );
+    if (!leadCheck.rows.length) return res.status(404).json({ error: "Lead not found" });
+
+    const results = [];
+    for (const uid of user_ids) {
+      const userId = parseInt(uid, 10);
+      if (!userId) continue;
+      // Skip if already clocked in
+      const open = await db.query(
+        "SELECT id FROM time_entries WHERE user_id = $1 AND company_id = $2 AND clock_out IS NULL",
+        [userId, companyId]
+      );
+      if (open.rows.length) {
+        results.push({ user_id: userId, status: "already_clocked_in" });
+        continue;
+      }
+      await db.query(
+        `INSERT INTO time_entries (company_id, user_id, lead_id, work_type, clock_in)
+         VALUES ($1, $2, $3, 'job', NOW())`,
+        [companyId, userId, lead_id]
+      );
+      results.push({ user_id: userId, status: "clocked_in" });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error("Crew clock-in error:", err);
+    res.status(500).json({ error: "Failed to clock in crew" });
+  }
+});
+
+// ============================================================================
 // PUT /api/time/clock-out/:entryId
 // Clocks out an open entry. Only the owning user (or admin/master) can clock out.
 // Computes duration_minutes automatically.

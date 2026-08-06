@@ -74,7 +74,8 @@ export default function UserModal({
         password: "",
       });
     } else if (user) {
-      setViewMode("view");
+      // Only reset to view if we're not already in edit mode (prevents double-click bug)
+      setViewMode((prev) => (prev === "edit" ? "edit" : "view"));
       setForm({
         name: user.name || "",
         email: user.email || "",

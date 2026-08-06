@@ -6,7 +6,7 @@
 // ============================================================================
 
 import React, { useEffect, useState, useMemo } from "react";
-import { LeadAssignmentsAPI, CrewsAPI, UsersAPI } from "../api";
+import { LeadAssignmentsAPI, CrewsAPI, UsersAPI, apiRequest } from "../api";
 
 const ROLES = ["installer", "lead", "helper", "subcontractor"];
 
@@ -24,8 +24,10 @@ const ROLE_COLORS = {
   subcontractor: "bg-gray-100 text-gray-600",
 };
 
-export default function LeadTeamPanel({ lead, companyId, onClose }) {
+export default function LeadTeamPanel({ lead, companyId, currentUser, onClose }) {
   const leadId = lead?.id;
+  const isJob = lead?.status === "job";
+  const canClockIn = currentUser?.role === "admin" || currentUser?.role === "master";
 
   const [assignments, setAssignments] = useState([]);
   const [crews, setCrews] = useState([]);
@@ -44,6 +46,11 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
 
   // Which tab: "employee" | "crew"
   const [addTab, setAddTab] = useState("crew");
+
+  // Clock-in crew state
+  const [clockInSelected, setClockInSelected] = useState(new Set());
+  const [clockingIn, setClockingIn] = useState(false);
+  const [clockInResults, setClockInResults] = useState(null);
 
   useEffect(() => {
     loadAll();
@@ -170,6 +177,52 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
     }
   };
 
+  // All assigned user IDs (from crews and individuals)
+  const allAssignedUserIds = useMemo(() => {
+    const ids = new Set();
+    assignments.forEach((a) => ids.add(a.userId));
+    return ids;
+  }, [assignments]);
+
+  const allAssignedUsers = useMemo(() => {
+    return allUsers.filter((u) => allAssignedUserIds.has(u.id));
+  }, [allUsers, allAssignedUserIds]);
+
+  const toggleClockInUser = (userId) => {
+    setClockInSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleClockInAll = () => {
+    if (clockInSelected.size === allAssignedUsers.length) {
+      setClockInSelected(new Set());
+    } else {
+      setClockInSelected(new Set(allAssignedUsers.map((u) => u.id)));
+    }
+  };
+
+  const handleCrewClockIn = async () => {
+    if (!clockInSelected.size || clockingIn) return;
+    setClockingIn(true);
+    setClockInResults(null);
+    setError("");
+    try {
+      const cq = companyId ? `?company_id=${companyId}` : "";
+      const data = await apiRequest(`/api/time/crew-clock-in${cq}`, {
+        method: "POST",
+        body: JSON.stringify({ lead_id: leadId, user_ids: [...clockInSelected] }),
+      });
+      setClockInResults(data.results || []);
+    } catch (err) {
+      setError(err.message || "Failed to clock in crew");
+    } finally {
+      setClockingIn(false);
+    }
+  };
+
   const totalCount = crewGroups.length + individuals.length;
 
   return (
@@ -177,7 +230,7 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
       <div className="flex flex-col bg-white w-full h-full max-w-lg mx-auto shadow-2xl md:rounded-2xl md:my-8 md:h-auto md:max-h-[90vh]">
 
         {/* HEADER */}
-        <div className="bg-blue-700 text-white px-5 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
+        <div className="bg-blue-700 text-white px-6 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold">Assign Crew</h2>
             <p className="text-blue-200 text-sm mt-0.5 truncate">{lead?.name}</p>
@@ -191,7 +244,7 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded">
               {error}
@@ -399,8 +452,74 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
           </div>
         </div>
 
+        {/* CLOCK IN CREW — only when lead is in "job" status and user is admin/master */}
+        {isJob && canClockIn && allAssignedUsers.length > 0 && (
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-sm font-bold text-gray-700">Clock In Crew</div>
+              <span className="text-xs text-gray-400 italic">Tap a crew member to select</span>
+            </div>
+
+            {/* Clock All toggle */}
+            <label className="flex items-center gap-2 mb-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={clockInSelected.size === allAssignedUsers.length && allAssignedUsers.length > 0}
+                onChange={toggleClockInAll}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600"
+              />
+              <span className="text-sm font-semibold text-gray-700">Clock All In</span>
+            </label>
+
+            {/* Individual crew members */}
+            <div className="space-y-2">
+              {allAssignedUsers.map((u) => {
+                const isSelected = clockInSelected.has(u.id);
+                const result = clockInResults?.find((r) => r.user_id === u.id);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => !result && toggleClockInUser(u.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-colors text-left ${
+                      result?.status === "clocked_in"
+                        ? "border-green-400 bg-green-50 cursor-default"
+                        : result?.status === "already_clocked_in"
+                        ? "border-gray-200 bg-gray-50 cursor-default opacity-60"
+                        : isSelected
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                      result?.status === "clocked_in" ? "border-green-500 bg-green-500"
+                      : isSelected ? "border-blue-600 bg-blue-600" : "border-gray-400"
+                    }`} />
+                    <span className="text-sm font-semibold text-gray-900 flex-1">{u.name || u.email}</span>
+                    {result?.status === "clocked_in" && <span className="text-xs text-green-600 font-semibold">Clocked In</span>}
+                    {result?.status === "already_clocked_in" && <span className="text-xs text-gray-400">Already In</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded mt-2">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleCrewClockIn}
+              disabled={!clockInSelected.size || clockingIn}
+              className="w-full mt-3 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-xl transition-colors text-sm"
+            >
+              {clockingIn ? "Clocking In…" : clockInSelected.size > 0 ? `Clock In ${clockInSelected.size} Member${clockInSelected.size > 1 ? "s" : ""}` : "Select Members to Clock In"}
+            </button>
+          </div>
+        )}
+
         {/* FOOTER */}
-        <div className="border-t px-5 py-4 bg-gray-50 shrink-0 md:rounded-b-2xl">
+        <div className="border-t px-6 py-4 bg-gray-50 shrink-0 md:rounded-b-2xl">
           <button
             onClick={onClose}
             className="w-full py-2.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"

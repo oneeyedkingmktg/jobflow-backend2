@@ -236,7 +236,7 @@ export default function TimeTrackingPage({ onBack }) {
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-28">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 pb-28">
 
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg text-red-800 text-sm">

@@ -4,6 +4,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
+import { apiRequest } from "../api";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -87,6 +88,11 @@ commercialPricePerSfMax: null,
 
   // Redirect
   tyUrlRedirect: "",
+
+  // Service area zips (company-level, saved separately)
+  serviceAreaZips: Array.isArray(company?.serviceAreaZips ?? company?.service_area_zips)
+    ? (company?.serviceAreaZips ?? company?.service_area_zips).join(", ")
+    : (company?.serviceAreaZips ?? company?.service_area_zips) || "",
 });
 
 
@@ -409,6 +415,17 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
         throw new Error(data.error || "Failed to save estimator config");
       }
 
+      // Save service area zips to company record
+      const rawZips = (form.serviceAreaZips || "").replace(/[\[\]\s]/g, " ");
+      const zipsArray = rawZips.split(/[\s,]+/).map((z) => z.trim()).filter(Boolean);
+      await apiRequest(`/companies/${company.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: company.name,
+          service_area_zips: zipsArray.length > 0 ? zipsArray : null,
+        }),
+      });
+
       await onSave({});
       onClose();
     } catch (err) {
@@ -541,6 +558,26 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Service Area ZIP Codes */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="font-bold text-gray-900 mb-2">Service Area ZIP Codes</h3>
+              <p className="text-xs text-gray-500 mb-2">Limit estimator submissions to specific ZIP codes. Leave blank to accept all ZIP codes.</p>
+              {mode === "edit" ? (
+                <>
+                  <textarea
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    value={form.serviceAreaZips}
+                    onChange={(e) => handleChange("serviceAreaZips", e.target.value)}
+                    placeholder="60457, 60458, 60459"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">Enter ZIP codes separated by commas.</div>
+                </>
+              ) : (
+                <div className="text-sm text-gray-700">{form.serviceAreaZips || "All ZIP codes allowed"}</div>
+              )}
             </div>
           )}
 

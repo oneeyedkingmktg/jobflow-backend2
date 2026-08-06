@@ -372,6 +372,7 @@ billing_status,
       service_area_zips,
       sip_domain,
       reports_enabled,
+      job_reports_enabled,
       service_calls_enabled,
       clarity_project_id,
       time_tracking_enabled,
@@ -688,6 +689,16 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
         company.reports_enabled = reports_enabled;
       } catch (e) {
         console.error('reports_enabled update failed:', e.message);
+      }
+    }
+
+    if (job_reports_enabled !== undefined) {
+      try {
+        await db.pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS job_reports_enabled BOOLEAN DEFAULT false`);
+        await db.pool.query(`UPDATE companies SET job_reports_enabled = $1 WHERE id = $2`, [job_reports_enabled, companyId]);
+        company.job_reports_enabled = job_reports_enabled;
+      } catch (e) {
+        console.error('job_reports_enabled update failed:', e.message);
       }
     }
 

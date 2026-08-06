@@ -300,7 +300,7 @@ const hasEstimate = form?.hasEstimate === true;
         )}
 
         {/* Job Report */}
-        {!isEstimatorOnly && (user?.role === "admin" || user?.role === "master") && (
+        {!isEstimatorOnly && (user?.role === "admin" || user?.role === "master" || (currentCompany?.jobReportsEnabled ?? currentCompany?.job_reports_enabled ?? false)) && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowJobReports(true); }}
@@ -345,6 +345,7 @@ const hasEstimate = form?.hasEstimate === true;
         <LeadTeamPanel
           lead={form}
           companyId={currentCompany?.id || currentCompany?.companyId}
+          currentUser={user}
           onClose={() => setShowTeamPanel(false)}
         />
       )}
