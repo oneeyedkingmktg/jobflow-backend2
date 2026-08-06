@@ -63,6 +63,8 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   // Switch job: Set of userIds being switched, Set of userIds already switched
   const [switchingUsers, setSwitchingUsers] = useState(new Set());
   const [switchedUsers, setSwitchedUsers] = useState(new Set());
+  // Users explicitly kept on their current job (dismissed from this clock-in)
+  const [keptUsers, setKeptUsers] = useState(new Set());
 
   useEffect(() => {
     loadAll();
@@ -223,6 +225,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     setClockInResults(null);
     setActiveEntries(new Map());
     setSwitchedUsers(new Set());
+    setKeptUsers(new Set());
     setError("");
   };
 
@@ -575,8 +578,24 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                     );
                   }
 
+                  if (keptUsers.has(m.userId)) {
+                    // Foreman chose to keep them on current job
+                    return (
+                      <div
+                        key={m.userId}
+                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-200 bg-gray-50 opacity-60"
+                      >
+                        <span className="text-gray-400 text-base shrink-0">–</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-600">{m.userName}</div>
+                          <div className="text-xs text-gray-400">Staying on: {active?.lead_name || "current job"}</div>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   if (active && !result) {
-                    // Already clocked in on a different job — prompt to switch
+                    // Already clocked in on a different job — show explicit choice
                     return (
                       <div
                         key={m.userId}
@@ -584,19 +603,28 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="font-semibold text-gray-900 text-sm">{m.userName}</div>
-                          <span className="text-xs text-amber-700 font-semibold shrink-0">Already Clocked In</span>
+                          <span className="text-xs text-amber-700 font-bold shrink-0">Already Clocked In</span>
                         </div>
-                        <div className="text-xs text-amber-800">
-                          Currently on: <span className="font-semibold">{active.lead_name || "Non-Job Work"}</span> since {fmtTime(active.clock_in)}
+                        <div className="text-xs text-amber-900">
+                          Currently on: <span className="font-semibold">{active.lead_name || "Non-Job Work"}</span>
+                          <span className="text-amber-700"> · since {fmtTime(active.clock_in)}</span>
                         </div>
-                        <div className="text-xs text-gray-600 italic">Switch to clock them into this job instead?</div>
-                        <button
-                          onClick={() => handleSwitchJob(m.userId, active.id)}
-                          disabled={switchingUsers.has(m.userId)}
-                          className="w-full py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition"
-                        >
-                          {switchingUsers.has(m.userId) ? "Switching…" : "Yes, Switch to This Job"}
-                        </button>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            onClick={() => setKeptUsers((prev) => new Set([...prev, m.userId]))}
+                            disabled={switchingUsers.has(m.userId)}
+                            className="py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 rounded-lg transition"
+                          >
+                            Keep on Current Job
+                          </button>
+                          <button
+                            onClick={() => handleSwitchJob(m.userId, active.id)}
+                            disabled={switchingUsers.has(m.userId)}
+                            className="py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition"
+                          >
+                            {switchingUsers.has(m.userId) ? "Switching…" : "Switch to This Job"}
+                          </button>
+                        </div>
                       </div>
                     );
                   }
