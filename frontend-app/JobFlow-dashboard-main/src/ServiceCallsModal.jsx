@@ -83,7 +83,7 @@ function TimeSelects({ label, hour, minute, ampm, onHour, onMinute, onAmpm }) {
   );
 }
 
-export default function ServiceCallsModal({ leadId, initialScId, onClose, onCountChange, onServiceCallsChange }) {
+export default function ServiceCallsModal({ leadId, initialScId, canEdit = true, onClose, onCountChange, onServiceCallsChange }) {
   const { currentCompany } = useCompany();
   const companyId = currentCompany?.id;
 
@@ -599,12 +599,86 @@ export default function ServiceCallsModal({ leadId, initialScId, onClose, onCoun
             )}
           </div>
 
-          <button
-            onClick={openNew}
-            className="mt-4 w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition"
-          >
-            + Add Service Call
-          </button>
+          {canEdit && (
+            <button
+              onClick={openNew}
+              className="mt-4 w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition"
+            >
+              + Add Service Call
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── READ-ONLY DETAIL VIEW (view permission) ──────────────────────────────
+
+  if (view === "edit" && !canEdit) {
+    const typeLabel = scType === "follow_up_install" ? "Follow Up Install"
+      : scType === "service_call" ? "All Other Service Calls"
+      : "—";
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+        <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="p-5">
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setView("list")}
+                className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+              </button>
+              <h2 className="text-base font-bold text-gray-900 flex-1 text-center pr-8">Service Call</h2>
+            </div>
+
+            {/* Date / time pill */}
+            {pillLabel ? (
+              <div className="text-center mb-4">
+                <span className="inline-block bg-orange-50 border border-orange-300 text-orange-800 text-sm font-semibold px-5 py-2 rounded-full">
+                  {pillLabel}
+                </span>
+              </div>
+            ) : (
+              <p className="text-center text-xs text-gray-400 mb-4">No date set</p>
+            )}
+
+            {/* Title */}
+            <div className="mb-3">
+              <div className="text-xs text-gray-500 mb-1 font-medium">Title</div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800">
+                {title || "—"}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div className="mb-3">
+              <div className="text-xs text-gray-500 mb-1 font-medium">Service Call Type</div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800">
+                {typeLabel}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="mb-5">
+              <div className="text-xs text-gray-500 mb-1 font-medium">Notes</div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 min-h-[72px] whitespace-pre-wrap">
+                {notes || "—"}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setView("list")}
+              className="w-full bg-gray-100 text-gray-700 rounded-xl py-3 font-semibold text-sm hover:bg-gray-200 transition"
+            >
+              Back to List
+            </button>
+          </div>
         </div>
       </div>
     );

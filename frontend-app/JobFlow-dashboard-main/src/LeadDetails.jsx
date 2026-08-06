@@ -32,7 +32,9 @@ export default function LeadDetails({
   }, [form?.id, form?.zip]);
 
   const { user } = useAuth();
-  const serviceCallsEnabled = usePermission('service_calls') !== 'hide';
+  const serviceCallsPermission = usePermission('service_calls');
+  const serviceCallsEnabled = serviceCallsPermission !== 'hide';
+  const serviceCallsCanEdit = serviceCallsPermission === 'edit';
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);
@@ -400,6 +402,7 @@ export default function LeadDetails({
       {showServiceCallsModal && (
         <ServiceCallsModal
           leadId={form.id}
+          canEdit={serviceCallsCanEdit}
           onClose={() => setShowServiceCallsModal(false)}
           onCountChange={(count) => setServiceCallCount(count)}
         />
