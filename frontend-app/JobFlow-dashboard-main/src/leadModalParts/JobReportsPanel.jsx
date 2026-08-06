@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import { JobReportsAPI } from "../api";
+import { usePermission } from "../utils/usePermission";
 
 const PROJECT_TYPE_LABELS = {
   garage_1: "1 Car Garage",
@@ -210,7 +211,7 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
 // ============================================================================
 // TIME LOG MODAL — full entry list with edit/delete (z-[80])
 // ============================================================================
-function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, onClose, onUpdate }) {
+function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, canEdit, onClose, onUpdate }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editEntry, setEditEntry] = useState(null);
@@ -265,19 +266,23 @@ function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, onClose, 
                         <div className="text-xs text-gray-500 mt-0.5">{dateLabel} · {fmtHours(e.duration_minutes)}</div>
                         {e.notes && <div className="text-xs text-gray-400 italic mt-0.5 truncate">{e.notes}</div>}
                       </div>
-                      <div className="flex gap-3 shrink-0 mt-0.5">
-                        <button onClick={() => setEditEntry(e)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
-                        <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex gap-3 shrink-0 mt-0.5">
+                          <button onClick={() => setEditEntry(e)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Edit</button>
+                          <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-            <button type="button" onClick={() => setShowAdd(true)}
-              className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition">
-              + Add Entry
-            </button>
+            {canEdit && (
+              <button type="button" onClick={() => setShowAdd(true)}
+                className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition">
+                + Add Entry
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -300,7 +305,7 @@ function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, onClose, 
 // ============================================================================
 // TIME ENTRIES MODAL — clean aggregate view (z-[70])
 // ============================================================================
-function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange }) {
+function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWageChange }) {
   const [rows, setRows] = useState(
     employees.map((e) => ({ ...e, wageInput: e.effective_wage > 0 ? String(e.effective_wage) : "" }))
   );
@@ -372,11 +377,11 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
                       <div className="flex items-center justify-center">
                         <span className="text-gray-400 text-xs mr-0.5">$</span>
                         <input type="number" min="0" step="0.01" value={emp.wageInput} placeholder="0"
-                          onChange={(e) => !emp.non_employee_name && setWageInput(idx, e.target.value)}
-                          onBlur={() => !emp.non_employee_name && handleWageBlur(emp, idx)}
-                          className={`w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400 ${emp.non_employee_name ? "bg-gray-50 text-gray-400 cursor-default" : ""}`}
-                          disabled={!!saving[emp.user_id] || !!emp.non_employee_name}
-                          title={emp.non_employee_name ? "Wage is fixed at entry time for non-employee labor" : undefined} />
+                          onChange={(e) => canEdit && !emp.non_employee_name && setWageInput(idx, e.target.value)}
+                          onBlur={() => canEdit && !emp.non_employee_name && handleWageBlur(emp, idx)}
+                          className={`w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400 ${(!canEdit || emp.non_employee_name) ? "bg-gray-50 text-gray-400 cursor-default" : ""}`}
+                          disabled={!canEdit || !!saving[emp.user_id] || !!emp.non_employee_name}
+                          title={emp.non_employee_name ? "Wage is fixed at entry time for non-employee labor" : !canEdit ? "View only" : undefined} />
                       </div>
                       <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
                     </div>
@@ -390,10 +395,12 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
             )}
 
             <div className="flex gap-2 mt-5">
-              <button type="button" onClick={() => setShowAddModal(true)}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">
-                + Add Entry
-              </button>
+              {canEdit && (
+                <button type="button" onClick={() => setShowAddModal(true)}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">
+                  + Add Entry
+                </button>
+              )}
               <button type="button" onClick={() => setShowLogModal(true)}
                 className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition">
                 View Time Log
@@ -421,6 +428,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
           companyId={companyId}
           companyUsers={companyUsers}
           loadingUsers={loadingUsers}
+          canEdit={canEdit}
           onClose={() => setShowLogModal(false)}
           onUpdate={onWageChange}
         />
@@ -432,7 +440,7 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
 // ============================================================================
 // MATERIALS FORM
 // ============================================================================
-function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
+function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   const [materials, setMaterials] = useState([]);
   const [library, setLibrary] = useState({ categories: [] });
   const [loading, setLoading] = useState(true);
@@ -685,20 +693,22 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                           <div className="text-xs text-gray-400 mt-0.5 italic">{m.notes}</div>
                         )}
                       </div>
-                      <div className="flex gap-2 shrink-0 mt-0.5">
-                        <button
-                          onClick={() => startEdit(m)}
-                          className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(m.id)}
-                          className="text-red-400 hover:text-red-600 text-xs font-medium"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex gap-2 shrink-0 mt-0.5">
+                          <button
+                            onClick={() => startEdit(m)}
+                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(m.id)}
+                            className="text-red-400 hover:text-red-600 text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -957,7 +967,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : canEdit ? (
             <button
               type="button"
               onClick={() => setShowAddForm(true)}
@@ -965,7 +975,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
             >
               + Add Material
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -979,6 +989,8 @@ export default function JobReportsPanel({ lead, onClose }) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
   const companyId = user?.role === "master" ? (currentCompany?.id || currentCompany?.companyId) : null;
+  const jobReportPerm = usePermission('job_report');
+  const canEdit = jobReportPerm === 'edit';
 
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1082,7 +1094,7 @@ export default function JobReportsPanel({ lead, onClose }) {
                 onClick={() => setShowMaterials(true)}
                 className="w-full text-center text-sm text-blue-600 font-semibold py-2 rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 transition"
               >
-                Add / View Materials
+                {canEdit ? "Add / View Materials" : "View Materials"}
               </button>
             </div>
 
@@ -1130,6 +1142,7 @@ export default function JobReportsPanel({ lead, onClose }) {
           leadId={lead.id}
           companyId={companyId}
           employees={summary.labor.employees}
+          canEdit={canEdit}
           onClose={() => setShowTimeEntries(false)}
           onWageChange={() => { setShowTimeEntries(false); loadSummary(); }}
         />
@@ -1140,6 +1153,7 @@ export default function JobReportsPanel({ lead, onClose }) {
         <MaterialsForm
           leadId={lead.id}
           companyId={companyId}
+          canEdit={canEdit}
           onClose={() => setShowMaterials(false)}
           onUpdate={loadSummary}
         />

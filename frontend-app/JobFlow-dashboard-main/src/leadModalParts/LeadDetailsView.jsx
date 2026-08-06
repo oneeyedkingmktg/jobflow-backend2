@@ -28,6 +28,8 @@ const hasEstimate = form?.hasEstimate === true;
   const contactEditPermission = usePermission('contact_editing');
   const customerCommsPermission = usePermission('customer_communications');
   const bidderPermission = usePermission('bidder');
+  const manageLaborPermission = usePermission('manage_labor');
+  const jobReportPermission = usePermission('job_report');
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
   const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
   const [showEstimateModal, setShowEstimateModal] = useState(false);
@@ -288,8 +290,8 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Assign Team */}
-        {!isEstimatorOnly && (
+        {/* Manage Labor */}
+        {!isEstimatorOnly && manageLaborPermission !== 'hide' && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowTeamPanel(true); }}
@@ -300,7 +302,7 @@ const hasEstimate = form?.hasEstimate === true;
         )}
 
         {/* Job Report */}
-        {!isEstimatorOnly && (user?.role === "admin" || user?.role === "master" || (currentCompany?.jobReportsEnabled ?? currentCompany?.job_reports_enabled ?? false)) && (
+        {!isEstimatorOnly && jobReportPermission !== 'hide' && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowJobReports(true); }}
