@@ -11,6 +11,13 @@ const { authenticateToken, requireRole } = require("../middleware/auth");
 
 router.use(authenticateToken);
 
+// DB-level safety net: one open entry per user at a time (runs once on startup)
+db.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS time_entries_user_open_unique
+  ON time_entries (user_id)
+  WHERE clock_out IS NULL
+`).catch((err) => console.error("time_entries unique index migration:", err.message));
+
 function resolveCompanyId(req) {
   if (req.user.role === "master") {
     const id = req.query.company_id || (req.body && req.body.company_id);
