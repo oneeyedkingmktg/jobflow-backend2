@@ -65,6 +65,9 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   const [switchedUsers, setSwitchedUsers] = useState(new Set());
   // Users explicitly kept on their current job (dismissed from this clock-in)
   const [keptUsers, setKeptUsers] = useState(new Set());
+  // Currently clocked-in users for this specific job
+  const [activeForLead, setActiveForLead] = useState([]);
+  const [clockingOutUser, setClockingOutUser] = useState(null);
 
   useEffect(() => {
     loadAll();
@@ -73,11 +76,13 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   const loadAll = async () => {
     try {
       setLoading(true);
-      const [assignRes, crewRes, userRes] = await Promise.all([
+      const fetches = [
         LeadAssignmentsAPI.getAll(leadId),
         CrewsAPI.getAll(companyId),
         UsersAPI.getAll(companyId),
-      ]);
+        canClockIn ? apiRequest(`/api/time/active${cq}`) : Promise.resolve({ active: [] }),
+      ];
+      const [assignRes, crewRes, userRes, activeRes] = await Promise.all(fetches);
       setAssignments(assignRes.assignments || []);
       setCrews((crewRes.crews || []).filter((c) => c.is_active));
       setAllUsers(
@@ -85,11 +90,20 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
           (u) => u.isActive !== false && u.is_active !== false
         )
       );
+      setActiveForLead((activeRes.active || []).filter((e) => e.lead_id === leadId));
     } catch (err) {
       setError(err.message || "Failed to load team data");
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadActiveForLead = async () => {
+    if (!canClockIn) return;
+    try {
+      const data = await apiRequest(`/api/time/active${cq}`);
+      setActiveForLead((data.active || []).filter((e) => e.lead_id === leadId));
+    } catch {}
   };
 
   // Split assignments into crew groups and individuals
@@ -227,6 +241,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     setSwitchedUsers(new Set());
     setKeptUsers(new Set());
     setError("");
+    loadActiveForLead();
   };
 
   const handleClockInToggle = (userId) => {
@@ -252,6 +267,22 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
       setError(err.message || "Failed to clock in crew");
     } finally {
       setClockingIn(false);
+    }
+  };
+
+  const handleClockOutIndividual = async (entryId, userId) => {
+    setClockingOutUser(userId);
+    setError("");
+    try {
+      await apiRequest(`/api/time/clock-out/${entryId}${cq}`, {
+        method: "PUT",
+        body: JSON.stringify({}),
+      });
+      setActiveForLead((prev) => prev.filter((e) => e.id !== entryId));
+    } catch (err) {
+      setError(err.message || "Failed to clock out");
+    } finally {
+      setClockingOutUser(null);
     }
   };
 
@@ -290,7 +321,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
         {/* HEADER */}
         <div className="bg-blue-700 text-white px-6 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
           <div>
-            <h2 className="text-lg font-bold">Assign Crew</h2>
+            <h2 className="text-lg font-bold">Manage Labor</h2>
             <p className="text-blue-200 text-sm mt-0.5 truncate">{lead?.name}</p>
           </div>
           <button
@@ -306,6 +337,37 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded">
               {error}
+            </div>
+          )}
+
+          {/* Currently clocked in for this job */}
+          {activeForLead.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-gray-700 mb-2">
+                Clocked In Now ({activeForLead.length})
+              </div>
+              <div className="space-y-2">
+                {activeForLead.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900">{e.user_name}</div>
+                      <div className="text-xs text-emerald-700">Since {fmtTime(e.clock_in)}</div>
+                    </div>
+                    {canClockIn && (
+                      <button
+                        onClick={() => handleClockOutIndividual(e.id, e.user_id)}
+                        disabled={clockingOutUser === e.user_id}
+                        className="text-xs font-semibold text-red-600 bg-red-100 hover:bg-red-200 disabled:opacity-50 px-2 py-1 rounded-md transition shrink-0"
+                      >
+                        {clockingOutUser === e.user_id ? "…" : "Clock Out"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -484,9 +546,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
 
             {addTab === "employee" && (
               <div className="space-y-3">
-                <p className="text-xs text-gray-500">
-                  Add individuals when partial crew shows up — first remove the crew, then add the people who showed up.
-                </p>
                 {availableUsers.length === 0 ? (
                   <div className="text-sm text-gray-400 text-center py-3">
                     All active employees are already assigned
@@ -502,18 +561,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                       {availableUsers.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name || u.email}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                      className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
                         </option>
                       ))}
                     </select>

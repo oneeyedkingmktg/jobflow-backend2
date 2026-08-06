@@ -295,7 +295,7 @@ const hasEstimate = form?.hasEstimate === true;
             onClick={(e) => { e.stopPropagation(); setShowTeamPanel(true); }}
             className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
           >
-            Assign Crew
+            Manage Labor
           </button>
         )}
 
