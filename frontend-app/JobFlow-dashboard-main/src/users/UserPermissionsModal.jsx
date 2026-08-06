@@ -59,6 +59,18 @@ const CATEGORIES = [
     description: "Access to the Reports tab",
     flag: "reports_enabled",
   },
+  {
+    key: "manage_labor",
+    label: "Manage Labor",
+    description: "Assign crew, add individuals, and clock team in/out from a job",
+    flag: null,
+  },
+  {
+    key: "job_report",
+    label: "Job Report",
+    description: "Job cost reports: labor hours, materials, profit margin",
+    flag: "job_reports_enabled",
+  },
 ];
 
 function getVisibleCategories(company) {
