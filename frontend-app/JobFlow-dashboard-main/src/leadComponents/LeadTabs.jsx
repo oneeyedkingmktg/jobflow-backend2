@@ -9,10 +9,12 @@ export default function LeadTabs({
   counts,
   onAddLead,
   onRefresh,
+  onJobReports,
   isMasterAdmin,
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
+  const isAdminPlus = user?.role === "admin" || user?.role === "master";
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const tabs = [
@@ -27,6 +29,7 @@ export default function LeadTabs({
     "+ Pre-Lead",
     "Calendar",
     "Sync Contacts",
+    ...(isAdminPlus ? ["Job Reports"] : []),
   ];
 
   const lockedTabs = ["Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All", "Calendar", "Sync Contacts", "Deleted"];
@@ -56,6 +59,11 @@ export default function LeadTabs({
 
     if (t === "Sync Contacts") {
       onRefresh();
+      return;
+    }
+
+    if (t === "Job Reports") {
+      onJobReports?.();
       return;
     }
 

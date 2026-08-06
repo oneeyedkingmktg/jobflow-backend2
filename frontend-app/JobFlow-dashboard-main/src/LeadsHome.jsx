@@ -18,6 +18,7 @@ import LeadsHeader from "./leadComponents/LeadHeader.jsx";
 
 
 import LeadTabs from "./leadComponents/LeadTabs.jsx";
+import JobReportPickerModal from "./leadModalParts/JobReportPickerModal.jsx";
 import LeadSearchBar from "./leadComponents/LeadSearchBar.jsx";
 import LeadCard from "./leadComponents/LeadCard.jsx";
 
@@ -164,6 +165,7 @@ export default function LeadsHome() {
   const [includeJunk, setIncludeJunk] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showPhoneLookup, setShowPhoneLookup] = useState(false);
+  const [showJobReportPicker, setShowJobReportPicker] = useState(false);
   const [serviceCalls, setServiceCalls] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [blockedTimes, setBlockedTimes] = useState([]);
@@ -414,6 +416,7 @@ const matchesSearch =
         counts={counts}
         onRefresh={loadLeads}
         isMasterAdmin={isMasterAdmin}
+        onJobReports={() => setShowJobReportPicker(true)}
 onAddLead={() => {
   if (isMasterAdmin) alert("Add Lead clicked! Company ID: " + currentCompany?.id);
   console.log("🆕 Add Lead clicked - Current company:", currentCompany);
@@ -588,6 +591,13 @@ onSaveAndExit={async (data) => {
       )}
 
 
+
+      {showJobReportPicker && (
+        <JobReportPickerModal
+          companyId={currentCompany?.id || currentCompany?.companyId}
+          onClose={() => setShowJobReportPicker(false)}
+        />
+      )}
 
       {showPhoneLookup && (
         <PhoneLookupModal

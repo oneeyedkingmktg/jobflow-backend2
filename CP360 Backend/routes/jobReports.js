@@ -159,6 +159,35 @@ router.delete("/library/items/:id", async (req, res) => {
 });
 
 // ============================================================================
+// GET /api/job-reports/jobs-with-labor
+// All leads that have at least one time entry, ordered by most recent labor.
+// ============================================================================
+router.get("/jobs-with-labor", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT l.id, l.name, l.address, l.city, l.state, l.status,
+              MAX(te.clock_in) AS last_labor_at,
+              COALESCE(SUM(te.duration_minutes), 0)::int AS total_minutes,
+              COUNT(te.id)::int AS entry_count
+       FROM leads l
+       JOIN time_entries te ON te.lead_id = l.id AND te.company_id = $1
+       WHERE l.company_id = $1 AND l.deleted_at IS NULL
+       GROUP BY l.id, l.name, l.address, l.city, l.state, l.status
+       ORDER BY last_labor_at DESC NULLS LAST`,
+      [companyId]
+    );
+
+    res.json({ jobs: result.rows });
+  } catch (err) {
+    console.error("Jobs with labor error:", err);
+    res.status(500).json({ error: "Failed to fetch jobs with labor" });
+  }
+});
+
+// ============================================================================
 // PER-JOB: SUMMARY (labor + materials + profit calc)
 // ============================================================================
 

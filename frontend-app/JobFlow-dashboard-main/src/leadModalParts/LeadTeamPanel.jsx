@@ -436,20 +436,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                       </div>
                     </div>
 
-                    <select
-                      value={a.role}
-                      onChange={(e) => handleChangeRole(a, e.target.value)}
-                      className={`text-xs font-semibold rounded-md px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                        ROLE_COLORS[a.role] || ROLE_COLORS.installer
-                      }`}
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
-                        </option>
-                      ))}
-                    </select>
-
                     {canClockIn && (
                       <button
                         onClick={() =>

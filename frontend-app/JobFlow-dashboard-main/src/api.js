@@ -477,6 +477,9 @@ function cqUrl(url, companyId) {
 }
 
 export const JobReportsAPI = {
+  getJobsWithLabor: (companyId) =>
+    apiRequest(cqUrl("/api/job-reports/jobs-with-labor", companyId)),
+
   getSummary: (leadId, companyId) =>
     apiRequest(cqUrl(`/api/job-reports/${leadId}/summary`, companyId)),
 
