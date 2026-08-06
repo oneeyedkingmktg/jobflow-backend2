@@ -519,7 +519,6 @@ router.get("/active", requireRole("admin", "master"), async (req, res) => {
 // Body: { user_id, lead_id }
 // ============================================================================
 router.post("/switch-job", requireRole("admin", "master"), async (req, res) => {
-  const client = await db.connect();
   try {
     const companyId = resolveCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "company_id required" });
@@ -530,43 +529,40 @@ router.post("/switch-job", requireRole("admin", "master"), async (req, res) => {
     }
 
     // Verify lead belongs to company
-    const leadCheck = await client.query(
+    const leadCheck = await db.query(
       "SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL",
       [lead_id, companyId]
     );
     if (!leadCheck.rows.length) return res.status(404).json({ error: "Lead not found" });
 
-    await client.query("BEGIN");
+    const result = await db.transaction(async (client) => {
+      // Close any open entry for this user in this company
+      const closeResult = await client.query(
+        `UPDATE time_entries
+         SET clock_out = NOW(), duration_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in)) / 60)
+         WHERE user_id = $1 AND company_id = $2 AND clock_out IS NULL
+         RETURNING id`,
+        [user_id, companyId]
+      );
 
-    // Close any open entry for this user in this company
-    const closeResult = await client.query(
-      `UPDATE time_entries
-       SET clock_out = NOW(), duration_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in)) / 60)
-       WHERE user_id = $1 AND company_id = $2 AND clock_out IS NULL
-       RETURNING id`,
-      [user_id, companyId]
-    );
+      // Open new entry on the target job
+      const newEntry = await client.query(
+        `INSERT INTO time_entries (company_id, user_id, lead_id, work_type, clock_in)
+         VALUES ($1, $2, $3, 'job', NOW())
+         RETURNING id, user_id, lead_id, work_type, clock_in`,
+        [companyId, user_id, lead_id]
+      );
 
-    // Open new entry on the target job
-    const newEntry = await client.query(
-      `INSERT INTO time_entries (company_id, user_id, lead_id, work_type, clock_in)
-       VALUES ($1, $2, $3, 'job', NOW())
-       RETURNING id, user_id, lead_id, work_type, clock_in`,
-      [companyId, user_id, lead_id]
-    );
-
-    await client.query("COMMIT");
-
-    res.json({
-      clocked_out_entry_id: closeResult.rows[0]?.id ?? null,
-      new_entry: newEntry.rows[0],
+      return {
+        clocked_out_entry_id: closeResult.rows[0]?.id ?? null,
+        new_entry: newEntry.rows[0],
+      };
     });
+
+    res.json(result);
   } catch (err) {
-    await client.query("ROLLBACK");
     console.error("Switch job error:", err);
     res.status(500).json({ error: "Failed to switch job" });
-  } finally {
-    client.release();
   }
 });
 
