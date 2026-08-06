@@ -255,22 +255,15 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     }
   };
 
-  // Clock out of old job and immediately clock in on this job
-  const handleSwitchJob = async (userId, entryId) => {
+  // Atomically clock a user out of their current job and into this job
+  const handleSwitchJob = async (userId) => {
     setSwitchingUsers((prev) => new Set([...prev, userId]));
     setError("");
     try {
-      // Step 1: clock out of current job
-      await apiRequest(`/api/time/clock-out/${entryId}${cq}`, {
-        method: "PUT",
-        body: JSON.stringify({}),
-      });
-      // Step 2: clock in on this job
-      await apiRequest(`/api/time/crew-clock-in${cq}`, {
+      await apiRequest(`/api/time/switch-job${cq}`, {
         method: "POST",
-        body: JSON.stringify({ lead_id: leadId, user_ids: [userId] }),
+        body: JSON.stringify({ user_id: userId, lead_id: leadId }),
       });
-      // Mark as switched and remove from active entries
       setSwitchedUsers((prev) => new Set([...prev, userId]));
       setActiveEntries((prev) => {
         const next = new Map(prev);
@@ -618,7 +611,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                             No, Keep Current
                           </button>
                           <button
-                            onClick={() => handleSwitchJob(m.userId, active.id)}
+                            onClick={() => handleSwitchJob(m.userId)}
                             disabled={switchingUsers.has(m.userId)}
                             className="py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition"
                           >

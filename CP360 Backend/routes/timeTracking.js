@@ -513,6 +513,64 @@ router.get("/active", requireRole("admin", "master"), async (req, res) => {
 });
 
 // ============================================================================
+// POST /api/time/switch-job
+// Admin/master-initiated: atomically clock one user out of their current open
+// entry and into a new job in a single transaction.
+// Body: { user_id, lead_id }
+// ============================================================================
+router.post("/switch-job", requireRole("admin", "master"), async (req, res) => {
+  const client = await db.connect();
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const { user_id, lead_id } = req.body;
+    if (!user_id || !lead_id) {
+      return res.status(400).json({ error: "user_id and lead_id are required" });
+    }
+
+    // Verify lead belongs to company
+    const leadCheck = await client.query(
+      "SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL",
+      [lead_id, companyId]
+    );
+    if (!leadCheck.rows.length) return res.status(404).json({ error: "Lead not found" });
+
+    await client.query("BEGIN");
+
+    // Close any open entry for this user in this company
+    const closeResult = await client.query(
+      `UPDATE time_entries
+       SET clock_out = NOW(), duration_minutes = ROUND(EXTRACT(EPOCH FROM (NOW() - clock_in)) / 60)
+       WHERE user_id = $1 AND company_id = $2 AND clock_out IS NULL
+       RETURNING id`,
+      [user_id, companyId]
+    );
+
+    // Open new entry on the target job
+    const newEntry = await client.query(
+      `INSERT INTO time_entries (company_id, user_id, lead_id, work_type, clock_in)
+       VALUES ($1, $2, $3, 'job', NOW())
+       RETURNING id, user_id, lead_id, work_type, clock_in`,
+      [companyId, user_id, lead_id]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({
+      clocked_out_entry_id: closeResult.rows[0]?.id ?? null,
+      new_entry: newEntry.rows[0],
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Switch job error:", err);
+    res.status(500).json({ error: "Failed to switch job" });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================================================
 // POST /api/time/crew-clock-out
 // Admin/master-initiated: clocks out a list of users by user_id.
 // Body: { user_ids: [1,2,3] }
