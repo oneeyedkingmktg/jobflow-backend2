@@ -40,29 +40,47 @@ function fmtHours(minutes) {
 // ============================================================================
 // TIME ENTRY FORM MODAL — add or edit a single entry (z-[80])
 // ============================================================================
+const NON_EMPLOYEE_SENTINEL = "__non_employee__";
+
 function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUsers, onSave, onClose }) {
   const isEdit = !!entry;
   const totalMin = entry?.duration_minutes || 0;
+  const editIsNonEmployee = isEdit && !!entry.non_employee_name;
   const [form, setForm] = useState({
-    user_id: entry?.user_id ? String(entry.user_id) : "",
+    user_id: entry?.user_id ? String(entry.user_id) : (editIsNonEmployee ? NON_EMPLOYEE_SENTINEL : ""),
+    non_employee_name: entry?.non_employee_name || "",
     date: entry ? new Date(entry.clock_in).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     hours: isEdit ? String(Math.floor(totalMin / 60)) : "",
     minutes: isEdit ? String(totalMin % 60) : "",
     notes: entry?.notes || "",
-    wage: "",
+    wage: entry?.hourly_wage ? String(entry.hourly_wage) : "",
   });
   const [saving, setSaving] = useState(false);
+
+  const isNonEmployee = form.user_id === NON_EMPLOYEE_SENTINEL;
 
   const handleSubmit = async () => {
     const h = parseInt(form.hours, 10) || 0;
     const m = parseInt(form.minutes, 10) || 0;
-    if (!isEdit && !form.user_id) { alert("Please select an employee."); return; }
+    if (!isEdit) {
+      if (!form.user_id) { alert("Please select an employee."); return; }
+      if (isNonEmployee && !form.non_employee_name.trim()) { alert("Please enter a name for the non-employee."); return; }
+    }
     if (h + m === 0) { alert("Duration must be greater than 0."); return; }
     setSaving(true);
     try {
       if (isEdit) {
         await JobReportsAPI.updateTimeEntry(leadId, entry.id, {
           hours: h, minutes: m, date: form.date, notes: form.notes || null,
+        }, companyId);
+      } else if (isNonEmployee) {
+        await JobReportsAPI.addManualTime(leadId, {
+          non_employee_name: form.non_employee_name.trim(),
+          date: form.date,
+          hours: h,
+          minutes: m,
+          notes: form.notes || null,
+          wage: form.wage !== "" ? parseFloat(form.wage) : undefined,
         }, companyId);
       } else {
         await JobReportsAPI.addManualTime(leadId, {
@@ -101,13 +119,34 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
             <select value={form.user_id} onChange={(e) => {
               const uid = e.target.value;
               const sel = companyUsers.find((u) => String(u.id) === uid);
-              setForm((f) => ({ ...f, user_id: uid, wage: sel?.hourly_cost ? String(sel.hourly_cost) : f.wage }));
+              setForm((f) => ({
+                ...f,
+                user_id: uid,
+                non_employee_name: uid === NON_EMPLOYEE_SENTINEL ? f.non_employee_name : "",
+                wage: sel?.hourly_cost ? String(sel.hourly_cost) : (uid === NON_EMPLOYEE_SENTINEL ? f.wage : ""),
+              }));
             }} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
               <option value="">Select employee…</option>
               {companyUsers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              <option value={NON_EMPLOYEE_SENTINEL}>— Non-Employee / Temp Labor —</option>
             </select>
           )}
         </div>
+
+        {/* Non-employee name field */}
+        {!isEdit && isNonEmployee && (
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Name / Description</label>
+            <input
+              type="text"
+              placeholder="e.g. Day laborer, John's crew…"
+              value={form.non_employee_name}
+              onChange={(e) => setForm((f) => ({ ...f, non_employee_name: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+              autoFocus
+            />
+          </div>
+        )}
 
         {/* Date */}
         <div>
@@ -133,10 +172,12 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
           </div>
         </div>
 
-        {/* Wage (add only) */}
-        {!isEdit && (
+        {/* Wage — required for non-employee (no override table), optional for real employees */}
+        {(!isEdit || editIsNonEmployee) && (
           <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">Wage / hr ($)</label>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">
+              Wage / hr ($){isNonEmployee && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
             <input type="number" min="0" step="0.01" placeholder="0.00" value={form.wage}
               onChange={(e) => setForm((f) => ({ ...f, wage: e.target.value }))}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
@@ -331,10 +372,11 @@ function TimeEntriesModal({ leadId, companyId, employees, onClose, onWageChange 
                       <div className="flex items-center justify-center">
                         <span className="text-gray-400 text-xs mr-0.5">$</span>
                         <input type="number" min="0" step="0.01" value={emp.wageInput} placeholder="0"
-                          onChange={(e) => setWageInput(idx, e.target.value)}
-                          onBlur={() => handleWageBlur(emp, idx)}
-                          className="w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400"
-                          disabled={!!saving[emp.user_id]} />
+                          onChange={(e) => !emp.non_employee_name && setWageInput(idx, e.target.value)}
+                          onBlur={() => !emp.non_employee_name && handleWageBlur(emp, idx)}
+                          className={`w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400 ${emp.non_employee_name ? "bg-gray-50 text-gray-400 cursor-default" : ""}`}
+                          disabled={!!saving[emp.user_id] || !!emp.non_employee_name}
+                          title={emp.non_employee_name ? "Wage is fixed at entry time for non-employee labor" : undefined} />
                       </div>
                       <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
                     </div>

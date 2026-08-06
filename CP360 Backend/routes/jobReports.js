@@ -226,22 +226,25 @@ router.get("/:leadId/summary", async (req, res) => {
     if (!leadRow.rows.length) return res.status(404).json({ error: "Lead not found" });
     const lead = leadRow.rows[0];
 
-    // Labor: aggregate completed entries by employee, apply per-job wage override
+    // Labor: aggregate completed entries by employee, apply per-job wage override.
+    // Non-employee entries (user_id IS NULL) use stored hourly_wage directly.
     const laborRows = await db.query(
       `SELECT
          te.user_id,
-         u.name AS user_name,
-         u.hourly_cost AS default_wage,
-         COALESCE(o.wage_override, u.hourly_cost, 0) AS effective_wage,
+         COALESCE(u.name, te.non_employee_name) AS user_name,
+         te.non_employee_name,
+         COALESCE(u.hourly_cost, 0) AS default_wage,
+         COALESCE(o.wage_override, u.hourly_cost, te.hourly_wage, 0) AS effective_wage,
          (o.wage_override IS NOT NULL) AS has_override,
          SUM(te.duration_minutes) AS total_minutes
        FROM time_entries te
-       JOIN users u ON u.id = te.user_id
+       LEFT JOIN users u ON u.id = te.user_id
        LEFT JOIN job_cost_labor_overrides o
          ON o.lead_id = te.lead_id AND o.user_id = te.user_id
        WHERE te.lead_id = $1 AND te.clock_out IS NOT NULL
-       GROUP BY te.user_id, u.name, u.hourly_cost, o.wage_override
-       ORDER BY u.name ASC`,
+       GROUP BY te.user_id, COALESCE(u.name, te.non_employee_name),
+                te.non_employee_name, u.hourly_cost, o.wage_override, te.hourly_wage
+       ORDER BY COALESCE(u.name, te.non_employee_name) ASC`,
       [leadId]
     );
 
@@ -277,6 +280,7 @@ router.get("/:leadId/summary", async (req, res) => {
         employees: laborRows.rows.map((r) => ({
           user_id: r.user_id,
           user_name: r.user_name,
+          non_employee_name: r.non_employee_name || null,
           total_minutes: parseInt(r.total_minutes, 10) || 0,
           default_wage: parseFloat(r.default_wage) || 0,
           effective_wage: parseFloat(r.effective_wage) || 0,
@@ -449,9 +453,10 @@ router.get("/:leadId/time-entries", async (req, res) => {
 
     const result = await db.query(
       `SELECT te.id, te.user_id, te.clock_in, te.duration_minutes, te.notes,
-              u.name AS user_name
+              te.non_employee_name, te.hourly_wage,
+              COALESCE(u.name, te.non_employee_name) AS user_name
        FROM time_entries te
-       JOIN users u ON u.id = te.user_id
+       LEFT JOIN users u ON u.id = te.user_id
        WHERE te.lead_id = $1 AND te.company_id = $2
        ORDER BY te.clock_in ASC`,
       [leadId, companyId]
@@ -527,8 +532,11 @@ router.post("/:leadId/manual-time", async (req, res) => {
     const companyId = resolveCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "company_id required" });
 
-    const { user_id, date, hours = 0, minutes = 0, notes, wage } = req.body;
-    if (!user_id) return res.status(400).json({ error: "user_id required" });
+    const { user_id, non_employee_name, date, hours = 0, minutes = 0, notes, wage } = req.body;
+    const isNonEmployee = !user_id && non_employee_name;
+    if (!user_id && !non_employee_name) {
+      return res.status(400).json({ error: "user_id or non_employee_name required" });
+    }
 
     const totalMinutes = (parseInt(hours, 10) || 0) * 60 + (parseInt(minutes, 10) || 0);
     if (totalMinutes <= 0) return res.status(400).json({ error: "Duration must be greater than 0" });
@@ -539,33 +547,43 @@ router.post("/:leadId/manual-time", async (req, res) => {
     );
     if (!leadCheck.rows.length) return res.status(404).json({ error: "Lead not found" });
 
-    const userCheck = await db.query(
-      "SELECT id FROM users WHERE id = $1 AND company_id = $2",
-      [parseInt(user_id, 10), companyId]
-    );
-    if (!userCheck.rows.length) return res.status(404).json({ error: "User not found" });
+    if (!isNonEmployee) {
+      const userCheck = await db.query(
+        "SELECT id FROM users WHERE id = $1 AND company_id = $2",
+        [parseInt(user_id, 10), companyId]
+      );
+      if (!userCheck.rows.length) return res.status(404).json({ error: "User not found" });
+    }
 
     // Use noon as clock-in anchor to avoid timezone shifts bleeding across day boundaries
     const entryDate = date || new Date().toISOString().slice(0, 10);
     const clockIn = `${entryDate}T12:00:00`;
     const clockOut = new Date(new Date(clockIn).getTime() + totalMinutes * 60000).toISOString();
+    const wageNum = parseFloat(wage);
+    const storedWage = !isNaN(wageNum) && wageNum >= 0 ? wageNum : null;
 
     const result = await db.query(
       `INSERT INTO time_entries
-         (company_id, user_id, lead_id, work_type, clock_in, clock_out, duration_minutes, notes)
-       VALUES ($1, $2, $3, 'job', $4, $5, $6, $7)
+         (company_id, user_id, lead_id, work_type, clock_in, clock_out, duration_minutes, notes,
+          non_employee_name, hourly_wage)
+       VALUES ($1, $2, $3, 'job', $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [companyId, parseInt(user_id, 10), leadId, clockIn, clockOut, totalMinutes, notes || null]
+      [
+        companyId,
+        isNonEmployee ? null : parseInt(user_id, 10),
+        leadId, clockIn, clockOut, totalMinutes, notes || null,
+        isNonEmployee ? non_employee_name.trim() : null,
+        isNonEmployee ? storedWage : null,
+      ]
     );
 
-    // If a wage was provided, upsert the labor override for this lead+user
-    const wageNum = parseFloat(wage);
-    if (!isNaN(wageNum) && wageNum >= 0) {
+    // For real employees: upsert wage override when provided
+    if (!isNonEmployee && storedWage !== null) {
       await db.query(
         `INSERT INTO job_cost_labor_overrides (lead_id, company_id, user_id, wage_override)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (lead_id, user_id) DO UPDATE SET wage_override = EXCLUDED.wage_override, updated_at = NOW()`,
-        [leadId, companyId, parseInt(user_id, 10), wageNum]
+        [leadId, companyId, parseInt(user_id, 10), storedWage]
       );
     }
 

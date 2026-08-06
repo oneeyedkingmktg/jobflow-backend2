@@ -18,6 +18,14 @@ db.query(`
   WHERE clock_out IS NULL
 `).catch((err) => console.error("time_entries unique index migration:", err.message));
 
+// Non-employee time entry support: make user_id nullable, add name + wage columns
+db.query(`ALTER TABLE time_entries ALTER COLUMN user_id DROP NOT NULL`)
+  .catch(() => {}); // no-op if already nullable
+db.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS non_employee_name TEXT`)
+  .catch((err) => console.error("non_employee_name migration:", err.message));
+db.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS hourly_wage NUMERIC(10,2)`)
+  .catch((err) => console.error("hourly_wage migration:", err.message));
+
 function resolveCompanyId(req) {
   if (req.user.role === "master") {
     const id = req.query.company_id || (req.body && req.body.company_id);
@@ -402,9 +410,11 @@ router.get("/lead/:leadId", requireRole("admin", "master"), async (req, res) => 
     const result = await db.query(
       `SELECT te.id, te.user_id, te.work_type, te.clock_in, te.clock_out,
               te.duration_minutes, te.notes, te.service_call_id,
-              u.name AS user_name, u.hourly_cost
+              te.non_employee_name, te.hourly_wage,
+              COALESCE(u.name, te.non_employee_name) AS user_name,
+              COALESCE(u.hourly_cost, te.hourly_wage, 0) AS hourly_cost
        FROM time_entries te
-       JOIN users u ON u.id = te.user_id
+       LEFT JOIN users u ON u.id = te.user_id
        WHERE te.lead_id = $1
        ORDER BY te.clock_in ASC`,
       [leadId]
