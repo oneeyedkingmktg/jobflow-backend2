@@ -480,7 +480,7 @@ function MaterialsForm({ leadId, companyId, onClose, onUpdate }) {
       setSelectedCatId("");
       setSelectedItemId("");
       setAddMode("library");
-      setLibSearch("");
+      setExpandedPickerCats({});
       await load();
       onUpdate();
     } catch (err) {
