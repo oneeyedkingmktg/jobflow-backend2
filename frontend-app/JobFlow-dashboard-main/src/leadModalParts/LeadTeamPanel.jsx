@@ -60,8 +60,9 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   // Active entries: userId → { id, lead_name, clock_in }
   const [activeEntries, setActiveEntries] = useState(new Map());
   const [activeEntriesLoading, setActiveEntriesLoading] = useState(false);
-  // Clock-out: Set of userIds currently being clocked out
-  const [clockOutLoading, setClockOutLoading] = useState(new Set());
+  // Switch job: Set of userIds being switched, Set of userIds already switched
+  const [switchingUsers, setSwitchingUsers] = useState(new Set());
+  const [switchedUsers, setSwitchedUsers] = useState(new Set());
 
   useEffect(() => {
     loadAll();
@@ -221,6 +222,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     setClockInModal(null);
     setClockInResults(null);
     setActiveEntries(new Map());
+    setSwitchedUsers(new Set());
     setError("");
   };
 
@@ -250,25 +252,32 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     }
   };
 
-  const handleClockOutFromModal = async (userId, entryId) => {
-    setClockOutLoading((prev) => new Set([...prev, userId]));
+  // Clock out of old job and immediately clock in on this job
+  const handleSwitchJob = async (userId, entryId) => {
+    setSwitchingUsers((prev) => new Set([...prev, userId]));
     setError("");
     try {
+      // Step 1: clock out of current job
       await apiRequest(`/api/time/clock-out/${entryId}${cq}`, {
         method: "PUT",
         body: JSON.stringify({}),
       });
-      // Remove from active entries and auto-select them to clock in here
+      // Step 2: clock in on this job
+      await apiRequest(`/api/time/crew-clock-in${cq}`, {
+        method: "POST",
+        body: JSON.stringify({ lead_id: leadId, user_ids: [userId] }),
+      });
+      // Mark as switched and remove from active entries
+      setSwitchedUsers((prev) => new Set([...prev, userId]));
       setActiveEntries((prev) => {
         const next = new Map(prev);
         next.delete(userId);
         return next;
       });
-      setClockInChecked((prev) => new Set([...prev, userId]));
     } catch (err) {
-      setError(err.message || "Failed to clock out");
+      setError(err.message || "Failed to switch job");
     } finally {
-      setClockOutLoading((prev) => {
+      setSwitchingUsers((prev) => {
         const next = new Set(prev);
         next.delete(userId);
         return next;
@@ -550,25 +559,43 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                   const isChecked = clockInChecked.has(m.userId);
                   const result = clockInResults?.find((r) => r.user_id === m.userId);
 
-                  if (active && !result) {
-                    // Already clocked in somewhere — show clock-out option
+                  if (switchedUsers.has(m.userId)) {
+                    // Already switched to this job
                     return (
                       <div
                         key={m.userId}
-                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-amber-200 bg-amber-50"
+                        className="flex items-center gap-3 p-3 rounded-xl border-2 border-emerald-400 bg-emerald-50"
                       >
+                        <span className="text-emerald-600 font-bold text-base shrink-0">✓</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-gray-900">{m.userName}</div>
-                          <div className="text-xs text-amber-700 truncate">
-                            On: {active.lead_name || "Non-Job Work"} · since {fmtTime(active.clock_in)}
-                          </div>
+                          <div className="text-xs text-emerald-700">Switched to this job</div>
                         </div>
+                      </div>
+                    );
+                  }
+
+                  if (active && !result) {
+                    // Already clocked in on a different job — prompt to switch
+                    return (
+                      <div
+                        key={m.userId}
+                        className="p-3 rounded-xl border-2 border-amber-300 bg-amber-50 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-semibold text-gray-900 text-sm">{m.userName}</div>
+                          <span className="text-xs text-amber-700 font-semibold shrink-0">Already Clocked In</span>
+                        </div>
+                        <div className="text-xs text-amber-800">
+                          Currently on: <span className="font-semibold">{active.lead_name || "Non-Job Work"}</span> since {fmtTime(active.clock_in)}
+                        </div>
+                        <div className="text-xs text-gray-600 italic">Switch to clock them into this job instead?</div>
                         <button
-                          onClick={() => handleClockOutFromModal(m.userId, active.id)}
-                          disabled={clockOutLoading.has(m.userId)}
-                          className="text-xs font-bold text-red-600 bg-red-100 hover:bg-red-200 disabled:opacity-50 px-2 py-1 rounded-md shrink-0 transition"
+                          onClick={() => handleSwitchJob(m.userId, active.id)}
+                          disabled={switchingUsers.has(m.userId)}
+                          className="w-full py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition"
                         >
-                          {clockOutLoading.has(m.userId) ? "…" : "Clock Out"}
+                          {switchingUsers.has(m.userId) ? "Switching…" : "Yes, Switch to This Job"}
                         </button>
                       </div>
                     );
