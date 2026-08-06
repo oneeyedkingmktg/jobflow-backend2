@@ -160,12 +160,33 @@ router.delete("/library/items/:id", async (req, res) => {
 
 // ============================================================================
 // GET /api/job-reports/jobs-with-labor
-// All leads that have at least one time entry, ordered by most recent labor.
+// No search: leads with labor, ordered by most recent clock-in.
+// ?search=term: ALL matching leads (LEFT JOIN), ordered by recent labor then name.
 // ============================================================================
 router.get("/jobs-with-labor", async (req, res) => {
   try {
     const companyId = resolveCompanyId(req);
     if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const search = req.query.search ? `%${req.query.search.trim()}%` : null;
+
+    if (search) {
+      const result = await db.query(
+        `SELECT l.id, l.name, l.address, l.city, l.state, l.status,
+                MAX(te.clock_in) AS last_labor_at,
+                COALESCE(SUM(te.duration_minutes), 0)::int AS total_minutes,
+                COUNT(te.id)::int AS entry_count
+         FROM leads l
+         LEFT JOIN time_entries te ON te.lead_id = l.id AND te.company_id = $1
+         WHERE l.company_id = $1 AND l.deleted_at IS NULL
+           AND (l.name ILIKE $2 OR l.address ILIKE $2 OR l.city ILIKE $2 OR l.phone ILIKE $2)
+         GROUP BY l.id, l.name, l.address, l.city, l.state, l.status
+         ORDER BY last_labor_at DESC NULLS LAST, l.name ASC
+         LIMIT 50`,
+        [companyId, search]
+      );
+      return res.json({ jobs: result.rows });
+    }
 
     const result = await db.query(
       `SELECT l.id, l.name, l.address, l.city, l.state, l.status,

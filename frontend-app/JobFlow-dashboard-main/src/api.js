@@ -477,8 +477,11 @@ function cqUrl(url, companyId) {
 }
 
 export const JobReportsAPI = {
-  getJobsWithLabor: (companyId) =>
-    apiRequest(cqUrl("/api/job-reports/jobs-with-labor", companyId)),
+  getJobsWithLabor: (companyId, search) => {
+    const base = cqUrl("/api/job-reports/jobs-with-labor", companyId);
+    const url = search ? `${base}${companyId ? "&" : "?"}search=${encodeURIComponent(search)}` : base;
+    return apiRequest(url);
+  },
 
   getSummary: (leadId, companyId) =>
     apiRequest(cqUrl(`/api/job-reports/${leadId}/summary`, companyId)),

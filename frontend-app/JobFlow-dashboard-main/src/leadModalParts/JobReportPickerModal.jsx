@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { JobReportsAPI } from "../api";
 import JobReportsPanel from "./JobReportsPanel";
 
@@ -26,24 +26,27 @@ export default function JobReportPickerModal({ companyId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedLead, setSelectedLead] = useState(null);
+  const debounceRef = useRef(null);
 
-  useEffect(() => {
-    JobReportsAPI.getJobsWithLabor(companyId)
+  const fetchJobs = (term) => {
+    setLoading(true);
+    JobReportsAPI.getJobsWithLabor(companyId, term || undefined)
       .then((data) => setJobs(data.jobs || []))
-      .catch(() => {})
+      .catch(() => setJobs([]))
       .finally(() => setLoading(false));
-  }, [companyId]);
+  };
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return jobs;
-    const q = search.toLowerCase();
-    return jobs.filter(
-      (j) =>
-        j.name?.toLowerCase().includes(q) ||
-        j.address?.toLowerCase().includes(q) ||
-        j.city?.toLowerCase().includes(q)
-    );
-  }, [jobs, search]);
+  // Initial load
+  useEffect(() => { fetchJobs(""); }, [companyId]);
+
+  const handleSearch = (e) => {
+    const val = e.target.value;
+    setSearch(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchJobs(val), 300);
+  };
+
+  const filtered = jobs;
 
   if (selectedLead) {
     return (
@@ -80,7 +83,7 @@ export default function JobReportPickerModal({ companyId, onClose }) {
             type="text"
             placeholder="Search jobs…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearch}
             autoFocus
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
