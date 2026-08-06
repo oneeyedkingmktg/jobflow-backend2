@@ -138,12 +138,12 @@ export default function CrewsManager({ companyId, onClose }) {
     }
   };
 
-  const handleToggleLead = async (member) => {
+  const handleToggleLead = async (member, newIsLead) => {
     if (editing === "new") return;
     try {
-      await CrewsAPI.updateMember(editing.id, member.userId, !member.isLead);
+      await CrewsAPI.updateMember(editing.id, member.userId, newIsLead);
       const updateMembers = (members) =>
-        members.map((m) => (m.userId === member.userId ? { ...m, isLead: !m.isLead } : m));
+        members.map((m) => (m.userId === member.userId ? { ...m, isLead: newIsLead } : m));
       setCrews((prev) =>
         prev.map((c) => (c.id === editing.id ? { ...c, members: updateMembers(c.members || []) } : c))
       );
@@ -337,16 +337,14 @@ export default function CrewsManager({ companyId, onClose }) {
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => handleToggleLead(m)}
-                              className={`px-2 py-1 rounded-md text-xs font-semibold transition ${
-                                m.isLead
-                                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                              }`}
+                            <select
+                              value={m.isLead ? "lead" : "member"}
+                              onChange={(e) => handleToggleLead(m, e.target.value === "lead")}
+                              className="text-xs font-semibold rounded-md px-2 py-1 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-700"
                             >
-                              {m.isLead ? "Lead" : "Member"}
-                            </button>
+                              <option value="lead">Crew Lead</option>
+                              <option value="member">Member</option>
+                            </select>
                             <button
                               onClick={() => handleRemoveMember(m)}
                               className="text-red-400 hover:text-red-600 text-lg leading-none px-1"

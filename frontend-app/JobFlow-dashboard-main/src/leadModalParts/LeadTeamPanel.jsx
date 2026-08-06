@@ -26,7 +26,6 @@ const ROLE_COLORS = {
 
 export default function LeadTeamPanel({ lead, companyId, currentUser, onClose }) {
   const leadId = lead?.id;
-  const isJob = lead?.status === "job";
   const canClockIn = currentUser?.role === "admin" || currentUser?.role === "master";
 
   const [assignments, setAssignments] = useState([]);
@@ -47,8 +46,9 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
   // Which tab: "employee" | "crew"
   const [addTab, setAddTab] = useState("crew");
 
-  // Clock-in crew state
-  const [clockInSelected, setClockInSelected] = useState(new Set());
+  // Clock-in sub-modal state
+  const [clockInModal, setClockInModal] = useState(null); // null | crew group object
+  const [clockInChecked, setClockInChecked] = useState(new Set());
   const [clockingIn, setClockingIn] = useState(false);
   const [clockInResults, setClockInResults] = useState(null);
 
@@ -177,43 +177,38 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
     }
   };
 
-  // All assigned user IDs (from crews and individuals)
-  const allAssignedUserIds = useMemo(() => {
-    const ids = new Set();
-    assignments.forEach((a) => ids.add(a.userId));
-    return ids;
-  }, [assignments]);
+  // Clock-in sub-modal handlers
+  const handleClockInOpen = (group) => {
+    setClockInModal(group);
+    setClockInChecked(new Set(group.members.map((m) => m.userId)));
+    setClockInResults(null);
+    setError("");
+  };
 
-  const allAssignedUsers = useMemo(() => {
-    return allUsers.filter((u) => allAssignedUserIds.has(u.id));
-  }, [allUsers, allAssignedUserIds]);
+  const handleClockInClose = () => {
+    setClockInModal(null);
+    setClockInResults(null);
+    setError("");
+  };
 
-  const toggleClockInUser = (userId) => {
-    setClockInSelected((prev) => {
+  const handleClockInToggle = (userId) => {
+    setClockInChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
       return next;
     });
   };
 
-  const toggleClockInAll = () => {
-    if (clockInSelected.size === allAssignedUsers.length) {
-      setClockInSelected(new Set());
-    } else {
-      setClockInSelected(new Set(allAssignedUsers.map((u) => u.id)));
-    }
-  };
-
-  const handleCrewClockIn = async () => {
-    if (!clockInSelected.size || clockingIn) return;
+  const handleClockInSubmit = async () => {
+    if (!clockInChecked.size || clockingIn) return;
     setClockingIn(true);
-    setClockInResults(null);
     setError("");
     try {
       const cq = companyId ? `?company_id=${companyId}` : "";
       const data = await apiRequest(`/api/time/crew-clock-in${cq}`, {
         method: "POST",
-        body: JSON.stringify({ lead_id: leadId, user_ids: [...clockInSelected] }),
+        body: JSON.stringify({ lead_id: leadId, user_ids: [...clockInChecked] }),
       });
       setClockInResults(data.results || []);
     } catch (err) {
@@ -265,7 +260,7 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Crew blocks — one block per crew, no individual remove buttons */}
+                {/* Crew blocks — one block per crew */}
                 {crewGroups.map((group) => (
                   <div
                     key={`crew-${group.crewId}`}
@@ -284,12 +279,22 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                           {group.members.map((m) => m.userName).join(", ")}
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleRemoveCrew(group.crewId)}
-                        className="text-xs text-red-400 hover:text-red-600 font-medium shrink-0 px-1"
-                      >
-                        Remove crew
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {canClockIn && (
+                          <button
+                            onClick={() => handleClockInOpen(group)}
+                            className="text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-md transition"
+                          >
+                            Clock In
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemoveCrew(group.crewId)}
+                          className="text-xs text-red-400 hover:text-red-600 font-medium px-1"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -452,72 +457,6 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
           </div>
         </div>
 
-        {/* CLOCK IN CREW — only when lead is in "job" status and user is admin/master */}
-        {isJob && canClockIn && allAssignedUsers.length > 0 && (
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-sm font-bold text-gray-700">Clock In Crew</div>
-              <span className="text-xs text-gray-400 italic">Tap a crew member to select</span>
-            </div>
-
-            {/* Clock All toggle */}
-            <label className="flex items-center gap-2 mb-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={clockInSelected.size === allAssignedUsers.length && allAssignedUsers.length > 0}
-                onChange={toggleClockInAll}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600"
-              />
-              <span className="text-sm font-semibold text-gray-700">Clock All In</span>
-            </label>
-
-            {/* Individual crew members */}
-            <div className="space-y-2">
-              {allAssignedUsers.map((u) => {
-                const isSelected = clockInSelected.has(u.id);
-                const result = clockInResults?.find((r) => r.user_id === u.id);
-                return (
-                  <button
-                    key={u.id}
-                    onClick={() => !result && toggleClockInUser(u.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-colors text-left ${
-                      result?.status === "clocked_in"
-                        ? "border-green-400 bg-green-50 cursor-default"
-                        : result?.status === "already_clocked_in"
-                        ? "border-gray-200 bg-gray-50 cursor-default opacity-60"
-                        : isSelected
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                      result?.status === "clocked_in" ? "border-green-500 bg-green-500"
-                      : isSelected ? "border-blue-600 bg-blue-600" : "border-gray-400"
-                    }`} />
-                    <span className="text-sm font-semibold text-gray-900 flex-1">{u.name || u.email}</span>
-                    {result?.status === "clocked_in" && <span className="text-xs text-green-600 font-semibold">Clocked In</span>}
-                    {result?.status === "already_clocked_in" && <span className="text-xs text-gray-400">Already In</span>}
-                  </button>
-                );
-              })}
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded mt-2">
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={handleCrewClockIn}
-              disabled={!clockInSelected.size || clockingIn}
-              className="w-full mt-3 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-xl transition-colors text-sm"
-            >
-              {clockingIn ? "Clocking In…" : clockInSelected.size > 0 ? `Clock In ${clockInSelected.size} Member${clockInSelected.size > 1 ? "s" : ""}` : "Select Members to Clock In"}
-            </button>
-          </div>
-        )}
-
         {/* FOOTER */}
         <div className="border-t px-6 py-4 bg-gray-50 shrink-0 md:rounded-b-2xl">
           <button
@@ -528,6 +467,98 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
           </button>
         </div>
       </div>
+
+      {/* CLOCK IN SUB-MODAL */}
+      {clockInModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+            {/* Sub-modal header */}
+            <div className="bg-emerald-700 text-white px-5 py-4 flex items-center justify-between">
+              <div>
+                <div className="font-bold text-base">Clock In Crew</div>
+                <div className="text-emerald-200 text-sm mt-0.5">{clockInModal.crewName}</div>
+              </div>
+              <button
+                onClick={handleClockInClose}
+                className="text-emerald-200 hover:text-white text-2xl leading-none px-1"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Member list */}
+            <div className="p-5 space-y-2">
+              {clockInModal.members.map((m) => {
+                const isChecked = clockInChecked.has(m.userId);
+                const result = clockInResults?.find((r) => r.user_id === m.userId);
+                return (
+                  <label
+                    key={m.userId}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
+                      result?.status === "clocked_in"
+                        ? "border-emerald-400 bg-emerald-50 cursor-default"
+                        : result?.status === "already_clocked_in"
+                        ? "border-gray-200 bg-gray-50 cursor-default opacity-60"
+                        : isChecked
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!isChecked}
+                      disabled={!!result}
+                      onChange={() => !result && handleClockInToggle(m.userId)}
+                      className="w-4 h-4 rounded accent-emerald-600"
+                    />
+                    <span className="text-sm font-semibold text-gray-900 flex-1">
+                      {m.userName}
+                    </span>
+                    {result?.status === "clocked_in" && (
+                      <span className="text-xs text-emerald-600 font-semibold">Clocked In</span>
+                    )}
+                    {result?.status === "already_clocked_in" && (
+                      <span className="text-xs text-gray-400">Already In</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="mx-5 mb-3 bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded">
+                {error}
+              </div>
+            )}
+
+            {/* Submit button */}
+            <div className="px-5 pb-5">
+              {clockInResults ? (
+                <button
+                  onClick={handleClockInClose}
+                  className="w-full py-3 bg-gray-200 text-gray-700 hover:bg-gray-300 font-bold rounded-xl text-sm transition"
+                >
+                  Done
+                </button>
+              ) : (
+                <button
+                  onClick={handleClockInSubmit}
+                  disabled={!clockInChecked.size || clockingIn}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-xl text-sm transition"
+                >
+                  {clockingIn
+                    ? "Clocking In…"
+                    : clockInChecked.size > 0
+                    ? `Clock In ${clockInChecked.size} Member${clockInChecked.size !== 1 ? "s" : ""}`
+                    : "Select Members"}
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
