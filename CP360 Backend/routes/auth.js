@@ -102,9 +102,12 @@ router.post('/login', async (req, res) => {
         ARRAY(SELECT cm.crew_id FROM crew_members cm WHERE cm.user_id = u.id) AS crew_ids,
         c.ghl_location_id,
         u.service_calls_enabled,
-        u.permissions
+        u.permissions,
+        u.permission_role_id,
+        pr.permissions AS role_permissions
       FROM users u
       LEFT JOIN companies c ON u.company_id = c.id
+      LEFT JOIN permission_roles pr ON u.permission_role_id = pr.id
       WHERE u.email = $1 AND u.is_active = true`,
       [email]
     );
@@ -147,7 +150,9 @@ router.post('/login', async (req, res) => {
         planType: user.plan_type || 'pro',
         reportsEnabled: user.reports_enabled ?? false,
         service_calls_enabled: user.service_calls_enabled ?? false,
-        permissions: user.permissions ?? {}
+        permissions: user.permission_role_id
+          ? (user.role_permissions ?? {})
+          : (user.permissions ?? {})
       }
     });
 
@@ -182,9 +187,12 @@ router.get('/verify', async (req, res) => {
         c.plan_type,
         c.reports_enabled,
         u.service_calls_enabled,
-        u.permissions
+        u.permissions,
+        u.permission_role_id,
+        pr.permissions AS role_permissions
       FROM users u
       LEFT JOIN companies c ON u.company_id = c.id
+      LEFT JOIN permission_roles pr ON u.permission_role_id = pr.id
       WHERE u.id = $1 AND u.is_active = true`,
       [decoded.id]
     );
@@ -193,7 +201,11 @@ router.get('/verify', async (req, res) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    res.json({ success: true, user: result.rows[0] });
+    const u = result.rows[0];
+    const effectivePermissions = u.permission_role_id
+      ? (u.role_permissions ?? {})
+      : (u.permissions ?? {});
+    res.json({ success: true, user: { ...u, permissions: effectivePermissions } });
 
   } catch (error) {
     res.status(401).json({ message: 'Invalid token' });
