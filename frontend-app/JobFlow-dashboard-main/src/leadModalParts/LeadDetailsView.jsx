@@ -263,20 +263,18 @@ const hasEstimate = form?.hasEstimate === true;
         )}
 
         {/* Photos & Files */}
-        {contactEditPermission !== 'hide' && (
-          isEstimatorOnly ? (
-            <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
-              🔒 Upgrade to Pro for jobsite photos
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
-              className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
-            >
-              Photos &amp; Files
-            </button>
-          )
+        {isEstimatorOnly ? (
+          <div className="px-3 py-3 bg-gray-100 text-gray-400 rounded-xl font-semibold text-sm text-center border border-gray-200 cursor-not-allowed leading-tight">
+            🔒 Upgrade to Pro for jobsite photos
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowFilesModal(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            Photos &amp; Files
+          </button>
         )}
 
         {/* Bids */}
