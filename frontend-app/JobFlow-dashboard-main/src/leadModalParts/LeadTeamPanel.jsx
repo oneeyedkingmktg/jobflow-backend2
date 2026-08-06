@@ -388,6 +388,21 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                       ))}
                     </select>
 
+                    {canClockIn && (
+                      <button
+                        onClick={() =>
+                          handleClockInOpen({
+                            crewId: null,
+                            crewName: a.userName,
+                            crewColor: null,
+                            members: [{ userId: a.userId, userName: a.userName }],
+                          })
+                        }
+                        className="text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-md transition shrink-0"
+                      >
+                        Clock In
+                      </button>
+                    )}
                     <button
                       onClick={() => handleRemoveIndividual(a)}
                       className="text-gray-300 hover:text-red-500 text-xl leading-none px-1 shrink-0"
