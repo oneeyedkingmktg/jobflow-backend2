@@ -414,9 +414,9 @@ export default function TimeTrackingPage({ onBack }) {
 
       {/* ── Week Modal ────────────────────────────────────────────────── */}
       {showWeek && weekData && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center md:justify-center md:p-6">
-          <div className="w-full bg-white rounded-t-2xl md:rounded-2xl max-h-[80vh] md:max-w-2xl flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 md:p-6">
+          <div className="w-full bg-white rounded-2xl max-h-[80vh] md:max-w-2xl flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-900">This Week</h2>
               <button onClick={() => setShowWeek(false)} className="text-gray-500 hover:text-gray-700">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -424,7 +424,7 @@ export default function TimeTrackingPage({ onBack }) {
                 </svg>
               </button>
             </div>
-            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
+            <div className="overflow-y-auto flex-1 px-6 py-3 space-y-2">
               {weekData.entries.length === 0 ? (
                 <p className="text-center text-gray-400 text-sm py-8">No entries this week</p>
               ) : (

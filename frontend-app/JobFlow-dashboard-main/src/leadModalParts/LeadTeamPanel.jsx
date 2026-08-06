@@ -179,7 +179,7 @@ export default function LeadTeamPanel({ lead, companyId, onClose }) {
         {/* HEADER */}
         <div className="bg-blue-700 text-white px-5 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
           <div>
-            <h2 className="text-lg font-bold">Assign Team</h2>
+            <h2 className="text-lg font-bold">Assign Crew</h2>
             <p className="text-blue-200 text-sm mt-0.5 truncate">{lead?.name}</p>
           </div>
           <button

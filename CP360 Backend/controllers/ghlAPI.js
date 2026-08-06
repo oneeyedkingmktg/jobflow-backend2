@@ -1349,7 +1349,11 @@ console.log("[CALENDAR SYNC] Update Payload:", JSON.stringify(updatePayload, nul
     return { type, action: 'skipped', calendarEventId: existingEventId };
   }
 
-  // CREATE NEW
+  // CREATE NEW — skip if appointment is in the past (GHL rejects past slots even with ignoreDateRanges)
+  if (startDateTime < new Date()) {
+    console.warn(`⏭️ [CALENDAR SKIP] ${calendarType} for lead ${lead.id} is in the past (${startDateTime.toISOString()}) — skipping GHL create`);
+    return null;
+  }
   const created = await ghlCalendarRequestWithRetry(
     company,
     "/calendars/events/appointments",
