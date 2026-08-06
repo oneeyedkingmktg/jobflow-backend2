@@ -613,16 +613,16 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
                           <button
                             onClick={() => setKeptUsers((prev) => new Set([...prev, m.userId]))}
                             disabled={switchingUsers.has(m.userId)}
-                            className="py-2 text-xs font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 rounded-lg transition"
+                            className="py-2 text-xs font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 rounded-lg transition"
                           >
-                            Keep on Current Job
+                            No, Keep Current
                           </button>
                           <button
                             onClick={() => handleSwitchJob(m.userId, active.id)}
                             disabled={switchingUsers.has(m.userId)}
                             className="py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition"
                           >
-                            {switchingUsers.has(m.userId) ? "Switching…" : "Switch to This Job"}
+                            {switchingUsers.has(m.userId) ? "Switching…" : "Yes, Switch Job"}
                           </button>
                         </div>
                       </div>
@@ -672,24 +672,22 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
             )}
 
             <div className="px-5 pb-5">
-              {clockInResults ? (
+              {clockInChecked.size > 0 && !clockInResults ? (
+                <button
+                  onClick={handleClockInSubmit}
+                  disabled={clockingIn || activeEntriesLoading}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition"
+                >
+                  {clockingIn
+                    ? "Clocking In…"
+                    : `Clock In ${clockInChecked.size} Member${clockInChecked.size !== 1 ? "s" : ""}`}
+                </button>
+              ) : (
                 <button
                   onClick={handleClockInClose}
                   className="w-full py-3 bg-gray-200 text-gray-700 hover:bg-gray-300 font-bold rounded-xl text-sm transition"
                 >
-                  Done
-                </button>
-              ) : (
-                <button
-                  onClick={handleClockInSubmit}
-                  disabled={!clockInChecked.size || clockingIn || activeEntriesLoading}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold rounded-xl text-sm transition"
-                >
-                  {clockingIn
-                    ? "Clocking In…"
-                    : clockInChecked.size > 0
-                    ? `Clock In ${clockInChecked.size} Member${clockInChecked.size !== 1 ? "s" : ""}`
-                    : "No Members Selected"}
+                  {clockInResults ? "Done" : "Close"}
                 </button>
               )}
             </div>
