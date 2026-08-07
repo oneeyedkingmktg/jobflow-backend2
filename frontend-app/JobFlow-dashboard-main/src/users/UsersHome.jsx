@@ -123,8 +123,11 @@ const canManage = showAllUsers
           ...(form.sip_username !== undefined && { sip_username: form.sip_username || null }),
           ...(form.sip_password ? { sip_password: form.sip_password } : {}),
           sip_incoming_enabled: form.sip_incoming_enabled,
+          service_calls_enabled: form.service_calls_enabled,
           is_salesman: form.is_salesman || false,
           salesman_color: form.salesman_color || null,
+          permission_role_id: form.permission_role_id ?? null,
+          hourly_cost: form.hourly_cost !== "" ? form.hourly_cost : null,
         };
 
         console.log("Updating user with payload:", payload);
