@@ -112,6 +112,10 @@ export default function CalendarView({
   const amSalesman = currentUser?.isSalesman === true;
   // restrictedView = true when user is a crew member or salesman (not admin/master)
   const restrictedView = !isAdminOrMaster && (amCrewMember || amSalesman);
+  // Global access = admin/master OR role has calendar_other_crews permission
+  const hasGlobalCalendarAccess =
+    isAdminOrMaster ||
+    (calendarRolePerms?.calendar_other_crews !== false && calendarRolePerms?.calendar_install !== false);
   // ────────────────────────────────────────────────────────────────────────
 
   const getDaysInMonth = (year, month) => {
@@ -398,13 +402,6 @@ export default function CalendarView({
   const handleLeadClick = (lead, subView, date = null) => {
     onSelectLead(lead, subView, date);
   };
-
-  // Whether this user sees crew-level toggles (global access)
-  const hasGlobalCalendarAccess = useMemo(() => {
-    if (isAdminOrMaster) return true;
-    if (calendarRolePerms?.calendar_other_crews !== false && calendarRolePerms?.calendar_install !== false) return true;
-    return false;
-  }, [isAdminOrMaster, calendarRolePerms]);
 
   // Which calendar options appear in the gear panel?
   // Admin/master → all three. Role with calendar perms → filtered by role. Fallback → restrictedView logic.
