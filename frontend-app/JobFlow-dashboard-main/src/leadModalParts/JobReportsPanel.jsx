@@ -459,6 +459,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   const [editForm, setEditForm] = useState({ name: "", qty: "", unit: "", unit_cost: "", notes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [expandedPickerCats, setExpandedPickerCats] = useState({});
+  const [expandedMatCats, setExpandedMatCats] = useState({});
 
   const load = useCallback(async () => {
     try {
@@ -615,14 +616,24 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
             <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
           ) : !showAddForm && materials.length > 0 ? (
             <div className="space-y-2">
-              {groupedMaterials.map(({ category, items }) => (
-                <div key={category || "__custom__"}>
+              {groupedMaterials.map(({ category, items }) => {
+                const catKey = category || "__custom__";
+                const isExpanded = expandedMatCats[catKey] !== false;
+                return (
+                <div key={catKey} className={showCatHeaders ? "border border-gray-200 rounded-xl overflow-hidden" : ""}>
                   {showCatHeaders && (
-                    <div className="px-1 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                      {category || "Custom"}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedMatCats((p) => ({ ...p, [catKey]: !isExpanded }))}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-50 text-left"
+                    >
+                      <span className={`text-gray-400 text-xs transition-transform ${isExpanded ? "rotate-90" : ""}`}>▶</span>
+                      <span className="text-sm font-semibold text-gray-700">{category || "Custom"}</span>
+                      <span className="text-xs text-gray-400 ml-auto">({items.length})</span>
+                    </button>
                   )}
-                  <div className="space-y-2">
+                  {(!showCatHeaders || isExpanded) && (
+                  <div className="space-y-2 p-2">
                   {items.map((m) => (
                 <div key={m.id} className="bg-gray-50 rounded-xl px-4 py-3">
                   {editingId === m.id ? (
@@ -714,8 +725,10 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
                 </div>
               ))}
               </div>
-            </div>
-          ))}
+                  )}
+                </div>
+                );
+              })}
             </div>
           ) : !showAddForm ? (
             <p className="text-gray-400 text-sm text-center py-4">No materials added yet.</p>

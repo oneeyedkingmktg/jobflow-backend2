@@ -42,7 +42,7 @@ export default function MaterialsLibraryAdmin({ onBack, companyId: propCompanyId
       const data = await JobReportsAPI.getLibrary(companyId);
       const cats = data.categories || [];
       setCategories(cats);
-      if (cats.length > 0) setExpandedCats({ [cats[0].id]: true });
+      setExpandedCats({});
     } catch (err) {
       console.error("Library load error:", err);
     } finally {
