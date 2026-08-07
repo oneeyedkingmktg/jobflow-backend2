@@ -356,6 +356,7 @@ async function runMigrations() {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS salesman_color VARCHAR(7)`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT`,
     `ALTER TABLE crews ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT`,
+    `ALTER TABLE crews ADD COLUMN IF NOT EXISTS has_calendar BOOLEAN DEFAULT false`,
     // Phase 2 — salesman assignment on appointments
     `ALTER TABLE leads ADD COLUMN IF NOT EXISTS appointment_salesman_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
     // Phase 5 — salesman/crew secondary GHL calendar event IDs

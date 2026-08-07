@@ -19,7 +19,7 @@ const PRESET_COLORS = [
   "#64748b", // slate
 ];
 
-const BLANK_FORM = { name: "", color: "#6366f1", is_active: true };
+const BLANK_FORM = { name: "", color: "#6366f1", is_active: true, has_calendar: false };
 
 export default function CrewsManager({ companyId, onClose }) {
   const [crews, setCrews] = useState([]);
@@ -63,7 +63,7 @@ export default function CrewsManager({ companyId, onClose }) {
   };
 
   const openEdit = (crew) => {
-    setForm({ name: crew.name, color: crew.color || "#6366f1", is_active: crew.is_active });
+    setForm({ name: crew.name, color: crew.color || "#6366f1", is_active: crew.is_active, has_calendar: crew.has_calendar || false });
     setEditing(crew);
     setError("");
     setSelectedUserId("");
@@ -303,6 +303,26 @@ export default function CrewsManager({ companyId, onClose }) {
                   <div
                     className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
                       form.is_active ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Has Calendar toggle */}
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+                <div>
+                  <div className="font-semibold text-gray-800 text-sm">Has a Calendar</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Show this crew's installs in the scheduling calendar</div>
+                </div>
+                <div
+                  onClick={() => setForm((p) => ({ ...p, has_calendar: !p.has_calendar }))}
+                  className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${
+                    form.has_calendar ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      form.has_calendar ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </div>

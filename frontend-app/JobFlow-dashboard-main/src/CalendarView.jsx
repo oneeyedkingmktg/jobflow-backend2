@@ -60,6 +60,7 @@ export default function CalendarView({
   crewAssignments = {},
   individualAssignments = {},
   calendarRolePerms = null,
+  calendarCrews = [],
 }) {
   const [viewMode, setViewMode] = useState("month");
   const [selectedDate, setSelectedDate] = useState(null);
@@ -204,23 +205,37 @@ export default function CalendarView({
     return map;
   }, [leads, serviceCalls]);
 
-  // Phase 4: Apply access control to groupedByDate
+  // Phase 4: Apply access control + crew toggle filtering to groupedByDate
   const filteredGroupedByDate = useMemo(() => {
-    if (!restrictedView) return groupedByDate;
-
     const result = {};
     for (const [date, data] of Object.entries(groupedByDate)) {
-      const filteredAppt = amSalesman
-        ? data.appt.filter((l) => l.appointmentSalesmanId === currentUser?.id)
-        : [];
-      const filteredInstall = data.install.filter((l) => {
-        const leadCrews = crewAssignments[l.id] || [];
-        return leadCrews.some((c) => myCrewIds.includes(c.id));
-      });
-      result[date] = { appt: filteredAppt, install: filteredInstall, sc: [] };
+      let filteredAppt = data.appt;
+      let filteredInstall = data.install;
+      let filteredSc = data.sc;
+
+      if (restrictedView) {
+        filteredAppt = amSalesman
+          ? data.appt.filter((l) => l.appointmentSalesmanId === currentUser?.id)
+          : [];
+        filteredInstall = data.install.filter((l) => {
+          const leadCrews = crewAssignments[l.id] || [];
+          return leadCrews.some((c) => myCrewIds.includes(c.id));
+        });
+        filteredSc = [];
+      } else if (hasGlobalCalendarAccess && calendarCrews.length > 0) {
+        // Filter installs by crew toggles — unassigned installs always show
+        filteredInstall = data.install.filter((l) => {
+          const leadCrews = crewAssignments[l.id] || [];
+          const hasCalendarCrews = leadCrews.filter((c) => calendarCrews.some((cc) => cc.id === c.id));
+          if (hasCalendarCrews.length === 0) return true; // unassigned or no calendar crew → always show
+          return hasCalendarCrews.some((c) => visibleCalendars[`crew_${c.id}`] !== false);
+        });
+      }
+
+      result[date] = { appt: filteredAppt, install: filteredInstall, sc: filteredSc };
     }
     return result;
-  }, [groupedByDate, restrictedView, amSalesman, currentUser?.id, crewAssignments, myCrewIds]);
+  }, [groupedByDate, restrictedView, amSalesman, currentUser?.id, crewAssignments, myCrewIds, hasGlobalCalendarAccess, calendarCrews, visibleCalendars]);
 
   const blocksByDate = useMemo(() => {
     const map = {};
@@ -357,6 +372,10 @@ export default function CalendarView({
         if (restrictedView) {
           const leadCrews = crewAssignments[l.id] || [];
           if (!leadCrews.some((c) => myCrewIds.includes(c.id))) return;
+        } else if (hasGlobalCalendarAccess && calendarCrews.length > 0) {
+          const leadCrews = crewAssignments[l.id] || [];
+          const hasCalendarCrews = leadCrews.filter((c) => calendarCrews.some((cc) => cc.id === c.id));
+          if (hasCalendarCrews.length > 0 && !hasCalendarCrews.some((c) => visibleCalendars[`crew_${c.id}`] !== false)) return;
         }
         allLeads.push({ ...l, displayDate: l.installDate, displayType: "install" });
       }
@@ -379,6 +398,13 @@ export default function CalendarView({
   const handleLeadClick = (lead, subView, date = null) => {
     onSelectLead(lead, subView, date);
   };
+
+  // Whether this user sees crew-level toggles (global access)
+  const hasGlobalCalendarAccess = useMemo(() => {
+    if (isAdminOrMaster) return true;
+    if (calendarRolePerms?.calendar_other_crews !== false && calendarRolePerms?.calendar_install !== false) return true;
+    return false;
+  }, [isAdminOrMaster, calendarRolePerms]);
 
   // Which calendar options appear in the gear panel?
   // Admin/master → all three. Role with calendar perms → filtered by role. Fallback → restrictedView logic.
@@ -425,7 +451,7 @@ export default function CalendarView({
         </svg>
       </button>
       {showFilter && (
-        <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[190px]">
+        <div className="absolute right-0 top-10 z-30 bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[200px]">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Show Calendars</div>
           {gearFilterOptions.map(({ key, label, color }) => (
             <label key={key} className="flex items-center gap-2 py-1 cursor-pointer select-none">
@@ -439,6 +465,28 @@ export default function CalendarView({
               />
             </label>
           ))}
+          {/* Per-crew toggles — only for global access users when installs are visible */}
+          {hasGlobalCalendarAccess && visibleCalendars.install && calendarCrews.length > 0 && (
+            <>
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-1 border-t pt-2">Crews</div>
+              {calendarCrews.map((crew) => {
+                const crewKey = `crew_${crew.id}`;
+                const isOn = visibleCalendars[crewKey] !== false;
+                return (
+                  <label key={crew.id} className="flex items-center gap-2 py-1 cursor-pointer select-none">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: crew.color || "#22c55e" }} />
+                    <span className="text-sm text-gray-700 flex-1">{crew.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={isOn}
+                      onChange={() => setVisibleCalendars((prev) => ({ ...prev, [crewKey]: !isOn }))}
+                      className="w-4 h-4 accent-blue-600"
+                    />
+                  </label>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -173,6 +173,7 @@ export default function LeadsHome() {
   const [crewAssignments, setCrewAssignments] = useState({});
   const [individualAssignments, setIndividualAssignments] = useState({});
   const [calendarRolePerms, setCalendarRolePerms] = useState(null);
+  const [calendarCrews, setCalendarCrews] = useState([]);
 
   // --------------------------------------------------
   // Load leads
@@ -225,6 +226,9 @@ const loadLeads = async () => {
       .catch(() => {});
     CrewsAPI.getLeadAssignments(currentCompany.id)
       .then((data) => setCrewAssignments(data.assignments || {}))
+      .catch(() => {});
+    CrewsAPI.getAll(currentCompany.id)
+      .then((data) => setCalendarCrews((data.crews || []).filter((c) => c.has_calendar && c.is_active)))
       .catch(() => {});
     CrewsAPI.getLeadIndividualAssignments(currentCompany.id)
       .then((data) => setIndividualAssignments(data.assignments || {}))
@@ -453,6 +457,7 @@ onAddLead={() => {
       crewAssignments={crewAssignments}
       individualAssignments={individualAssignments}
       calendarRolePerms={calendarRolePerms}
+      calendarCrews={calendarCrews}
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>
