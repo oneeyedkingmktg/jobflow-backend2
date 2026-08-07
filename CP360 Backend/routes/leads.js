@@ -149,7 +149,8 @@ router.get("/calendar-dots", async (req, res) => {
     if (!company_id) return res.status(400).json({ error: "company_id required" });
 
     const result = await pool.query(
-      `SELECT id, name, install_date, install_tentative, install_duration_days, install_end_date, appointment_date, appointment_time
+      `SELECT id, name, install_date, install_tentative, install_duration_days, install_end_date,
+              appointment_date, appointment_time, appointment_salesman_id
        FROM leads
        WHERE company_id = $1
          AND deleted_at IS NULL
@@ -235,11 +236,13 @@ router.get("/salesman-conflict-check", async (req, res) => {
       return res.status(400).json({ error: "salesman_user_id, date, and time required" });
     }
 
+    // 60-minute buffer: block any existing appointment within 60 min of the requested time
     let query = `
-      SELECT id, name FROM leads
+      SELECT id, name, appointment_time FROM leads
       WHERE appointment_salesman_id = $1
         AND appointment_date = $2
-        AND appointment_time = $3
+        AND appointment_time IS NOT NULL
+        AND ABS(EXTRACT(EPOCH FROM (appointment_time::time - $3::time)) / 60) < 60
         AND deleted_at IS NULL
         AND status != 'status_junk'
     `;
@@ -249,6 +252,8 @@ router.get("/salesman-conflict-check", async (req, res) => {
       query += ` AND id != $4`;
       params.push(exclude_lead_id);
     }
+
+    query += ` ORDER BY appointment_time ASC LIMIT 1`;
 
     const result = await pool.query(query, params);
     res.json({ taken: result.rows.length > 0, conflict: result.rows[0] || null });

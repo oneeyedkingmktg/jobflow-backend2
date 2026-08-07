@@ -191,8 +191,10 @@ export default function ApptDateTimeModal({
     try {
       const salesmanCheck = await LeadsAPI.checkSalesmanConflict(selectedSalesmanId, selectedDate, finalTime24, excludeLeadId);
       if (salesmanCheck.taken) {
-        const name = salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || "This salesman";
-        setSlotError(`${name} already has an appointment at this time (${salesmanCheck.conflict?.name || "another lead"}). Choose a different time.`);
+        const sName = salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || "This salesman";
+        const conflict = salesmanCheck.conflict;
+        const conflictTime = conflict?.appointment_time ? ` at ${formatTime12h(conflict.appointment_time)}` : "";
+        setSlotError(`${sName} already has an appointment${conflictTime} (${conflict?.name || "another lead"}). Must be 60+ min apart.`);
         return;
       }
     } catch { /* allow save if check fails */ }
@@ -282,7 +284,14 @@ export default function ApptDateTimeModal({
     </>
   );
 
-  const apptsList = dayDate ? (groupedByDate[dayDate]?.appt || []) : [];
+  const allApptsList = dayDate ? (groupedByDate[dayDate]?.appt || []) : [];
+  const apptsList = selectedSalesmanId
+    ? allApptsList.filter((l) => String(l.appointment_salesman_id) === String(selectedSalesmanId))
+    : allApptsList;
+
+  const selectedSalesmanName = selectedSalesmanId
+    ? salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || null
+    : null;
 
   const dayViewBlock = (
     <div>
@@ -312,11 +321,23 @@ export default function ApptDateTimeModal({
           </button>
         </div>
       </div>
+      <div className="mb-1 flex items-center gap-1 text-xs text-gray-500">
+        {selectedSalesmanName ? (
+          <>
+            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+            <span>Showing <span className="font-semibold text-gray-700">{selectedSalesmanName}</span>'s appointments</span>
+          </>
+        ) : (
+          <span className="italic">Showing all salesmen's appointments</span>
+        )}
+      </div>
       <div className="border rounded-md bg-gray-50 p-2 mb-3 min-h-[60px] max-h-[120px] overflow-y-auto">
         {dotsLoading ? (
           <p className="text-xs text-gray-400 italic text-center mt-2">Loading...</p>
         ) : apptsList.length === 0 ? (
-          <p className="text-xs text-gray-400 italic text-center mt-2">No appointments this day</p>
+          <p className="text-xs text-gray-400 italic text-center mt-2">
+            {selectedSalesmanName ? `No appointments for ${selectedSalesmanName} this day` : "No appointments this day"}
+          </p>
         ) : (
           <div className="space-y-1">
             {apptsList
