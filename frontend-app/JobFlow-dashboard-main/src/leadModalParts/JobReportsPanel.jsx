@@ -618,7 +618,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
             <div className="space-y-2">
               {groupedMaterials.map(({ category, items }) => {
                 const catKey = category || "__custom__";
-                const isExpanded = expandedMatCats[catKey] !== false;
+                const isExpanded = expandedMatCats[catKey] === true;
                 return (
                 <div key={catKey} className={showCatHeaders ? "border border-gray-200 rounded-xl overflow-hidden" : ""}>
                   {showCatHeaders && (
