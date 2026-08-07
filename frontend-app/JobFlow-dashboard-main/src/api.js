@@ -457,6 +457,12 @@ export const TimeAPI = {
 
   getToday: () => apiRequest("/api/time/today"),
 
+  updateEntry: (entryId, data) =>
+    apiRequest(`/api/time/entries/${entryId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   getWeek: () => apiRequest("/api/time/week"),
 
   getLeadEntries: (leadId) => apiRequest(`/api/time/lead/${leadId}`),

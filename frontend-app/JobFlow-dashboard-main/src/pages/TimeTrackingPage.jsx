@@ -2,7 +2,7 @@
 // Employee time tracking — clock in/out per job
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { apiRequest } from "../api";
+import { apiRequest, TimeAPI } from "../api";
 import { useCompany } from "../CompanyContext";
 import { useAuth } from "../AuthContext";
 
@@ -63,6 +63,10 @@ export default function TimeTrackingPage({ onBack }) {
   const [clockLoading, setClockLoading] = useState(false);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+  const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editHours, setEditHours] = useState("");
+  const [editMinutes, setEditMinutes] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const searchTimer = useRef(null);
 
@@ -187,6 +191,33 @@ export default function TimeTrackingPage({ onBack }) {
     } catch {}
     finally {
       setClockingOutId(null);
+    }
+  };
+
+  // ── Entry edit ───────────────────────────────────────────────────────────
+
+  const startEditEntry = (e) => {
+    const totalMin = e.duration_minutes || 0;
+    setEditingEntryId(e.id);
+    setEditHours(String(Math.floor(totalMin / 60)));
+    setEditMinutes(String(totalMin % 60));
+  };
+
+  const handleSaveEdit = async (entryId) => {
+    const h = parseInt(editHours, 10) || 0;
+    const m = parseInt(editMinutes, 10) || 0;
+    if (h + m === 0) { setError("Duration must be greater than 0."); return; }
+    setSavingEdit(true);
+    try {
+      const res = await TimeAPI.updateEntry(entryId, { hours: h, minutes: m });
+      setTodayEntries((prev) =>
+        prev.map((e) => (e.id === entryId ? { ...e, duration_minutes: res.entry.duration_minutes } : e))
+      );
+      setEditingEntryId(null);
+    } catch (err) {
+      setError(err.message || "Failed to save entry");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -428,21 +459,79 @@ export default function TimeTrackingPage({ onBack }) {
               {todayEntries.map((e) => (
                 <div
                   key={e.id}
-                  className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-start justify-between"
+                  className="bg-white border border-gray-200 rounded-xl px-4 py-3"
                 >
-                  <div className="min-w-0 mr-3">
-                    <div className="text-sm font-semibold text-gray-900 truncate">
-                      {e.lead_name || (e.work_type === "non_job" ? "Non-Job Work" : "Job")}
+                  {editingEntryId === e.id ? (
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {e.lead_name || (e.work_type === "non_job" ? "Non-Job Work" : "Job")}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={editHours}
+                            onChange={(ev) => setEditHours(ev.target.value)}
+                            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-gray-500">hrs</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={editMinutes}
+                            onChange={(ev) => setEditMinutes(ev.target.value)}
+                            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-gray-500">min</span>
+                        </div>
+                        <button
+                          onClick={() => handleSaveEdit(e.id)}
+                          disabled={savingEdit}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
+                        >
+                          {savingEdit ? "…" : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingEntryId(null)}
+                          className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {fmtTime(e.clock_in)} → {e.clock_out ? fmtTime(e.clock_out) : "In progress…"}
+                  ) : (
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 mr-3">
+                        <div className="text-sm font-semibold text-gray-900 truncate">
+                          {e.lead_name || (e.work_type === "non_job" ? "Non-Job Work" : "Job")}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {fmtTime(e.clock_in)} → {e.clock_out ? fmtTime(e.clock_out) : "In progress…"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {e.clock_out ? (
+                          <>
+                            <span className="text-sm font-bold text-gray-700">{fmtDuration(e.duration_minutes)}</span>
+                            <button
+                              onClick={() => startEditEntry(e)}
+                              className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+                            >
+                              Edit
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-sm font-bold text-green-600">{liveDuration(e.clock_in)}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-sm font-bold text-gray-700 flex-shrink-0">
-                    {e.clock_out ? fmtDuration(e.duration_minutes) : (
-                      <span className="text-green-600">{liveDuration(e.clock_in)}</span>
-                    )}
-                  </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -328,6 +328,48 @@ router.put("/clock-out/:entryId", async (req, res) => {
 });
 
 // ============================================================================
+// PUT /api/time/entries/:entryId
+// Edit duration of a completed entry. User can edit their own; admin can edit any in company.
+// Body: { hours, minutes }
+// ============================================================================
+router.put("/entries/:entryId", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    const entryId = parseInt(req.params.entryId, 10);
+    const { hours, minutes } = req.body;
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const h = parseInt(hours, 10) || 0;
+    const m = parseInt(minutes, 10) || 0;
+    const totalMinutes = h * 60 + m;
+    if (totalMinutes <= 0) return res.status(400).json({ error: "Duration must be greater than 0" });
+
+    const entryRes = await db.query(
+      `SELECT id, user_id, company_id, clock_out FROM time_entries WHERE id = $1`,
+      [entryId]
+    );
+    if (!entryRes.rows.length) return res.status(404).json({ error: "Entry not found" });
+    const entry = entryRes.rows[0];
+
+    if (String(entry.company_id) !== String(companyId)) return res.status(403).json({ error: "Forbidden" });
+    if (!entry.clock_out) return res.status(400).json({ error: "Cannot edit an open (not clocked out) entry" });
+
+    const isAdmin = req.user.role === "admin" || req.user.role === "master";
+    if (!isAdmin && entry.user_id !== req.user.id) return res.status(403).json({ error: "Forbidden" });
+
+    const result = await db.query(
+      `UPDATE time_entries SET duration_minutes = $1 WHERE id = $2
+       RETURNING id, user_id, lead_id, work_type, clock_in, clock_out, duration_minutes, notes`,
+      [totalMinutes, entryId]
+    );
+    res.json({ entry: result.rows[0] });
+  } catch (err) {
+    console.error("Update entry error:", err);
+    res.status(500).json({ error: "Failed to update entry" });
+  }
+});
+
+// ============================================================================
 // GET /api/time/today
 // Returns the current user's time entries for today, with lead name.
 // ============================================================================
