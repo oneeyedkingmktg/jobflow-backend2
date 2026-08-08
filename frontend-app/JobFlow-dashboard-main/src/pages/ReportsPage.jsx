@@ -698,14 +698,14 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="px-4 pt-6 pb-4">
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-4">
         <h1 className="text-xl font-bold text-gray-900">Reports</h1>
         {currentCompany && (
           <p className="text-xs text-gray-500 mt-0.5">{currentCompany.name || currentCompany.company_name}</p>
         )}
       </div>
 
-      <div className="px-4">
+      <div className="max-w-2xl mx-auto px-4">
         {loading && <Spinner />}
         {error && <ErrorMsg msg={error} />}
         {!loading && !error && definitions.length === 0 && (
