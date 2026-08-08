@@ -165,7 +165,7 @@ function AutomationRecoveryContent({ companyId }) {
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
-        Recovered appointments are contacts that were moved into Lead status after manual follow-up stalled, then later booked an appointment. Recovered sales are contacts that were moved into Not Sold after the sales process stalled, then later became sold jobs.
+        <strong>Full Funnel Closings</strong> counts every lead that was ever placed in Lead status and then sold — filtered by sold date. This shows your CP marketing system is turning leads into closed jobs. <strong>Not Sold Recoveries</strong> counts leads that were moved to Not Sold at some point but later came back and closed. Both numbers use the sold date as the filter, so "30 Days" means sold in the last 30 days.
       </p>
 
       {/* Range selector */}
@@ -203,34 +203,29 @@ function AutomationRecoveryContent({ companyId }) {
 
       {!loading && !error && m && (
         <>
-          {/* Appointment cards */}
-          <SectionCard title="Appointments">
-            <MetricRow label="Total Appointments Set" value={m.totalAppts} />
-            <MetricRow label="Recovered Appointments" value={m.recoveredAppts} />
+          {/* Full Funnel */}
+          <SectionCard title="Full Funnel Closings (Lead → Sold)">
             <MetricRow
-              label="Appointment Recovery Rate"
-              value={`${m.apptRecoveryPct}%`}
-              sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : undefined}
+              label="Leads Closed"
+              value={m.funnelTotal}
+              sub={m.avgDaysFunnel != null ? `Avg ${m.avgDaysFunnel} days from lead to close` : undefined}
             />
           </SectionCard>
 
-          {/* Sales cards */}
-          <SectionCard title="Sales">
-            <MetricRow label="Total Jobs Sold" value={m.totalSold} />
-            <MetricRow label="Recovered Sales" value={m.recoveredSales} />
-            <MetricRow label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} />
+          {/* Not Sold Recoveries */}
+          <SectionCard title="Not Sold Recoveries">
             <MetricRow
-              label="Sales Recovery Rate"
-              value={`${m.salesRecoveryPct}%`}
-              sub={m.avgDaysSale != null ? `Avg ${m.avgDaysSale} days to recovery` : undefined}
+              label="Recovered &amp; Closed"
+              value={m.recoveryTotal}
+              sub={m.avgDaysRecovery != null ? `Avg ${m.avgDaysRecovery} days from Not Sold to close` : undefined}
             />
           </SectionCard>
 
-          {/* Recovered appointments table */}
+          {/* Full funnel detail table */}
           <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Appointments Detail</div>
-            {data.recoveredAppts.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No recovered appointments in this range.</p>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Full Funnel Detail</div>
+            {data.funnelLeads.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No closed leads in this range.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-xs">
@@ -239,18 +234,22 @@ function AutomationRecoveryContent({ companyId }) {
                       <th className="text-left px-3 py-2 font-semibold">Contact</th>
                       <th className="text-left px-3 py-2 font-semibold">Source</th>
                       <th className="text-left px-3 py-2 font-semibold">Entered Lead</th>
-                      <th className="text-left px-3 py-2 font-semibold">Appt Set</th>
+                      <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
                       <th className="text-right px-3 py-2 font-semibold">Days</th>
+                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {data.recoveredAppts.map((r, i) => (
+                    {data.funnelLeads.map((r, i) => (
                       <tr key={i} className="bg-white">
                         <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLeadAt)}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.apptSetAt)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
+                        <td className="px-3 py-2 text-right font-medium text-green-700">
+                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -259,11 +258,11 @@ function AutomationRecoveryContent({ companyId }) {
             )}
           </div>
 
-          {/* Recovered sales table */}
+          {/* Recovery detail table */}
           <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Sales Detail</div>
-            {data.recoveredSales.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No recovered sales in this range.</p>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery Detail</div>
+            {data.recoveredLeads.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No Not Sold recoveries in this range.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-xs">
@@ -278,15 +277,15 @@ function AutomationRecoveryContent({ companyId }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {data.recoveredSales.map((r, i) => (
+                    {data.recoveredLeads.map((r, i) => (
                       <tr key={i} className="bg-white">
                         <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLostAt)}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredNotSoldAt)}</td>
                         <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
                         <td className="px-3 py-2 text-right font-medium text-green-700">
-                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">Missing</span>}
+                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
                         </td>
                       </tr>
                     ))}
@@ -637,7 +636,7 @@ function ReportModal({ report, companyId, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4">
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
           <div>
