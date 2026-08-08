@@ -395,14 +395,12 @@ const handleSaveTracking = async () => {
   };
 
   const ENDPOINT_MAP = {
-    recent_activity: "activity",
-    conversions: "conversions",
     automation_recovery: "automation-recovery",
     conversions_by_source: "conversions-by-source",
     cost_per_sale: "cost-per-sale",
   };
 
-  const newStyleReports = ["conversions_by_source", "cost_per_sale"];
+  const newStyleReports = ["automation_recovery", "conversions_by_source", "cost_per_sale"];
 
   const fetchReportData = async (def, range) => {
     setReportLoading(true);
@@ -484,7 +482,7 @@ const handleSaveTracking = async () => {
 
       const ModalShell = ({ children }) => (
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-16 px-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
               <div>
                 <h3 className="text-base font-bold text-gray-900">{openReport.name}</h3>
@@ -502,17 +500,17 @@ const handleSaveTracking = async () => {
       );
 
       if (openReport.key === "automation_recovery") {
-        const m = data;
+        const m = data?.metrics;
+        const funnelLeads = data?.funnelLeads || [];
+        const recoveredLeads = data?.recoveredLeads || [];
+        const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : "—";
         const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-        const Row = ({ label, value, green }) => (
-          <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
-            <span className="text-sm text-gray-600">{label}</span>
-            <span className={`text-sm font-semibold ${green ? "text-green-700" : ""}`}>{value}</span>
-          </div>
-        );
         const RANGES = [{ key: "30", label: "30 Days" }, { key: "90", label: "90 Days" }, { key: "ytd", label: "YTD" }];
         return (
           <ModalShell>
+            <p className="text-xs text-gray-500 mb-3">
+              <strong>Full Funnel Closings</strong> — leads ever in Lead status that sold in this window. <strong>Not Sold Recoveries</strong> — leads that went Not Sold then later closed. Both filtered by sold date.
+            </p>
             <div className="flex gap-1.5 mb-4">
               {RANGES.map((r) => (
                 <button
@@ -529,20 +527,87 @@ const handleSaveTracking = async () => {
             ) : (
               <>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Appointments</div>
-                  <Row label="Total Appointments Set" value={m.totalAppts} />
-                  <Row label="Recovered Appointments" value={m.recoveredAppts} />
-                  <Row label="Appointment Recovery Rate" value={`${m.apptRecoveryPct}%`} />
-                  {m.avgDaysAppt != null && <Row label="Avg Days to Recovery" value={`${m.avgDaysAppt} days`} />}
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Full Funnel Closings (Lead → Sold)</div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span className="text-sm text-gray-600">Leads Closed</span>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold">{m.funnelTotal}</span>
+                      {m.avgDaysFunnel != null && <div className="text-xs text-gray-400">Avg {m.avgDaysFunnel} days lead to close</div>}
+                    </div>
+                  </div>
                 </div>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Sales</div>
-                  <Row label="Total Jobs Sold" value={m.totalSold} />
-                  <Row label="Recovered Sales" value={m.recoveredSales} />
-                  <Row label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} green />
-                  <Row label="Sales Recovery Rate" value={`${m.salesRecoveryPct}%`} />
-                  {m.avgDaysSale != null && <Row label="Avg Days to Recovery" value={`${m.avgDaysSale} days`} />}
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recoveries</div>
+                  <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span className="text-sm text-gray-600">Recovered &amp; Closed</span>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold">{m.recoveryTotal}</span>
+                      {m.avgDaysRecovery != null && <div className="text-xs text-gray-400">Avg {m.avgDaysRecovery} days Not Sold to close</div>}
+                    </div>
+                  </div>
                 </div>
+                {funnelLeads.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Full Funnel Detail</div>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-gray-500">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                            <th className="text-left px-3 py-2 font-semibold">Source</th>
+                            <th className="text-left px-3 py-2 font-semibold">Entered Lead</th>
+                            <th className="text-left px-3 py-2 font-semibold">Sold</th>
+                            <th className="text-right px-3 py-2 font-semibold">Days</th>
+                            <th className="text-right px-3 py-2 font-semibold">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {funnelLeads.map((r, i) => (
+                            <tr key={i} className="bg-white">
+                              <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                              <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLeadAt)}</td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
+                              <td className="px-3 py-2 text-right font-medium text-green-700">{r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {recoveredLeads.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery Detail</div>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-gray-500">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                            <th className="text-left px-3 py-2 font-semibold">Source</th>
+                            <th className="text-left px-3 py-2 font-semibold">Entered Not Sold</th>
+                            <th className="text-left px-3 py-2 font-semibold">Sold</th>
+                            <th className="text-right px-3 py-2 font-semibold">Days</th>
+                            <th className="text-right px-3 py-2 font-semibold">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {recoveredLeads.map((r, i) => (
+                            <tr key={i} className="bg-white">
+                              <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                              <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredNotSoldAt)}</td>
+                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
+                              <td className="px-3 py-2 text-right font-medium text-green-700">{r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </ModalShell>
