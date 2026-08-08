@@ -165,7 +165,7 @@ function AutomationRecoveryContent({ companyId }) {
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
-        <strong>Full Funnel Closings</strong> counts every lead that was ever placed in Lead status and then sold — filtered by sold date. This shows your CP marketing system is turning leads into closed jobs. <strong>Not Sold Recoveries</strong> counts leads that were moved to Not Sold at some point but later came back and closed. Both numbers use the sold date as the filter, so "30 Days" means sold in the last 30 days.
+        <strong>Period Summary</strong> shows leads that came in and jobs that closed during the selected window. Leads received uses the date the lead entered the system; everything else is filtered by sold date. <strong>Not Sold Recoveries</strong> counts leads that were marked Not Sold at some point but later came back and closed — these are included in the closed totals above.
       </p>
 
       {/* Range selector */}
@@ -203,12 +203,14 @@ function AutomationRecoveryContent({ companyId }) {
 
       {!loading && !error && m && (
         <>
-          {/* Full Funnel */}
-          <SectionCard title="Full Funnel Closings (Lead → Sold)">
+          {/* Period Summary */}
+          <SectionCard title="Period Summary">
+            <MetricRow label="Leads Received" value={m.leadsReceived} />
+            <MetricRow label="Jobs Closed" value={m.totalSold} />
             <MetricRow
-              label="Leads Closed"
-              value={m.funnelTotal}
-              sub={m.avgDaysFunnel != null ? `Avg ${m.avgDaysFunnel} days from lead to close` : undefined}
+              label="Revenue Closed"
+              value={fmtMoney(m.totalRevenue)}
+              sub={m.avgDaysToClose != null ? `Avg ${m.avgDaysToClose} days lead to close` : undefined}
             />
           </SectionCard>
 
@@ -219,13 +221,14 @@ function AutomationRecoveryContent({ companyId }) {
               value={m.recoveryTotal}
               sub={m.avgDaysRecovery != null ? `Avg ${m.avgDaysRecovery} days from Not Sold to close` : undefined}
             />
+            <MetricRow label="Revenue Recovered" value={m.recoveryRevenue > 0 ? fmtMoney(m.recoveryRevenue) : "—"} />
           </SectionCard>
 
-          {/* Full funnel detail table */}
+          {/* Closed jobs detail */}
           <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Full Funnel Detail</div>
-            {data.funnelLeads.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No closed leads in this range.</p>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Closed Jobs Detail</div>
+            {data.soldLeads.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No closed jobs in this range.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-xs">
@@ -233,14 +236,14 @@ function AutomationRecoveryContent({ companyId }) {
                     <tr>
                       <th className="text-left px-3 py-2 font-semibold">Contact</th>
                       <th className="text-left px-3 py-2 font-semibold">Source</th>
-                      <th className="text-left px-3 py-2 font-semibold">Entered Lead</th>
+                      <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
                       <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
                       <th className="text-right px-3 py-2 font-semibold">Days</th>
                       <th className="text-right px-3 py-2 font-semibold">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {data.funnelLeads.map((r, i) => (
+                    {data.soldLeads.map((r, i) => (
                       <tr key={i} className="bg-white">
                         <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
@@ -258,7 +261,7 @@ function AutomationRecoveryContent({ companyId }) {
             )}
           </div>
 
-          {/* Recovery detail table */}
+          {/* Recovery detail */}
           <div className="mb-3">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery Detail</div>
             {data.recoveredLeads.length === 0 ? (

@@ -128,9 +128,9 @@ router.get('/conversions', async (req, res) => {
 });
 
 // ─── GET /api/reports/automation-recovery ────────────────────────────────────
-// Metric 1: leads that were ever in 'lead' status and sold in the date window.
-// Metric 2: leads that were ever in 'not_sold'/'lost' status and later sold in the date window.
-// Date anchor: sold_at on the leads table.
+// Period summary: leads received (created_at) + all closed stats (sold_at).
+// Recovery: leads ever in not_sold/lost that later sold in the window.
+// All date filters anchor on sold_at except leadsReceived which uses created_at.
 router.get('/automation-recovery', async (req, res) => {
   try {
     const companyId = companyIdFor(req);
@@ -149,60 +149,59 @@ router.get('/automation-recovery', async (req, res) => {
       from = new Date(now); from.setDate(from.getDate() - 30);
     }
 
-    // Metric 1: full funnel — ever in lead status → sold within window
-    const [funnelRes, funnelDetailRes, recoveryRes, recoveryDetailRes] = await Promise.all([
+    const [leadsCreatedRes, closedStatsRes, recoveryRes, soldDetailRes, recoveryDetailRes] = await Promise.all([
+
+      // Leads received in window (by created_at)
+      pool.query(
+        `SELECT COUNT(*)::int AS total
+         FROM leads
+         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
+           AND created_at >= $2 AND created_at <= $3`,
+        [companyId, from, to]
+      ),
+
+      // All closed stats in window (by sold_at)
+      pool.query(
+        `SELECT
+           COUNT(*)::int AS total_sold,
+           COALESCE(SUM(contract_price), 0)::numeric AS total_revenue,
+           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (sold_at - created_at)) / 86400)))::int AS avg_days_to_close
+         FROM leads
+         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
+           AND sold_at >= $2 AND sold_at <= $3`,
+        [companyId, from, to]
+      ),
+
+      // Not Sold recoveries — count, avg days, total recovered revenue
       pool.query(
         `SELECT
            COUNT(DISTINCT l.id)::int AS total,
-           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (l.sold_at - se_lead.first_lead_at)) / 86400)))::int AS avg_days
-         FROM leads l
-         JOIN LATERAL (
-           SELECT MIN(created_at) AS first_lead_at
-           FROM status_events
-           WHERE lead_id = l.id AND to_status = 'lead'
-         ) se_lead ON se_lead.first_lead_at IS NOT NULL
-         WHERE l.company_id = $1
-           AND l.deleted_at IS NULL
-           AND l.status != 'status_junk'
-           AND l.sold_at >= $2 AND l.sold_at <= $3`,
-        [companyId, from, to]
-      ),
-      pool.query(
-        `SELECT
-           l.full_name, l.lead_source, l.contract_price,
-           se_lead.first_lead_at AS entered_lead_at,
-           l.sold_at,
-           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (l.sold_at - se_lead.first_lead_at)) / 86400))::int AS days_to_sold
-         FROM leads l
-         JOIN LATERAL (
-           SELECT MIN(created_at) AS first_lead_at
-           FROM status_events
-           WHERE lead_id = l.id AND to_status = 'lead'
-         ) se_lead ON se_lead.first_lead_at IS NOT NULL
-         WHERE l.company_id = $1
-           AND l.deleted_at IS NULL
-           AND l.status != 'status_junk'
-           AND l.sold_at >= $2 AND l.sold_at <= $3
-         ORDER BY l.sold_at DESC`,
-        [companyId, from, to]
-      ),
-      // Metric 2: recovery — ever in not_sold/lost → sold within window
-      pool.query(
-        `SELECT
-           COUNT(DISTINCT l.id)::int AS total,
-           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (l.sold_at - se_lost.last_lost_at)) / 86400)))::int AS avg_days
+           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (l.sold_at - se_lost.last_lost_at)) / 86400)))::int AS avg_days,
+           COALESCE(SUM(l.contract_price), 0)::numeric AS total_revenue
          FROM leads l
          JOIN LATERAL (
            SELECT MAX(created_at) AS last_lost_at
            FROM status_events
            WHERE lead_id = l.id AND to_status IN ('lost', 'not_sold') AND created_at < l.sold_at
          ) se_lost ON se_lost.last_lost_at IS NOT NULL
-         WHERE l.company_id = $1
-           AND l.deleted_at IS NULL
-           AND l.status != 'status_junk'
+         WHERE l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
            AND l.sold_at >= $2 AND l.sold_at <= $3`,
         [companyId, from, to]
       ),
+
+      // All closed leads detail (sold_at in window)
+      pool.query(
+        `SELECT
+           full_name, lead_source, contract_price, created_at AS entered_lead_at, sold_at,
+           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (sold_at - created_at)) / 86400))::int AS days_to_sold
+         FROM leads
+         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
+           AND sold_at >= $2 AND sold_at <= $3
+         ORDER BY sold_at DESC`,
+        [companyId, from, to]
+      ),
+
+      // Not Sold recovery detail
       pool.query(
         `SELECT
            l.full_name, l.lead_source, l.contract_price,
@@ -215,27 +214,28 @@ router.get('/automation-recovery', async (req, res) => {
            FROM status_events
            WHERE lead_id = l.id AND to_status IN ('lost', 'not_sold') AND created_at < l.sold_at
          ) se_lost ON se_lost.last_lost_at IS NOT NULL
-         WHERE l.company_id = $1
-           AND l.deleted_at IS NULL
-           AND l.status != 'status_junk'
+         WHERE l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
            AND l.sold_at >= $2 AND l.sold_at <= $3
          ORDER BY l.sold_at DESC`,
         [companyId, from, to]
       ),
     ]);
 
-    const fm = funnelRes.rows[0];
-    const rm = recoveryRes.rows[0];
+    const cs = closedStatsRes.rows[0];
+    const rv = recoveryRes.rows[0];
 
     res.json({
       success: true,
       metrics: {
-        funnelTotal:      fm.total,
-        avgDaysFunnel:    fm.avg_days,
-        recoveryTotal:    rm.total,
-        avgDaysRecovery:  rm.avg_days,
+        leadsReceived:   leadsCreatedRes.rows[0].total,
+        totalSold:       cs.total_sold,
+        totalRevenue:    parseFloat(cs.total_revenue) || 0,
+        avgDaysToClose:  cs.avg_days_to_close,
+        recoveryTotal:   rv.total,
+        recoveryRevenue: parseFloat(rv.total_revenue) || 0,
+        avgDaysRecovery: rv.avg_days,
       },
-      funnelLeads: funnelDetailRes.rows.map(r => ({
+      soldLeads: soldDetailRes.rows.map(r => ({
         fullName:      r.full_name,
         leadSource:    r.lead_source,
         contractPrice: r.contract_price,
@@ -244,12 +244,12 @@ router.get('/automation-recovery', async (req, res) => {
         daysToSold:    r.days_to_sold,
       })),
       recoveredLeads: recoveryDetailRes.rows.map(r => ({
-        fullName:          r.full_name,
-        leadSource:        r.lead_source,
-        contractPrice:     r.contract_price,
-        enteredNotSoldAt:  r.entered_not_sold_at,
-        soldAt:            r.sold_at,
-        daysToSold:        r.days_to_sold,
+        fullName:         r.full_name,
+        leadSource:       r.lead_source,
+        contractPrice:    r.contract_price,
+        enteredNotSoldAt: r.entered_not_sold_at,
+        soldAt:           r.sold_at,
+        daysToSold:       r.days_to_sold,
       })),
     });
   } catch (error) {
