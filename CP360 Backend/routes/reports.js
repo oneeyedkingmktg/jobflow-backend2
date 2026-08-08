@@ -128,9 +128,9 @@ router.get('/conversions', async (req, res) => {
 });
 
 // ─── GET /api/reports/automation-recovery ────────────────────────────────────
-// Period summary: leads received (created_at) + all closed stats (sold_at).
-// Recovery: leads ever in not_sold/lost that later sold in the window.
-// All date filters anchor on sold_at except leadsReceived which uses created_at.
+// Appointments: total appts set, leads converted lead→appt, recovered appts.
+// Sales: total sold, recovered sales (not_sold/lost → sold), recovered revenue.
+// Detail log: recovered sales only, all rows including null contract_price.
 router.get('/automation-recovery', async (req, res) => {
   try {
     const companyId = companyIdFor(req);
@@ -149,107 +149,119 @@ router.get('/automation-recovery', async (req, res) => {
       from = new Date(now); from.setDate(from.getDate() - 30);
     }
 
-    const [leadsCreatedRes, closedStatsRes, recoveryRes, soldDetailRes, recoveryDetailRes] = await Promise.all([
+    const [totalApptsRes, totalSoldRes, leadsToApptRes, recoveredApptsRes, recoveredSalesRes] = await Promise.all([
 
-      // Leads received in window (by created_at)
+      // Total appointments set in window (appt_booked event date)
       pool.query(
-        `SELECT COUNT(*)::int AS total
-         FROM leads
-         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
-           AND created_at >= $2 AND created_at <= $3`,
+        `SELECT COUNT(DISTINCT se.lead_id)::int AS total
+         FROM status_events se
+         JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
+         WHERE se.to_status = 'appt_booked' AND se.created_at >= $2 AND se.created_at <= $3`,
         [companyId, from, to]
       ),
 
-      // All closed stats in window (by sold_at)
+      // Total jobs sold in window (sold event date)
       pool.query(
-        `SELECT
-           COUNT(*)::int AS total_sold,
-           COALESCE(SUM(contract_price), 0)::numeric AS total_revenue,
-           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (sold_at - created_at)) / 86400)))::int AS avg_days_to_close
-         FROM leads
-         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
-           AND sold_at >= $2 AND sold_at <= $3`,
+        `SELECT COUNT(DISTINCT se.lead_id)::int AS total
+         FROM status_events se
+         JOIN leads l ON l.id = se.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
+         WHERE se.to_status = 'sold' AND se.created_at >= $2 AND se.created_at <= $3`,
         [companyId, from, to]
       ),
 
-      // Not Sold recoveries — count, avg days, total recovered revenue
+      // Leads converted lead→appt in window (had a prior 'lead' event)
       pool.query(
-        `SELECT
-           COUNT(DISTINCT l.id)::int AS total,
-           ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (l.sold_at - se_lost.last_lost_at)) / 86400)))::int AS avg_days,
-           COALESCE(SUM(l.contract_price), 0)::numeric AS total_revenue
-         FROM leads l
+        `SELECT COUNT(DISTINCT se_appt.lead_id)::int AS total
+         FROM status_events se_appt
+         JOIN leads l ON l.id = se_appt.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
+         WHERE se_appt.to_status = 'appt_booked'
+           AND se_appt.created_at >= $2 AND se_appt.created_at <= $3
+           AND EXISTS (
+             SELECT 1 FROM status_events
+             WHERE lead_id = se_appt.lead_id AND to_status = 'lead' AND created_at < se_appt.created_at
+           )`,
+        [companyId, from, to]
+      ),
+
+      // Recovered appts detail: lead → appt_booked in window
+      pool.query(
+        `SELECT DISTINCT ON (se_appt.lead_id)
+           l.full_name, l.lead_source,
+           se_lead.created_at AS entered_lead_at,
+           se_appt.created_at AS appt_set_at,
+           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_appt.created_at - se_lead.created_at)) / 86400))::int AS days_to_recovery
+         FROM status_events se_appt
+         JOIN leads l ON l.id = se_appt.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
          JOIN LATERAL (
-           SELECT MAX(created_at) AS last_lost_at
-           FROM status_events
-           WHERE lead_id = l.id AND to_status IN ('lost', 'not_sold') AND created_at < l.sold_at
-         ) se_lost ON se_lost.last_lost_at IS NOT NULL
-         WHERE l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
-           AND l.sold_at >= $2 AND l.sold_at <= $3`,
+           SELECT created_at FROM status_events
+           WHERE lead_id = se_appt.lead_id AND to_status = 'lead' AND created_at < se_appt.created_at
+           ORDER BY created_at DESC LIMIT 1
+         ) se_lead ON true
+         WHERE se_appt.to_status = 'appt_booked'
+           AND se_appt.created_at >= $2 AND se_appt.created_at <= $3
+         ORDER BY se_appt.lead_id, se_appt.created_at DESC`,
         [companyId, from, to]
       ),
 
-      // All closed leads detail (sold_at in window)
+      // Recovered sales detail: not_sold/lost → sold in window — ALL rows including null contract_price
       pool.query(
-        `SELECT
-           full_name, lead_source, contract_price, created_at AS entered_lead_at, sold_at,
-           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (sold_at - created_at)) / 86400))::int AS days_to_sold
-         FROM leads
-         WHERE company_id = $1 AND deleted_at IS NULL AND status != 'status_junk'
-           AND sold_at >= $2 AND sold_at <= $3
-         ORDER BY sold_at DESC`,
-        [companyId, from, to]
-      ),
-
-      // Not Sold recovery detail
-      pool.query(
-        `SELECT
+        `SELECT DISTINCT ON (se_sold.lead_id)
            l.full_name, l.lead_source, l.contract_price,
-           se_lost.last_lost_at AS entered_not_sold_at,
-           l.sold_at,
-           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (l.sold_at - se_lost.last_lost_at)) / 86400))::int AS days_to_sold
-         FROM leads l
+           se_lost.created_at AS entered_lost_at,
+           se_sold.created_at AS sold_at,
+           GREATEST(0, ROUND(EXTRACT(EPOCH FROM (se_sold.created_at - se_lost.created_at)) / 86400))::int AS days_to_recovery
+         FROM status_events se_sold
+         JOIN leads l ON l.id = se_sold.lead_id AND l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
          JOIN LATERAL (
-           SELECT MAX(created_at) AS last_lost_at
-           FROM status_events
-           WHERE lead_id = l.id AND to_status IN ('lost', 'not_sold') AND created_at < l.sold_at
-         ) se_lost ON se_lost.last_lost_at IS NOT NULL
-         WHERE l.company_id = $1 AND l.deleted_at IS NULL AND l.status != 'status_junk'
-           AND l.sold_at >= $2 AND l.sold_at <= $3
-         ORDER BY l.sold_at DESC`,
+           SELECT created_at FROM status_events
+           WHERE lead_id = se_sold.lead_id AND to_status IN ('lost', 'not_sold') AND created_at < se_sold.created_at
+           ORDER BY created_at DESC LIMIT 1
+         ) se_lost ON true
+         WHERE se_sold.to_status = 'sold'
+           AND se_sold.created_at >= $2 AND se_sold.created_at <= $3
+         ORDER BY se_sold.lead_id, se_sold.created_at DESC`,
         [companyId, from, to]
       ),
     ]);
 
-    const cs = closedStatsRes.rows[0];
-    const rv = recoveryRes.rows[0];
+    const recoveredAppts  = recoveredApptsRes.rows;
+    const recoveredSales  = recoveredSalesRes.rows;
+    const recoveredSalesRevenue = recoveredSales.reduce((sum, r) => sum + (parseFloat(r.contract_price) || 0), 0);
+    const avgDaysAppt = recoveredAppts.length
+      ? Math.round(recoveredAppts.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredAppts.length) : null;
+    const avgDaysSale = recoveredSales.length
+      ? Math.round(recoveredSales.reduce((s, r) => s + r.days_to_recovery, 0) / recoveredSales.length) : null;
+    const totalAppts = totalApptsRes.rows[0].total;
+    const totalSold  = totalSoldRes.rows[0].total;
 
     res.json({
       success: true,
       metrics: {
-        leadsReceived:   leadsCreatedRes.rows[0].total,
-        totalSold:       cs.total_sold,
-        totalRevenue:    parseFloat(cs.total_revenue) || 0,
-        avgDaysToClose:  cs.avg_days_to_close,
-        recoveryTotal:   rv.total,
-        recoveryRevenue: parseFloat(rv.total_revenue) || 0,
-        avgDaysRecovery: rv.avg_days,
+        totalAppts,
+        leadsToAppt:          leadsToApptRes.rows[0].total,
+        recoveredAppts:       recoveredAppts.length,
+        apptRecoveryPct:      pct(recoveredAppts.length, totalAppts),
+        avgDaysAppt,
+        totalSold,
+        recoveredSales:       recoveredSales.length,
+        recoveredSalesRevenue,
+        salesRecoveryPct:     pct(recoveredSales.length, totalSold),
+        avgDaysSale,
       },
-      soldLeads: soldDetailRes.rows.map(r => ({
+      recoveredAppts: recoveredAppts.map(r => ({
         fullName:      r.full_name,
         leadSource:    r.lead_source,
-        contractPrice: r.contract_price,
         enteredLeadAt: r.entered_lead_at,
-        soldAt:        r.sold_at,
-        daysToSold:    r.days_to_sold,
+        apptSetAt:     r.appt_set_at,
+        daysToRecovery: r.days_to_recovery,
       })),
-      recoveredLeads: recoveryDetailRes.rows.map(r => ({
-        fullName:         r.full_name,
-        leadSource:       r.lead_source,
-        contractPrice:    r.contract_price,
-        enteredNotSoldAt: r.entered_not_sold_at,
-        soldAt:           r.sold_at,
-        daysToSold:       r.days_to_sold,
+      recoveredSales: recoveredSales.map(r => ({
+        fullName:       r.full_name,
+        leadSource:     r.lead_source,
+        contractPrice:  r.contract_price,
+        enteredLostAt:  r.entered_lost_at,
+        soldAt:         r.sold_at,
+        daysToRecovery: r.days_to_recovery,
       })),
     });
   } catch (error) {

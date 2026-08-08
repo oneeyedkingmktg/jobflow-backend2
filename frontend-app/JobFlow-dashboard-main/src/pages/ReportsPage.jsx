@@ -165,10 +165,9 @@ function AutomationRecoveryContent({ companyId }) {
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
-        <strong>Period Summary</strong> shows leads that came in and jobs that closed during the selected window. Leads received uses the date the lead entered the system; everything else is filtered by sold date. <strong>Not Sold Recoveries</strong> counts leads that were marked Not Sold at some point but later came back and closed — these are included in the closed totals above.
+        Appointments filtered by when the appointment was booked. Sales filtered by when the job was marked sold. <strong>Lead → Appt</strong> counts leads the system converted to appointments. <strong>Recovered</strong> means the lead had stalled into Not Sold or Lost before coming back. The detail log shows every recovered sale — including those missing a contract amount so they can be updated.
       </p>
 
-      {/* Range selector */}
       <div className="flex gap-1.5 mb-3 flex-wrap">
         {RANGES.map((r) => (
           <button
@@ -203,69 +202,32 @@ function AutomationRecoveryContent({ companyId }) {
 
       {!loading && !error && m && (
         <>
-          {/* Period Summary */}
-          <SectionCard title="Period Summary">
-            <MetricRow label="Leads Received" value={m.leadsReceived} />
-            <MetricRow label="Jobs Closed" value={m.totalSold} />
+          <SectionCard title="Appointments">
+            <MetricRow label="Total Appointments Set" value={m.totalAppts} />
+            <MetricRow label="Lead → Appt Conversions" value={m.leadsToAppt} />
+            <MetricRow label="Recovered Appointments" value={m.recoveredAppts} />
             <MetricRow
-              label="Revenue Closed"
-              value={fmtMoney(m.totalRevenue)}
-              sub={m.avgDaysToClose != null ? `Avg ${m.avgDaysToClose} days lead to close` : undefined}
+              label="Appointment Recovery Rate"
+              value={`${m.apptRecoveryPct}%`}
+              sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : undefined}
             />
           </SectionCard>
 
-          {/* Not Sold Recoveries */}
-          <SectionCard title="Not Sold Recoveries">
+          <SectionCard title="Sales">
+            <MetricRow label="Total Jobs Sold" value={m.totalSold} />
+            <MetricRow label="Recovered Sales" value={m.recoveredSales} />
+            <MetricRow label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} />
             <MetricRow
-              label="Recovered &amp; Closed"
-              value={m.recoveryTotal}
-              sub={m.avgDaysRecovery != null ? `Avg ${m.avgDaysRecovery} days from Not Sold to close` : undefined}
+              label="Sales Recovery Rate"
+              value={`${m.salesRecoveryPct}%`}
+              sub={m.avgDaysSale != null ? `Avg ${m.avgDaysSale} days to recovery` : undefined}
             />
-            <MetricRow label="Revenue Recovered" value={m.recoveryRevenue > 0 ? fmtMoney(m.recoveryRevenue) : "—"} />
           </SectionCard>
 
-          {/* Closed jobs detail */}
           <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Closed Jobs Detail</div>
-            {data.soldLeads.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No closed jobs in this range.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                      <th className="text-left px-3 py-2 font-semibold">Source</th>
-                      <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
-                      <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
-                      <th className="text-right px-3 py-2 font-semibold">Days</th>
-                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.soldLeads.map((r, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLeadAt)}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
-                        <td className="px-3 py-2 text-right font-medium text-green-700">
-                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Recovery detail */}
-          <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery Detail</div>
-            {data.recoveredLeads.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No Not Sold recoveries in this range.</p>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Sales Detail</div>
+            {data.recoveredSales.length === 0 ? (
+              <p className="text-sm text-gray-400 italic py-1">No recovered sales in this range.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-xs">
@@ -280,13 +242,13 @@ function AutomationRecoveryContent({ companyId }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {data.recoveredLeads.map((r, i) => (
+                    {data.recoveredSales.map((r, i) => (
                       <tr key={i} className="bg-white">
                         <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredNotSoldAt)}</td>
+                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLostAt)}</td>
                         <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToSold ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
                         <td className="px-3 py-2 text-right font-medium text-green-700">
                           {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
                         </td>
