@@ -434,6 +434,8 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS job_cost_labor_overrides_lead_user_idx ON job_cost_labor_overrides (lead_id, user_id)`,
+    // Deactivate removed reports
+    `UPDATE report_definitions SET is_active = false WHERE key IN ('recent_activity', 'conversions')`,
   ];
   for (const sql of migrations) {
     try {

@@ -627,8 +627,6 @@ function CostPerSaleContent({ companyId }) {
 // ─── report modal wrapper ────────────────────────────────────────────────────
 
 const REPORT_CONTENT = {
-  recent_activity: ActivityContent,
-  conversions: ConversionsContent,
   automation_recovery: AutomationRecoveryContent,
   conversions_by_source: ConversionsBySourceContent,
   cost_per_sale: CostPerSaleContent,
@@ -726,19 +724,7 @@ export default function ReportsPage() {
           </button>
         ))}
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 mb-3">
-          <div className="text-base font-semibold text-gray-900 mb-1">Clarity Tracking</div>
-          <p className="text-xs text-gray-500 mb-3">
-            Open your Clarity <strong>Settings</strong> button at the top then <strong>Overview</strong> on the left. Find your <strong>Project ID</strong>.
-          </p>
-          <div className="text-xs text-gray-500 uppercase font-semibold mb-1">Project ID</div>
-          <input
-            readOnly
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700"
-            value={currentCompany?.clarityProjectId || currentCompany?.clarity_project_id || ""}
-            placeholder="Not configured — set in Company Settings → Tracking"
-          />
-        </div>
+
       </div>
 
       {openReport && (
