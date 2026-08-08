@@ -131,7 +131,7 @@ function ExpandableDetail({ label, rows, children }) {
         <svg className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-        {open ? "Hide Details" : `View Details${rows > 0 ? ` (${rows})` : ""}`}
+        {open ? `Hide ${label}` : `${label}${rows > 0 ? ` (${rows})` : ""}`}
       </button>
       {open && <div className="mt-2">{children}</div>}
     </div>
@@ -225,7 +225,7 @@ function AutomationRecoveryContent({ companyId }) {
               value={`${m.apptRecoveryPct}%`}
               sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : undefined}
             />
-            <ExpandableDetail label="View Details" rows={(data.recoveredAppts || []).length}>
+            <ExpandableDetail label="Contact Log" rows={(data.recoveredAppts || []).length}>
               {(data.recoveredAppts || []).length === 0 ? (
                 <p className="text-xs text-gray-400 italic py-1">No recovered appointments in this range.</p>
               ) : (
@@ -259,7 +259,7 @@ function AutomationRecoveryContent({ companyId }) {
           <SectionCard title="Lead Sales">
             <MetricRow label="Recovered Sales" value={m.leadSalesCount} />
             <MetricRow label="Recovered Sales Value" value={fmtMoney(m.leadSalesRevenue)} />
-            <ExpandableDetail label="View Details" rows={(data.leadSales || []).length}>
+            <ExpandableDetail label="Contact Log" rows={(data.leadSales || []).length}>
               {(data.leadSales || []).length === 0 ? (
                 <p className="text-xs text-gray-400 italic py-1">No lead sales in this range.</p>
               ) : (
@@ -298,7 +298,7 @@ function AutomationRecoveryContent({ companyId }) {
               value={`${m.notSoldRecoveryPct}%`}
               sub={m.avgDaysNotSold != null ? `Avg ${m.avgDaysNotSold} days to recovery` : undefined}
             />
-            <ExpandableDetail label="View Details" rows={(data.notSoldRecovery || []).length}>
+            <ExpandableDetail label="Contact Log" rows={(data.notSoldRecovery || []).length}>
               {(data.notSoldRecovery || []).length === 0 ? (
                 <p className="text-xs text-gray-400 italic py-1">No not-sold recoveries in this range.</p>
               ) : (
