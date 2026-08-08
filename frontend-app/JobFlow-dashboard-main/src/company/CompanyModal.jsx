@@ -5,9 +5,10 @@
 
 console.log("📂 CompanyModal.jsx file loaded");
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { apiRequest } from "../api";
+import { REPORT_CONTENT } from "../reports/ReportContents";
 import UsersHome from "../users/UsersHome";
 import EstimatorPricingModal from "./EstimatorPricingModal";
 import EstimatorMasterModal from "./EstimatorMasterModal";
@@ -58,14 +59,6 @@ export default function CompanyModal({
   // REPORTS STATE
   const [reportDefs, setReportDefs] = useState(null);
   const [openReport, setOpenReport] = useState(null);
-  const [reportData, setReportData] = useState(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportRange, setReportRange] = useState('90');
-  const [cplSources, setCplSources] = useState([]);
-  const [cplLoading, setCplLoading] = useState(false);
-  const [cplSaving, setCplSaving] = useState(false);
-  const [editingCpls, setEditingCpls] = useState(false);
-  const cplDraftRef = useRef({});
 
   // ORPHAN CHECK STATE
   const [orphanLoading, setOrphanLoading] = useState(false);
@@ -394,35 +387,7 @@ const handleSaveTracking = async () => {
     }
   };
 
-  const ENDPOINT_MAP = {
-    automation_recovery: "automation-recovery",
-    conversions_by_source: "conversions-by-source",
-    cost_per_sale: "cost-per-sale",
-  };
-
-  const newStyleReports = ["automation_recovery", "conversions_by_source", "cost_per_sale"];
-
-  const fetchReportData = async (def, range) => {
-    setReportLoading(true);
-    setReportData(null);
-    const endpoint = ENDPOINT_MAP[def.key] ?? def.key;
-    let url = `/api/reports/${endpoint}?company_id=${company.id}&range=${range || '90'}`;
-    try {
-      const res = await apiRequest(url);
-      setReportData(newStyleReports.includes(def.key) ? res : res.metrics);
-    } catch (e) {
-      setReportData(null);
-    }
-    setReportLoading(false);
-  };
-
-  const openReportModal = (def) => {
-    setOpenReport(def);
-    setEditingCpls(false);
-    const defaultRange = newStyleReports.includes(def.key) ? '90' : '30';
-    setReportRange(defaultRange);
-    fetchReportData(def, defaultRange);
-  };
+  const openReportModal = (def) => setOpenReport(def);
 
   const runOrphanCheck = async () => {
     setOrphanLoading(true);
@@ -478,9 +443,9 @@ const handleSaveTracking = async () => {
 
     const ReportPopup = () => {
       if (!openReport) return null;
-      const data = reportData;
-
-      const ModalShell = ({ children }) => (
+      const Content = REPORT_CONTENT[openReport.key];
+      if (!Content) return null;
+      return (
         <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-16 px-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[75vh] flex flex-col">
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
@@ -491,350 +456,10 @@ const handleSaveTracking = async () => {
               <button onClick={() => setOpenReport(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-4">×</button>
             </div>
             <div className="overflow-y-auto px-5 py-4 flex-1">
-              {reportLoading ? (
-                <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-4 border-blue-500 border-t-transparent" /></div>
-              ) : children}
+              <Content companyId={company.id} />
             </div>
           </div>
         </div>
-      );
-
-      if (openReport.key === "automation_recovery") {
-        const m = data?.metrics;
-        const recoveredAppts  = data?.recoveredAppts  || [];
-        const leadSales       = data?.leadSales       || [];
-        const notSoldRecovery = data?.notSoldRecovery || [];
-        const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : "—";
-        const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-        const fmtMoneyOrDash = (v) => (v == null || v === 0) ? <span className="text-gray-400">—</span> : fmtMoney(v);
-        const Row = ({ label, value, sub }) => (
-          <div className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
-            <span className="text-sm text-gray-600">{label}</span>
-            <div className="text-right">
-              <span className="text-sm font-semibold">{value}</span>
-              {sub && <div className="text-xs text-gray-400">{sub}</div>}
-            </div>
-          </div>
-        );
-        const RANGES = [
-          { key: "30", label: "30 Days" }, { key: "60", label: "60 Days" },
-          { key: "90", label: "90 Days" }, { key: "ytd", label: "This Year" }, { key: "all", label: "All Time" },
-        ];
-        return (
-          <ModalShell>
-            <p className="text-xs text-gray-500 mb-3">
-              Shows how your follow-up system converts contacts back into appointments and sales. Appointments filter by booking date. Sales filter by sold date. A sale counts in only one bucket — Not Sold Recovery takes priority over Lead Sales.
-            </p>
-            <div className="flex gap-1.5 mb-4 flex-wrap">
-              {RANGES.map((r) => (
-                <button key={r.key}
-                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {!m ? (
-              <p className="text-sm text-gray-400 italic py-2">No data available.</p>
-            ) : (
-              <>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Appointments</div>
-                  <Row label="Total Appointments Set" value={m.totalAppts} />
-                  <Row label="Recovered Appointments" value={m.recoveredAppts} />
-                  <Row label="Appointment Recovery Rate" value={`${m.apptRecoveryPct}%`}
-                    sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : null} />
-                  {recoveredAppts.length > 0 && (
-                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
-                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
-                        <th className="text-left px-3 py-2 font-semibold">Appt Date</th>
-                        <th className="text-right px-3 py-2 font-semibold">Days</th>
-                      </tr></thead><tbody className="divide-y divide-gray-100">
-                        {recoveredAppts.map((r, i) => (
-                          <tr key={i} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.apptDate)}</td>
-                            <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
-                          </tr>
-                        ))}
-                      </tbody></table>
-                    </div>
-                  )}
-                </div>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Lead Sales</div>
-                  <Row label="Recovered Sales" value={m.leadSalesCount} />
-                  <Row label="Recovered Sales Value" value={fmtMoney(m.leadSalesRevenue)} />
-                  {leadSales.length > 0 && (
-                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
-                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
-                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
-                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
-                      </tr></thead><tbody className="divide-y divide-gray-100">
-                        {leadSales.map((r, i) => (
-                          <tr key={i} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
-                            <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
-                          </tr>
-                        ))}
-                      </tbody></table>
-                    </div>
-                  )}
-                </div>
-                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery</div>
-                  <Row label="Recovered Sales" value={m.notSoldCount} />
-                  <Row label="Recovered Sales Value" value={fmtMoney(m.notSoldRevenue)} />
-                  <Row label="Recovery Rate" value={`${m.notSoldRecoveryPct}%`}
-                    sub={m.avgDaysNotSold != null ? `Avg ${m.avgDaysNotSold} days to recovery` : null} />
-                  {notSoldRecovery.length > 0 && (
-                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
-                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                        <th className="text-left px-3 py-2 font-semibold">Not Sold Date</th>
-                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
-                        <th className="text-right px-3 py-2 font-semibold">Days</th>
-                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
-                      </tr></thead><tbody className="divide-y divide-gray-100">
-                        {notSoldRecovery.map((r, i) => (
-                          <tr key={i} className="bg-white">
-                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.notSoldDate)}</td>
-                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
-                            <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
-                            <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
-                          </tr>
-                        ))}
-                      </tbody></table>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </ModalShell>
-        );
-      }
-
-      const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-      const fmtPct = (v) => v != null ? `${v}%` : "—";
-      const fmtDays = (v) => v != null ? `${v}d` : "—";
-      const CBS_RANGES = [{ key: "30", label: "30d" }, { key: "60", label: "60d" }, { key: "90", label: "90d" }];
-
-      if (openReport.key === "conversions_by_source") {
-        const rows = data?.rows || [];
-        const totals = data?.totals;
-        return (
-          <ModalShell>
-            <p className="text-xs text-gray-500 mb-3">Leads grouped by UTM source. No UTM = organic. Junk excluded.</p>
-            <div className="flex gap-1.5 mb-3">
-              {CBS_RANGES.map((r) => (
-                <button key={r.key}
-                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {rows.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Source</th>
-                      <th className="text-right px-3 py-2 font-semibold">Leads</th>
-                      <th className="text-right px-3 py-2 font-semibold">Appts</th>
-                      <th className="text-right px-3 py-2 font-semibold">Appt%</th>
-                      <th className="text-right px-3 py-2 font-semibold">Sold</th>
-                      <th className="text-right px-3 py-2 font-semibold">Lead→Sold%</th>
-                      <th className="text-right px-3 py-2 font-semibold">Appt→Sold%</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {rows.map((r, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.apptsSet}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptRate)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.sold}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.leadToSoldPct)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.apptToSoldPct)}</td>
-                      </tr>
-                    ))}
-                    {totals && (
-                      <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                        <td className="px-3 py-2 text-gray-900">Totals</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{totals.totalLeads}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{totals.apptsSet}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.apptRate)}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{totals.sold}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.leadToSoldPct)}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.apptToSoldPct)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ModalShell>
-        );
-      }
-
-      if (openReport.key === "cost_per_sale") {
-        const rows = data?.rows || [];
-        const totals = data?.totals;
-        const loadCpls = () => {
-          setCplLoading(true);
-          setEditingCpls(true);
-          apiRequest(`/api/reports/source-cpls?company_id=${company.id}`)
-            .then((r) => {
-              setCplSources(r.sources);
-              cplDraftRef.current = {};
-              r.sources.forEach(s => { cplDraftRef.current[s.source] = String(s.cpl); });
-              setCplLoading(false);
-            })
-            .catch(() => setCplLoading(false));
-        };
-        const saveCpls = () => {
-          setCplSaving(true);
-          apiRequest(`/api/reports/source-cpls?company_id=${company.id}`, {
-            method: "PUT",
-            body: JSON.stringify({ cpls: cplSources.map((s) => ({ source: s.source, cpl: parseFloat(cplDraftRef.current[s.source]) || 0 })) }),
-          }).then(() => {
-            setCplSaving(false);
-            setEditingCpls(false);
-            fetchReportData(openReport, reportRange);
-          }).catch(() => setCplSaving(false));
-        };
-        return (
-          <ModalShell>
-            <p className="text-xs text-gray-500 mb-3">Ad spend vs. revenue by UTM source. Sold jobs without contract price excluded.</p>
-            <div className="flex gap-1.5 mb-3">
-              {CBS_RANGES.map((r) => (
-                <button key={r.key}
-                  onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${reportRange === r.key ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {!editingCpls && (
-              <button onClick={loadCpls} className="mb-3 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50">
-                Edit CPL Settings
-              </button>
-            )}
-            {editingCpls && (
-              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <div className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-2">CPL Settings</div>
-                {cplLoading ? <div className="text-xs text-gray-400">Loading…</div> : (
-                  <>
-                    <div className="space-y-2 mb-3">
-                      {cplSources.map((s, i) => (
-                        <div key={s.source} className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-gray-700 w-24 capitalize">{s.source}</span>
-                          <span className="text-xs text-gray-500">$</span>
-                          <input type="text" inputMode="decimal" defaultValue={s.cpl}
-                            onChange={(e) => { cplDraftRef.current[s.source] = e.target.value; }}
-                            className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-20" />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={saveCpls} disabled={cplSaving} className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50">
-                        {cplSaving ? "Saving…" : "Save"}
-                      </button>
-                      <button onClick={() => setEditingCpls(false)} className="px-3 py-1 border border-gray-300 rounded-lg text-xs font-medium text-gray-700">Cancel</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-            {rows.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-4">No lead data in this date range.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Source</th>
-                      <th className="text-right px-3 py-2 font-semibold">CPL</th>
-                      <th className="text-right px-3 py-2 font-semibold">Leads</th>
-                      <th className="text-right px-3 py-2 font-semibold">Spend</th>
-                      <th className="text-right px-3 py-2 font-semibold">Sold</th>
-                      <th className="text-right px-3 py-2 font-semibold">Revenue</th>
-                      <th className="text-right px-3 py-2 font-semibold">Cost/Sale</th>
-                      <th className="text-right px-3 py-2 font-semibold">Ad%</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {rows.map((r, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-3 py-2 font-medium text-gray-800 capitalize">{r.source}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.cpl)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.totalLeads}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.totalAdSpend)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.soldWithPrice}</td>
-                        <td className="px-3 py-2 text-right text-green-700 font-medium">{fmtMoney(r.totalRevenue)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtMoney(r.costPerSale)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{fmtPct(r.adCostPctOfRevenue)}</td>
-                      </tr>
-                    ))}
-                    {totals && (
-                      <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                        <td className="px-3 py-2 text-gray-900">Totals</td>
-                        <td className="px-3 py-2 text-right text-gray-400">—</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{totals.totalLeads}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(totals.totalAdSpend)}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{totals.soldWithPrice}</td>
-                        <td className="px-3 py-2 text-right text-green-700">{fmtMoney(totals.totalRevenue)}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtMoney(totals.costPerSale)}</td>
-                        <td className="px-3 py-2 text-right text-gray-900">{fmtPct(totals.adCostPctOfRevenue)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ModalShell>
-        );
-      }
-
-      const SectionCard = ({ title, d }) => (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-          <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</div>
-          {!d || (d.totalLeads === 0 && d.newLeads === undefined) ? (
-            <p className="text-sm text-gray-400 italic">No data yet</p>
-          ) : openReport.key === "recent_activity" ? (
-            <>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">New Leads</span><span className="text-sm font-semibold">{d.newLeads}</span></div>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Appointments Set</span><span className="text-sm font-semibold">{d.apptsSet}</span></div>
-              <div className="flex justify-between py-2"><span className="text-sm text-gray-600">Jobs Sold</span><span className="text-sm font-semibold">{d.jobsSold}</span></div>
-            </>
-          ) : (
-            <>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Leads in this report</span><span className="text-sm font-semibold">{d.totalLeads}</span></div>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Lead → Appointment</span><span className="text-sm font-semibold">{d.leadsToAppt} ({d.leadToApptPct}%)</span></div>
-              <div className="flex justify-between py-2 border-b border-gray-100"><span className="text-sm text-gray-600">Appointment → Sold</span><span className="text-sm font-semibold">{d.apptToSold} ({d.apptToSoldPct}%)</span></div>
-              <div className="flex justify-between py-2"><span className="text-sm text-gray-600">Lead → Sold (total)</span><span className="text-sm font-semibold">{d.leadsToSold} ({d.leadToSoldPct}%)</span></div>
-            </>
-          )}
-        </div>
-      );
-
-      return (
-        <ModalShell>
-          <SectionCard title="Regular Leads" d={data?.non_estimator} />
-          <SectionCard title="Estimator Leads" d={data?.estimator} />
-        </ModalShell>
       );
     };
 
