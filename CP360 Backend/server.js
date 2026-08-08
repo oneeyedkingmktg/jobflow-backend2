@@ -226,7 +226,7 @@ async function runMigrations() {
         )`,
     // automation_recovery report definition (upsert so name/description are always correct)
     `INSERT INTO report_definitions (key, name, description) VALUES
-      ('automation_recovery', 'Automation Recovery', 'Appointments set, lead-to-appt conversions, and Not Sold recoveries. Shows your automation system is working.')
+      ('automation_recovery', 'Automation Recovery', 'Track recovered appointments, lead sales, and Not Sold turnarounds to see your follow-up system paying off.')
       ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
     // Restore recent_activity row in case its name was accidentally overwritten
     `UPDATE report_definitions

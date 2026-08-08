@@ -120,44 +120,71 @@ function ConversionsContent({ companyId }) {
   );
 }
 
+function ExpandableDetail({ label, rows, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium py-1"
+      >
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        {open ? "Hide Details" : `View Details${rows > 0 ? ` (${rows})` : ""}`}
+      </button>
+      {open && <div className="mt-2">{children}</div>}
+    </div>
+  );
+}
+
+function ContactLink({ id, name }) {
+  function handleClick(e) {
+    e.preventDefault();
+    if (!id) return;
+    sessionStorage.setItem("pendingOpenLeadId", String(id));
+    window.__setAppScreen?.("leads");
+  }
+  return (
+    <button onClick={handleClick} className="text-blue-600 hover:underline text-left font-medium">
+      {name || "—"}
+    </button>
+  );
+}
+
 function AutomationRecoveryContent({ companyId }) {
   const [range, setRange] = useState("30");
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  function load(r, start, end) {
+  function load(r) {
     setLoading(true);
     setError(null);
     let url = `/api/reports/automation-recovery?range=${r}`;
     if (companyId) url += `&company_id=${companyId}`;
-    if (r === "custom" && start && end) url += `&start=${start}&end=${end}`;
     apiRequest(url)
-      .then((r) => { setData(r); setLoading(false); })
+      .then((res) => { setData(res); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }
 
   useEffect(() => { load("30"); }, [companyId]);
 
-  function handleRangeClick(r) {
+  function handleRange(r) {
     setRange(r);
-    if (r !== "custom") load(r);
-  }
-
-  function handleCustomApply() {
-    if (customStart && customEnd) load("custom", customStart, customEnd);
+    load(r);
   }
 
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : "—";
   const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmtMoneyOrDash = (v) => (v == null || v === 0) ? <span className="text-gray-400">—</span> : fmtMoney(v);
 
   const RANGES = [
     { key: "30", label: "30 Days" },
+    { key: "60", label: "60 Days" },
     { key: "90", label: "90 Days" },
-    { key: "ytd", label: "YTD" },
-    { key: "custom", label: "Custom" },
+    { key: "ytd", label: "This Year" },
+    { key: "all", label: "All Time" },
   ];
 
   const m = data?.metrics;
@@ -165,14 +192,14 @@ function AutomationRecoveryContent({ companyId }) {
   return (
     <div>
       <p className="text-xs text-gray-500 mb-3">
-        Appointments filtered by when the appointment was booked. Sales filtered by when the job was marked sold. <strong>Lead → Appt</strong> counts leads the system converted to appointments. <strong>Recovered</strong> means the lead had stalled into Not Sold or Lost before coming back. The detail log shows every recovered sale — including those missing a contract amount so they can be updated.
+        Shows how your follow-up system converts contacts back into appointments and sales. Appointments filter by booking date. Sales filter by sold date. A sale counts in only one bucket — Not Sold Recovery takes priority over Lead Sales.
       </p>
 
-      <div className="flex gap-1.5 mb-3 flex-wrap">
+      <div className="flex gap-1.5 mb-4 flex-wrap">
         {RANGES.map((r) => (
           <button
             key={r.key}
-            onClick={() => handleRangeClick(r.key)}
+            onClick={() => handleRange(r.key)}
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
               range === r.key
                 ? "bg-blue-600 text-white border-blue-600"
@@ -183,82 +210,125 @@ function AutomationRecoveryContent({ companyId }) {
           </button>
         ))}
       </div>
-      {range === "custom" && (
-        <div className="flex gap-2 items-center mb-3 flex-wrap">
-          <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
-          <span className="text-xs text-gray-500">to</span>
-          <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1 text-xs" />
-          <button onClick={handleCustomApply}
-            className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium">
-            Apply
-          </button>
-        </div>
-      )}
 
       {loading && <Spinner />}
       {error && <ErrorMsg msg={error} />}
 
       {!loading && !error && m && (
         <>
+          {/* ── APPOINTMENTS ── */}
           <SectionCard title="Appointments">
             <MetricRow label="Total Appointments Set" value={m.totalAppts} />
-            <MetricRow label="Lead → Appt Conversions" value={m.leadsToAppt} />
             <MetricRow label="Recovered Appointments" value={m.recoveredAppts} />
             <MetricRow
               label="Appointment Recovery Rate"
               value={`${m.apptRecoveryPct}%`}
               sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : undefined}
             />
-          </SectionCard>
-
-          <SectionCard title="Sales">
-            <MetricRow label="Total Jobs Sold" value={m.totalSold} />
-            <MetricRow label="Recovered Sales" value={m.recoveredSales} />
-            <MetricRow label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} />
-            <MetricRow
-              label="Sales Recovery Rate"
-              value={`${m.salesRecoveryPct}%`}
-              sub={m.avgDaysSale != null ? `Avg ${m.avgDaysSale} days to recovery` : undefined}
-            />
-          </SectionCard>
-
-          <div className="mb-3">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Sales Detail</div>
-            {data.recoveredSales.length === 0 ? (
-              <p className="text-sm text-gray-400 italic py-1">No recovered sales in this range.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                      <th className="text-left px-3 py-2 font-semibold">Source</th>
-                      <th className="text-left px-3 py-2 font-semibold">Entered Not Sold</th>
-                      <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
-                      <th className="text-right px-3 py-2 font-semibold">Days</th>
-                      <th className="text-right px-3 py-2 font-semibold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.recoveredSales.map((r, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLostAt)}</td>
-                        <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
-                        <td className="px-3 py-2 text-right font-medium text-green-700">
-                          {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
-                        </td>
+            <ExpandableDetail label="View Details" rows={(data.recoveredAppts || []).length}>
+              {(data.recoveredAppts || []).length === 0 ? (
+                <p className="text-xs text-gray-400 italic py-1">No recovered appointments in this range.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Appt Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Days</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.recoveredAppts.map((r, i) => (
+                        <tr key={i} className="bg-white">
+                          <td className="px-3 py-2"><ContactLink id={r.id} name={r.fullName} /></td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.apptDate)}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </ExpandableDetail>
+          </SectionCard>
+
+          {/* ── LEAD SALES ── */}
+          <SectionCard title="Lead Sales">
+            <MetricRow label="Recovered Sales" value={m.leadSalesCount} />
+            <MetricRow label="Recovered Sales Value" value={fmtMoney(m.leadSalesRevenue)} />
+            <ExpandableDetail label="View Details" rows={(data.leadSales || []).length}>
+              {(data.leadSales || []).length === 0 ? (
+                <p className="text-xs text-gray-400 italic py-1">No lead sales in this range.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.leadSales.map((r, i) => (
+                        <tr key={i} className="bg-white">
+                          <td className="px-3 py-2"><ContactLink id={r.id} name={r.fullName} /></td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
+                          <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </ExpandableDetail>
+          </SectionCard>
+
+          {/* ── NOT SOLD RECOVERY ── */}
+          <SectionCard title="Not Sold Recovery">
+            <MetricRow label="Recovered Sales" value={m.notSoldCount} />
+            <MetricRow label="Recovered Sales Value" value={fmtMoney(m.notSoldRevenue)} />
+            <MetricRow
+              label="Recovery Rate"
+              value={`${m.notSoldRecoveryPct}%`}
+              sub={m.avgDaysNotSold != null ? `Avg ${m.avgDaysNotSold} days to recovery` : undefined}
+            />
+            <ExpandableDetail label="View Details" rows={(data.notSoldRecovery || []).length}>
+              {(data.notSoldRecovery || []).length === 0 ? (
+                <p className="text-xs text-gray-400 italic py-1">No not-sold recoveries in this range.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Not Sold Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Days</th>
+                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.notSoldRecovery.map((r, i) => (
+                        <tr key={i} className="bg-white">
+                          <td className="px-3 py-2"><ContactLink id={r.id} name={r.fullName} /></td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.notSoldDate)}</td>
+                          <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                          <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </ExpandableDetail>
+          </SectionCard>
         </>
       )}
     </div>

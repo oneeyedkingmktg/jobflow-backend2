@@ -342,6 +342,18 @@ const loadLeads = async () => {
     return () => window.removeEventListener('openLeadByGhlContact', handleOpenLead);
   }, [leads]);
 
+  useEffect(() => {
+    if (!leads.length) return;
+    const pendingId = sessionStorage.getItem('pendingOpenLeadId');
+    if (!pendingId) return;
+    const id = parseInt(pendingId, 10);
+    const lead = leads.find((l) => l.id === id);
+    if (lead) {
+      sessionStorage.removeItem('pendingOpenLeadId');
+      setSelectedLead(lead);
+      setIsNewLead(false);
+    }
+  }, [leads]);
 
   // --------------------------------------------------
   // Counts

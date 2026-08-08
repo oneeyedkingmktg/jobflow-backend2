@@ -501,9 +501,12 @@ const handleSaveTracking = async () => {
 
       if (openReport.key === "automation_recovery") {
         const m = data?.metrics;
-        const recoveredSales = data?.recoveredSales || [];
+        const recoveredAppts  = data?.recoveredAppts  || [];
+        const leadSales       = data?.leadSales       || [];
+        const notSoldRecovery = data?.notSoldRecovery || [];
         const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : "—";
         const fmtMoney = (v) => v == null ? "—" : `$${parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        const fmtMoneyOrDash = (v) => (v == null || v === 0) ? <span className="text-gray-400">—</span> : fmtMoney(v);
         const Row = ({ label, value, sub }) => (
           <div className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
             <span className="text-sm text-gray-600">{label}</span>
@@ -513,13 +516,16 @@ const handleSaveTracking = async () => {
             </div>
           </div>
         );
-        const RANGES = [{ key: "30", label: "30 Days" }, { key: "90", label: "90 Days" }, { key: "ytd", label: "YTD" }];
+        const RANGES = [
+          { key: "30", label: "30 Days" }, { key: "60", label: "60 Days" },
+          { key: "90", label: "90 Days" }, { key: "ytd", label: "This Year" }, { key: "all", label: "All Time" },
+        ];
         return (
           <ModalShell>
             <p className="text-xs text-gray-500 mb-3">
-              Appointments filtered by booking date. Sales filtered by sold date. <strong>Lead → Appt</strong> counts system-driven conversions. <strong>Recovered</strong> means the lead had stalled into Not Sold or Lost before coming back. Detail log shows all recovered sales including those missing a contract amount.
+              Shows how your follow-up system converts contacts back into appointments and sales. Appointments filter by booking date. Sales filter by sold date. A sale counts in only one bucket — Not Sold Recovery takes priority over Lead Sales.
             </p>
-            <div className="flex gap-1.5 mb-4">
+            <div className="flex gap-1.5 mb-4 flex-wrap">
               {RANGES.map((r) => (
                 <button key={r.key}
                   onClick={() => { setReportRange(r.key); fetchReportData(openReport, r.key); }}
@@ -535,51 +541,78 @@ const handleSaveTracking = async () => {
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
                   <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Appointments</div>
                   <Row label="Total Appointments Set" value={m.totalAppts} />
-                  <Row label="Lead → Appt Conversions" value={m.leadsToAppt} />
                   <Row label="Recovered Appointments" value={m.recoveredAppts} />
                   <Row label="Appointment Recovery Rate" value={`${m.apptRecoveryPct}%`}
                     sub={m.avgDaysAppt != null ? `Avg ${m.avgDaysAppt} days to recovery` : null} />
+                  {recoveredAppts.length > 0 && (
+                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Appt Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Days</th>
+                      </tr></thead><tbody className="divide-y divide-gray-100">
+                        {recoveredAppts.map((r, i) => (
+                          <tr key={i} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.apptDate)}</td>
+                            <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                          </tr>
+                        ))}
+                      </tbody></table>
+                    </div>
+                  )}
                 </div>
                 <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Sales</div>
-                  <Row label="Total Jobs Sold" value={m.totalSold} />
-                  <Row label="Recovered Sales" value={m.recoveredSales} />
-                  <Row label="Recovered Revenue" value={fmtMoney(m.recoveredSalesRevenue)} />
-                  <Row label="Sales Recovery Rate" value={`${m.salesRecoveryPct}%`}
-                    sub={m.avgDaysSale != null ? `Avg ${m.avgDaysSale} days to recovery` : null} />
-                </div>
-                <div className="mb-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Recovered Sales Detail</div>
-                  {recoveredSales.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic py-1">No recovered sales in this range.</p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-xl border border-gray-200">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 text-gray-500">
-                          <tr>
-                            <th className="text-left px-3 py-2 font-semibold">Contact</th>
-                            <th className="text-left px-3 py-2 font-semibold">Source</th>
-                            <th className="text-left px-3 py-2 font-semibold">Entered Not Sold</th>
-                            <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
-                            <th className="text-right px-3 py-2 font-semibold">Days</th>
-                            <th className="text-right px-3 py-2 font-semibold">Amount</th>
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Lead Sales</div>
+                  <Row label="Recovered Sales" value={m.leadSalesCount} />
+                  <Row label="Recovered Sales Value" value={fmtMoney(m.leadSalesRevenue)} />
+                  {leadSales.length > 0 && (
+                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Lead Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
+                      </tr></thead><tbody className="divide-y divide-gray-100">
+                        {leadSales.map((r, i) => (
+                          <tr key={i} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.leadDate)}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {recoveredSales.map((r, i) => (
-                            <tr key={i} className="bg-white">
-                              <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
-                              <td className="px-3 py-2 text-gray-500">{r.leadSource || "—"}</td>
-                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.enteredLostAt)}</td>
-                              <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldAt)}</td>
-                              <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
-                              <td className="px-3 py-2 text-right font-medium text-green-700">
-                                {r.contractPrice != null ? fmtMoney(r.contractPrice) : <span className="text-gray-400">—</span>}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                        ))}
+                      </tbody></table>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-3">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Not Sold Recovery</div>
+                  <Row label="Recovered Sales" value={m.notSoldCount} />
+                  <Row label="Recovered Sales Value" value={fmtMoney(m.notSoldRevenue)} />
+                  <Row label="Recovery Rate" value={`${m.notSoldRecoveryPct}%`}
+                    sub={m.avgDaysNotSold != null ? `Avg ${m.avgDaysNotSold} days to recovery` : null} />
+                  {notSoldRecovery.length > 0 && (
+                    <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="w-full text-xs"><thead className="bg-gray-50 text-gray-500"><tr>
+                        <th className="text-left px-3 py-2 font-semibold">Contact</th>
+                        <th className="text-left px-3 py-2 font-semibold">Not Sold Date</th>
+                        <th className="text-left px-3 py-2 font-semibold">Sold Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Days</th>
+                        <th className="text-right px-3 py-2 font-semibold">Contract</th>
+                      </tr></thead><tbody className="divide-y divide-gray-100">
+                        {notSoldRecovery.map((r, i) => (
+                          <tr key={i} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-gray-800">{r.fullName || "—"}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.notSoldDate)}</td>
+                            <td className="px-3 py-2 text-gray-500">{fmtDate(r.soldDate)}</td>
+                            <td className="px-3 py-2 text-right text-gray-700">{r.daysToRecovery}</td>
+                            <td className="px-3 py-2 text-right font-medium text-green-700">{fmtMoneyOrDash(r.contractPrice)}</td>
+                          </tr>
+                        ))}
+                      </tbody></table>
                     </div>
                   )}
                 </div>
