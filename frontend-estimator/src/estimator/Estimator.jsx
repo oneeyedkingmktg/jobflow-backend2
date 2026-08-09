@@ -12,7 +12,7 @@ import EstimatorResults from "./components/EstimatorResults";
 
 const params = new URLSearchParams(window.location.search);
 const companyId = params.get("company");
-const previewMode = params.get("preview") === "1";
+// previewMode is evaluated inside the component (see below)
 let utmSource = params.get("utm_source") || null;
 
 const PREVIEW_ESTIMATE = {
@@ -392,6 +392,9 @@ export default function Estimator() {
   // Config hook - handles fetching and style generation
   const { config, customStyles, useCustomStyles } = useEstimatorConfig();
 
+  // Evaluated inside the component so it runs during render, not at module-eval time
+  const previewMode = window.location.search.includes("preview=1");
+
   // Screen state
   const [screen, setScreen] = useState(() => previewMode ? 2 : 1);
   const [activeFinish, setActiveFinish] = useState("flake");
@@ -486,6 +489,15 @@ export default function Estimator() {
       });
     }
   }, [config]);
+
+  // Backup: if lazy init missed preview (timing edge case), jump on mount
+  useEffect(() => {
+    if (!window.location.search.includes("preview=1")) return;
+    setEstimate(PREVIEW_ESTIMATE);
+    setProjectType("garage_2");
+    setCondition("good");
+    setScreen(2);
+  }, []);
 
   // Wait for config to load
   if (!config) {

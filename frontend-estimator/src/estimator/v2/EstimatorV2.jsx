@@ -4,7 +4,7 @@
 // Build: All 5 steps + results + second estimate flow + combined results
 // ============================================================================
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import useEstimatorConfig from "../hooks/useEstimatorConfig";
 import { validEmail, validPhone, formatPhoneNumber } from "../utils/validators";
 
@@ -13,7 +13,7 @@ const _urlParams   = new URLSearchParams(window.location.search);
 const _utmSource   = _urlParams.get("utm_source")   || null;
 const _utmMedium   = _urlParams.get("utm_medium")   || null;
 const _utmCampaign = _urlParams.get("utm_campaign") || null;
-const previewMode  = _urlParams.get("preview") === "1";
+// previewMode is evaluated inside the component (see below)
 
 const PREVIEW_ESTIMATE = {
   allPriceRanges: {
@@ -170,6 +170,9 @@ function MiniProgress({ current, total, primaryColor }) {
 export default function EstimatorV2() {
   const { config, customStyles, useCustomStyles } = useEstimatorConfig();
 
+  // Evaluated inside the component so it runs during render, not at module-eval time
+  const previewMode = window.location.search.includes("preview=1");
+
   // Navigation: 1-5 = main steps, 6 = results, 7-9 = second estimate steps, 10 = combined results
   const [step, setStep] = useState(() => previewMode ? 6 : 1);
 
@@ -219,6 +222,16 @@ export default function EstimatorV2() {
       try { if (typeof clarity === "function") clarity("event", "estimator_interaction_v2"); } catch {}
     }
   }
+
+  // Backup: if lazy init missed preview (timing edge case), jump on mount
+  useEffect(() => {
+    if (!window.location.search.includes("preview=1")) return;
+    setEstimate(PREVIEW_ESTIMATE);
+    setProjectType("garage_2");
+    setCondition("good");
+    setActiveFinish("flake");
+    setStep(6);
+  }, []);
 
   // ---- Guards ----
   if (!config) return <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>;
