@@ -327,7 +327,7 @@ const infoBoxClass = useCustomStyles
 
     {infoText && (
       <div className="text-xs text-gray-500 italic pt-1">
-        * {infoText}
+        * {renderTextWithInlineLinks(String(infoText))}
       </div>
     )}
   </div>

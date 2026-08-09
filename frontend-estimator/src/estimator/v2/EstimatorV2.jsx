@@ -703,7 +703,7 @@ export default function EstimatorV2() {
                 )}
               </div>
               {getInfoText(estimate, activeFinish) && (
-                <div className="rounded-md px-4 py-3 text-sm mt-3" style={infoBoxStyle}>* {getInfoText(estimate, activeFinish)}</div>
+                <div className="rounded-md px-4 py-3 text-sm mt-3" style={infoBoxStyle}>* {renderTextWithInlineLinks(String(getInfoText(estimate, activeFinish)))}</div>
               )}
               {(cta1Button || cta2Button) && (
                 <div className="flex flex-col gap-3 mt-6">
@@ -870,7 +870,7 @@ export default function EstimatorV2() {
                   <div className="text-sm font-semibold text-gray-500">{buildProjectLabel(projectType, length, width, squareFeet)}</div>
                   <div className="text-2xl font-bold">{getPriceDisplay(allRanges1, activeFinish)}<span className="text-xs align-super">*</span></div>
                   <div className="text-xs text-gray-500">Condition: {getConditionLabel(condition)}</div>
-                  {r1?.minimumApplied && r1?.min === r1?.max && <p className="text-xs text-gray-400 italic">{minJobInfoText}</p>}
+                  {r1?.minimumApplied && r1?.min === r1?.max && <p className="text-xs text-gray-400 italic">{renderTextWithInlineLinks(String(minJobInfoText))}</p>}
                 </div>
               </div>
 
@@ -881,7 +881,7 @@ export default function EstimatorV2() {
                   <div className="text-sm font-semibold text-gray-500">{buildProjectLabel(projectType2, length2, width2, squareFeet2)}</div>
                   <div className="text-2xl font-bold">{getPriceDisplay(allRanges2, activeFinish2)}<span className="text-xs align-super">*</span></div>
                   <div className="text-xs text-gray-500">Condition: {getConditionLabel(condition2)}</div>
-                  {r2?.minimumApplied && r2?.min === r2?.max && <p className="text-xs text-gray-400 italic">{minJobInfoText}</p>}
+                  {r2?.minimumApplied && r2?.min === r2?.max && <p className="text-xs text-gray-400 italic">{renderTextWithInlineLinks(String(minJobInfoText))}</p>}
                 </div>
               </div>
 
@@ -896,14 +896,14 @@ export default function EstimatorV2() {
                     }
                   </div>
                   {(r1?.minimumApplied || r2?.minimumApplied) && (
-                    <p className="text-xs text-gray-400 italic mt-1">{minJobInfoText}</p>
+                    <p className="text-xs text-gray-400 italic mt-1">{renderTextWithInlineLinks(String(minJobInfoText))}</p>
                   )}
                 </div>
               )}
 
               {/* Combined project message */}
               {combinedProjectMsg && (
-                <div className="rounded-md px-4 py-3 text-sm mb-4" style={infoBoxStyle}>{combinedProjectMsg}</div>
+                <div className="rounded-md px-4 py-3 text-sm mb-4" style={infoBoxStyle}>{renderTextWithInlineLinks(String(combinedProjectMsg))}</div>
               )}
 
               {/* CTAs */}
@@ -914,7 +914,7 @@ export default function EstimatorV2() {
                 </div>
               )}
 
-              <p className="text-xs text-gray-400 italic text-center mt-4">* {standardInfoText}</p>
+              <p className="text-xs text-gray-400 italic text-center mt-4">* {renderTextWithInlineLinks(String(standardInfoText))}</p>
             </div>
           )}
 

@@ -685,6 +685,13 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
   <h3 className="font-bold text-gray-900 mb-3">Text Content</h3>
 
   <div className="space-y-4">
+    <p className="text-xs text-gray-500">
+      To add a clickable link inside any text field, use this format:{" "}
+      <code className="bg-gray-100 px-1 rounded">(url, link text)</code>
+      {" "}— example:{" "}
+      <code className="bg-gray-100 px-1 rounded">(https://proshieldfloors.com/commercial-floors/, learn more)</code>
+    </p>
+
     {textInput("Custom Floor Display Name", "customProjectLabel", "e.g. Dance Floors")}
     {textArea("Minimum Job Info Text", "minJobInfoText")}
     {textArea("Standard Info Text", "standardInfoText")}
@@ -731,12 +738,6 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
     <hr className="my-4" />
 
     <h4 className="font-semibold text-gray-700 text-sm">Finish Descriptions on Results Page</h4>
-    <p className="text-xs text-gray-500 mb-2">
-      To add a clickable link inside a description, use this format:{" "}
-      <code className="bg-gray-100 px-1 rounded">(url,text)</code>
-      {" "}— example:{" "}
-      <code className="bg-gray-100 px-1 rounded">(https://coatingpro360.com,learn more)</code>
-    </p>
 
 {textArea(
   "Solid Finish Description (Results Page)",

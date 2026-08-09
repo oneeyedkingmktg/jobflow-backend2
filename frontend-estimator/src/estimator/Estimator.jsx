@@ -18,6 +18,26 @@ let utmCampaign = params.get("utm_campaign") || null;
 let utmAudience = params.get("utm_audience") || null;
 let utmCreative = params.get("utm_creative") || null;
 
+function renderTextWithInlineLinks(text) {
+  if (!text || typeof text !== "string") return null;
+  const parts = [];
+  const re = /\((https?:\/\/[^,\s]+)\s*,\s*([^)]+)\)/g;
+  let lastIndex = 0;
+  let match;
+  let linkIndex = 0;
+  while ((match = re.exec(text)) !== null) {
+    const [fullMatch, url, linkText] = match;
+    const start = match.index;
+    const end = start + fullMatch.length;
+    if (start > lastIndex) parts.push(text.slice(lastIndex, start));
+    parts.push(<a key={`il-${linkIndex++}`} href={url} target="_top" className="underline">{linkText}</a>);
+    lastIndex = end;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  if (parts.length === 0) return text;
+  return parts.map((p, i) => (typeof p === "string" ? <span key={`t-${i}`}>{p}</span> : p));
+}
+
 // ============================================================================
 // Modal shown when a returning customer already has 2 estimates on file
 // ============================================================================
@@ -302,7 +322,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
           </div>
           <div className="text-sm text-gray-600 mt-1">Condition: {getConditionLabel(condition)}</div>
           {space1MinApplied && (
-            <p className="text-xs text-gray-500 italic mt-2">{minJobInfoText}</p>
+            <p className="text-xs text-gray-500 italic mt-2">{renderTextWithInlineLinks(String(minJobInfoText))}</p>
           )}
         </div>
       </div>
@@ -319,7 +339,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
           </div>
           <div className="text-sm text-gray-600 mt-1">Condition: {getConditionLabel(condition2)}</div>
           {space2MinApplied && (
-            <p className="text-xs text-gray-500 italic mt-2">{minJobInfoText}</p>
+            <p className="text-xs text-gray-500 italic mt-2">{renderTextWithInlineLinks(String(minJobInfoText))}</p>
           )}
         </div>
       </div>
@@ -336,7 +356,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
       {/* Combined project message — below total */}
       {combinedProjectMessage && (
         <div className={`${infoBoxClass} mb-4`} style={infoBoxStyle}>
-          {combinedProjectMessage}
+          {renderTextWithInlineLinks(String(combinedProjectMessage))}
         </div>
       )}
 
@@ -348,7 +368,7 @@ function CombinedResults({ config, useCustomStyles, estimate, projectType, condi
 
       {/* Standard info text footnote */}
       {standardInfoText && (
-        <p className="text-xs text-gray-500 italic text-center">* {standardInfoText}</p>
+        <p className="text-xs text-gray-500 italic text-center">* {renderTextWithInlineLinks(String(standardInfoText))}</p>
       )}
     </div>
   );
