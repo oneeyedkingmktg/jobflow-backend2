@@ -939,6 +939,24 @@ try {
           onSave={saveSizeModal}
         />
 
+        {previewMode && screen === 1 && (
+          <div className="text-center mb-4 py-3 px-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <p className="text-xs font-semibold text-orange-700 mb-2">PREVIEW MODE — no lead will be submitted</p>
+            <button
+              type="button"
+              onClick={() => {
+                setEstimate(PREVIEW_ESTIMATE);
+                setProjectType("garage_2");
+                setCondition("good");
+                setScreen(2);
+              }}
+              className="px-5 py-2 text-sm font-bold text-white rounded-xl bg-orange-500"
+            >
+              Jump to Results Page →
+            </button>
+          </div>
+        )}
+
         {screen === 1 && (
           <>
           <EstimatorForm
