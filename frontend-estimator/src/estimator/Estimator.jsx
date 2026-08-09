@@ -12,6 +12,7 @@ import EstimatorResults from "./components/EstimatorResults";
 
 const params = new URLSearchParams(window.location.search);
 const companyId = params.get("company");
+const previewMode = params.get("preview") === "1";
 let utmSource = params.get("utm_source") || null;
 let utmMedium = params.get("utm_medium") || null;
 let utmCampaign = params.get("utm_campaign") || null;
@@ -473,6 +474,28 @@ export default function Estimator() {
     }
   }, [config]);
 
+  // Preview mode: jump straight to results with mock data
+  useEffect(() => {
+    if (!config || !previewMode || screen !== 1) return;
+    const mockEstimate = {
+      allPriceRanges: {
+        solid:    { min: 1200, max: 1800, minimumApplied: false },
+        flake:    { min: 1400, max: 2100, minimumApplied: false },
+        metallic: { min: 1800, max: 2600, minimumApplied: false },
+        custom:   { min: 2000, max: 3000, minimumApplied: false },
+      },
+      selectedQuality: "flake",
+      calculatedSf: 480,
+      displayPriceMin: 1400,
+      displayPriceMax: 2100,
+    };
+    setEstimate(mockEstimate);
+    setActiveFinish("flake");
+    setProjectType("garage_2");
+    setCondition("good");
+    setScreen(2);
+  }, [config]);
+
   // Wait for config to load
   if (!config) {
     return <div>Loading...</div>;
@@ -490,7 +513,7 @@ export default function Estimator() {
   }
 
   // No company parameter OR estimator not enabled - show promo
-  if (!companyId || !config.is_active) {
+  if (!companyId || (!config.is_active && !previewMode)) {
     return (
       <div className="max-w-2xl mx-auto p-8 text-center">
         <h1 className="text-3xl font-bold mb-6">Push Button Marketing for Floor Coating Contractors</h1>
@@ -1019,21 +1042,28 @@ try {
         )}
 
         {screen === 2 && estimate && (
-          <EstimatorResults
-            config={config}
-            useCustomStyles={useCustomStyles}
-            estimate={estimate}
-            projectType={projectType}
-            condition={condition}
-            length={length}
-            width={width}
-            squareFeet={squareFeet}
-            companyPhone={companyPhone}
-            activeFinish={activeFinish}
-            setActiveFinish={setActiveFinish}
-            onSecondEstimate={leadId && estimateCount < 2 ? () => setScreen(3) : undefined}
-            estimateCount={estimateCount}
-          />
+          <>
+            {previewMode && (
+              <div className="text-center text-xs font-semibold text-orange-700 bg-orange-100 border border-orange-300 rounded-lg px-3 py-1 mb-3">
+                PREVIEW MODE — sample prices shown, no lead submitted
+              </div>
+            )}
+            <EstimatorResults
+              config={config}
+              useCustomStyles={useCustomStyles}
+              estimate={estimate}
+              projectType={projectType}
+              condition={condition}
+              length={length}
+              width={width}
+              squareFeet={squareFeet}
+              companyPhone={companyPhone}
+              activeFinish={activeFinish}
+              setActiveFinish={setActiveFinish}
+              onSecondEstimate={leadId && estimateCount < 2 ? () => setScreen(3) : undefined}
+              estimateCount={estimateCount}
+            />
+          </>
         )}
 
         {/* Screen 3: Second estimate mini-form */}

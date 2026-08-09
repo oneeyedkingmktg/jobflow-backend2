@@ -4,15 +4,16 @@
 // Build: All 5 steps + results + second estimate flow + combined results
 // ============================================================================
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import useEstimatorConfig from "../hooks/useEstimatorConfig";
 import { validEmail, validPhone, formatPhoneNumber } from "../utils/validators";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://api.coatingpro360.com";
-const _urlParams  = new URLSearchParams(window.location.search);
+const _urlParams   = new URLSearchParams(window.location.search);
 const _utmSource   = _urlParams.get("utm_source")   || null;
 const _utmMedium   = _urlParams.get("utm_medium")   || null;
 const _utmCampaign = _urlParams.get("utm_campaign") || null;
+const previewMode  = _urlParams.get("preview") === "1";
 
 const TOTAL_STEPS = 5;
 
@@ -206,6 +207,28 @@ export default function EstimatorV2() {
     }
   }
 
+  // Preview mode: jump straight to results with mock data
+  useEffect(() => {
+    if (!config || !previewMode || step !== 1) return;
+    const mockEstimate = {
+      allPriceRanges: {
+        solid:    { min: 1200, max: 1800, minimumApplied: false },
+        flake:    { min: 1400, max: 2100, minimumApplied: false },
+        metallic: { min: 1800, max: 2600, minimumApplied: false },
+        custom:   { min: 2000, max: 3000, minimumApplied: false },
+      },
+      selectedQuality: "flake",
+      calculatedSf: 480,
+      displayPriceMin: 1400,
+      displayPriceMax: 2100,
+    };
+    setEstimate(mockEstimate);
+    setActiveFinish("flake");
+    setProjectType("garage_2");
+    setCondition("good");
+    setStep(6);
+  }, [config]);
+
   // ---- Guards ----
   if (!config) return <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>;
   if (config.plan_type === "suspended") {
@@ -218,7 +241,7 @@ export default function EstimatorV2() {
   }
   const urlParams = new URLSearchParams(window.location.search);
   const companyId = urlParams.get("company");
-  if (!companyId || !config.is_active) {
+  if (!companyId || (!config.is_active && !previewMode)) {
     return (
       <div className="max-w-lg mx-auto p-8 text-center">
         <h1 className="text-2xl font-bold mb-4">Push Button Marketing for Floor Coating Contractors</h1>
@@ -692,6 +715,11 @@ export default function EstimatorV2() {
           {/* ══════════ STEP 6: Results ══════════ */}
           {step === 6 && estimate && (
             <div>
+              {previewMode && (
+                <div className="text-center text-xs font-semibold text-orange-700 bg-orange-100 border border-orange-300 rounded-lg px-3 py-1 mb-3">
+                  PREVIEW MODE — sample prices shown, no lead submitted
+                </div>
+              )}
               <h2 className="text-2xl font-bold text-center mb-6">Your Estimated Price</h2>
               <FinishTabs ranges={allRanges1} active={activeFinish} setActive={setActiveFinish} />
               <div className="rounded-xl overflow-hidden text-center p-6 space-y-2" style={{ border: `1px solid ${priceBoxBorderColor}`, marginTop: "-1px" }}>
