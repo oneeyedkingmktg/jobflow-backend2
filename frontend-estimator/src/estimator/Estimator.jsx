@@ -14,6 +14,19 @@ const params = new URLSearchParams(window.location.search);
 const companyId = params.get("company");
 const previewMode = params.get("preview") === "1";
 let utmSource = params.get("utm_source") || null;
+
+const PREVIEW_ESTIMATE = {
+  allPriceRanges: {
+    solid:    { min: 1200, max: 1800, minimumApplied: false },
+    flake:    { min: 1400, max: 2100, minimumApplied: false },
+    metallic: { min: 1800, max: 2600, minimumApplied: false },
+    custom:   { min: 2000, max: 3000, minimumApplied: false },
+  },
+  selectedQuality: "flake",
+  calculatedSf: 480,
+  displayPriceMin: 1400,
+  displayPriceMax: 2100,
+};
 let utmMedium = params.get("utm_medium") || null;
 let utmCampaign = params.get("utm_campaign") || null;
 let utmAudience = params.get("utm_audience") || null;
@@ -380,13 +393,13 @@ export default function Estimator() {
   const { config, customStyles, useCustomStyles } = useEstimatorConfig();
 
   // Screen state
-  const [screen, setScreen] = useState(1);
+  const [screen, setScreen] = useState(() => previewMode ? 2 : 1);
   const [activeFinish, setActiveFinish] = useState("flake");
   const [activeFinish2, setActiveFinish2] = useState("flake");
 
   // Form state (estimate 1)
-  const [projectType, setProjectType] = useState("");
-  const [condition, setCondition] = useState("");
+  const [projectType, setProjectType] = useState(() => previewMode ? "garage_2" : "");
+  const [condition, setCondition] = useState(() => previewMode ? "good" : "");
   const [length, setLength] = useState("");
   const [width, setWidth] = useState("");
   const [squareFeet, setSquareFeet] = useState("");
@@ -394,7 +407,7 @@ export default function Estimator() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [zip, setZip] = useState("");
-  const [estimate, setEstimate] = useState(null);
+  const [estimate, setEstimate] = useState(() => previewMode ? PREVIEW_ESTIMATE : null);
   const [companyPhone, setCompanyPhone] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -472,28 +485,6 @@ export default function Estimator() {
         document.head.appendChild(newScript);
       });
     }
-  }, [config]);
-
-  // Preview mode: jump straight to results with mock data
-  useEffect(() => {
-    if (!config || !previewMode || screen !== 1) return;
-    const mockEstimate = {
-      allPriceRanges: {
-        solid:    { min: 1200, max: 1800, minimumApplied: false },
-        flake:    { min: 1400, max: 2100, minimumApplied: false },
-        metallic: { min: 1800, max: 2600, minimumApplied: false },
-        custom:   { min: 2000, max: 3000, minimumApplied: false },
-      },
-      selectedQuality: "flake",
-      calculatedSf: 480,
-      displayPriceMin: 1400,
-      displayPriceMax: 2100,
-    };
-    setEstimate(mockEstimate);
-    setActiveFinish("flake");
-    setProjectType("garage_2");
-    setCondition("good");
-    setScreen(2);
   }, [config]);
 
   // Wait for config to load

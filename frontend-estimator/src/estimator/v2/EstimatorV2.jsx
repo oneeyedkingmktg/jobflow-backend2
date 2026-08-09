@@ -4,7 +4,7 @@
 // Build: All 5 steps + results + second estimate flow + combined results
 // ============================================================================
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import useEstimatorConfig from "../hooks/useEstimatorConfig";
 import { validEmail, validPhone, formatPhoneNumber } from "../utils/validators";
 
@@ -14,6 +14,19 @@ const _utmSource   = _urlParams.get("utm_source")   || null;
 const _utmMedium   = _urlParams.get("utm_medium")   || null;
 const _utmCampaign = _urlParams.get("utm_campaign") || null;
 const previewMode  = _urlParams.get("preview") === "1";
+
+const PREVIEW_ESTIMATE = {
+  allPriceRanges: {
+    solid:    { min: 1200, max: 1800, minimumApplied: false },
+    flake:    { min: 1400, max: 2100, minimumApplied: false },
+    metallic: { min: 1800, max: 2600, minimumApplied: false },
+    custom:   { min: 2000, max: 3000, minimumApplied: false },
+  },
+  selectedQuality: "flake",
+  calculatedSf: 480,
+  displayPriceMin: 1400,
+  displayPriceMax: 2100,
+};
 
 const TOTAL_STEPS = 5;
 
@@ -158,16 +171,16 @@ export default function EstimatorV2() {
   const { config, customStyles, useCustomStyles } = useEstimatorConfig();
 
   // Navigation: 1-5 = main steps, 6 = results, 7-9 = second estimate steps, 10 = combined results
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => previewMode ? 6 : 1);
 
   // First estimate
   const [projectCategory, setProjectCategory] = useState("");
-  const [projectType, setProjectType]         = useState("");
+  const [projectType, setProjectType]         = useState(() => previewMode ? "garage_2" : "");
   const [length, setLength]                   = useState("");
   const [width, setWidth]                     = useState("");
   const [squareFeet, setSquareFeet]           = useState("");
   const [sizeMode, setSizeMode]               = useState("dims");
-  const [condition, setCondition]             = useState("");
+  const [condition, setCondition]             = useState(() => previewMode ? "good" : "");
   const [zip, setZip]                         = useState("");
   const [zipError, setZipError]               = useState("");
   const [name, setName]                       = useState("");
@@ -177,7 +190,7 @@ export default function EstimatorV2() {
   const [submitError, setSubmitError]         = useState("");
 
   // First estimate results
-  const [estimate, setEstimate]               = useState(null);
+  const [estimate, setEstimate]               = useState(() => previewMode ? PREVIEW_ESTIMATE : null);
   const [activeFinish, setActiveFinish]       = useState("flake");
   const [companyPhone, setCompanyPhone]       = useState("");
   const [leadId, setLeadId]                   = useState(null);
@@ -206,28 +219,6 @@ export default function EstimatorV2() {
       try { if (typeof clarity === "function") clarity("event", "estimator_interaction_v2"); } catch {}
     }
   }
-
-  // Preview mode: jump straight to results with mock data
-  useEffect(() => {
-    if (!config || !previewMode || step !== 1) return;
-    const mockEstimate = {
-      allPriceRanges: {
-        solid:    { min: 1200, max: 1800, minimumApplied: false },
-        flake:    { min: 1400, max: 2100, minimumApplied: false },
-        metallic: { min: 1800, max: 2600, minimumApplied: false },
-        custom:   { min: 2000, max: 3000, minimumApplied: false },
-      },
-      selectedQuality: "flake",
-      calculatedSf: 480,
-      displayPriceMin: 1400,
-      displayPriceMax: 2100,
-    };
-    setEstimate(mockEstimate);
-    setActiveFinish("flake");
-    setProjectType("garage_2");
-    setCondition("good");
-    setStep(6);
-  }, [config]);
 
   // ---- Guards ----
   if (!config) return <div className="p-8 text-center text-gray-400 text-sm">Loading...</div>;
