@@ -17,6 +17,8 @@ export default function EstimatorMasterModal({ company, onSave, onClose }) {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [embedV2Copied, setEmbedV2Copied] = useState(false);
+  const [previewV1Copied, setPreviewV1Copied] = useState(false);
+  const [previewV2Copied, setPreviewV2Copied] = useState(false);
   
   const [form, setForm] = useState({
   estimatorEnabled: false,
@@ -528,6 +530,44 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                 </div>
               </div>
 
+              {/* Preview Link (v1) */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-1">Preview Results Page (v1)</h3>
+                <p className="text-xs text-gray-500 mb-2">Open this link to preview the results page without submitting a test lead.</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    className="flex-1 px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+                    value={`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&preview=1`}
+                  />
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&preview=1`);
+                        setPreviewV1Copied(true);
+                        setTimeout(() => setPreviewV1Copied(false), 2000);
+                      }}
+                      className="px-3 py-2 bg-orange-500 text-white text-xs rounded-lg whitespace-nowrap"
+                    >
+                      Copy
+                    </button>
+                    {previewV1Copied && (
+                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        Copied!
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&preview=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-gray-700 text-white text-xs rounded-lg whitespace-nowrap"
+                  >
+                    Open
+                  </a>
+                </div>
+              </div>
+
               {/* Step-by-Step Estimator (v2) */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <h3 className="font-bold text-gray-900 mb-2">Step-by-Step Estimator (v2)</h3>
@@ -556,6 +596,44 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
                       </span>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Preview Link (v2) */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <h3 className="font-bold text-gray-900 mb-1">Preview Results Page (v2)</h3>
+                <p className="text-xs text-gray-500 mb-2">Open this link to preview the results page without submitting a test lead.</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    className="flex-1 px-3 py-2 border rounded-lg text-xs font-mono bg-white text-gray-700"
+                    value={`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&v=2&preview=1`}
+                  />
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&v=2&preview=1`);
+                        setPreviewV2Copied(true);
+                        setTimeout(() => setPreviewV2Copied(false), 2000);
+                      }}
+                      className="px-3 py-2 bg-orange-500 text-white text-xs rounded-lg whitespace-nowrap"
+                    >
+                      Copy
+                    </button>
+                    {previewV2Copied && (
+                      <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                        Copied!
+                      </span>
+                    )}
+                  </div>
+                  <a
+                    href={`https://estimate.coatingpro360.com/?company=${company.estimatorCode}&v=2&preview=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-gray-700 text-white text-xs rounded-lg whitespace-nowrap"
+                  >
+                    Open
+                  </a>
                 </div>
               </div>
 
