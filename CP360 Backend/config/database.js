@@ -8,7 +8,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  max: 10,
+  idleTimeoutMillis: 30000,      // discard idle connections at 30s (before Railway's ~60s kill)
+  connectionTimeoutMillis: 5000, // fail fast if pool can't provide a connection in 5s
 });
 
 // Test connection on startup
@@ -21,8 +24,10 @@ pool.on('error', (err) => {
   console.error('❌ Database pool error (non-fatal):', err.message);
 });
 
-// Query helper function — retries once on stale connection errors (Railway drops idle connections)
-const query = async (text, params, _retry = false) => {
+const RETRYABLE_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT']);
+
+// Query helper — retries up to 2 times on stale/transient connection errors
+const query = async (text, params, _attempt = 0) => {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
@@ -34,11 +39,10 @@ const query = async (text, params, _retry = false) => {
 
     return res;
   } catch (error) {
-    const stale = error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED';
-    if (!_retry && stale) {
-      // Wait 200ms for the pool to create a fresh connection, then try once more
-      await new Promise(r => setTimeout(r, 200));
-      return query(text, params, true);
+    if (_attempt < 2 && RETRYABLE_CODES.has(error.code)) {
+      console.warn(`DB query retry ${_attempt + 1}/2 (${error.code})`);
+      await new Promise(r => setTimeout(r, 500));
+      return query(text, params, _attempt + 1);
     }
     console.error('Database query error:', error);
     throw error;
