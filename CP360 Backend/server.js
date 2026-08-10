@@ -55,6 +55,7 @@ const ghlRoutes = require("./routes/ghl");
 const messagesRoutes = require("./routes/messages");
 const sipRoutes = require("./routes/sip");
 const bidderRoutes = require("./routes/bidder");
+const visualizerRoutes = require("./routes/visualizer");
 const permissionRolesRoutes = require("./routes/permissionRoles");
 const crewsRoutes = require("./routes/crews");
 const leadAssignmentsRoutes = require("./routes/leadAssignments");
@@ -109,6 +110,7 @@ app.use("/api/messages", messagesRoutes);
 app.use("/api/sip", sipRoutes);
 app.use("/google-drive", googleDriveRoutes);
 app.use("/api/bidder", bidderRoutes);
+app.use("/api/visualizer", visualizerRoutes);
 app.use("/leads/:leadId/service-calls", serviceCallsRoutes);
 app.use("/api/reports", authenticateToken, reportsRoutes);
 app.use("/api/permission-roles", permissionRolesRoutes);
@@ -446,6 +448,39 @@ async function runMigrations() {
     `CREATE UNIQUE INDEX IF NOT EXISTS job_cost_labor_overrides_lead_user_idx ON job_cost_labor_overrides (lead_id, user_id)`,
     // Deactivate removed reports
     `UPDATE report_definitions SET is_active = false WHERE key IN ('recent_activity', 'conversions')`,
+    // Visualizer feature flag
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS visualizer_enabled BOOLEAN DEFAULT false`,
+    // Chip color library (per-company)
+    `CREATE TABLE IF NOT EXISTS chip_colors (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      reference_image_key TEXT,
+      reference_image_url TEXT,
+      sort_order INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS chip_colors_company_idx ON chip_colors (company_id, is_active)`,
+    // Visualizations generated per lead
+    `CREATE TABLE IF NOT EXISTS visualizations (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id),
+      lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
+      chip_color_id INTEGER REFERENCES chip_colors(id),
+      original_image_key TEXT,
+      original_image_url TEXT,
+      generated_image_key TEXT,
+      generated_image_url TEXT,
+      rendering_provider TEXT DEFAULT 'gpt-image-1',
+      status VARCHAR(20) DEFAULT 'processing',
+      error_message TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    )`,
+    `CREATE INDEX IF NOT EXISTS visualizations_company_idx ON visualizations (company_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS visualizations_lead_idx ON visualizations (lead_id)`,
   ];
   for (const sql of migrations) {
     try {
