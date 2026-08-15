@@ -1,7 +1,26 @@
 // File: src/users/UserCard.jsx
 import React from "react";
+import { useAuth } from "../AuthContext";
+
+function formatLastActive(ts) {
+  if (!ts) return "Never";
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString();
+}
 
 export default function UserCard({ user, onClick }) {
+  const { user: currentUser } = useAuth();
+  const isMaster = currentUser?.role === "master";
+
   return (
     <div
       onClick={onClick}
@@ -37,9 +56,9 @@ export default function UserCard({ user, onClick }) {
           </p>
         )}
 
-        {user.last_login && (
+        {isMaster && (
           <p className="text-xs text-gray-400 mt-1">
-            Last login: {user.last_login}
+            Last active: {formatLastActive(user.lastActivity)}
           </p>
         )}
       </div>
