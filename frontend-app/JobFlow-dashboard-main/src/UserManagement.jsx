@@ -115,7 +115,7 @@ export default function UserManagement({ onBack }) {
                 </div>
                 {currentUser.role === "master" && (
                   <div className="text-xs text-gray-400 mt-0.5">
-                    Last active: {formatLastActive(u.last_activity)}
+                    Last active: {formatLastActive(u.lastActivity)}
                   </div>
                 )}
               </div>
@@ -286,7 +286,7 @@ export default function UserManagement({ onBack }) {
             <div>Created: {selectedUser.created_at}</div>
           )}
           {currentUser.role === "master" && (
-            <div>Last Active: {formatLastActive(selectedUser.last_activity)}</div>
+            <div>Last Active: {formatLastActive(selectedUser.lastActivity)}</div>
           )}
         </div>
       </div>
