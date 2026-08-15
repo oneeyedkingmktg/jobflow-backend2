@@ -3,6 +3,21 @@ import { UsersAPI } from "./api";
 import { useCompany } from "./CompanyContext";
 import { useAuth } from "./AuthContext";
 
+function formatLastActive(ts) {
+  if (!ts) return "Never";
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString();
+}
+
 export default function UserManagement({ onBack }) {
   const { currentCompany } = useCompany();
   const { user: currentUser } = useAuth();
@@ -97,13 +112,12 @@ export default function UserManagement({ onBack }) {
                   <span>Role: {u.role}</span>
                   <span>•</span>
                   <span>{u.is_active ? "Active" : "Inactive"}</span>
-                  {u.last_login && (
-                    <>
-                      <span>•</span>
-                      <span>Last login: {u.last_login}</span>
-                    </>
-                  )}
                 </div>
+                {currentUser.role === "master" && (
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    Last active: {formatLastActive(u.last_activity)}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -271,11 +285,8 @@ export default function UserManagement({ onBack }) {
           {selectedUser.created_at && (
             <div>Created: {selectedUser.created_at}</div>
           )}
-          {selectedUser.updated_at && (
-            <div>Updated: {selectedUser.updated_at}</div>
-          )}
-          {selectedUser.last_login && (
-            <div>Last Login: {selectedUser.last_login}</div>
+          {currentUser.role === "master" && (
+            <div>Last Active: {formatLastActive(selectedUser.last_activity)}</div>
           )}
         </div>
       </div>
