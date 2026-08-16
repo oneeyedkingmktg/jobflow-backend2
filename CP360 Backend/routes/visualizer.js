@@ -46,6 +46,68 @@ router.get('/chip-colors', async (req, res) => {
   }
 });
 
+// POST /api/visualizer/pregenerate — start all 6 featured colors in background immediately
+router.post('/pregenerate', upload.single('image'), async (req, res) => {
+  const { company_id } = req.body;
+  if (!company_id) return res.status(400).json({ error: 'company_id required' });
+  if (!req.file) return res.status(400).json({ error: 'image required' });
+
+  try {
+    const co = await db.query(
+      `SELECT id, visualizer_enabled FROM companies WHERE id=$1 AND deleted_at IS NULL`,
+      [company_id]
+    );
+    if (!co.rows.length) return res.status(404).json({ error: 'Company not found' });
+    if (!co.rows[0].visualizer_enabled) return res.status(403).json({ error: 'Visualizer not enabled' });
+
+    const { rows: featured } = await db.query(
+      `SELECT cc.id, cc.name, cc.description, cc.reference_image_url
+       FROM chip_colors cc
+       JOIN company_chip_selections ccs ON ccs.chip_color_id = cc.id
+       WHERE ccs.company_id = $1 AND cc.is_active = true
+       ORDER BY ccs.sort_order, cc.name`,
+      [company_id]
+    );
+
+    if (!featured.length) return res.json({ generations: [] });
+
+    // Create all visualization records first
+    const generations = [];
+    for (const chip of featured) {
+      const { rows } = await db.query(
+        `INSERT INTO visualizations (company_id, chip_color_id, rendering_provider, status)
+         VALUES ($1, $2, $3, 'processing') RETURNING id`,
+        [company_id, chip.id, process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1']
+      );
+      generations.push({
+        chip_color_id: chip.id,
+        visualization_id: rows[0].id,
+        name: chip.name,
+        reference_image_url: chip.reference_image_url,
+      });
+    }
+
+    // Respond immediately — fire background generations staggered 500ms apart
+    res.json({ generations });
+
+    const rawBuffer = req.file.buffer;
+    generations.forEach(({ visualization_id, chip_color_id }, i) => {
+      const chip = featured.find(c => c.id === chip_color_id);
+      setTimeout(() => {
+        generateVisualization({
+          visualizationId: visualization_id,
+          rawImageBuffer: rawBuffer,
+          chipColor: chip,
+          companyId: company_id,
+        }).catch(err => console.error(`[Pregenerate] viz ${visualization_id} failed:`, err.message));
+      }, i * 500);
+    });
+  } catch (err) {
+    console.error('POST /visualizer/pregenerate error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to start pregeneration' });
+  }
+});
+
 // POST /api/visualizer/start — upload image, kick off generation, return id immediately
 router.post('/start', upload.single('image'), async (req, res) => {
   const { company_id, chip_color_id } = req.body;
@@ -60,13 +122,11 @@ router.post('/start', upload.single('image'), async (req, res) => {
     if (!co.rows.length) return res.status(404).json({ error: 'Company not found' });
     if (!co.rows[0].visualizer_enabled) return res.status(403).json({ error: 'Visualizer not enabled for this company' });
 
-    // Validate chip is in this company's selection
+    // Validate chip exists in platform library (any active color is usable)
     const chip = await db.query(
-      `SELECT cc.id, cc.name, cc.description, cc.reference_image_url
-       FROM chip_colors cc
-       JOIN company_chip_selections ccs ON ccs.chip_color_id = cc.id
-       WHERE cc.id=$1 AND ccs.company_id=$2 AND cc.is_active=true`,
-      [chip_color_id, company_id]
+      `SELECT id, name, description, reference_image_url
+       FROM chip_colors WHERE id=$1 AND is_active=true`,
+      [chip_color_id]
     );
     if (!chip.rows.length) return res.status(404).json({ error: 'Chip color not found' });
 

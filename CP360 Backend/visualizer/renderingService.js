@@ -15,18 +15,35 @@ function uuid() {
   return crypto.randomUUID();
 }
 
-// Resize + pad to a square RGBA PNG under 4MB (DALL-E 2 / gpt-image-1 requirement)
+// Supported OpenAI output sizes for gpt-image-1
+const SIZES = [
+  { w: 1536, h: 1024, label: '1536x1024' }, // landscape
+  { w: 1024, h: 1536, label: '1024x1536' }, // portrait
+  { w: 1024, h: 1024, label: '1024x1024' }, // square
+];
+
+// Pick best output size based on input aspect ratio, then crop-fill to match
 async function preprocessImage(inputBuffer) {
-  const make = (size) =>
+  const meta = await sharp(inputBuffer).metadata();
+  const ratio = (meta.width || 1) / (meta.height || 1);
+
+  let target;
+  if (ratio >= 1.2)       target = SIZES[0]; // landscape
+  else if (ratio <= 0.85) target = SIZES[1]; // portrait
+  else                    target = SIZES[2]; // square
+
+  const make = (w, h) =>
     sharp(inputBuffer)
-      .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      .rotate()                                          // auto-rotate from EXIF
+      .resize(w, h, { fit: 'cover', position: 'centre' })
       .ensureAlpha()
       .png({ compressionLevel: 9 })
       .toBuffer();
 
-  let buf = await make(1024);
-  if (buf.length > 4 * 1024 * 1024) buf = await make(512);
-  return buf;
+  let buf = await make(target.w, target.h);
+  // If still over 4MB, step down to 1024x1024
+  if (buf.length > 4 * 1024 * 1024) buf = await make(1024, 1024);
+  return { buffer: buf, size: target.label };
 }
 
 async function uploadToR2(key, buffer) {
@@ -42,7 +59,7 @@ async function uploadToR2(key, buffer) {
 // Called from controller. Runs async after the HTTP response has already been sent.
 async function generateVisualization({ visualizationId, rawImageBuffer, chipColor, companyId }) {
   try {
-    const processedBuffer = await preprocessImage(rawImageBuffer);
+    const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
 
     // Store original
     const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
@@ -53,7 +70,7 @@ async function generateVisualization({ visualizationId, rawImageBuffer, chipColo
     );
 
     // Call AI provider
-    const result = await openAIProvider.generate({ imageBuffer: processedBuffer, chipColor });
+    const result = await openAIProvider.generate({ imageBuffer: processedBuffer, chipColor, size });
 
     // Store generated image
     const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;

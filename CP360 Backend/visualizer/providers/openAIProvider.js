@@ -20,7 +20,7 @@ function buildPrompt(chipColor) {
   );
 }
 
-async function generate({ imageBuffer, chipColor }) {
+async function generate({ imageBuffer, chipColor, size }) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const { toFile } = require('openai');
@@ -31,7 +31,7 @@ async function generate({ imageBuffer, chipColor }) {
     image: imageFile,
     prompt: buildPrompt(chipColor),
     n: 1,
-    size: '1024x1024',
+    size: size || '1536x1024',
   });
 
   const item = response.data[0];
