@@ -9,7 +9,8 @@
 // Safe to re-run — uses ON CONFLICT DO NOTHING on name.
 // ============================================================================
 
-require('dotenv').config({ path: '.env.local' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const axios = require('axios');
 const { Pool } = require('pg');
@@ -158,6 +159,14 @@ async function insertChipColor({ name, code, key, url, sortOrder }) {
 }
 
 async function main() {
+  const required = ['DATABASE_URL', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length) {
+    console.error('Missing env vars:', missing.join(', '));
+    console.error('Make sure .env.local exists in CP360 Backend/ with these values.');
+    process.exit(1);
+  }
+
   console.log(`Torginol scraper — ${PRODUCTS.length} colors to process\n`);
 
   let success = 0;
