@@ -117,7 +117,8 @@ commercialPricePerSfMax: null,
         if (!response.ok) throw new Error("Failed to load estimator config");
 
         const data = await response.json();
-setForm({
+setForm(prev => ({
+  ...prev,
   estimatorEnabled: data.is_active ?? false,
 
   // Typography
@@ -185,7 +186,7 @@ commercialPricePerSfMax: data.commercial_price_per_sf_max ?? null,
   cta1Link: data.cta1_link ?? "",
   cta2Button: data.cta2_button ?? "",
   cta2Link: data.cta2_link ?? "",
-});
+}));
 
       } catch (err) {
         setError(err.message || "Failed to load estimator config");
