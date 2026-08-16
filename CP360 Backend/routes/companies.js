@@ -291,6 +291,7 @@ router.put('/:id', requireRole('master', 'admin'), async (req, res) => {
     Object.keys(req.body || {}).forEach((k) => {
       if (req.body[k] !== undefined) sanitizedBody[k] = req.body[k];
     });
+    const zipsExplicitlyProvided = 'service_area_zips' in sanitizedBody;
 
     console.log('═══════════════════════════════════════');
     console.log('🔍 COMPANY UPDATE ROUTE HIT');
@@ -493,7 +494,7 @@ show_conversations = COALESCE($22, show_conversations),
   meta_base_tag = CASE WHEN $26::text IS NULL THEN meta_base_tag WHEN $26::text = '' THEN NULL ELSE $26::text END,
   google_conversion_event = CASE WHEN $27::text IS NULL THEN google_conversion_event WHEN $27::text = '' THEN NULL ELSE $27::text END,
   meta_conversion_event = CASE WHEN $28::text IS NULL THEN meta_conversion_event WHEN $28::text = '' THEN NULL ELSE $28::text END,
-  service_area_zips = $29,
+  service_area_zips = CASE WHEN $42::boolean THEN $29::jsonb ELSE service_area_zips END,
   sip_domain = COALESCE($30, sip_domain),
   plan_type = COALESCE($31, plan_type),
   est_push_title = COALESCE($32, est_push_title),
@@ -550,6 +551,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   service_calls_enabled ?? null,                               // $39
   clarity_project_id ?? null,                                  // $40
   time_tracking_enabled ?? null,                               // $41
+  zipsExplicitlyProvided,                                      // $42
 ]
 
 );
