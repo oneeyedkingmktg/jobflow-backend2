@@ -481,6 +481,23 @@ async function runMigrations() {
     )`,
     `CREATE INDEX IF NOT EXISTS visualizations_company_idx ON visualizations (company_id, created_at DESC)`,
     `CREATE INDEX IF NOT EXISTS visualizations_lead_idx ON visualizations (lead_id)`,
+    // Migrate chip_colors to platform-level library (remove per-company scoping)
+    `DROP INDEX IF EXISTS chip_colors_company_idx`,
+    `ALTER TABLE chip_colors DROP COLUMN IF EXISTS company_id`,
+    `ALTER TABLE chip_colors ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'torginol'`,
+    `ALTER TABLE chip_colors ADD COLUMN IF NOT EXISTS product_code TEXT`,
+    // Unique name prevents duplicate scraper runs
+    `CREATE UNIQUE INDEX IF NOT EXISTS chip_colors_name_idx ON chip_colors (LOWER(name))`,
+    // Per-company color selection (up to 6 picks from platform library)
+    `CREATE TABLE IF NOT EXISTS company_chip_selections (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      chip_color_id INTEGER NOT NULL REFERENCES chip_colors(id) ON DELETE CASCADE,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, chip_color_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS company_chip_selections_company_idx ON company_chip_selections (company_id)`,
   ];
   for (const sql of migrations) {
     try {

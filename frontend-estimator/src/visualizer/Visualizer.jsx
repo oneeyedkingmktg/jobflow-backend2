@@ -85,6 +85,7 @@ function ChipSelectStep({ imageFile, onNext, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/visualizer/chip-colors?company=${companyId}`)
@@ -116,6 +117,10 @@ function ChipSelectStep({ imageFile, onNext, onBack }) {
 
   if (loading) return <div className="text-center p-12 text-gray-400">Loading colors...</div>;
 
+  const featured = colors.filter((c) => c.featured);
+  const displayed = showAll ? colors : featured;
+  const extraCount = colors.length - featured.length;
+
   return (
     <div className="max-w-xl mx-auto p-6 space-y-6">
       <div>
@@ -129,23 +134,35 @@ function ChipSelectStep({ imageFile, onNext, onBack }) {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        {colors.map((c) => (
+        {displayed.map((c) => (
           <button key={c.id} onClick={() => setSelected(c)}
             className={`border-2 rounded-xl p-3 text-left transition-all ${
               selected?.id === c.id ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
             }`}>
-            {c.reference_image_url && (
+            {c.reference_image_url ? (
               <img src={c.reference_image_url} alt={c.name}
                 className="w-full h-24 object-cover rounded-lg mb-2" />
-            )}
-            {!c.reference_image_url && (
+            ) : (
               <div className="w-full h-24 bg-gray-100 rounded-lg mb-2 flex items-center justify-center text-2xl">🎨</div>
             )}
             <div className="font-semibold text-gray-800 text-sm">{c.name}</div>
-            {c.description && <div className="text-xs text-gray-400 mt-0.5">{c.description}</div>}
           </button>
         ))}
       </div>
+
+      {!showAll && extraCount > 0 && (
+        <button onClick={() => setShowAll(true)}
+          className="w-full py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors">
+          Show all {colors.length} colors →
+        </button>
+      )}
+
+      {showAll && (
+        <button onClick={() => setShowAll(false)}
+          className="w-full py-2 text-sm text-gray-400 hover:text-gray-600">
+          Show fewer colors
+        </button>
+      )}
 
       {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
