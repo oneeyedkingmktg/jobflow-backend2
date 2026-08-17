@@ -157,7 +157,7 @@ router.post('/start', upload.single('image'), async (req, res) => {
 router.get('/status/:id', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, status, original_image_url, generated_image_url, error_message
+      `SELECT id, status, original_image_url, generated_image_url, error_message, failure_type
        FROM visualizations WHERE id=$1`,
       [req.params.id]
     );

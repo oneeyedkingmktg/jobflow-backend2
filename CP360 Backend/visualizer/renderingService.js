@@ -1,94 +1,171 @@
 // ============================================================================
-// Rendering service — orchestrates preprocess → AI call → R2 storage
-// The rest of the app only calls generateVisualization(). The AI provider
-// and storage details are invisible to callers.
+// Rendering service — orchestrates the visualization pipeline.
+//
+// Default pipeline (VISUALIZATION_PROVIDER=compositing or unset):
+//   preprocess → preflight → upload original → SAM 2 segment → composite → upload result
+//
+// Fallback (VISUALIZATION_PROVIDER=openai):
+//   preprocess → upload original → OpenAI gpt-image-1 → upload result
 // ============================================================================
 
 const sharp = require('sharp');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const axios = require('axios');
+const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { r2, BUCKET, PUBLIC_URL } = require('../config/r2');
-const openAIProvider = require('./providers/openAIProvider');
-const db = require('../config/database');
-const crypto = require('crypto');
+const openAIProvider      = require('./providers/openAIProvider');
+const { runPreflightChecks } = require('./preflightChecks');
+const { segmentFloor }    = require('./samProvider');
+const { composite }       = require('./compositingEngine');
+const db                  = require('../config/database');
+const crypto              = require('crypto');
 
-function uuid() {
-  return crypto.randomUUID();
-}
+function uuid() { return crypto.randomUUID(); }
 
-// Supported OpenAI output sizes for gpt-image-1
 const SIZES = [
-  { w: 1536, h: 1024, label: '1536x1024' }, // landscape
-  { w: 1024, h: 1536, label: '1024x1536' }, // portrait
-  { w: 1024, h: 1024, label: '1024x1024' }, // square
+  { w: 1536, h: 1024, label: '1536x1024' },
+  { w: 1024, h: 1536, label: '1024x1536' },
+  { w: 1024, h: 1024, label: '1024x1024' },
 ];
 
-// Pick best output size based on input aspect ratio, then crop-fill to match
 async function preprocessImage(inputBuffer) {
   const meta = await sharp(inputBuffer).metadata();
   const ratio = (meta.width || 1) / (meta.height || 1);
 
   let target;
-  if (ratio >= 1.2)       target = SIZES[0]; // landscape
-  else if (ratio <= 0.85) target = SIZES[1]; // portrait
-  else                    target = SIZES[2]; // square
+  if (ratio >= 1.2)       target = SIZES[0];
+  else if (ratio <= 0.85) target = SIZES[1];
+  else                    target = SIZES[2];
 
   const make = (w, h) =>
     sharp(inputBuffer)
-      .rotate()                                          // auto-rotate from EXIF
+      .rotate()
       .resize(w, h, { fit: 'cover', position: 'centre' })
       .ensureAlpha()
       .png({ compressionLevel: 9 })
       .toBuffer();
 
   let buf = await make(target.w, target.h);
-  // If still over 4MB, step down to 1024x1024
   if (buf.length > 4 * 1024 * 1024) buf = await make(1024, 1024);
   return { buffer: buf, size: target.label };
 }
 
-async function uploadToR2(key, buffer) {
-  await r2.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: 'image/png',
-  }));
+async function uploadToR2(key, buffer, contentType = 'image/png') {
+  await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: contentType }));
   return `${PUBLIC_URL}/${key}`;
 }
 
-// Called from controller. Runs async after the HTTP response has already been sent.
-async function generateVisualization({ visualizationId, rawImageBuffer, chipColor, companyId }) {
+async function downloadUrl(url) {
+  const resp = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+  return Buffer.from(resp.data);
+}
+
+// ── Compositing pipeline ──────────────────────────────────────────────────────
+
+async function runCompositingPipeline({ visualizationId, rawImageBuffer, chipColor, companyId }) {
+  // 1. Preprocess
+  const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
+
+  // 2. Pre-flight checks — fast, free, zero API calls
+  const preflightFail = await runPreflightChecks(processedBuffer);
+  if (preflightFail) {
+    await db.query(
+      `UPDATE visualizations SET status='failed', failure_type='user_input', error_message=$1 WHERE id=$2`,
+      [preflightFail.message, visualizationId]
+    );
+    return;
+  }
+
+  // 3. Store original
+  const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
+  const originalUrl = await uploadToR2(originalKey, processedBuffer);
+  await db.query(
+    `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
+    [originalKey, originalUrl, visualizationId]
+  );
+
+  // 4. SAM 2 floor segmentation
+  let maskBuffer;
   try {
-    const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
-
-    // Store original
-    const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
-    const originalUrl = await uploadToR2(originalKey, processedBuffer);
-    await db.query(
-      `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
-      [originalKey, originalUrl, visualizationId]
-    );
-
-    // Call AI provider
-    const result = await openAIProvider.generate({ imageBuffer: processedBuffer, chipColor, size });
-
-    // Store generated image
-    const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;
-    const generatedUrl = await uploadToR2(generatedKey, result.buffer);
-
-    await db.query(
-      `UPDATE visualizations
-       SET status='complete', generated_image_key=$1, generated_image_url=$2,
-           rendering_provider=$3, completed_at=NOW()
-       WHERE id=$4`,
-      [generatedKey, generatedUrl, result.provider, visualizationId]
-    );
+    const segResult = await segmentFloor(originalUrl);
+    maskBuffer = segResult.maskBuffer;
   } catch (err) {
-    console.error(`[Visualizer] generation failed for id=${visualizationId}:`, err.message);
+    const isUserInput = err.userInput === true;
     await db.query(
-      `UPDATE visualizations SET status='failed', error_message=$1 WHERE id=$2`,
-      [err.message, visualizationId]
+      `UPDATE visualizations SET status='failed', failure_type=$1, error_message=$2 WHERE id=$3`,
+      [isUserInput ? 'user_input' : 'error', err.message, visualizationId]
     );
+    return;
+  }
+
+  // 5. Store floor mask
+  const maskKey = `visualizer/masks/${companyId}/${uuid()}.png`;
+  const maskUrl = await uploadToR2(maskKey, maskBuffer);
+  await db.query(
+    `UPDATE visualizations SET mask_key=$1, mask_url=$2 WHERE id=$3`,
+    [maskKey, maskUrl, visualizationId]
+  );
+
+  // 6. Fetch chip texture from R2
+  const textureBuffer = await downloadUrl(chipColor.reference_image_url);
+
+  // 7. Composite texture onto floor
+  const resultBuffer = await composite({ processedBuffer, maskBuffer, textureBuffer });
+
+  // 8. Store result
+  const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;
+  const generatedUrl = await uploadToR2(generatedKey, resultBuffer);
+
+  await db.query(
+    `UPDATE visualizations
+     SET status='complete', generated_image_key=$1, generated_image_url=$2,
+         rendering_provider='compositing', completed_at=NOW()
+     WHERE id=$3`,
+    [generatedKey, generatedUrl, visualizationId]
+  );
+}
+
+// ── OpenAI fallback pipeline ──────────────────────────────────────────────────
+
+async function runOpenAIPipeline({ visualizationId, rawImageBuffer, chipColor, companyId }) {
+  const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
+
+  const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
+  const originalUrl = await uploadToR2(originalKey, processedBuffer);
+  await db.query(
+    `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
+    [originalKey, originalUrl, visualizationId]
+  );
+
+  const result = await openAIProvider.generate({ imageBuffer: processedBuffer, chipColor, size });
+
+  const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;
+  const generatedUrl = await uploadToR2(generatedKey, result.buffer);
+
+  await db.query(
+    `UPDATE visualizations
+     SET status='complete', generated_image_key=$1, generated_image_url=$2,
+         rendering_provider=$3, completed_at=NOW()
+     WHERE id=$4`,
+    [generatedKey, generatedUrl, result.provider, visualizationId]
+  );
+}
+
+// ── Public entry point ────────────────────────────────────────────────────────
+
+async function generateVisualization({ visualizationId, rawImageBuffer, chipColor, companyId }) {
+  const useOpenAI = process.env.VISUALIZATION_PROVIDER === 'openai';
+  try {
+    if (useOpenAI) {
+      await runOpenAIPipeline({ visualizationId, rawImageBuffer, chipColor, companyId });
+    } else {
+      await runCompositingPipeline({ visualizationId, rawImageBuffer, chipColor, companyId });
+    }
+  } catch (err) {
+    console.error(`[Visualizer] pipeline failed for id=${visualizationId}:`, err.message);
+    await db.query(
+      `UPDATE visualizations SET status='failed', failure_type='error', error_message=$1 WHERE id=$2`,
+      [err.message, visualizationId]
+    ).catch(() => {});
   }
 }
 
