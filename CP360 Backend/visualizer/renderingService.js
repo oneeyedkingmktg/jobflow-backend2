@@ -76,6 +76,7 @@ async function runCompositingPipeline({ visualizationId, rawImageBuffer, chipCol
   }
 
   // 3. Store original
+  const { width: imgWidth, height: imgHeight } = await sharp(processedBuffer).metadata();
   const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
   const originalUrl = await uploadToR2(originalKey, processedBuffer);
   await db.query(
@@ -83,10 +84,10 @@ async function runCompositingPipeline({ visualizationId, rawImageBuffer, chipCol
     [originalKey, originalUrl, visualizationId]
   );
 
-  // 4. SAM 2 floor segmentation
+  // 4. SAM 2 floor segmentation — pass pixel dimensions for accurate point placement
   let maskBuffer;
   try {
-    const segResult = await segmentFloor(originalUrl);
+    const segResult = await segmentFloor(originalUrl, imgWidth, imgHeight);
     maskBuffer = segResult.maskBuffer;
   } catch (err) {
     const isUserInput = err.userInput === true;

@@ -2,20 +2,20 @@
 // Uses axios (already a dependency) — no new npm packages required.
 // Requires env var: REPLICATE_API_TOKEN
 //
-// Strategy: prompt a single point at center-x, 75% down the image.
+// Strategy: prompt a single point at center-x, 75% down the image (pixel coords).
 // In most garage photos taken from the entrance this lands on the floor.
 
 const axios = require('axios');
 
-const REPLICATE_API = 'https://api.replicate.com/v1';
-const SAM2_MODEL   = 'meta/sam-2';
+const REPLICATE_API    = 'https://api.replicate.com/v1';
+const SAM2_MODEL       = 'meta/sam-2';
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS       = 90000;
 
 const FAILURE_MESSAGES = {
-  no_floor:     "We couldn't find a garage floor in this photo. Make sure the floor is clearly visible and take the photo while standing, looking slightly downward toward the center of the garage.",
+  no_floor:        "We couldn't find a garage floor in this photo. Make sure the floor is clearly visible and take the photo while standing, looking slightly downward toward the center of the garage.",
   floor_too_small: "Very little floor is visible in your photo. Pull your vehicle outside the garage and take the photo again for the best result.",
-  floor_unclear: "We had trouble finding your floor boundary. Try opening the garage door for more natural light and contrast, or take the photo from a slightly lower angle.",
+  floor_unclear:   "We had trouble finding your floor boundary. Try opening the garage door for more natural light and contrast, or take the photo from a slightly lower angle.",
 };
 
 function userFail(code) {
@@ -29,8 +29,9 @@ async function replicateRequest(method, endpoint, data) {
     method,
     url: `${REPLICATE_API}${endpoint}`,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization:  `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'Prefer':       'wait', // ask Replicate to wait up to 60s before returning
     },
     data,
   });
@@ -57,29 +58,37 @@ async function downloadBuffer(url) {
 async function analyzeMask(maskBuffer) {
   const sharp = require('sharp');
   const { channels } = await sharp(maskBuffer).greyscale().stats();
-  const mean = channels[0].mean; // 0–255
-  const coverage = mean / 255;   // 0.0–1.0
+  const mean     = channels[0].mean; // 0–255
+  const coverage = mean / 255;       // 0.0–1.0
 
-  if (coverage < 0.02)  throw userFail('no_floor');
-  if (coverage < 0.05)  throw userFail('floor_too_small');
-  if (coverage > 0.92)  throw userFail('floor_unclear');
+  if (coverage < 0.02) throw userFail('no_floor');
+  if (coverage < 0.05) throw userFail('floor_too_small');
+  if (coverage > 0.92) throw userFail('floor_unclear');
 
   return { coverage };
 }
 
-async function segmentFloor(imageUrl) {
-  // Start prediction — point prompt at center-x, 75% down
+// imageWidth and imageHeight are the pixel dimensions of the preprocessed image.
+// SAM 2 on Replicate expects pixel coordinates, not normalized 0-1 values.
+async function segmentFloor(imageUrl, imageWidth, imageHeight) {
+  const pointX = Math.round(imageWidth  * 0.5);  // center horizontally
+  const pointY = Math.round(imageHeight * 0.75); // 75% down — typical floor location
+
+  // Use the newer Replicate 'model' field to always target the latest sam-2 version
   const { data: prediction } = await replicateRequest('POST', '/predictions', {
-    version: SAM2_MODEL,
+    model: SAM2_MODEL,
     input: {
-      image:         imageUrl,
-      point_coords:  '[[0.5, 0.75]]',
-      point_labels:  '[1]',
+      image:            imageUrl,
+      point_coords:     `[[${pointX}, ${pointY}]]`,
+      point_labels:     '[1]',
       multimask_output: false,
     },
   });
 
-  const result = await pollPrediction(prediction.id);
+  // If Replicate returned a completed prediction immediately (Prefer: wait), skip polling
+  const result = (prediction.status === 'succeeded')
+    ? prediction
+    : await pollPrediction(prediction.id);
 
   // SAM 2 returns an array of mask URLs; take the first
   const outputUrls = Array.isArray(result.output) ? result.output : [result.output];
