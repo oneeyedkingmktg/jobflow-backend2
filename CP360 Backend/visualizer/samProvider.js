@@ -77,8 +77,7 @@ async function analyzeMask(maskBuffer) {
   const mean     = channels[0].mean; // 0–255
   const coverage = mean / 255;       // 0.0–1.0
 
-  if (coverage < 0.02) throw userFail('no_floor');
-  if (coverage < 0.05) throw userFail('floor_too_small');
+  if (coverage < 0.01) throw userFail('no_floor'); // essentially empty
   if (coverage > 0.92) throw userFail('floor_unclear');
 
   return { coverage };
@@ -95,9 +94,9 @@ async function segmentFloor(imageUrl) {
     version: SAM2_VERSION,
     input: {
       image:                  imageUrl,
-      points_per_side:        16,
-      pred_iou_thresh:        0.75,
-      stability_score_thresh: 0.85,
+      points_per_side:        32,   // denser grid = more masks = better floor coverage
+      pred_iou_thresh:        0.50, // permissive — large flat floors score low on IoU
+      stability_score_thresh: 0.65, // permissive — concrete is uniform, low edge contrast
     },
   });
 
@@ -113,22 +112,32 @@ async function segmentFloor(imageUrl) {
   // Download all masks in parallel
   const maskBuffers = await Promise.all(maskUrls.map(downloadBuffer));
 
-  // Score each mask: fraction of ON pixels in the floor zone (bottom 65% of image)
+  // Score each mask by how floor-like it is:
+  //   - What fraction of its ON pixels are in the bottom half of the image (floor zone)
+  //   - Weighted by total mask size (bigger is better, up to a point)
   const scores = await Promise.all(maskBuffers.map(async (buf) => {
     const { data, info } = await sharp(buf)
       .greyscale()
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const rowStart   = Math.round(info.height * 0.35);
-    const zonePixels = (info.height - rowStart) * info.width;
-    let on = 0;
-    for (let y = rowStart; y < info.height; y++) {
-      for (let x = 0; x < info.width; x++) {
-        if (data[y * info.width + x] > 128) on++;
+    const totalPixels  = info.width * info.height;
+    const floorRowStart = Math.round(info.height * 0.40); // bottom 60% = floor zone
+
+    let totalOn = 0, floorOn = 0;
+    for (let i = 0; i < totalPixels; i++) {
+      if (data[i] > 128) {
+        totalOn++;
+        const y = Math.floor(i / info.width);
+        if (y >= floorRowStart) floorOn++;
       }
     }
-    return on / zonePixels;
+    if (totalOn === 0) return 0;
+
+    // Score = fraction of mask in floor zone × size factor (prefer larger masks)
+    const floorFraction = floorOn / totalOn;
+    const sizeFactor    = Math.min(1, totalOn / (totalPixels * 0.10)); // normalize at 10% coverage
+    return floorFraction * sizeFactor;
   }));
 
   const bestIdx   = scores.indexOf(Math.max(...scores));
@@ -136,13 +145,12 @@ async function segmentFloor(imageUrl) {
 
   console.log(`[SAM2] ${maskUrls.length} masks; best floor score: ${bestScore.toFixed(3)} (mask ${bestIdx})`);
 
-  if (bestScore < 0.02) throw userFail('no_floor');
-  if (bestScore < 0.05) throw userFail('floor_too_small');
+  if (bestScore < 0.01) throw userFail('no_floor');
 
   const maskBuffer = maskBuffers[bestIdx];
   const { coverage } = await analyzeMask(maskBuffer);
 
-  if (coverage > 0.92) throw userFail('floor_unclear');
+  if (coverage > 0.95) throw userFail('floor_unclear');
 
   return { maskBuffer, coverage };
 }

@@ -13,7 +13,7 @@ const CHIP_RADIUS_FAR  = 0.0018;  // fraction of width at top (vanishing-point-s
 const CHIP_COVERAGE    = 0.92;
 
 // Gloss: simulates epoxy sheen with a soft radial highlight
-const GLOSS_OPACITY    = 0.22;
+const GLOSS_OPACITY    = 0.40;
 const GLOSS_COLOR      = { r: 255, g: 255, b: 255 };
 
 function pickColor(recipe, rnd) {
@@ -59,51 +59,55 @@ function generateChipTexture(width, height, recipe, maskRaw) {
   }
   if (maskTop >= maskBottom) { maskTop = 0; maskBottom = height - 1; }
 
-  // Jittered grid — divide canvas into cells, one chip per cell at a random position.
-  // This eliminates clustering/splotchiness from pure random placement.
-  // Cell size based on the smallest chip (far end) so near-end chips naturally overlap slightly.
-  const cellSize = Math.max(6, Math.round(CHIP_RADIUS_FAR * width * 2.2));
+  // Perspective-aware jittered grid.
+  // Cell size scales continuously with y-position so chip density stays uniform
+  // even as chip radius grows from far (top) to near (bottom).
+  const maskSpan   = maskBottom - maskTop || height;
+  const FAR_CELL   = Math.max(4,  Math.round(CHIP_RADIUS_FAR  * width * 2.4));
+  const NEAR_CELL  = Math.max(10, Math.round(CHIP_RADIUS_NEAR * width * 2.4));
 
-  for (let gy = 0; gy * cellSize < height; gy++) {
-    for (let gx = 0; gx * cellSize < width; gx++) {
-      // ~8% of cells left empty — shows concrete, natural variation
-      if (Math.random() > CHIP_COVERAGE) continue;
+  let rowY = 0;
+  while (rowY < height) {
+    const rowYFrac = Math.max(0, Math.min(1, (rowY - maskTop) / maskSpan));
+    const cell     = Math.round(FAR_CELL + (NEAR_CELL - FAR_CELL) * rowYFrac);
 
-      // Jittered position within the cell
-      const cx = Math.min(width  - 1, Math.round(gx * cellSize + Math.random() * cellSize));
-      const cy = Math.min(height - 1, Math.round(gy * cellSize + Math.random() * cellSize));
+    let colX = 0;
+    while (colX < width) {
+      if (Math.random() <= CHIP_COVERAGE) {
+        const cx = Math.min(width  - 1, colX + Math.round(Math.random() * cell));
+        const cy = Math.min(height - 1, rowY + Math.round(Math.random() * cell));
 
-      // Skip if not on floor mask
-      if (maskRaw[cy * width + cx] < 64) continue;
+        if (maskRaw[cy * width + cx] >= 64) {
+          // Per-chip perspective using the chip's actual y-position
+          const yFrac  = Math.max(0, Math.min(1, (cy - maskTop) / maskSpan));
+          const chipR  = Math.max(1, Math.round(
+            (CHIP_RADIUS_FAR + (CHIP_RADIUS_NEAR - CHIP_RADIUS_FAR) * yFrac) * width
+          ));
+          const chipRY = Math.max(1, Math.round(chipR * (0.35 + 0.65 * yFrac)));
 
-      // Perspective: chips scale from small (far/top) to large (near/bottom)
-      const yFrac  = maskTop === maskBottom ? 0.5 :
-                     Math.max(0, Math.min(1, (cy - maskTop) / (maskBottom - maskTop)));
-      const chipR  = Math.max(1, Math.round(
-        (CHIP_RADIUS_FAR + (CHIP_RADIUS_NEAR - CHIP_RADIUS_FAR) * yFrac) * width
-      ));
-      // Vertical foreshortening — chips compress vertically near vanishing point
-      const chipRY = Math.max(1, Math.round(chipR * (0.35 + 0.65 * yFrac)));
+          const rgb = varyBrightness(pickColor(normalized, Math.random()));
+          const x0  = Math.max(0, cx - chipR);
+          const x1  = Math.min(width  - 1, cx + chipR);
+          const y0  = Math.max(0, cy - chipRY);
+          const y1  = Math.min(height - 1, cy + chipRY);
 
-      const rgb = varyBrightness(pickColor(normalized, Math.random()));
-      const x0  = Math.max(0, cx - chipR);
-      const x1  = Math.min(width  - 1, cx + chipR);
-      const y0  = Math.max(0, cy - chipRY);
-      const y1  = Math.min(height - 1, cy + chipRY);
-
-      for (let py = y0; py <= y1; py++) {
-        for (let px = x0; px <= x1; px++) {
-          const dx = (px - cx) / chipR;
-          const dy = (py - cy) / chipRY;
-          if (dx * dx + dy * dy <= 1) {
-            const idx = (py * width + px) * 3;
-            buf[idx]     = rgb.r;
-            buf[idx + 1] = rgb.g;
-            buf[idx + 2] = rgb.b;
+          for (let py = y0; py <= y1; py++) {
+            for (let px = x0; px <= x1; px++) {
+              const dx = (px - cx) / chipR;
+              const dy = (py - cy) / chipRY;
+              if (dx * dx + dy * dy <= 1) {
+                const idx  = (py * width + px) * 3;
+                buf[idx]     = rgb.r;
+                buf[idx + 1] = rgb.g;
+                buf[idx + 2] = rgb.b;
+              }
+            }
           }
         }
       }
+      colX += cell;
     }
+    rowY += cell;
   }
 
   return buf;
@@ -115,7 +119,7 @@ function buildGlossLayer(width, height) {
   const buf = Buffer.allocUnsafe(width * height);
   // Gloss hotspot: upper-center of the image
   const hx = width  * 0.50;
-  const hy = height * 0.15;
+  const hy = height * 0.28;
   // Radius of the gloss falloff
   const radius = Math.sqrt(width * width + height * height) * 0.65;
 
