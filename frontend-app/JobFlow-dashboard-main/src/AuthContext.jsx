@@ -36,6 +36,7 @@ const normalizeUser = (u) => {
     // Feature flags
     serviceCallsEnabled: u.service_calls_enabled ?? u.serviceCallsEnabled ?? false,
     reportsEnabled: u.reports_enabled ?? u.reportsEnabled ?? false,
+    visualizerEnabled: u.visualizer_enabled ?? u.visualizerEnabled ?? false,
 
     // Per-user permissions
     permissions: u.permissions ?? {},

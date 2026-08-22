@@ -377,6 +377,7 @@ billing_status,
       service_calls_enabled,
       clarity_project_id,
       time_tracking_enabled,
+      visualizer_enabled,
     } = sanitizedBody;
 
     const companyId = req.params.id;
@@ -505,6 +506,7 @@ show_conversations = COALESCE($22, show_conversations),
   service_calls_enabled = COALESCE($39, service_calls_enabled),
   clarity_project_id = CASE WHEN $40::text IS NULL THEN clarity_project_id WHEN $40::text = '' THEN NULL ELSE $40::text END,
   time_tracking_enabled = COALESCE($41, time_tracking_enabled),
+  visualizer_enabled = COALESCE($43, visualizer_enabled),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -552,6 +554,7 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   clarity_project_id ?? null,                                  // $40
   time_tracking_enabled ?? null,                               // $41
   zipsExplicitlyProvided,                                      // $42
+  visualizer_enabled ?? null,                                  // $43
 ]
 
 );

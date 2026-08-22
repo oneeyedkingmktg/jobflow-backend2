@@ -77,6 +77,12 @@ const CATEGORIES = [
     description: "Job cost reports: labor hours, materials, profit margin",
     flag: "job_reports_enabled",
   },
+  {
+    key: "visualizer",
+    label: "Floor Visualizer",
+    description: "Build and apply floor chip blends on contact records",
+    flag: "visualizer_enabled",
+  },
 ];
 
 function getVisibleCategories(company) {

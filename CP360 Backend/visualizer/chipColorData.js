@@ -60,7 +60,7 @@ function load() {
     if (!recipeMap.has(blendName)) recipeMap.set(blendName, []);
     const color = colorMap.get(componentCode);
     if (color) {
-      recipeMap.get(blendName).push({ rgb: color.rgb, weight: pct / 100 });
+      recipeMap.get(blendName).push({ hex: color.hex, name: color.name, rgb: color.rgb, weight: pct / 100 });
     }
   }
 }

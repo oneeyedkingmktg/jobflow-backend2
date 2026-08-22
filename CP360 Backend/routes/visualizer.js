@@ -10,10 +10,11 @@ const multer = require('multer');
 const router = express.Router();
 const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { generateVisualization, compositeCustomBlend } = require('../visualizer/renderingService');
-const { getAllPrimitives, hexToRgb } = require('../visualizer/chipColorData');
+const { generateVisualization, compositeCustomBlend, compositeInternalBlend } = require('../visualizer/renderingService');
+const { getAllPrimitives, hexToRgb, getRecipe } = require('../visualizer/chipColorData');
 const { resolveLeadFolder, uploadFileToFolder } = require('../controllers/googleDrive');
-const { sendVisualizationEmail } = require('../services/email');
+const { sendVisualizationEmail, sendSwatchEmail } = require('../services/email');
+const sharp = require('sharp');
 const axios = require('axios');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { r2, BUCKET, PUBLIC_URL } = require('../config/r2');
@@ -307,6 +308,188 @@ router.post('/send-email', async (req, res) => {
   } catch (err) {
     console.error('POST /visualizer/send-email error:', err);
     res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// ============================================================================
+// INTERNAL CRM ROUTES — authenticated, for use inside contact records
+// ============================================================================
+
+// GET /api/visualizer/recipe/:chip_color_id — recipe for a library chip color
+router.get('/recipe/:chip_color_id', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name FROM chip_colors WHERE id=$1 AND is_active=true`,
+      [req.params.chip_color_id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Chip color not found' });
+
+    const rawRecipe = getRecipe(rows[0].name);
+    if (!rawRecipe || !rawRecipe.length) {
+      return res.status(404).json({ error: 'No blend recipe found for this color' });
+    }
+
+    const recipe = rawRecipe.map(item => ({
+      hex:        item.hex  || null,
+      name:       item.name || null,
+      percentage: Math.round((item.weight || 0) * 100),
+    }));
+
+    res.json({ chip_color: rows[0], recipe });
+  } catch (err) {
+    console.error('GET /visualizer/recipe error:', err);
+    res.status(500).json({ error: 'Failed to load recipe' });
+  }
+});
+
+// POST /api/visualizer/swatch — generate a blend swatch PNG, optionally save to Drive
+// Body: { recipe: [{hex, name, percentage}], lead_id? }
+router.post('/swatch', authenticateToken, async (req, res) => {
+  const { recipe, lead_id } = req.body;
+  if (!Array.isArray(recipe) || !recipe.length) {
+    return res.status(400).json({ error: 'recipe required' });
+  }
+
+  try {
+    const companyId = req.user.company_id;
+
+    // Normalize percentages to sum to 100
+    const total = recipe.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0);
+    const norm  = recipe.map(r => ({
+      ...r,
+      pct: total > 0 ? (parseFloat(r.percentage) || 0) / total * 100 : 100 / recipe.length,
+    }));
+
+    // Build swatch: horizontal color bands + text labels below
+    const W = 600, SWATCH_H = 100, LABEL_H = 50, H = SWATCH_H + LABEL_H;
+    const dividers = [];
+    const texts    = [];
+    let   x = 0;
+
+    for (const c of norm) {
+      const segW = Math.round((c.pct / 100) * W);
+      if (segW <= 0) continue;
+      dividers.push(`<rect x="${x}" y="0" width="${segW}" height="${SWATCH_H}" fill="${c.hex || '#cccccc'}"/>`);
+      const cx = x + segW / 2;
+      const shortName = (c.name || '').length > 13 ? (c.name || '').slice(0, 13) + '…' : (c.name || '');
+      texts.push(
+        `<text x="${cx}" y="${SWATCH_H + 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#374151" font-weight="600">${shortName}</text>`,
+        `<text x="${cx}" y="${SWATCH_H + 34}" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#6b7280">${Math.round(c.pct)}%</text>`,
+      );
+      x += segW;
+    }
+
+    const svg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
+      `<rect width="${W}" height="${H}" fill="#ffffff"/>` +
+      dividers.join('') + texts.join('') +
+      `</svg>`
+    );
+
+    const swatchBuffer = await sharp(svg).png().toBuffer();
+
+    const swatchKey = `visualizer/swatches/${companyId}/${crypto.randomUUID()}.png`;
+    await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: swatchBuffer, ContentType: 'image/png' }));
+    const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
+
+    if (lead_id) {
+      const date      = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const blendLbl  = norm.map(c => c.name || c.hex).join(' / ').slice(0, 45);
+      const fileName  = `Blend Swatch - ${blendLbl} (${date}).png`;
+      resolveLeadFolder(parseInt(lead_id), { create: true })
+        .then(folder => uploadFileToFolder(folder.id, fileName, 'image/png', swatchBuffer))
+        .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
+    }
+
+    res.json({ swatch_url: swatchUrl });
+  } catch (err) {
+    console.error('POST /visualizer/swatch error:', err);
+    res.status(500).json({ error: 'Failed to generate swatch' });
+  }
+});
+
+// POST /api/visualizer/send-swatch-email — email swatch PNG to customer from a lead record
+// Body: { swatch_url, lead_id, blend_description? }
+router.post('/send-swatch-email', authenticateToken, async (req, res) => {
+  const { swatch_url, lead_id, blend_description } = req.body;
+  if (!swatch_url || !lead_id) {
+    return res.status(400).json({ error: 'swatch_url and lead_id required' });
+  }
+
+  try {
+    const { rows } = await db.query(
+      `SELECT l.name AS customer_name, l.email AS customer_email,
+              c.company_name, c.phone AS company_phone,
+              c.primary_color, c.accent_color, c.logo_url
+       FROM leads l
+       JOIN companies c ON c.id = l.company_id
+       WHERE l.id = $1 AND l.company_id = $2 AND l.deleted_at IS NULL`,
+      [lead_id, req.user.company_id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Lead not found' });
+
+    const row = rows[0];
+    if (!row.customer_email) return res.status(400).json({ error: 'Lead has no email address on file' });
+
+    await sendSwatchEmail({
+      toEmail:          row.customer_email,
+      customerName:     row.customer_name,
+      companyName:      row.company_name,
+      swatchUrl:        swatch_url,
+      blendDescription: blend_description || null,
+      primaryColor:     row.primary_color  || null,
+      accentColor:      row.accent_color   || null,
+      logoUrl:          row.logo_url       || null,
+      companyPhone:     row.company_phone  || null,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /visualizer/send-swatch-email error:', err);
+    res.status(500).json({ error: 'Failed to send swatch email' });
+  }
+});
+
+// POST /api/visualizer/apply-internal — upload photo + recipe, run composite pipeline in background
+// Multipart: image file + recipe (JSON string) + lead_id + company_id
+router.post('/apply-internal', authenticateToken, upload.single('image'), async (req, res) => {
+  const { lead_id, recipe: recipeJson } = req.body;
+  if (!lead_id || !recipeJson || !req.file) {
+    return res.status(400).json({ error: 'lead_id, recipe, and image required' });
+  }
+
+  let recipe;
+  try { recipe = JSON.parse(recipeJson); } catch { return res.status(400).json({ error: 'Invalid recipe JSON' }); }
+  if (!Array.isArray(recipe) || !recipe.length) return res.status(400).json({ error: 'recipe must be a non-empty array' });
+
+  try {
+    const companyId = req.user.company_id;
+
+    // Verify lead belongs to this company
+    const leadCheck = await db.query(
+      `SELECT id FROM leads WHERE id=$1 AND company_id=$2 AND deleted_at IS NULL`,
+      [lead_id, companyId]
+    );
+    if (!leadCheck.rows.length) return res.status(404).json({ error: 'Lead not found' });
+
+    // Convert recipe: [{hex, percentage}] → [{rgb, weight}]
+    const converted = recipe.map(({ hex, percentage }) => ({
+      rgb:    hexToRgb(hex),
+      weight: (parseFloat(percentage) || 0) / 100,
+    })).filter(c => c.weight > 0);
+    if (!converted.length) return res.status(400).json({ error: 'Recipe has no valid entries' });
+
+    const result = await compositeInternalBlend({
+      leadId:        parseInt(lead_id),
+      companyId,
+      recipe:        converted,
+      rawImageBuffer: req.file.buffer,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('POST /visualizer/apply-internal error:', err);
+    res.status(500).json({ error: 'Failed to start visualization' });
   }
 });
 

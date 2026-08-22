@@ -272,4 +272,72 @@ async function compositeCustomBlend({ sourceVisualizationId, companyId, recipe }
   };
 }
 
-module.exports = { generateVisualization, compositeCustomBlend };
+// ── Internal CRM blend (full pipeline, new photo, background) ─────────────────
+// recipe: [{ rgb: {r,g,b}, weight: 0–1 }] (already converted from hex)
+// Returns { visualization_id } immediately; pipeline runs in background.
+
+async function compositeInternalBlend({ leadId, companyId, recipe, rawImageBuffer }) {
+  const { rows } = await db.query(
+    `INSERT INTO visualizations (company_id, lead_id, rendering_provider, status)
+     VALUES ($1, $2, 'compositing-internal', 'processing') RETURNING id`,
+    [companyId, leadId || null]
+  );
+  const visualizationId = rows[0].id;
+
+  setImmediate(async () => {
+    try {
+      const { buffer: processedBuffer } = await preprocessImage(rawImageBuffer);
+
+      const { runPreflightChecks } = require('./preflightChecks');
+      const preflightFail = await runPreflightChecks(processedBuffer);
+      if (preflightFail) {
+        await db.query(
+          `UPDATE visualizations SET status='failed', failure_type='user_input', error_message=$1 WHERE id=$2`,
+          [preflightFail.message, visualizationId]
+        );
+        return;
+      }
+
+      const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
+      const originalUrl = await uploadToR2(originalKey, processedBuffer);
+      await db.query(
+        `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
+        [originalKey, originalUrl, visualizationId]
+      );
+
+      const { width, height } = await sharp(processedBuffer).metadata();
+      const segResult = await segmentFloor(originalUrl, width, height);
+      const maskBuffer = segResult.maskBuffer;
+
+      const maskKey = `visualizer/masks/${companyId}/${uuid()}.png`;
+      const maskUrl = await uploadToR2(maskKey, maskBuffer);
+      await db.query(
+        `UPDATE visualizations SET mask_key=$1, mask_url=$2 WHERE id=$3`,
+        [maskKey, maskUrl, visualizationId]
+      );
+
+      const resultBuffer = await composite({ processedBuffer, maskBuffer, recipe });
+      const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;
+      const generatedUrl = await uploadToR2(generatedKey, resultBuffer);
+
+      await db.query(
+        `UPDATE visualizations
+         SET status='complete', generated_image_key=$1, generated_image_url=$2,
+             rendering_provider='compositing-internal', completed_at=NOW()
+         WHERE id=$3`,
+        [generatedKey, generatedUrl, visualizationId]
+      );
+    } catch (err) {
+      console.error(`[Visualizer Internal] pipeline failed for id=${visualizationId}:`, err.message);
+      const isUserInput = err.userInput === true;
+      await db.query(
+        `UPDATE visualizations SET status='failed', failure_type=$1, error_message=$2 WHERE id=$3`,
+        [isUserInput ? 'user_input' : 'error', err.message, visualizationId]
+      ).catch(() => {});
+    }
+  });
+
+  return { visualization_id: visualizationId };
+}
+
+module.exports = { generateVisualization, compositeCustomBlend, compositeInternalBlend };

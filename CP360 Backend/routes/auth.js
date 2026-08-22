@@ -102,6 +102,7 @@ router.post('/login', async (req, res) => {
         ARRAY(SELECT cm.crew_id FROM crew_members cm WHERE cm.user_id = u.id) AS crew_ids,
         c.ghl_location_id,
         u.service_calls_enabled,
+        c.visualizer_enabled,
         u.permissions,
         u.permission_role_id,
         pr.permissions AS role_permissions
@@ -150,6 +151,7 @@ router.post('/login', async (req, res) => {
         planType: user.plan_type || 'pro',
         reportsEnabled: user.reports_enabled ?? false,
         service_calls_enabled: user.service_calls_enabled ?? false,
+        visualizerEnabled: user.visualizer_enabled ?? false,
         permissions: user.permission_role_id
           ? (user.role_permissions ?? {})
           : (user.permissions ?? {})
@@ -187,6 +189,7 @@ router.get('/verify', async (req, res) => {
         c.plan_type,
         c.reports_enabled,
         u.service_calls_enabled,
+        c.visualizer_enabled,
         u.permissions,
         u.permission_role_id,
         pr.permissions AS role_permissions

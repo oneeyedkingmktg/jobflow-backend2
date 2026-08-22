@@ -482,6 +482,39 @@ async function sendVisualizationEmail({
   });
 }
 
+async function sendSwatchEmail({
+  toEmail, customerName, companyName, swatchUrl, blendDescription,
+  primaryColor = null, accentColor = null, logoUrl = null, companyPhone = null,
+}) {
+  const displayName = companyName || 'CoatingPro360';
+  const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const HBG         = primaryColor || '#00875A';
+  const AC          = accentColor  || '#16a34a';
+
+  const html = [
+    `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto">`,
+    emailHeader(HBG, AC, displayName, logoUrl),
+    `<tr><td bgcolor="#ffffff" style="padding:28px;border:1px solid #e5e7eb;border-top:none">`,
+    `<p style="font-size:16px;color:#111;margin:0 0 6px">Hi ${customerName || 'there'},</p>`,
+    `<p style="font-size:15px;color:#4b5563;margin:0 0 20px">Here's the floor chip blend we discussed for your project${blendDescription ? ': <strong>' + blendDescription + '</strong>' : ''}.</p>`,
+    swatchUrl ? `<img src="${swatchUrl}" alt="Chip Blend Swatch" style="width:100%;border-radius:8px;display:block;border:1px solid #e5e7eb;margin-bottom:24px">` : '',
+    `<p style="font-size:15px;color:#4b5563;margin:0 0 20px">Let us know if you'd like to make any changes or if you're ready to move forward!</p>`,
+    contactLine(companyPhone),
+    `</td></tr>`,
+    `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
+    `<p style="margin:0;font-size:12px;color:#ffffff;font-weight:bold;font-family:Arial,sans-serif">&#9733; ${displayName}</p>`,
+    `</td></tr>`,
+    `</table>`,
+  ].join('');
+
+  await transporter.sendMail({
+    from: fromHeader,
+    to: toEmail,
+    subject: `Your Floor Chip Blend from ${displayName}`,
+    html,
+  });
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendProposalAcceptedEmails,
@@ -489,4 +522,5 @@ module.exports = {
   sendPaymentReceivedEmail,
   sendWarrantyEmail,
   sendVisualizationEmail,
+  sendSwatchEmail,
 };

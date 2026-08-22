@@ -4,6 +4,7 @@ import { useAuth } from "./AuthContext";
 import { usePermission } from "./utils/usePermission";
 import { apiRequest } from "./api";
 import ServiceCallsModal from "./ServiceCallsModal";
+import VisualizerPanel from "./leadModalParts/VisualizerPanel";
 
 
 export default function LeadDetails({
@@ -35,6 +36,10 @@ export default function LeadDetails({
   const serviceCallsPermission = usePermission('service_calls');
   const serviceCallsEnabled = serviceCallsPermission !== 'hide';
   const serviceCallsCanEdit = serviceCallsPermission === 'edit';
+
+  const visualizerPermission = usePermission('visualizer');
+  const visualizerEnabled = user?.visualizerEnabled && visualizerPermission !== 'hide';
+  const [showVisualizerPanel, setShowVisualizerPanel] = useState(false);
 
   const [showServiceCallsModal, setShowServiceCallsModal] = useState(false);
   const [serviceCallCount, setServiceCallCount] = useState(0);
@@ -405,6 +410,25 @@ export default function LeadDetails({
           canEdit={serviceCallsCanEdit}
           onClose={() => setShowServiceCallsModal(false)}
           onCountChange={(count) => setServiceCallCount(count)}
+        />
+      )}
+
+      {/* FLOOR VISUALIZER BUTTON */}
+      {visualizerEnabled && (
+        <button
+          onClick={() => setShowVisualizerPanel(true)}
+          className="w-full bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm hover:border-blue-400 cursor-pointer transition text-left"
+        >
+          <span className="text-sm font-semibold text-blue-600">Floor Visualizer</span>
+        </button>
+      )}
+
+      {/* FLOOR VISUALIZER PANEL */}
+      {showVisualizerPanel && (
+        <VisualizerPanel
+          lead={form}
+          canEdit={visualizerPermission === 'edit'}
+          onClose={() => setShowVisualizerPanel(false)}
         />
       )}
 
