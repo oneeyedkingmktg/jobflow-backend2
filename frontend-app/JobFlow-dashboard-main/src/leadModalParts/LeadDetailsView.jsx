@@ -9,6 +9,7 @@ import LeadFilesPanel from "./LeadFilesPanel.jsx";
 import BidderPanel from "./BidderPanel.jsx";
 import LeadTeamPanel from "./LeadTeamPanel.jsx";
 import JobReportsPanel from "./JobReportsPanel.jsx";
+import VisualizerPanel from "./VisualizerPanel.jsx";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import { BidderAPI } from "../api";
@@ -30,7 +31,9 @@ const hasEstimate = form?.hasEstimate === true;
   const bidderPermission = usePermission('bidder');
   const manageLaborPermission = usePermission('manage_labor');
   const jobReportPermission = usePermission('job_report');
+  const visualizerPermission = usePermission('visualizer');
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
+  const visualizerEnabled = (currentCompany?.visualizerEnabled ?? currentCompany?.visualizer_enabled ?? false) && visualizerPermission !== 'hide';
   const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
   const [showEstimateModal, setShowEstimateModal] = useState(false);
   const [estimateData, setEstimateData] = useState(null);
@@ -40,6 +43,7 @@ const hasEstimate = form?.hasEstimate === true;
   const [bidCount, setBidCount] = useState(null);
   const [showTeamPanel, setShowTeamPanel] = useState(false);
   const [showJobReports, setShowJobReports] = useState(false);
+  const [showVisualizerPanel, setShowVisualizerPanel] = useState(false);
 
   useEffect(() => {
     if (form?.id && !isEstimatorOnly && bidderEnabled) {
@@ -310,6 +314,17 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
+        {/* Floor Visualizer */}
+        {!isEstimatorOnly && visualizerEnabled && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowVisualizerPanel(true); }}
+            className="px-3 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-blue-700 transition text-center leading-tight"
+          >
+            Floor Visualizer
+          </button>
+        )}
+
       </div>
 
       {/* FILES MODAL */}
@@ -355,6 +370,15 @@ const hasEstimate = form?.hasEstimate === true;
         <JobReportsPanel
           lead={form}
           onClose={() => setShowJobReports(false)}
+        />
+      )}
+
+      {/* FLOOR VISUALIZER PANEL */}
+      {showVisualizerPanel && (
+        <VisualizerPanel
+          lead={form}
+          canEdit={visualizerPermission === 'edit'}
+          onClose={() => setShowVisualizerPanel(false)}
         />
       )}
     </>
