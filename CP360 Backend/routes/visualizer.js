@@ -362,16 +362,16 @@ router.post('/swatch', authenticateToken, async (req, res) => {
 
     const xmlEsc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    // Dimensions
-    const W        = 600;
-    const TITLE_H  = blend_name ? 40 : 0;
-    const SWATCH_H = 120;
-    const LABEL_H  = 60;
+    // Dimensions — 960px wide for crisp resolution on all screens
+    const W        = 960;
+    const TITLE_H  = blend_name ? 64 : 0;
+    const SWATCH_H = 320;
+    const LABEL_H  = 96;
     const H        = TITLE_H + SWATCH_H + LABEL_H;
 
     const titleSection = blend_name
       ? `<rect x="0" y="0" width="${W}" height="${TITLE_H}" fill="#1e3a5f"/>` +
-        `<text x="${W / 2}" y="${TITLE_H - 12}" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#ffffff" font-weight="700">${xmlEsc(blend_name)}</text>`
+        `<text x="${W / 2}" y="${TITLE_H - 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#ffffff" font-weight="700">${xmlEsc(blend_name)}</text>`
       : '';
 
     const bars  = [];
@@ -385,8 +385,8 @@ router.post('/swatch', authenticateToken, async (req, res) => {
       const cx = x + segW / 2;
       const nm = (c.name || '').length > 12 ? (c.name || '').slice(0, 12) + '…' : (c.name || '');
       texts.push(
-        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 20}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#374151" font-weight="700">${xmlEsc(nm)}</text>`,
-        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 38}" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#6b7280">${Math.round(c.pct)}%</text>`,
+        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 34}" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#374151" font-weight="700">${xmlEsc(nm)}</text>`,
+        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 62}" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" fill="#6b7280">${Math.round(c.pct)}%</text>`,
       );
       x += segW;
     }
@@ -396,7 +396,7 @@ router.post('/swatch', authenticateToken, async (req, res) => {
     const dividers = [];
     for (const c of norm) {
       const segW = Math.round((c.pct / 100) * W);
-      if (x > 0) dividers.push(`<line x1="${x}" y1="${TITLE_H}" x2="${x}" y2="${TITLE_H + SWATCH_H}" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`);
+      if (x > 0) dividers.push(`<line x1="${x}" y1="${TITLE_H}" x2="${x}" y2="${TITLE_H + SWATCH_H}" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>`);
       x += segW;
     }
 
@@ -407,7 +407,7 @@ router.post('/swatch', authenticateToken, async (req, res) => {
       `</svg>`
     );
 
-    const swatchBuffer = await sharp(svg).png().toBuffer();
+    const swatchBuffer = await sharp(svg, { density: 144 }).png().toBuffer();
 
     const swatchKey = `visualizer/swatches/${companyId}/${crypto.randomUUID()}.png`;
     await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: swatchBuffer, ContentType: 'image/png' }));
