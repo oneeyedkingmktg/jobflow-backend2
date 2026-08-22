@@ -15,8 +15,8 @@ let _nextId = 1;
 function newId() { return _nextId++; }
 
 // ── Canvas chip/flake blend preview ─────────────────────────────────────────
-// Draws scattered chip shapes in each color proportional to percentage.
-// showLabels=true → percentage label row below; mini=true → smaller chips for tiles.
+// Jagged polygon chips, 100% coverage (no background showing), square canvas.
+// showLabels=true → color legend below; mini=true → smaller tiles.
 function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "" }) {
   const canvasRef = useRef(null);
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
@@ -29,14 +29,10 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
     const W = canvas.width;
     const H = canvas.height;
 
-    // Concrete-gray base
-    ctx.fillStyle = '#c9c9c9';
-    ctx.fillRect(0, 0, W, H);
-
-    // Build weighted color pool
+    // Build weighted color pool (600 entries for smooth distribution)
     const pool = [];
     for (const item of items) {
-      const count = Math.max(1, Math.round((parseFloat(item.percentage) / total) * 300));
+      const count = Math.max(1, Math.round((parseFloat(item.percentage) / total) * 600));
       for (let i = 0; i < count; i++) pool.push(item.hex);
     }
     // Fisher-Yates shuffle
@@ -45,56 +41,91 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const chipCount = mini ? 600 : 1800;
-    const maxRW = mini ? 3.5 : 6;
-    const maxRH = mini ? 2.5 : 4;
+    // Seed-based draw so we pull colors sequentially (not random index)
+    let poolIdx = 0;
+    const nextColor = () => pool[poolIdx++ % pool.length];
 
-    for (let i = 0; i < chipCount; i++) {
-      const hex = pool[i % pool.length];
+    // Draw one jagged polygon chip centered at (x, y)
+    const drawChip = (x, y, rx, ry, angle) => {
+      const verts = 4 + Math.floor(Math.random() * 4); // 4–7 sides
+      ctx.beginPath();
+      for (let i = 0; i < verts; i++) {
+        // Spread vertices unevenly around the perimeter for jagged look
+        const baseA = (i / verts) * Math.PI * 2 + angle;
+        const jitterA = baseA + (Math.random() - 0.5) * (Math.PI * 1.1 / verts);
+        const jitterR = 0.45 + Math.random() * 0.55;
+        const px = x + Math.cos(jitterA) * rx * jitterR;
+        const py = y + Math.sin(jitterA) * ry * jitterR;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    // ── Pass 1: dense offset-grid — guarantees full coverage ──────────────
+    // Fill dominant color first so any tiny sub-pixel gap matches a chip color
+    const dominant = items.reduce((a, b) =>
+      parseFloat(a.percentage) > parseFloat(b.percentage) ? a : b
+    );
+    ctx.fillStyle = dominant.hex;
+    ctx.fillRect(0, 0, W, H);
+
+    const spacing = mini ? 5 : 9;
+    const maxRX   = mini ? 6 : 11;
+    const maxRY   = mini ? 4 : 7;
+
+    for (let row = -1; row < H / spacing + 2; row++) {
+      for (let col = -1; col < W / spacing + 2; col++) {
+        const x = col * spacing
+          + (row % 2 === 0 ? 0 : spacing * 0.5)
+          + (Math.random() - 0.5) * spacing * 0.6;
+        const y = row * spacing + (Math.random() - 0.5) * spacing * 0.6;
+        const rx = maxRX * (0.55 + Math.random() * 0.45);
+        const ry = maxRY * (0.55 + Math.random() * 0.45);
+        ctx.fillStyle = nextColor();
+        drawChip(x, y, rx, ry, Math.random() * Math.PI);
+      }
+    }
+
+    // ── Pass 2: random overlay for natural scatter ─────────────────────────
+    const overlay = mini ? 250 : 700;
+    for (let i = 0; i < overlay; i++) {
       const x = Math.random() * W;
       const y = Math.random() * H;
-      const rw = 1.5 + Math.random() * maxRW;
-      const rh = 1.0 + Math.random() * maxRH;
-      const angle = Math.random() * Math.PI;
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.globalAlpha = 0.88 + Math.random() * 0.12;
-      ctx.fillStyle = hex;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      const rx = maxRX * (0.35 + Math.random() * 0.65);
+      const ry = maxRY * (0.35 + Math.random() * 0.65);
+      ctx.fillStyle = nextColor();
+      drawChip(x, y, rx, ry, Math.random() * Math.PI);
     }
-  // Re-render only when recipe identity changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(items.map(i => `${i.hex}:${i.percentage}`))]);
 
   if (!items.length) {
     return (
-      <div className={`rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center ${className}`} style={{ minHeight: mini ? 60 : 120 }}>
+      <div className={`rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center aspect-square ${className}`}>
         <span className="text-xs text-gray-400">{mini ? '' : 'Add colors to see preview'}</span>
       </div>
     );
   }
 
+  const px = mini ? 120 : 320;
+
   return (
     <div className={`rounded-xl overflow-hidden border border-gray-200 shadow-sm ${className}`}>
       <canvas
         ref={canvasRef}
-        width={mini ? 160 : 480}
-        height={mini ? 100 : 180}
-        className="w-full block"
-        style={{ height: mini ? 80 : 160 }}
+        width={px}
+        height={px}
+        className="w-full aspect-square block"
       />
       {showLabels && (
         <div className="flex bg-white border-t border-gray-100">
           {items.map((c, i) => {
             const pct = Math.round((parseFloat(c.percentage) / total) * 100);
             return (
-              <div key={i} style={{ width: `${(parseFloat(c.percentage) / total) * 100}%`, minWidth: 28 }} className="text-center py-1.5 overflow-hidden px-0.5">
-                <div className="w-3 h-3 rounded-full mx-auto mb-0.5 border border-gray-300" style={{ background: c.hex }} />
+              <div key={i} style={{ width: `${(parseFloat(c.percentage) / total) * 100}%`, minWidth: 32 }} className="text-center py-1.5 overflow-hidden px-0.5">
+                <div className="w-3 h-3 rounded-sm mx-auto mb-0.5 border border-gray-300" style={{ background: c.hex }} />
                 <div className="text-xs font-bold text-gray-700 truncate leading-tight">{(c.name || '').split(' ').slice(-1)[0]}</div>
                 <div className="text-xs text-gray-400 leading-tight">{pct}%</div>
               </div>
