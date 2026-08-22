@@ -143,41 +143,52 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
 }
 
 // ── Custom blend builder (color picker + sliders) ────────────────────────────
-function CustomBlendBuilder({ primitives, items, setItems, originalRecipe }) {
+function CustomBlendBuilder({ primitives, items, setItems }) {
   const [search, setSearch] = useState('');
 
   const filtered = search
     ? primitives.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
     : primitives;
 
+  // Extract short label: prefer code (F-101), else extract from name, else last word
+  const shortLabel = (c) => c.code || (c.name || '').match(/F-\d+/)?.[0] || (c.name || '').split(' ').slice(-1)[0];
+
   const toggle = (p) => {
     if (items.find(c => c.hex === p.hex)) {
       setItems(prev => prev.filter(c => c.hex !== p.hex));
-    } else {
-      const n = items.length + 1;
-      const even = Math.floor(100 / n);
-      setItems(prev => [...prev.map(c => ({ ...c, percentage: even })), { hex: p.hex, name: p.name, code: p.code, percentage: even }]);
+      return;
     }
+    if (items.length === 0) {
+      setItems([{ hex: p.hex, name: p.name, code: p.code, percentage: 100 }]);
+      return;
+    }
+    // New color starts at 10%; scale existing colors proportionally to make room
+    const newPct = 10;
+    const currentTotal = items.reduce((s, c) => s + (parseFloat(c.percentage) || 0), 0);
+    const scale = (currentTotal - newPct) / currentTotal;
+    setItems(prev => [
+      ...prev.map(c => ({ ...c, percentage: Math.max(1, Math.round(c.percentage * scale)) })),
+      { hex: p.hex, name: p.name, code: p.code, percentage: newPct },
+    ]);
   };
 
   const setPct = (hex, val) => {
     setItems(prev => prev.map(c => c.hex === hex ? { ...c, percentage: Math.max(1, Math.min(99, parseInt(val) || 1)) } : c));
   };
 
-  // Extract short label: prefer code (F-101), else last word of name
-  const shortLabel = (c) => c.code || (c.name || '').match(/F-\d+/)?.[0] || (c.name || '').split(' ').slice(-1)[0];
+  const total = items.reduce((s, c) => s + (parseFloat(c.percentage) || 0), 0) || 1;
 
   return (
     <div className="space-y-3">
-      {/* Original formula reference — only shown when forked from library */}
-      {originalRecipe && originalRecipe.length > 0 && (
+      {/* Live custom blend summary */}
+      {items.length > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Original Formula</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Custom Blend</p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {originalRecipe.map((r, i) => (
-              <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
-                <span className="inline-block w-2.5 h-2.5 rounded-sm border border-gray-300 flex-shrink-0" style={{ background: r.hex }} />
-                {shortLabel(r)} <span className="text-gray-400">{Math.round(r.percentage)}%</span>
+            {items.map((c, i) => (
+              <span key={i} className="text-xs text-gray-600 flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm border border-gray-300 flex-shrink-0" style={{ background: c.hex }} />
+                {shortLabel(c)} <span className="text-gray-400">{Math.round((parseFloat(c.percentage) / total) * 100)}%</span>
               </span>
             ))}
           </div>
@@ -189,9 +200,7 @@ function CustomBlendBuilder({ primitives, items, setItems, originalRecipe }) {
           {items.map(c => (
             <div key={c.hex} className="flex items-center gap-2">
               <div className="w-5 h-5 rounded flex-shrink-0 border border-gray-200 shadow-sm" style={{ background: c.hex }} />
-              <span className="text-xs font-semibold text-gray-700 w-20 truncate flex-shrink-0">{c.name}</span>
               <input type="range" min="1" max="99" value={c.percentage} onChange={e => setPct(c.hex, e.target.value)} className="flex-1 accent-blue-500" />
-              <span className="text-xs font-mono text-gray-500 w-10 text-right flex-shrink-0">{shortLabel(c)}</span>
               <button onClick={() => setItems(prev => prev.filter(x => x.hex !== c.hex))} className="text-gray-300 hover:text-red-400 text-lg leading-none flex-shrink-0">×</button>
             </div>
           ))}
@@ -236,7 +245,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [customItems, setCustomItems] = useState([]);
   const [blendName, setBlendName] = useState('');
   const [editingId, setEditingId] = useState(null); // null = creating new
-  const [originalRecipe, setOriginalRecipe] = useState(null); // set when forking a library blend
 
   // Save-blend modal: null | { mode: 'new'|'edit', proposedName: string }
   const [saveModal, setSaveModal] = useState(null);
@@ -281,10 +289,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       .catch(() => setLibRecipe([]));
   }, [selectedLibColor?.id]);
 
-  // Customize library blend → fork into custom tab, preserving original for reference
+  // Customize library blend → fork into custom tab
   const customizeLibBlend = () => {
     if (!libRecipe.length) return;
-    setOriginalRecipe(libRecipe.map(r => ({ ...r })));
     setCustomItems(libRecipe.map(r => ({ ...r })));
     setBlendName(selectedLibColor?.name || '');
     setBlendTab('custom');
@@ -318,7 +325,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     setCustomItems([]);
     setSelectedLibColor(null);
     setLibRecipe([]);
-    setOriginalRecipe(null);
     setBlendTab('library');
     setError(null);
   };
@@ -560,7 +566,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {/* Custom tab */}
                 {blendTab === 'custom' && (
                   <div className="space-y-3">
-                    <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} originalRecipe={originalRecipe} />
+                    <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
                     <ChipBlendPreview recipe={customItems} showLabels className="w-full" />
                     <input
                       type="text"
