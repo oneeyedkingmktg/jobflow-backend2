@@ -14,8 +14,26 @@ function getToken() { return localStorage.getItem("authToken"); }
 let _nextId = 1;
 function newId() { return _nextId++; }
 
+// ── Seeded PRNG (mulberry32) — same recipe → same layout at any canvas size ──
+function _hash(str) {
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < str.length; i++)
+    h = (Math.imul(h ^ str.charCodeAt(i), 0x01000193)) >>> 0;
+  return h;
+}
+function _mkRand(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ── Shared chip rendering logic ───────────────────────────────────────────────
-// Used by both the live canvas preview and the swatch-save blob generator.
+// Uses a seeded RNG derived from the recipe so screen preview == saved image.
+// Positions are normalized (0–1) then scaled, so layout is canvas-size-independent.
 function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
   if (!items.length) return;
@@ -24,17 +42,25 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
     (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0)
   );
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-  ctx.lineWidth = Math.max(0.5, W / 320 * 0.7); // scale stroke with canvas size
+  // Seed from recipe content — identical recipe → identical layout
+  const seed = _hash(items.map(r => `${r.hex}:${Math.round(parseFloat(r.percentage))}`).join(','));
+  const rand = _mkRand(seed);
 
-  const drawFlake = (cx, cy, maxR) => {
-    const verts = 7 + Math.floor(Math.random() * 7);
-    const elongation = 0.28 + Math.random() * 0.85;
-    const rot = Math.random() * Math.PI;
+  // Border: scale with canvas, always visible (minimum 0.5px)
+  ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+  ctx.lineWidth = Math.max(0.5, W * 0.002);
+
+  const drawFlake = (cxN, cyN, rN) => {
+    const cx = cxN * W;
+    const cy = cyN * H;
+    const maxR = rN * W;
+    const verts = 7 + Math.floor(rand() * 7);
+    const elongation = 0.28 + rand() * 0.85;
+    const rot = rand() * Math.PI;
     ctx.beginPath();
     for (let i = 0; i < verts; i++) {
       const a = (i / verts) * Math.PI * 2;
-      const r = maxR * (0.12 + Math.random() * 0.88);
+      const r = maxR * (0.12 + rand() * 0.88);
       const lx = Math.cos(a) * r;
       const ly = Math.sin(a) * r * elongation;
       const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
@@ -44,16 +70,16 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
     }
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
+    ctx.stroke(); // border on every flake, always
   };
 
   ctx.fillStyle = sorted[0].hex;
   ctx.fillRect(0, 0, W, H);
 
-  // Scale chip sizes and counts to canvas dimensions
-  const minR = mini ? 3 : Math.max(7, W * 0.022);
-  const maxR = mini ? 10 : Math.max(22, W * 0.069);
-  const scaleFactor = mini ? 18 : (W / 320) * (H / 320) * 130;
+  // Normalized chip radius range — same visual size ratio at any canvas resolution
+  const minRN = mini ? 0.025 : 0.022;
+  const maxRN = mini ? 0.083 : 0.069;
+  const scaleFactor = mini ? 18 : 130;
 
   for (let ci = 1; ci < sorted.length; ci++) {
     const color = sorted[ci];
@@ -61,18 +87,17 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
     const count = Math.max(mini ? 2 : 6, Math.round(pct * scaleFactor));
     ctx.fillStyle = color.hex;
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() * (W + maxR * 2)) - maxR;
-      const y = (Math.random() * (H + maxR * 2)) - maxR;
-      drawFlake(x, y, minR + Math.random() * (maxR - minR));
+      const xN = (rand() * (1 + maxRN * 2)) - maxRN;
+      const yN = (rand() * (1 + maxRN * 2)) - maxRN;
+      drawFlake(xN, yN, minRN + rand() * (maxRN - minRN));
     }
   }
 
-  // Dominant-color top pass for visible chip texture in base area
+  // Dominant-color top pass — stroked border makes chips visible against same-color base
   ctx.fillStyle = sorted[0].hex;
-  const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25 * (W / 320));
+  const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25);
   for (let i = 0; i < domCount; i++) {
-    drawFlake(Math.random() * W, Math.random() * H,
-      (minR + Math.random() * (maxR - minR)) * 0.7);
+    drawFlake(rand(), rand(), (minRN + rand() * (maxRN - minRN)) * 0.7);
   }
 }
 
