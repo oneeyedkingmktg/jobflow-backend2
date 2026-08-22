@@ -343,9 +343,9 @@ router.get('/recipe/:chip_color_id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/visualizer/swatch — generate a blend swatch PNG, optionally save to Drive
-// Body: { recipe: [{hex, name, percentage}], lead_id? }
+// Body: { recipe: [{hex, name, percentage}], lead_id?, blend_name? }
 router.post('/swatch', authenticateToken, async (req, res) => {
-  const { recipe, lead_id } = req.body;
+  const { recipe, lead_id, blend_name } = req.body;
   if (!Array.isArray(recipe) || !recipe.length) {
     return res.status(400).json({ error: 'recipe required' });
   }
@@ -360,29 +360,50 @@ router.post('/swatch', authenticateToken, async (req, res) => {
       pct: total > 0 ? (parseFloat(r.percentage) || 0) / total * 100 : 100 / recipe.length,
     }));
 
-    // Build swatch: horizontal color bands + text labels below
-    const W = 600, SWATCH_H = 100, LABEL_H = 50, H = SWATCH_H + LABEL_H;
-    const dividers = [];
-    const texts    = [];
+    const xmlEsc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // Dimensions
+    const W        = 600;
+    const TITLE_H  = blend_name ? 40 : 0;
+    const SWATCH_H = 120;
+    const LABEL_H  = 60;
+    const H        = TITLE_H + SWATCH_H + LABEL_H;
+
+    const titleSection = blend_name
+      ? `<rect x="0" y="0" width="${W}" height="${TITLE_H}" fill="#1e3a5f"/>` +
+        `<text x="${W / 2}" y="${TITLE_H - 12}" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" fill="#ffffff" font-weight="700">${xmlEsc(blend_name)}</text>`
+      : '';
+
+    const bars  = [];
+    const texts = [];
     let   x = 0;
 
     for (const c of norm) {
       const segW = Math.round((c.pct / 100) * W);
       if (segW <= 0) continue;
-      dividers.push(`<rect x="${x}" y="0" width="${segW}" height="${SWATCH_H}" fill="${c.hex || '#cccccc'}"/>`);
+      bars.push(`<rect x="${x}" y="${TITLE_H}" width="${segW}" height="${SWATCH_H}" fill="${c.hex || '#cccccc'}"/>`);
       const cx = x + segW / 2;
-      const shortName = (c.name || '').length > 13 ? (c.name || '').slice(0, 13) + '…' : (c.name || '');
+      const nm = (c.name || '').length > 12 ? (c.name || '').slice(0, 12) + '…' : (c.name || '');
       texts.push(
-        `<text x="${cx}" y="${SWATCH_H + 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#374151" font-weight="600">${shortName}</text>`,
-        `<text x="${cx}" y="${SWATCH_H + 34}" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#6b7280">${Math.round(c.pct)}%</text>`,
+        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 20}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#374151" font-weight="700">${xmlEsc(nm)}</text>`,
+        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 38}" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#6b7280">${Math.round(c.pct)}%</text>`,
       );
+      x += segW;
+    }
+
+    // Divider lines between segments
+    x = 0;
+    const dividers = [];
+    for (const c of norm) {
+      const segW = Math.round((c.pct / 100) * W);
+      if (x > 0) dividers.push(`<line x1="${x}" y1="${TITLE_H}" x2="${x}" y2="${TITLE_H + SWATCH_H}" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`);
       x += segW;
     }
 
     const svg = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
       `<rect width="${W}" height="${H}" fill="#ffffff"/>` +
-      dividers.join('') + texts.join('') +
+      titleSection + bars.join('') + dividers.join('') + texts.join('') +
       `</svg>`
     );
 
@@ -393,9 +414,9 @@ router.post('/swatch', authenticateToken, async (req, res) => {
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
     if (lead_id) {
-      const date      = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const blendLbl  = norm.map(c => c.name || c.hex).join(' / ').slice(0, 45);
-      const fileName  = `Blend Swatch - ${blendLbl} (${date}).png`;
+      const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const label    = blend_name || norm.map(c => c.name || c.hex).join(' / ').slice(0, 40);
+      const fileName = `Blend Swatch - ${label} (${date}).png`;
       resolveLeadFolder(parseInt(lead_id), { create: true })
         .then(folder => uploadFileToFolder(folder.id, fileName, 'image/png', swatchBuffer))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
