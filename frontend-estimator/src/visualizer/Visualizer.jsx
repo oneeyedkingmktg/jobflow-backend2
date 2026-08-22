@@ -81,14 +81,240 @@ function UploadStep({ onNext }) {
   );
 }
 
+// ── Custom Blend Panel ────────────────────────────────────────────────────────
+function CustomBlendPanel({ preGens, blendItems, setBlendItems, onResult }) {
+  const [primitives, setPrimitives] = useState([]);
+  const [search, setSearch] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/visualizer/primitives`)
+      .then(r => r.json())
+      .then(d => setPrimitives(d.colors || []))
+      .catch(() => {});
+  }, []);
+
+  const filtered = primitives.filter(c =>
+    !search ||
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.code.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function distributeEvenly(items) {
+    if (!items.length) return [];
+    const perItem = Math.floor(100 / items.length);
+    return items.map((b, i) => ({
+      ...b,
+      pct: i === 0 ? 100 - perItem * (items.length - 1) : perItem,
+    }));
+  }
+
+  function addColor(color) {
+    if (blendItems.find(b => b.code === color.code)) return;
+    if (blendItems.length >= 5) return;
+    setBlendItems(distributeEvenly([...blendItems, { ...color, pct: 0 }]));
+  }
+
+  function removeColor(code) {
+    setBlendItems(distributeEvenly(blendItems.filter(b => b.code !== code)));
+  }
+
+  function adjustPct(idx, rawVal) {
+    const val = Math.max(5, Math.min(90, parseInt(rawVal) || 5));
+    setBlendItems(prev => {
+      const remaining = 100 - val;
+      const others = prev.filter((_, i) => i !== idx);
+      const otherSum = others.reduce((s, x) => s + x.pct, 0);
+      const next = prev.map((item, i) => {
+        if (i === idx) return { ...item, pct: val };
+        if (otherSum === 0) return { ...item, pct: Math.round(remaining / others.length) };
+        return { ...item, pct: Math.round((item.pct / otherSum) * remaining) };
+      });
+      // Fix rounding drift
+      const diff = 100 - next.reduce((s, x) => s + x.pct, 0);
+      if (diff !== 0) {
+        const fixIdx = next.findIndex((_, i) => i !== idx);
+        if (fixIdx !== -1) next[fixIdx] = { ...next[fixIdx], pct: next[fixIdx].pct + diff };
+      }
+      return next;
+    });
+  }
+
+  // Find any complete preGen — it has the cached mask we need
+  const sourceViz = Object.values(preGens).find(pg => pg.status === "complete");
+  const canPreview = blendItems.length > 0 && !!sourceViz;
+  const maskPending = blendItems.length > 0 && !sourceViz;
+
+  async function handlePreview() {
+    if (!canPreview || generating) return;
+    setGenerating(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/visualizer/composite-custom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_visualization_id: sourceViz.visualization_id,
+          company_id: companyId,
+          recipe: blendItems.map(b => ({ hex: b.hex, percentage: b.pct })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Preview failed");
+      onResult(data, blendItems);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const previewLabel = generating
+    ? "Generating preview..."
+    : blendItems.length === 0
+    ? "Add colors below to preview"
+    : maskPending
+    ? "Waiting for background processing…"
+    : "Preview on My Floor →";
+
+  return (
+    <div className="space-y-5">
+      {/* Color library search + grid */}
+      <div>
+        <p className="text-sm font-semibold text-gray-600 mb-2">
+          Pick colors for your blend <span className="text-gray-400 font-normal">(up to 5)</span>
+        </p>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or F-code…"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:border-green-400"
+        />
+        <div className="grid grid-cols-3 gap-1.5 max-h-52 overflow-y-auto pr-0.5">
+          {filtered.map(c => {
+            const isAdded = !!blendItems.find(b => b.code === c.code);
+            const maxed = !isAdded && blendItems.length >= 5;
+            return (
+              <button
+                key={c.code}
+                onClick={() => addColor(c)}
+                disabled={isAdded || maxed}
+                className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-left transition-all ${
+                  isAdded
+                    ? "border-green-400 bg-green-50 cursor-default"
+                    : maxed
+                    ? "border-gray-100 opacity-40 cursor-not-allowed"
+                    : "border-gray-200 hover:border-green-400 hover:bg-green-50 cursor-pointer"
+                }`}
+              >
+                <div
+                  className="w-5 h-5 rounded flex-shrink-0 border border-black/10"
+                  style={{ backgroundColor: c.hex }}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-gray-800 truncate">{c.name}</div>
+                  <div className="text-xs text-gray-400">{c.code}</div>
+                </div>
+                {isAdded && <span className="ml-auto text-green-500 text-xs flex-shrink-0">✓</span>}
+              </button>
+            );
+          })}
+          {!filtered.length && (
+            <p className="col-span-3 text-center text-sm text-gray-400 py-4">No colors match "{search}"</p>
+          )}
+        </div>
+      </div>
+
+      {/* Selected colors + percentage sliders */}
+      {blendItems.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-gray-600 mb-2">Adjust percentages:</p>
+          <div className="space-y-3">
+            {blendItems.map((b, idx) => (
+              <div key={b.code} className="flex items-center gap-2">
+                <div
+                  className="w-6 h-6 rounded flex-shrink-0 border border-black/10"
+                  style={{ backgroundColor: b.hex }}
+                />
+                <span className="text-xs text-gray-700 w-20 flex-shrink-0 truncate">{b.name}</span>
+                <input
+                  type="range"
+                  min="5"
+                  max="90"
+                  value={b.pct}
+                  onChange={e => adjustPct(idx, e.target.value)}
+                  className="flex-1 accent-green-600 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-gray-800 w-8 text-right flex-shrink-0">{b.pct}%</span>
+                <button
+                  onClick={() => removeColor(b.code)}
+                  className="text-gray-300 hover:text-red-400 flex-shrink-0 text-xl leading-none font-light"
+                >×</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Blend swatch preview */}
+          <div className="mt-4">
+            <p className="text-xs text-gray-400 mb-1.5">Blend preview:</p>
+            <div className="h-9 rounded-xl overflow-hidden flex border border-black/10 shadow-sm">
+              {blendItems.map(b => (
+                <div
+                  key={b.code}
+                  style={{ width: `${b.pct}%`, backgroundColor: b.hex }}
+                  className="transition-all duration-150"
+                />
+              ))}
+            </div>
+            <div className="flex mt-1">
+              {blendItems.map(b => (
+                <div
+                  key={b.code}
+                  style={{ width: `${b.pct}%` }}
+                  className="text-center text-xs text-gray-400 truncate px-0.5"
+                >
+                  {b.pct >= 15 ? `${b.pct}%` : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-red-600 text-sm text-center">{error}</p>}
+
+      {maskPending && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-center">
+          Preview unlocks in ~30 sec once your first standard color finishes generating in the background.
+        </p>
+      )}
+
+      <button
+        onClick={handlePreview}
+        disabled={!canPreview || generating}
+        className={`w-full py-3 font-bold rounded-xl text-white transition-colors ${
+          canPreview && !generating
+            ? "bg-green-600 hover:bg-green-700"
+            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+        }`}
+      >
+        {previewLabel}
+      </button>
+    </div>
+  );
+}
+
 // ── Step 2: Chip color selection + pre-generation ─────────────────────────────
-function ChipSelectStep({ imageFile, preGens, onPreGensUpdate, onNext, onBack }) {
+function ChipSelectStep({ imageFile, preGens, onPreGensUpdate, onNext, onBack, onCustomBlendResult }) {
   const [colors, setColors] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [mode, setMode] = useState("standard"); // "standard" | "custom"
+  const [blendItems, setBlendItems] = useState([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/visualizer/chip-colors?company=${companyId}`)
@@ -140,7 +366,7 @@ function ChipSelectStep({ imageFile, preGens, onPreGensUpdate, onNext, onBack })
       return;
     }
 
-    // Custom color — generate fresh
+    // Non-featured color — generate fresh
     setSubmitting(true);
     setError("");
     try {
@@ -187,86 +413,126 @@ function ChipSelectStep({ imageFile, preGens, onPreGensUpdate, onNext, onBack })
       <div>
         <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-700 mb-4">← Back</button>
         <h2 className="text-2xl font-bold text-gray-900">Choose Your Chip Blend</h2>
-        <p className="text-gray-500 text-sm mt-1">Top colors are generating in the background — pick one to get started.</p>
       </div>
 
-      {colors.length === 0 && !error && (
-        <p className="text-gray-400 text-center py-8">No chip colors configured yet.</p>
-      )}
-
-      <div className="grid grid-cols-3 gap-2">
-        {displayed.map((c) => {
-          const pg = getPreGen(c.id);
-          const isComplete = pg?.status === "complete";
-          const isProcessing = pg?.status === "processing";
-
-          return (
-            <button key={c.id} onClick={() => setSelected(c)}
-              className={`border-2 rounded-xl p-2 text-left transition-all relative ${
-                selected?.id === c.id ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
-              }`}>
-              <div className="relative mb-1.5">
-                {c.reference_image_url ? (
-                  <img src={c.reference_image_url} alt={c.name}
-                    className="w-full h-16 object-cover rounded-lg" />
-                ) : (
-                  <div className="w-full h-16 bg-gray-100 rounded-lg" />
-                )}
-                {isComplete && (
-                  <div className="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow">
-                    <span className="text-white text-xs font-bold">✓</span>
-                  </div>
-                )}
-                {isProcessing && (
-                  <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow">
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-              </div>
-              <div className="font-semibold text-gray-800 text-xs leading-tight">{c.name}</div>
-            </button>
-          );
-        })}
+      {/* Mode tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        <button
+          onClick={() => setMode("standard")}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+            mode === "standard"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Standard Colors
+        </button>
+        <button
+          onClick={() => setMode("custom")}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+            mode === "custom"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          ✨ Custom Blend
+        </button>
       </div>
 
-      {!showAll && extraCount > 0 && (
-        <button onClick={() => setShowAll(true)}
-          className="w-full py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors">
-          Show all {colors.length} colors →
-        </button>
-      )}
-      {showAll && (
-        <button onClick={() => setShowAll(false)}
-          className="w-full py-2 text-sm text-gray-400 hover:text-gray-600">
-          Show fewer colors
-        </button>
-      )}
+      {/* Standard mode */}
+      {mode === "standard" && (
+        <>
+          <p className="text-gray-500 text-sm -mt-2">Top colors are generating in the background — pick one to get started.</p>
 
-      {error && <p className="text-red-600 text-sm text-center">{error}</p>}
+          {colors.length === 0 && !error && (
+            <p className="text-gray-400 text-center py-8">No chip colors configured yet.</p>
+          )}
 
-      {/* Sticky generate bar */}
-      {selected && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-xl p-4 z-50">
-          <div className="max-w-xl mx-auto">
-            <div className="flex items-center gap-3 mb-1.5">
-              {selected.reference_image_url && (
-                <img src={selected.reference_image_url} alt={selected.name}
-                  className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200" />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-400">Selected</div>
-                <div className="font-bold text-gray-900 truncate">{selected.name}</div>
-              </div>
-              <button onClick={handleGenerate} disabled={submitting}
-                className={`px-5 py-2.5 font-bold rounded-xl text-white transition-colors flex-shrink-0 ${
-                  submitting ? "bg-gray-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                }`}>
-                {getBarLabel()}
-              </button>
-            </div>
-            {getBarNote() && <p className="text-xs text-center text-gray-400">{getBarNote()}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            {displayed.map((c) => {
+              const pg = getPreGen(c.id);
+              const isComplete = pg?.status === "complete";
+              const isProcessing = pg?.status === "processing";
+
+              return (
+                <button key={c.id} onClick={() => setSelected(c)}
+                  className={`border-2 rounded-xl p-2 text-left transition-all relative ${
+                    selected?.id === c.id ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+                  }`}>
+                  <div className="relative mb-1.5">
+                    {c.reference_image_url ? (
+                      <img src={c.reference_image_url} alt={c.name}
+                        className="w-full h-16 object-cover rounded-lg" />
+                    ) : (
+                      <div className="w-full h-16 bg-gray-100 rounded-lg" />
+                    )}
+                    {isComplete && (
+                      <div className="absolute top-1 right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow">
+                        <span className="text-white text-xs font-bold">✓</span>
+                      </div>
+                    )}
+                    {isProcessing && (
+                      <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow">
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="font-semibold text-gray-800 text-xs leading-tight">{c.name}</div>
+                </button>
+              );
+            })}
           </div>
-        </div>
+
+          {!showAll && extraCount > 0 && (
+            <button onClick={() => setShowAll(true)}
+              className="w-full py-2.5 border border-gray-300 rounded-xl text-sm text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors">
+              Show all {colors.length} colors →
+            </button>
+          )}
+          {showAll && (
+            <button onClick={() => setShowAll(false)}
+              className="w-full py-2 text-sm text-gray-400 hover:text-gray-600">
+              Show fewer colors
+            </button>
+          )}
+
+          {error && <p className="text-red-600 text-sm text-center">{error}</p>}
+
+          {/* Sticky generate bar */}
+          {selected && (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-xl p-4 z-50">
+              <div className="max-w-xl mx-auto">
+                <div className="flex items-center gap-3 mb-1.5">
+                  {selected.reference_image_url && (
+                    <img src={selected.reference_image_url} alt={selected.name}
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-gray-400">Selected</div>
+                    <div className="font-bold text-gray-900 truncate">{selected.name}</div>
+                  </div>
+                  <button onClick={handleGenerate} disabled={submitting}
+                    className={`px-5 py-2.5 font-bold rounded-xl text-white transition-colors flex-shrink-0 ${
+                      submitting ? "bg-gray-300 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                    }`}>
+                    {getBarLabel()}
+                  </button>
+                </div>
+                {getBarNote() && <p className="text-xs text-center text-gray-400">{getBarNote()}</p>}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Custom blend mode */}
+      {mode === "custom" && (
+        <CustomBlendPanel
+          preGens={preGens}
+          blendItems={blendItems}
+          setBlendItems={setBlendItems}
+          onResult={onCustomBlendResult}
+        />
       )}
     </div>
   );
@@ -323,7 +589,7 @@ function GeneratingStep({ visualizationId, onDone }) {
 }
 
 // ── Step 4: Result + color switcher + lead capture ────────────────────────────
-function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor, onReset }) {
+function ResultStep({ result, currentVizId, currentChip, preGens, customResult, customBlendItems, onSwitchColor, onSwitchToCustom, onReset }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -359,6 +625,7 @@ function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor,
   }
 
   const preGenList = Object.values(preGens);
+  const isCustomActive = customResult && currentVizId === customResult.visualization_id;
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -392,10 +659,40 @@ function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor,
       <p className="text-xs text-center text-gray-400 -mt-4">Tap image to expand</p>
 
       {/* Color switcher row */}
-      {preGenList.length > 0 && (
+      {(preGenList.length > 0 || customResult) && (
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase mb-2 text-center">Switch Color</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
+
+            {/* Custom blend card */}
+            {customResult && (
+              <button
+                onClick={() => onSwitchToCustom()}
+                className={`flex-shrink-0 w-20 p-1.5 rounded-xl border-2 transition-all ${
+                  isCustomActive
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-200 hover:border-green-400 cursor-pointer"
+                }`}
+              >
+                {/* Swatch showing blend colors */}
+                <div className="w-full h-14 rounded-lg overflow-hidden flex border border-black/10 mb-1">
+                  {customBlendItems.map(b => (
+                    <div
+                      key={b.code}
+                      style={{ width: `${b.pct}%`, backgroundColor: b.hex }}
+                    />
+                  ))}
+                </div>
+                <div className="text-xs font-medium text-gray-700 text-center leading-tight">My Blend</div>
+                {isCustomActive && (
+                  <div className="absolute top-0.5 right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+            )}
+
+            {/* Standard preGen cards */}
             {preGenList.map((pg) => {
               const isCurrent = pg.visualization_id === currentVizId;
               const isReady = pg.status === "complete" && pg.result;
@@ -405,7 +702,7 @@ function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor,
                 <button key={pg.visualization_id}
                   onClick={() => handleColorSwitch(pg)}
                   disabled={!isReady || isCurrent}
-                  className={`flex-shrink-0 w-20 p-1.5 rounded-xl border-2 transition-all ${
+                  className={`flex-shrink-0 w-20 p-1.5 rounded-xl border-2 transition-all relative ${
                     isCurrent
                       ? "border-green-500 bg-green-50"
                       : isReady
@@ -420,7 +717,7 @@ function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor,
                         <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
                       </div>
                     )}
-                    {isCurrent && (
+                    {isCurrent && !isCustomActive && (
                       <div className="absolute top-0.5 right-0.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs font-bold">✓</span>
                       </div>
@@ -480,10 +777,12 @@ function ResultStep({ result, currentVizId, currentChip, preGens, onSwitchColor,
 export default function Visualizer() {
   const [step, setStep] = useState(1);
   const [imageFile, setImageFile] = useState(null);
-  const [preGens, setPreGens] = useState({});       // { [viz_id]: { chip_color_id, name, ref_image_url, status, result } }
+  const [preGens, setPreGens] = useState({});
   const [currentVizId, setCurrentVizId] = useState(null);
   const [currentChip, setCurrentChip] = useState(null);
   const [result, setResult] = useState(null);
+  const [customResult, setCustomResult] = useState(null);
+  const [customBlendItems, setCustomBlendItems] = useState([]);
 
   // Poll all processing preGens from root — works across steps
   useEffect(() => {
@@ -519,6 +818,8 @@ export default function Visualizer() {
     setCurrentVizId(null);
     setCurrentChip(null);
     setResult(null);
+    setCustomResult(null);
+    setCustomBlendItems([]);
   }
 
   function handleChipNext(vizId, chip, resultData, skipGenerating) {
@@ -532,10 +833,26 @@ export default function Visualizer() {
     }
   }
 
+  function handleCustomBlendResult(data, blendItems) {
+    setCustomResult(data);
+    setCustomBlendItems(blendItems);
+    setResult(data);
+    setCurrentVizId(data.visualization_id);
+    setCurrentChip(null);
+    setStep(4);
+  }
+
   function handleSwitchColor(newResult, newVizId, pg) {
     setResult(newResult);
     setCurrentVizId(newVizId);
     setCurrentChip({ id: pg.chip_color_id, name: pg.name });
+  }
+
+  function handleSwitchToCustom() {
+    if (!customResult) return;
+    setResult(customResult);
+    setCurrentVizId(customResult.visualization_id);
+    setCurrentChip(null);
   }
 
   if (!companyId) {
@@ -559,6 +876,7 @@ export default function Visualizer() {
           onPreGensUpdate={setPreGens}
           onBack={() => setStep(1)}
           onNext={handleChipNext}
+          onCustomBlendResult={handleCustomBlendResult}
         />
       )}
       {step === 3 && (
@@ -573,7 +891,10 @@ export default function Visualizer() {
           currentVizId={currentVizId}
           currentChip={currentChip}
           preGens={preGens}
+          customResult={customResult}
+          customBlendItems={customBlendItems}
           onSwitchColor={handleSwitchColor}
+          onSwitchToCustom={handleSwitchToCustom}
           onReset={reset}
         />
       )}

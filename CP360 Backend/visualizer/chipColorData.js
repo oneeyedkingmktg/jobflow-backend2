@@ -90,4 +90,8 @@ function getRecipe(chipColorName) {
   return null;
 }
 
-module.exports = { getRecipe, colorMap, recipeMap };
+function getAllPrimitives() {
+  return Array.from(colorMap.entries()).map(([code, { hex, name }]) => ({ code, name, hex }));
+}
+
+module.exports = { getRecipe, getAllPrimitives, hexToRgb, colorMap, recipeMap };

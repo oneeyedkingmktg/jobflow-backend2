@@ -10,7 +10,8 @@ const multer = require('multer');
 const router = express.Router();
 const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { generateVisualization } = require('../visualizer/renderingService');
+const { generateVisualization, compositeCustomBlend } = require('../visualizer/renderingService');
+const { getAllPrimitives, hexToRgb } = require('../visualizer/chipColorData');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { r2, BUCKET, PUBLIC_URL } = require('../config/r2');
 const crypto = require('crypto');
@@ -43,6 +44,45 @@ router.get('/chip-colors', async (req, res) => {
   } catch (err) {
     console.error('GET /visualizer/chip-colors error:', err);
     res.status(500).json({ error: 'Failed to load chip colors' });
+  }
+});
+
+// GET /api/visualizer/primitives — all 126 Torginol chip colors (name, F-code, hex) for custom blend builder
+router.get('/primitives', (req, res) => {
+  try {
+    res.json({ colors: getAllPrimitives() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load color library' });
+  }
+});
+
+// POST /api/visualizer/composite-custom — synchronous custom blend composite (reuses cached SAM 2 mask)
+// Body: { source_visualization_id, company_id, recipe: [{hex, percentage}] }
+router.post('/composite-custom', async (req, res) => {
+  const { source_visualization_id, company_id, recipe } = req.body;
+  if (!source_visualization_id || !company_id || !Array.isArray(recipe) || !recipe.length) {
+    return res.status(400).json({ error: 'source_visualization_id, company_id, and recipe are required' });
+  }
+
+  try {
+    const converted = recipe.map(({ hex, percentage }) => ({
+      rgb:    hexToRgb(hex),
+      weight: (parseFloat(percentage) || 0) / 100,
+    })).filter(c => c.weight > 0);
+
+    if (!converted.length) return res.status(400).json({ error: 'Recipe has no valid entries' });
+
+    const result = await compositeCustomBlend({
+      sourceVisualizationId: source_visualization_id,
+      companyId:             company_id,
+      recipe:                converted,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('POST /visualizer/composite-custom error:', err);
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message });
   }
 });
 

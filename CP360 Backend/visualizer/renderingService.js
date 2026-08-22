@@ -149,13 +149,14 @@ async function runCompositingPipeline({
     return;
   }
 
-  // 5. Store mask (for reference/debugging)
+  // 5. Store mask on ALL visualizations in the batch so any complete viz
+  //    can serve as a custom blend source without re-running SAM 2.
   const maskKey = `visualizer/masks/${companyId}/${uuid()}.png`;
   const maskUrl = await uploadToR2(maskKey, maskBuffer);
-  await db.query(
-    `UPDATE visualizations SET mask_key=$1, mask_url=$2 WHERE id=$3`,
-    [maskKey, maskUrl, visualizationId]
-  );
+  const allBatchIds = [visualizationId, ...followers.map(f => f.visualizationId)];
+  await Promise.all(allBatchIds.map(id =>
+    db.query(`UPDATE visualizations SET mask_key=$1, mask_url=$2 WHERE id=$3`, [maskKey, maskUrl, id])
+  ));
 
   // 6. Composite leader color
   await compositeOneColor({ visualizationId, processedBuffer, maskBuffer, chipColor, companyId, originalUrl });
@@ -231,4 +232,44 @@ async function generateVisualization({
   }
 }
 
-module.exports = { generateVisualization };
+// ── Custom blend composite (synchronous, reuses cached mask) ──────────────────
+// recipe: [{ rgb: {r,g,b}, weight: 0–1 }] (already converted from hex before calling)
+
+async function compositeCustomBlend({ sourceVisualizationId, companyId, recipe }) {
+  const { rows } = await db.query(
+    `SELECT original_image_url, mask_url FROM visualizations
+     WHERE id=$1 AND company_id=$2 AND status='complete' AND mask_url IS NOT NULL`,
+    [sourceVisualizationId, companyId]
+  );
+  if (!rows.length) {
+    throw Object.assign(new Error('Source visualization not found or mask not ready'), { status: 404 });
+  }
+
+  const { original_image_url, mask_url } = rows[0];
+
+  const [processedBuffer, maskBuffer] = await Promise.all([
+    downloadUrl(original_image_url),
+    downloadUrl(mask_url),
+  ]);
+
+  const resultBuffer  = await composite({ processedBuffer, maskBuffer, recipe });
+  const generatedKey  = `visualizer/generated/${companyId}/${uuid()}.png`;
+  const generatedUrl  = await uploadToR2(generatedKey, resultBuffer);
+
+  const { rows: viz } = await db.query(
+    `INSERT INTO visualizations
+       (company_id, rendering_provider, status, original_image_url,
+        generated_image_key, generated_image_url, completed_at)
+     VALUES ($1, 'compositing-custom', 'complete', $2, $3, $4, NOW())
+     RETURNING id`,
+    [companyId, original_image_url, generatedKey, generatedUrl]
+  );
+
+  return {
+    visualization_id: viz[0].id,
+    generated_image_url: generatedUrl,
+    original_image_url,
+  };
+}
+
+module.exports = { generateVisualization, compositeCustomBlend };
