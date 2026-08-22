@@ -425,10 +425,68 @@ async function sendWarrantyEmail({
   });
 }
 
+async function sendVisualizationEmail({
+  toEmail, customerName, companyName, originalImageUrl, generatedImageUrl,
+  primaryColor = null, accentColor = null, logoUrl = null, companyPhone = null,
+}) {
+  const displayName = companyName || 'CoatingPro360';
+  const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const HBG         = primaryColor || '#00875A';
+  const AC          = accentColor  || '#16a34a';
+
+  const html = [
+    `<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto">`,
+    emailHeader(HBG, AC, displayName, logoUrl),
+
+    `<tr><td bgcolor="#ffffff" style="padding:28px;border:1px solid #e5e7eb;border-top:none">`,
+    `<p style="font-size:16px;color:#111;margin:0 0 6px">Hi ${customerName || 'there'},</p>`,
+    `<p style="font-size:15px;color:#4b5563;margin:0 0 24px">Here's your floor visualization — see the before and after side by side:</p>`,
+
+    // Before / After images
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">`,
+    `<tr>`,
+    `<td width="49%" style="vertical-align:top;text-align:center;padding-right:6px">`,
+    `<p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Before</p>`,
+    originalImageUrl ? `<img src="${originalImageUrl}" alt="Before" style="width:100%;border-radius:8px;display:block;border:1px solid #e5e7eb">` : '',
+    `</td>`,
+    `<td width="2%"></td>`,
+    `<td width="49%" style="vertical-align:top;text-align:center;padding-left:6px">`,
+    `<p style="margin:0 0 6px;font-size:11px;font-weight:700;color:${HBG};text-transform:uppercase;letter-spacing:1px">After</p>`,
+    generatedImageUrl ? `<img src="${generatedImageUrl}" alt="After" style="width:100%;border-radius:8px;display:block;border:1px solid #e5e7eb">` : '',
+    `</td>`,
+    `</tr>`,
+    `</table>`,
+
+    `<p style="font-size:15px;color:#4b5563;margin:0 0 20px">Like what you see? We'd love to give you a free quote for your project.</p>`,
+
+    // CTA button
+    `<table cellpadding="0" cellspacing="0" style="margin:0 auto 24px">`,
+    `<tr><td bgcolor="${HBG}" style="border-radius:6px">`,
+    `<a href="mailto:${process.env.SMTP_USER}" style="display:block;color:#fff;font-weight:bold;font-size:15px;text-decoration:none;font-family:Arial,sans-serif;white-space:nowrap;padding:14px 32px">Get a Free Quote</a>`,
+    `</td></tr></table>`,
+
+    contactLine(companyPhone),
+    `</td></tr>`,
+
+    `<tr><td bgcolor="${HBG}" style="padding:14px 28px;text-align:center">`,
+    `<p style="margin:0;font-size:12px;color:#ffffff;font-weight:bold;font-family:Arial,sans-serif">&#9733; ${displayName}</p>`,
+    `</td></tr>`,
+    `</table>`,
+  ].join('');
+
+  await transporter.sendMail({
+    from: fromHeader,
+    to: toEmail,
+    subject: `Your Floor Visualization from ${displayName}`,
+    html,
+  });
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendProposalAcceptedEmails,
   sendProposalLinkEmail,
   sendPaymentReceivedEmail,
   sendWarrantyEmail,
+  sendVisualizationEmail,
 };

@@ -595,8 +595,12 @@ function ResultStep({ result, currentVizId, currentChip, preGens, customResult, 
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState(""); // email actually submitted
   const [error, setError] = useState("");
   const [lightbox, setLightbox] = useState(null);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   async function handleColorSwitch(pg) {
     if (pg.visualization_id === currentVizId) return;
@@ -617,10 +621,36 @@ function ResultStep({ result, currentVizId, currentChip, preGens, customResult, 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setSubmitted(true);
+      setSubmittedEmail(email.trim());
     } catch (err) {
       setError(err.message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSendEmail() {
+    if (emailSending || emailSent || !submittedEmail) return;
+    setEmailSending(true);
+    setEmailError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/visualizer/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visualization_id: currentVizId,
+          company_id: companyId,
+          customer_email: submittedEmail,
+          customer_name: name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send email");
+      setEmailSent(true);
+    } catch (err) {
+      setEmailError(err.message);
+    } finally {
+      setEmailSending(false);
     }
   }
 
@@ -738,11 +768,37 @@ function ResultStep({ result, currentVizId, currentChip, preGens, customResult, 
 
       {/* Lead capture */}
       {submitted ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center space-y-2">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center space-y-3">
           <div className="text-3xl">✅</div>
           <h3 className="font-bold text-green-800">We'll be in touch!</h3>
           <p className="text-sm text-green-700">Thank you, {name}. Someone will reach out shortly to discuss your project.</p>
-          <button onClick={onReset} className="mt-2 text-sm text-green-600 underline">Try another color</button>
+          <p className="text-xs text-green-600">📁 Your visualization has been saved to your project folder.</p>
+
+          {/* Email button — only if they gave us an email */}
+          {submittedEmail && (
+            <div className="pt-1">
+              {emailSent ? (
+                <p className="text-sm font-semibold text-green-700">📧 Images emailed to {submittedEmail}</p>
+              ) : (
+                <>
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={emailSending}
+                    className={`w-full py-2.5 rounded-xl font-semibold text-sm border-2 transition-colors ${
+                      emailSending
+                        ? "border-gray-200 text-gray-400 cursor-not-allowed"
+                        : "border-green-500 text-green-700 hover:bg-green-100"
+                    }`}
+                  >
+                    {emailSending ? "Sending…" : "📧 Email me the before & after images"}
+                  </button>
+                  {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+                </>
+              )}
+            </div>
+          )}
+
+          <button onClick={onReset} className="mt-1 text-sm text-green-600 underline">Try another color</button>
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">

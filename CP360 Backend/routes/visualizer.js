@@ -12,6 +12,9 @@ const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { generateVisualization, compositeCustomBlend } = require('../visualizer/renderingService');
 const { getAllPrimitives, hexToRgb } = require('../visualizer/chipColorData');
+const { resolveLeadFolder, uploadFileToFolder } = require('../controllers/googleDrive');
+const { sendVisualizationEmail } = require('../services/email');
+const axios = require('axios');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { r2, BUCKET, PUBLIC_URL } = require('../config/r2');
 const crypto = require('crypto');
@@ -211,7 +214,7 @@ router.get('/status/:id', async (req, res) => {
   }
 });
 
-// POST /api/visualizer/lead — capture contact info, create lead, link visualization
+// POST /api/visualizer/lead — capture contact info, create lead, link visualization, save to Drive
 router.post('/lead', async (req, res) => {
   const { visualization_id, company_id, name, phone, email } = req.body;
   if (!company_id || !name || !phone) return res.status(400).json({ error: 'company_id, name, and phone required' });
@@ -230,12 +233,80 @@ router.post('/lead', async (req, res) => {
         `UPDATE visualizations SET lead_id=$1 WHERE id=$2 AND company_id=$3`,
         [leadId, visualization_id, company_id]
       );
+
+      // Save visualization image to Drive in background — never fails the response
+      saveVisualizationToDrive(leadId, visualization_id, name).catch(err => {
+        if (!err.noDrive) console.error('[Visualizer] Drive save failed:', err.message);
+      });
     }
 
     res.json({ ok: true, lead_id: leadId });
   } catch (err) {
     console.error('POST /visualizer/lead error:', err);
     res.status(500).json({ error: 'Failed to create lead' });
+  }
+});
+
+// Background helper — saves generated visualization image to the lead's Drive folder
+async function saveVisualizationToDrive(leadId, visualizationId, customerName) {
+  const { rows } = await db.query(
+    `SELECT v.generated_image_url, cc.name AS chip_name
+     FROM visualizations v
+     LEFT JOIN chip_colors cc ON cc.id = v.chip_color_id
+     WHERE v.id = $1 AND v.status = 'complete'`,
+    [visualizationId]
+  );
+  if (!rows.length || !rows[0].generated_image_url) return;
+
+  const { generated_image_url, chip_name } = rows[0];
+  const folder = await resolveLeadFolder(leadId, { create: true });
+
+  const resp   = await axios.get(generated_image_url, { responseType: 'arraybuffer', timeout: 30000 });
+  const buffer = Buffer.from(resp.data);
+  const label  = chip_name ? chip_name : 'Custom Blend';
+  const date   = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const fileName = `Floor Preview - ${label} (${date}).png`;
+
+  await uploadFileToFolder(folder.id, fileName, 'image/png', buffer);
+  console.log(`[Visualizer] Saved "${fileName}" to Drive for lead ${leadId}`);
+}
+
+// POST /api/visualizer/send-email — email before/after images to the customer
+router.post('/send-email', async (req, res) => {
+  const { visualization_id, company_id, customer_email, customer_name } = req.body;
+  if (!visualization_id || !company_id || !customer_email) {
+    return res.status(400).json({ error: 'visualization_id, company_id, and customer_email required' });
+  }
+
+  try {
+    const vizRes = await db.query(
+      `SELECT v.original_image_url, v.generated_image_url,
+              c.name AS company_name, c.phone AS company_phone,
+              c.primary_color, c.accent_color, c.logo_url
+       FROM visualizations v
+       JOIN companies c ON c.id = v.company_id
+       WHERE v.id = $1 AND v.company_id = $2 AND v.status = 'complete'`,
+      [visualization_id, company_id]
+    );
+    if (!vizRes.rows.length) return res.status(404).json({ error: 'Visualization not found' });
+
+    const row = vizRes.rows[0];
+    await sendVisualizationEmail({
+      toEmail:           customer_email,
+      customerName:      customer_name || null,
+      companyName:       row.company_name,
+      originalImageUrl:  row.original_image_url,
+      generatedImageUrl: row.generated_image_url,
+      primaryColor:      row.primary_color  || null,
+      accentColor:       row.accent_color   || null,
+      logoUrl:           row.logo_url       || null,
+      companyPhone:      row.company_phone  || null,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /visualizer/send-email error:', err);
+    res.status(500).json({ error: 'Failed to send email' });
   }
 });
 

@@ -260,6 +260,56 @@ async function uploadFileToFolder(folderId, fileName, mimeType, buffer) {
   return res.data;
 }
 
+// ------------------------------------------------------------------
+// Find or create the Drive folder for a lead.
+// Shared by the googleDrive route AND the visualizer route (Drive save on lead capture).
+// Throws with err.noDrive = true if the company has no Drive base folder configured.
+// ------------------------------------------------------------------
+async function resolveLeadFolder(leadId, { create = true } = {}) {
+  const leadResult = await db.query(
+    `SELECT id, name, project_type, company_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+    [leadId]
+  );
+  if (!leadResult.rows.length)
+    throw Object.assign(new Error('Lead not found'), { status: 404 });
+
+  const lead = leadResult.rows[0];
+
+  const companyResult = await db.query(
+    `SELECT id, google_drive_base_folder_id FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+    [lead.company_id]
+  );
+  if (!companyResult.rows.length)
+    throw Object.assign(new Error('Company not found'), { status: 404 });
+
+  const company = companyResult.rows[0];
+  if (!company.google_drive_base_folder_id) {
+    throw Object.assign(
+      new Error('Google Drive base folder not configured for this company'),
+      { status: 400, noDrive: true }
+    );
+  }
+
+  const fullName = buildLeadFolderName(lead.name, lead.project_type);
+  const baseName = lead.name || 'Lead';
+  const parentId = company.google_drive_base_folder_id;
+
+  const exactMatch = await findFolder(fullName, parentId);
+  if (exactMatch) return exactMatch;
+
+  const existingFolder = await findFolderByPrefix(baseName, parentId);
+  if (existingFolder) {
+    if (existingFolder.name !== fullName) {
+      await renameFolder(existingFolder.id, fullName);
+      existingFolder.name = fullName;
+    }
+    return existingFolder;
+  }
+
+  if (!create) return null;
+  return getOrCreateFolder(fullName, parentId);
+}
+
 module.exports = {
   getDriveClient,
   requireOAuthDriveClient,
@@ -272,4 +322,5 @@ module.exports = {
   getOrCreateFolder,
   listFilesInFolder,
   uploadFileToFolder,
+  resolveLeadFolder,
 };
