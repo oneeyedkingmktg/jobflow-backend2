@@ -8,7 +8,7 @@
 const axios = require('axios');
 
 const REPLICATE_API    = 'https://api.replicate.com/v1';
-const SAM2_MODEL       = 'meta/sam-2';
+const SAM2_VERSION     = 'fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83';
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS       = 90000;
 
@@ -25,16 +25,22 @@ function userFail(code) {
 async function replicateRequest(method, endpoint, data) {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var is not set');
-  return axios({
-    method,
-    url: `${REPLICATE_API}${endpoint}`,
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Prefer':       'wait', // ask Replicate to wait up to 60s before returning
-    },
-    data,
-  });
+  try {
+    return await axios({
+      method,
+      url: `${REPLICATE_API}${endpoint}`,
+      headers: {
+        Authorization:  `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer':       'wait',
+      },
+      data,
+    });
+  } catch (err) {
+    const body = err.response?.data;
+    console.error('[SAM2] Replicate error', err.response?.status, JSON.stringify(body));
+    throw new Error(`Replicate ${err.response?.status || 'network'}: ${JSON.stringify(body)}`);
+  }
 }
 
 async function pollPrediction(predictionId) {
@@ -68,36 +74,65 @@ async function analyzeMask(maskBuffer) {
   return { coverage };
 }
 
-// imageWidth and imageHeight are the pixel dimensions of the preprocessed image.
-// SAM 2 on Replicate expects pixel coordinates, not normalized 0-1 values.
-async function segmentFloor(imageUrl, imageWidth, imageHeight) {
-  const pointX = Math.round(imageWidth  * 0.5);  // center horizontally
-  const pointY = Math.round(imageHeight * 0.75); // 75% down — typical floor location
+// Replicate's meta/sam-2 uses automatic mask generation (no point prompts).
+// We run it with a coarse grid, download all individual masks, then score each
+// by how much of the floor zone (bottom 65% of the image) it covers.
+// The highest-scoring mask is the floor.
+async function segmentFloor(imageUrl) {
+  const sharp = require('sharp');
 
-  // Use the newer Replicate 'model' field to always target the latest sam-2 version
   const { data: prediction } = await replicateRequest('POST', '/predictions', {
-    model: SAM2_MODEL,
+    version: SAM2_VERSION,
     input: {
-      image:            imageUrl,
-      point_coords:     `[[${pointX}, ${pointY}]]`,
-      point_labels:     '[1]',
-      multimask_output: false,
+      image:                  imageUrl,
+      points_per_side:        16,
+      pred_iou_thresh:        0.75,
+      stability_score_thresh: 0.85,
     },
   });
 
-  // If Replicate returned a completed prediction immediately (Prefer: wait), skip polling
   const result = (prediction.status === 'succeeded')
     ? prediction
     : await pollPrediction(prediction.id);
 
-  // SAM 2 returns an array of mask URLs; take the first
-  const outputUrls = Array.isArray(result.output) ? result.output : [result.output];
-  if (!outputUrls.length || !outputUrls[0]) {
-    throw new Error('SAM 2 returned no mask output');
+  const maskUrls = result.output?.individual_masks;
+  if (!Array.isArray(maskUrls) || !maskUrls.length) {
+    throw new Error('SAM 2 returned no individual masks');
   }
 
-  const maskBuffer = await downloadBuffer(outputUrls[0]);
+  // Download all masks in parallel
+  const maskBuffers = await Promise.all(maskUrls.map(downloadBuffer));
+
+  // Score each mask: fraction of ON pixels in the floor zone (bottom 65% of image)
+  const scores = await Promise.all(maskBuffers.map(async (buf) => {
+    const { data, info } = await sharp(buf)
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const rowStart   = Math.round(info.height * 0.35);
+    const zonePixels = (info.height - rowStart) * info.width;
+    let on = 0;
+    for (let y = rowStart; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        if (data[y * info.width + x] > 128) on++;
+      }
+    }
+    return on / zonePixels;
+  }));
+
+  const bestIdx   = scores.indexOf(Math.max(...scores));
+  const bestScore = scores[bestIdx];
+
+  console.log(`[SAM2] ${maskUrls.length} masks; best floor score: ${bestScore.toFixed(3)} (mask ${bestIdx})`);
+
+  if (bestScore < 0.02) throw userFail('no_floor');
+  if (bestScore < 0.05) throw userFail('floor_too_small');
+
+  const maskBuffer = maskBuffers[bestIdx];
   const { coverage } = await analyzeMask(maskBuffer);
+
+  if (coverage > 0.92) throw userFail('floor_unclear');
 
   return { maskBuffer, coverage };
 }

@@ -87,21 +87,23 @@ router.post('/pregenerate', upload.single('image'), async (req, res) => {
       });
     }
 
-    // Respond immediately — fire background generations staggered 500ms apart
+    // Respond immediately — run SAM 2 ONCE then fire all color composites in parallel
     res.json({ generations });
 
     const rawBuffer = req.file.buffer;
-    generations.forEach(({ visualization_id, chip_color_id }, i) => {
-      const chip = featured.find(c => c.id === chip_color_id);
-      setTimeout(() => {
-        generateVisualization({
-          visualizationId: visualization_id,
-          rawImageBuffer: rawBuffer,
-          chipColor: chip,
-          companyId: company_id,
-        }).catch(err => console.error(`[Pregenerate] viz ${visualization_id} failed:`, err.message));
-      }, i * 500);
-    });
+
+    // Run the segmentation pipeline once and share the mask across all colors
+    generateVisualization({
+      visualizationId: generations[0].visualization_id,
+      rawImageBuffer:  rawBuffer,
+      chipColor:       featured.find(c => c.id === generations[0].chip_color_id),
+      companyId:       company_id,
+      isLeader:        true,  // this call runs SAM 2 and stores the mask
+      followers:       generations.slice(1).map(g => ({
+        visualizationId: g.visualization_id,
+        chipColor:       featured.find(c => c.id === g.chip_color_id),
+      })),
+    }).catch(err => console.error(`[Pregenerate] leader failed:`, err.message));
   } catch (err) {
     console.error('POST /visualizer/pregenerate error:', err);
     if (!res.headersSent) res.status(500).json({ error: 'Failed to start pregeneration' });

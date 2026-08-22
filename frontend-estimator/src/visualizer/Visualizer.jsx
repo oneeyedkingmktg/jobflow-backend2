@@ -18,7 +18,10 @@ function UploadStep({ onNext }) {
 
   function handleFile(f) {
     if (!f) return;
-    if (!f.type.startsWith("image/")) { setError("Please upload an image file."); return; }
+    const ext = f.name.split('.').pop().toLowerCase();
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'];
+    const isImage = f.type.startsWith("image/") || allowedExts.includes(ext);
+    if (!isImage) { setError("Please upload an image file (JPG, PNG, or HEIC)."); return; }
     if (f.size > 20 * 1024 * 1024) { setError("Image must be under 20MB."); return; }
     setError("");
     setFile(f);
