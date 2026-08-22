@@ -65,8 +65,8 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
     };
 
     // Subtle dark edge so individual chips read even at 100% one color
-    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-    ctx.lineWidth = 0.3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+    ctx.lineWidth = 0.6;
 
     // ── Pass 1: dense offset-grid — guarantees full coverage ──────────────
     // Fill dominant color first so any tiny sub-pixel gap matches a chip color
@@ -184,11 +184,13 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
       {items.length > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Custom Blend</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
             {items.map((c, i) => (
               <span key={i} className="text-xs text-gray-600 flex items-center gap-1">
                 <span className="inline-block w-2.5 h-2.5 rounded-sm border border-gray-300 flex-shrink-0" style={{ background: c.hex }} />
-                {shortLabel(c)} <span className="text-gray-400">{Math.round((parseFloat(c.percentage) / total) * 100)}%</span>
+                <span className="font-mono text-gray-500">{shortLabel(c)}</span>
+                <span className="text-gray-700 font-semibold">{(c.name || '').split(' ').filter(w => !/F-\d+/.test(w) && w !== 'Torginol').join(' ')}</span>
+                <span className="text-gray-400">{Math.round((parseFloat(c.percentage) / total) * 100)}%</span>
               </span>
             ))}
           </div>
@@ -200,6 +202,7 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
           {items.map(c => (
             <div key={c.hex} className="flex items-center gap-2">
               <div className="w-5 h-5 rounded flex-shrink-0 border border-gray-200 shadow-sm" style={{ background: c.hex }} />
+              <span className="text-xs font-semibold text-gray-700 w-24 truncate flex-shrink-0">{(c.name || '').split(' ').filter(w => !/F-\d+/.test(w) && w !== 'Torginol').join(' ')}</span>
               <input type="range" min="1" max="99" value={c.percentage} onChange={e => setPct(c.hex, e.target.value)} className="flex-1 accent-blue-500" />
               <button onClick={() => setItems(prev => prev.filter(x => x.hex !== c.hex))} className="text-gray-300 hover:text-red-400 text-lg leading-none flex-shrink-0">×</button>
             </div>
