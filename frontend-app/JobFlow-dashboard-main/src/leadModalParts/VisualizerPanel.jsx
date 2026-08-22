@@ -65,8 +65,8 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
     };
 
     // Subtle dark edge so individual chips read even at 100% one color
-    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
-    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+    ctx.lineWidth = 0.3;
 
     // ── Pass 1: dense offset-grid — guarantees full coverage ──────────────
     // Fill dominant color first so any tiny sub-pixel gap matches a chip color
@@ -143,7 +143,7 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
 }
 
 // ── Custom blend builder (color picker + sliders) ────────────────────────────
-function CustomBlendBuilder({ primitives, items, setItems }) {
+function CustomBlendBuilder({ primitives, items, setItems, originalRecipe }) {
   const [search, setSearch] = useState('');
 
   const filtered = search
@@ -164,16 +164,34 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
     setItems(prev => prev.map(c => c.hex === hex ? { ...c, percentage: Math.max(1, Math.min(99, parseInt(val) || 1)) } : c));
   };
 
+  // Extract short label: prefer code (F-101), else last word of name
+  const shortLabel = (c) => c.code || (c.name || '').match(/F-\d+/)?.[0] || (c.name || '').split(' ').slice(-1)[0];
+
   return (
     <div className="space-y-3">
+      {/* Original formula reference — only shown when forked from library */}
+      {originalRecipe && originalRecipe.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Original Formula</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {originalRecipe.map((r, i) => (
+              <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm border border-gray-300 flex-shrink-0" style={{ background: r.hex }} />
+                {shortLabel(r)} <span className="text-gray-400">{Math.round(r.percentage)}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {items.length > 0 && (
         <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
           {items.map(c => (
             <div key={c.hex} className="flex items-center gap-2">
               <div className="w-5 h-5 rounded flex-shrink-0 border border-gray-200 shadow-sm" style={{ background: c.hex }} />
-              <span className="text-xs font-semibold text-gray-700 w-24 truncate flex-shrink-0">{c.name}</span>
+              <span className="text-xs font-semibold text-gray-700 w-20 truncate flex-shrink-0">{c.name}</span>
               <input type="range" min="1" max="99" value={c.percentage} onChange={e => setPct(c.hex, e.target.value)} className="flex-1 accent-blue-500" />
-              <span className="text-xs text-gray-500 w-7 text-right flex-shrink-0">{c.percentage}%</span>
+              <span className="text-xs font-mono text-gray-500 w-10 text-right flex-shrink-0">{shortLabel(c)}</span>
               <button onClick={() => setItems(prev => prev.filter(x => x.hex !== c.hex))} className="text-gray-300 hover:text-red-400 text-lg leading-none flex-shrink-0">×</button>
             </div>
           ))}
@@ -218,6 +236,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [customItems, setCustomItems] = useState([]);
   const [blendName, setBlendName] = useState('');
   const [editingId, setEditingId] = useState(null); // null = creating new
+  const [originalRecipe, setOriginalRecipe] = useState(null); // set when forking a library blend
 
   // Save-blend modal: null | { mode: 'new'|'edit', proposedName: string }
   const [saveModal, setSaveModal] = useState(null);
@@ -262,9 +281,10 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       .catch(() => setLibRecipe([]));
   }, [selectedLibColor?.id]);
 
-  // Customize library blend → fork into custom tab
+  // Customize library blend → fork into custom tab, preserving original for reference
   const customizeLibBlend = () => {
     if (!libRecipe.length) return;
+    setOriginalRecipe(libRecipe.map(r => ({ ...r })));
     setCustomItems(libRecipe.map(r => ({ ...r })));
     setBlendName(selectedLibColor?.name || '');
     setBlendTab('custom');
@@ -298,6 +318,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     setCustomItems([]);
     setSelectedLibColor(null);
     setLibRecipe([]);
+    setOriginalRecipe(null);
     setBlendTab('library');
     setError(null);
   };
@@ -539,7 +560,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {/* Custom tab */}
                 {blendTab === 'custom' && (
                   <div className="space-y-3">
-                    <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
+                    <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} originalRecipe={originalRecipe} />
                     <ChipBlendPreview recipe={customItems} showLabels className="w-full" />
                     <input
                       type="text"
