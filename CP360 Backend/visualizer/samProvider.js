@@ -22,7 +22,7 @@ function userFail(code) {
   return Object.assign(new Error(FAILURE_MESSAGES[code]), { userInput: true, code });
 }
 
-async function replicateRequest(method, endpoint, data) {
+async function replicateRequest(method, endpoint, data, isRetry = false) {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) throw new Error('REPLICATE_API_TOKEN env var is not set');
   try {
@@ -37,9 +37,19 @@ async function replicateRequest(method, endpoint, data) {
       data,
     });
   } catch (err) {
-    const body = err.response?.data;
-    console.error('[SAM2] Replicate error', err.response?.status, JSON.stringify(body));
-    throw new Error(`Replicate ${err.response?.status || 'network'}: ${JSON.stringify(body)}`);
+    const status = err.response?.status;
+    const body   = err.response?.data;
+
+    // Rate limited — wait the requested time and retry once
+    if (status === 429 && !isRetry) {
+      const waitSec = (body?.retry_after || 10) + 2;
+      console.log(`[SAM2] Rate limited (429). Waiting ${waitSec}s then retrying...`);
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+      return replicateRequest(method, endpoint, data, true);
+    }
+
+    console.error('[SAM2] Replicate error', status, JSON.stringify(body));
+    throw new Error(`Replicate ${status || 'network'}: ${JSON.stringify(body)}`);
   }
 }
 

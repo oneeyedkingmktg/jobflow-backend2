@@ -46,7 +46,7 @@ function generateChipTexture(width, height, recipe, maskRaw) {
     buf[i * 3 + 2] = CONCRETE_COLOR.b;
   }
 
-  // Find the vertical extent of the floor mask (top and bottom rows that have mask pixels)
+  // Find vertical floor extent for perspective scaling
   let maskTop = height, maskBottom = 0;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -59,49 +59,48 @@ function generateChipTexture(width, height, recipe, maskRaw) {
   }
   if (maskTop >= maskBottom) { maskTop = 0; maskBottom = height - 1; }
 
-  // Calculate total floor area for chip count estimation
-  let floorPixels = 0;
-  for (let i = 0; i < width * height; i++) {
-    if (maskRaw[i] > 128) floorPixels++;
-  }
+  // Jittered grid — divide canvas into cells, one chip per cell at a random position.
+  // This eliminates clustering/splotchiness from pure random placement.
+  // Cell size based on the smallest chip (far end) so near-end chips naturally overlap slightly.
+  const cellSize = Math.max(6, Math.round(CHIP_RADIUS_FAR * width * 2.2));
 
-  // Average chip radius for coverage estimation
-  const avgRadius = (CHIP_RADIUS_NEAR + CHIP_RADIUS_FAR) / 2 * width;
-  const avgArea   = Math.PI * avgRadius * avgRadius;
-  const numChips  = Math.round((floorPixels * CHIP_COVERAGE) / avgArea);
+  for (let gy = 0; gy * cellSize < height; gy++) {
+    for (let gx = 0; gx * cellSize < width; gx++) {
+      // ~8% of cells left empty — shows concrete, natural variation
+      if (Math.random() > CHIP_COVERAGE) continue;
 
-  for (let i = 0; i < numChips; i++) {
-    // Pick random position within the image bounds (mask culls non-floor chips)
-    const cx = Math.floor(Math.random() * width);
-    const cy = Math.floor(Math.random() * height);
+      // Jittered position within the cell
+      const cx = Math.min(width  - 1, Math.round(gx * cellSize + Math.random() * cellSize));
+      const cy = Math.min(height - 1, Math.round(gy * cellSize + Math.random() * cellSize));
 
-    // Skip chip if center not on floor (saves drawing chips that won't show)
-    if (maskRaw[cy * width + cx] < 64) continue;
+      // Skip if not on floor mask
+      if (maskRaw[cy * width + cx] < 64) continue;
 
-    // Perspective: chip radius scales linearly from far (top) to near (bottom)
-    const yFrac  = maskTop === maskBottom ? 0.5 :
-                   Math.max(0, Math.min(1, (cy - maskTop) / (maskBottom - maskTop)));
-    const chipR  = Math.max(1, Math.round(
-      (CHIP_RADIUS_FAR + (CHIP_RADIUS_NEAR - CHIP_RADIUS_FAR) * yFrac) * width
-    ));
-    // Vertical compression at far end — chips foreshorten with perspective
-    const chipRY = Math.max(1, Math.round(chipR * (0.4 + 0.6 * yFrac)));
+      // Perspective: chips scale from small (far/top) to large (near/bottom)
+      const yFrac  = maskTop === maskBottom ? 0.5 :
+                     Math.max(0, Math.min(1, (cy - maskTop) / (maskBottom - maskTop)));
+      const chipR  = Math.max(1, Math.round(
+        (CHIP_RADIUS_FAR + (CHIP_RADIUS_NEAR - CHIP_RADIUS_FAR) * yFrac) * width
+      ));
+      // Vertical foreshortening — chips compress vertically near vanishing point
+      const chipRY = Math.max(1, Math.round(chipR * (0.35 + 0.65 * yFrac)));
 
-    const rgb  = varyBrightness(pickColor(normalized, Math.random()));
-    const x0   = Math.max(0, cx - chipR);
-    const x1   = Math.min(width  - 1, cx + chipR);
-    const y0   = Math.max(0, cy - chipRY);
-    const y1   = Math.min(height - 1, cy + chipRY);
+      const rgb = varyBrightness(pickColor(normalized, Math.random()));
+      const x0  = Math.max(0, cx - chipR);
+      const x1  = Math.min(width  - 1, cx + chipR);
+      const y0  = Math.max(0, cy - chipRY);
+      const y1  = Math.min(height - 1, cy + chipRY);
 
-    for (let py = y0; py <= y1; py++) {
-      for (let px = x0; px <= x1; px++) {
-        const dx = (px - cx) / chipR;
-        const dy = (py - cy) / chipRY;
-        if (dx * dx + dy * dy <= 1) {
-          const idx = (py * width + px) * 3;
-          buf[idx]     = rgb.r;
-          buf[idx + 1] = rgb.g;
-          buf[idx + 2] = rgb.b;
+      for (let py = y0; py <= y1; py++) {
+        for (let px = x0; px <= x1; px++) {
+          const dx = (px - cx) / chipR;
+          const dy = (py - cy) / chipRY;
+          if (dx * dx + dy * dy <= 1) {
+            const idx = (py * width + px) * 3;
+            buf[idx]     = rgb.r;
+            buf[idx + 1] = rgb.g;
+            buf[idx + 2] = rgb.b;
+          }
         }
       }
     }

@@ -76,7 +76,7 @@ async function downloadUrl(url) {
 
 // ── Single color composite (mask already known) ───────────────────────────────
 
-async function compositeOneColor({ visualizationId, processedBuffer, maskBuffer, chipColor, companyId }) {
+async function compositeOneColor({ visualizationId, processedBuffer, maskBuffer, chipColor, companyId, originalUrl }) {
   const recipe = getRecipe(chipColor.name);
   if (!recipe || !recipe.length) {
     await db.query(
@@ -93,10 +93,10 @@ async function compositeOneColor({ visualizationId, processedBuffer, maskBuffer,
 
   await db.query(
     `UPDATE visualizations
-     SET status='complete', generated_image_key=$1, generated_image_url=$2,
+     SET status='complete', original_image_url=$1, generated_image_key=$2, generated_image_url=$3,
          rendering_provider='compositing', completed_at=NOW()
-     WHERE id=$3`,
-    [generatedKey, generatedUrl, visualizationId]
+     WHERE id=$4`,
+    [originalUrl || null, generatedKey, generatedUrl, visualizationId]
   );
 }
 
@@ -122,10 +122,11 @@ async function runCompositingPipeline({
     return;
   }
 
-  // 3. Store original (shared across all colors in this batch)
+  // 3. Store original (shared across leader + all followers)
   const { width, height } = await sharp(processedBuffer).metadata();
   const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
   const originalUrl = await uploadToR2(originalKey, processedBuffer);
+  // Only update leader's record here — followers get originalUrl set in compositeOneColor
   await db.query(
     `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
     [originalKey, originalUrl, visualizationId]
@@ -157,18 +158,25 @@ async function runCompositingPipeline({
   );
 
   // 6. Composite leader color
-  await compositeOneColor({ visualizationId, processedBuffer, maskBuffer, chipColor, companyId });
+  await compositeOneColor({ visualizationId, processedBuffer, maskBuffer, chipColor, companyId, originalUrl });
 
-  // 7. Composite all follower colors in parallel using the same mask — no extra SAM 2 calls
+  // 7. Composite all follower colors in parallel — same mask, no extra SAM 2 calls
   if (followers.length) {
     await Promise.all(followers.map(f =>
       compositeOneColor({
         visualizationId: f.visualizationId,
         processedBuffer,
         maskBuffer,
-        chipColor: f.chipColor,
+        chipColor:   f.chipColor,
         companyId,
-      }).catch(err => console.error(`[Pregenerate] follower ${f.visualizationId} failed:`, err.message))
+        originalUrl,  // followers get same before-image so switching works
+      }).catch(async err => {
+        console.error(`[Pregenerate] follower ${f.visualizationId} failed:`, err.message);
+        await db.query(
+          `UPDATE visualizations SET status='failed', failure_type='error', error_message=$1 WHERE id=$2`,
+          [err.message, f.visualizationId]
+        ).catch(() => {});
+      })
     ));
   }
 }
