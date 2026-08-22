@@ -344,81 +344,84 @@ router.get('/recipe/:chip_color_id', authenticateToken, async (req, res) => {
 
 // POST /api/visualizer/swatch — generate a blend swatch PNG, optionally save to Drive
 // Body: { recipe: [{hex, name, percentage}], lead_id?, blend_name? }
-router.post('/swatch', authenticateToken, async (req, res) => {
-  const { recipe, lead_id, blend_name } = req.body;
-  if (!Array.isArray(recipe) || !recipe.length) {
-    return res.status(400).json({ error: 'recipe required' });
-  }
+// POST /api/visualizer/swatch
+// Accepts multipart: image (PNG canvas from frontend), blend_name, recipe JSON, lead_id?
+// Composites: title bar + chip image + legend → saves to R2, optionally Drive.
+router.post('/swatch', authenticateToken, upload.single('image'), async (req, res) => {
+  const { blend_name, recipe: recipeJson, lead_id } = req.body;
+  if (!req.file)    return res.status(400).json({ error: 'image required' });
+  if (!recipeJson)  return res.status(400).json({ error: 'recipe required' });
 
   try {
+    const recipe    = JSON.parse(recipeJson);
     const companyId = req.user.company_id;
+    const total     = recipe.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
+    const sorted    = [...recipe].sort((a, b) => (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0));
 
-    // Normalize percentages to sum to 100
-    const total = recipe.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0);
-    const norm  = recipe.map(r => ({
-      ...r,
-      pct: total > 0 ? (parseFloat(r.percentage) || 0) / total * 100 : 100 / recipe.length,
-    }));
+    const W       = 960;
+    const TITLE_H = 80;
+    const CHIP_H  = W;          // square chip preview
+    const LEG_H   = 90;
+    const xmlEsc  = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const xmlEsc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // ── 1. Resize chip canvas to 960×960 ─────────────────────────────────
+    const chipBuf = await sharp(req.file.buffer).resize(W, CHIP_H).png().toBuffer();
 
-    // Dimensions — 960px wide for crisp resolution on all screens
-    const W        = 960;
-    const TITLE_H  = blend_name ? 64 : 0;
-    const SWATCH_H = 320;
-    const LABEL_H  = 96;
-    const H        = TITLE_H + SWATCH_H + LABEL_H;
+    // ── 2. Title bar ──────────────────────────────────────────────────────
+    const titleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${TITLE_H}">` +
+      `<rect width="${W}" height="${TITLE_H}" fill="#ffffff"/>` +
+      `<text x="${W / 2}" y="${TITLE_H / 2 + 13}" text-anchor="middle" ` +
+        `font-family="Georgia,'Times New Roman',serif" font-size="38" ` +
+        `font-weight="bold" fill="#1a1a2e">${xmlEsc(blend_name || 'Custom Blend')}</text>` +
+      `</svg>`;
+    const titleBuf = await sharp(Buffer.from(titleSvg)).resize(W, TITLE_H).png().toBuffer();
 
-    const titleSection = blend_name
-      ? `<rect x="0" y="0" width="${W}" height="${TITLE_H}" fill="#1e3a5f"/>` +
-        `<text x="${W / 2}" y="${TITLE_H - 18}" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" fill="#ffffff" font-weight="700">${xmlEsc(blend_name)}</text>`
-      : '';
+    // ── 3. Legend bar — "■ F-code Name XX%" per color ────────────────────
+    const colW  = Math.floor(W / Math.max(sorted.length, 1));
+    const SQ    = 20;
+    const baseY = Math.round(LEG_H / 2);
+    let legendItems = '';
+    sorted.forEach((c, i) => {
+      const pct      = Math.round((parseFloat(c.percentage) / total) * 100);
+      const codePart = c.code || (c.name || '').match(/F-\d+/)?.[0] || '';
+      const namePart = (c.name || '').split(' ')
+        .filter(w => !/F-\d+/.test(w) && w.toLowerCase() !== 'torginol').join(' ');
+      const label    = [codePart, namePart, `${pct}%`].filter(Boolean).join(' ');
+      const ox       = i * colW + 16;
+      legendItems +=
+        `<rect x="${ox}" y="${baseY - SQ / 2}" width="${SQ}" height="${SQ}" fill="${c.hex}" rx="3"/>` +
+        `<text x="${ox + SQ + 8}" y="${baseY + 7}" font-family="Arial,sans-serif" ` +
+          `font-size="22" fill="#374151">${xmlEsc(label)}</text>`;
+    });
+    const legendSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${LEG_H}">` +
+      `<rect width="${W}" height="${LEG_H}" fill="#f5f6f7"/>` +
+      `<line x1="0" y1="0" x2="${W}" y2="0" stroke="#e5e7eb" stroke-width="1"/>` +
+      legendItems +
+      `</svg>`;
+    const legendBuf = await sharp(Buffer.from(legendSvg)).resize(W, LEG_H).png().toBuffer();
 
-    const bars  = [];
-    const texts = [];
-    let   x = 0;
+    // ── 4. Composite title + chip + legend ────────────────────────────────
+    const totalH = TITLE_H + CHIP_H + LEG_H;
+    const finalBuf = await sharp({
+      create: { width: W, height: totalH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+    }).composite([
+      { input: titleBuf,  left: 0, top: 0 },
+      { input: chipBuf,   left: 0, top: TITLE_H },
+      { input: legendBuf, left: 0, top: TITLE_H + CHIP_H },
+    ]).png().toBuffer();
 
-    for (const c of norm) {
-      const segW = Math.round((c.pct / 100) * W);
-      if (segW <= 0) continue;
-      bars.push(`<rect x="${x}" y="${TITLE_H}" width="${segW}" height="${SWATCH_H}" fill="${c.hex || '#cccccc'}"/>`);
-      const cx = x + segW / 2;
-      const nm = (c.name || '').length > 12 ? (c.name || '').slice(0, 12) + '…' : (c.name || '');
-      texts.push(
-        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 34}" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#374151" font-weight="700">${xmlEsc(nm)}</text>`,
-        `<text x="${cx}" y="${TITLE_H + SWATCH_H + 62}" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" fill="#6b7280">${Math.round(c.pct)}%</text>`,
-      );
-      x += segW;
-    }
-
-    // Divider lines between segments
-    x = 0;
-    const dividers = [];
-    for (const c of norm) {
-      const segW = Math.round((c.pct / 100) * W);
-      if (x > 0) dividers.push(`<line x1="${x}" y1="${TITLE_H}" x2="${x}" y2="${TITLE_H + SWATCH_H}" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>`);
-      x += segW;
-    }
-
-    const svg = Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
-      `<rect width="${W}" height="${H}" fill="#ffffff"/>` +
-      titleSection + bars.join('') + dividers.join('') + texts.join('') +
-      `</svg>`
-    );
-
-    const swatchBuffer = await sharp(svg, { density: 144 }).png().toBuffer();
-
+    // ── 5. Upload to R2 ───────────────────────────────────────────────────
     const swatchKey = `visualizer/swatches/${companyId}/${crypto.randomUUID()}.png`;
-    await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: swatchBuffer, ContentType: 'image/png' }));
+    await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: finalBuf, ContentType: 'image/png' }));
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
+    // ── 6. Async Drive save ───────────────────────────────────────────────
     if (lead_id) {
       const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const label    = blend_name || norm.map(c => c.name || c.hex).join(' / ').slice(0, 40);
+      const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
       const fileName = `Blend Swatch - ${label} (${date}).png`;
       resolveLeadFolder(parseInt(lead_id), { create: true })
-        .then(folder => uploadFileToFolder(folder.id, fileName, 'image/png', swatchBuffer))
+        .then(folder => uploadFileToFolder(folder.id, fileName, 'image/png', finalBuf))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
     }
 

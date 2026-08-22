@@ -14,9 +14,80 @@ function getToken() { return localStorage.getItem("authToken"); }
 let _nextId = 1;
 function newId() { return _nextId++; }
 
+// ── Shared chip rendering logic ───────────────────────────────────────────────
+// Used by both the live canvas preview and the swatch-save blob generator.
+function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
+  const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
+  if (!items.length) return;
+  const total = items.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
+  const sorted = [...items].sort((a, b) =>
+    (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0)
+  );
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = Math.max(0.5, W / 320 * 0.7); // scale stroke with canvas size
+
+  const drawFlake = (cx, cy, maxR) => {
+    const verts = 7 + Math.floor(Math.random() * 7);
+    const elongation = 0.28 + Math.random() * 0.85;
+    const rot = Math.random() * Math.PI;
+    ctx.beginPath();
+    for (let i = 0; i < verts; i++) {
+      const a = (i / verts) * Math.PI * 2;
+      const r = maxR * (0.12 + Math.random() * 0.88);
+      const lx = Math.cos(a) * r;
+      const ly = Math.sin(a) * r * elongation;
+      const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
+      const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  ctx.fillStyle = sorted[0].hex;
+  ctx.fillRect(0, 0, W, H);
+
+  // Scale chip sizes and counts to canvas dimensions
+  const minR = mini ? 3 : Math.max(7, W * 0.022);
+  const maxR = mini ? 10 : Math.max(22, W * 0.069);
+  const scaleFactor = mini ? 18 : (W / 320) * (H / 320) * 130;
+
+  for (let ci = 1; ci < sorted.length; ci++) {
+    const color = sorted[ci];
+    const pct = (parseFloat(color.percentage) || 0) / total;
+    const count = Math.max(mini ? 2 : 6, Math.round(pct * scaleFactor));
+    ctx.fillStyle = color.hex;
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() * (W + maxR * 2)) - maxR;
+      const y = (Math.random() * (H + maxR * 2)) - maxR;
+      drawFlake(x, y, minR + Math.random() * (maxR - minR));
+    }
+  }
+
+  // Dominant-color top pass for visible chip texture in base area
+  ctx.fillStyle = sorted[0].hex;
+  const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25 * (W / 320));
+  for (let i = 0; i < domCount; i++) {
+    drawFlake(Math.random() * W, Math.random() * H,
+      (minR + Math.random() * (maxR - minR)) * 0.7);
+  }
+}
+
+// Renders recipe to an off-screen canvas and returns a PNG Blob (for swatch upload).
+function renderChipsToBlob(recipe, size = 960) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    renderChipsToCtx(canvas.getContext('2d'), size, size, recipe);
+    canvas.toBlob(resolve, 'image/png');
+  });
+}
+
 // ── Canvas chip/flake blend preview ─────────────────────────────────────────
-// Dominant color = solid background. Minority colors = large scattered flakes.
-// Matches real floor chip appearance: organic torn-edge polygons, varied sizes.
 function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "" }) {
   const canvasRef = useRef(null);
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
@@ -25,77 +96,7 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !items.length) return;
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
-
-    // Sort descending so the largest % becomes the background
-    const sorted = [...items].sort((a, b) =>
-      (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0)
-    );
-
-    // Draw one organic floor chip — irregular polygon with elongation + high radius variance
-    const drawFlake = (cx, cy, maxR) => {
-      const verts = 7 + Math.floor(Math.random() * 7);       // 7–14 vertices
-      const elongation = 0.28 + Math.random() * 0.85;         // squash/stretch ratio
-      const rot = Math.random() * Math.PI;
-      ctx.beginPath();
-      for (let i = 0; i < verts; i++) {
-        const a = (i / verts) * Math.PI * 2;
-        const r = maxR * (0.12 + Math.random() * 0.88);       // high variance = torn edges
-        const lx = Math.cos(a) * r;
-        const ly = Math.sin(a) * r * elongation;
-        // Rotate the local (lx, ly) by rot
-        const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
-        const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    };
-
-    // Subtle stroke so chips of the same color still read as separate pieces
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 0.7;
-
-    // ── Background: fill entirely with dominant color ──────────────────────
-    ctx.fillStyle = sorted[0].hex;
-    ctx.fillRect(0, 0, W, H);
-
-    // Chip size params (scale with canvas)
-    const minR = mini ? 3  : 7;
-    const maxR = mini ? 10 : 22;
-
-    // ── Scatter chips for every non-dominant color ─────────────────────────
-    // count ≈ (pct / total) * scaleFactor, so a 24% color gets ~31 chips on 320px canvas
-    const scaleFactor = mini ? 18 : 130;
-
-    for (let ci = 1; ci < sorted.length; ci++) {
-      const color = sorted[ci];
-      const pct = (parseFloat(color.percentage) || 0) / total;
-      const count = Math.max(mini ? 2 : 6, Math.round(pct * scaleFactor));
-      ctx.fillStyle = color.hex;
-      for (let i = 0; i < count; i++) {
-        const x = (Math.random() * (W + maxR * 2)) - maxR;
-        const y = (Math.random() * (H + maxR * 2)) - maxR;
-        const r = minR + Math.random() * (maxR - minR);
-        drawFlake(x, y, r);
-      }
-    }
-
-    // ── Light scatter of dominant-color chips on top ───────────────────────
-    // Gives the base area visible chip texture (same colour, defined by stroke only)
-    ctx.fillStyle = sorted[0].hex;
-    const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25);
-    for (let i = 0; i < domCount; i++) {
-      const x = Math.random() * W;
-      const y = Math.random() * H;
-      const r = (minR + Math.random() * (maxR - minR)) * 0.7;
-      drawFlake(x, y, r);
-    }
-
+    renderChipsToCtx(canvas.getContext('2d'), canvas.width, canvas.height, items, mini);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(items.map(i => `${i.hex}:${i.percentage}`))]);
 
@@ -428,10 +429,25 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], emailing: false } })); }
   };
 
+  // Build the swatch FormData: render chip canvas client-side, POST image + metadata
+  const buildSwatchForm = async (blend, includeLeadId = false) => {
+    const blob = await renderChipsToBlob(blend.recipe, 960);
+    const fd = new FormData();
+    fd.append('image', blob, 'swatch.png');
+    fd.append('blend_name', blend.name);
+    fd.append('recipe', JSON.stringify(blend.recipe));
+    if (includeLeadId && lead?.id) fd.append('lead_id', lead.id);
+    return fd;
+  };
+
   const saveSwatchToDrive = async (blend) => {
     setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saving: true } }));
     try {
-      await apiRequest('/api/visualizer/swatch', { method: 'POST', body: JSON.stringify({ recipe: blend.recipe, lead_id: lead.id, blend_name: blend.name }) });
+      const fd = await buildSwatchForm(blend, true);
+      const result = await fetch(`${API_BASE}/api/visualizer/swatch`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd,
+      }).then(r => r.json());
+      if (result.error) throw new Error(result.error);
       setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saved: true } }));
     } catch (e) { setError(e.message); }
     finally { setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saving: false } })); }
@@ -440,8 +456,16 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const emailSwatch = async (blend) => {
     setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailing: true } }));
     try {
-      const { swatch_url } = await apiRequest('/api/visualizer/swatch', { method: 'POST', body: JSON.stringify({ recipe: blend.recipe, blend_name: blend.name }) });
-      await apiRequest('/api/visualizer/send-swatch-email', { method: 'POST', body: JSON.stringify({ swatch_url, lead_id: lead.id, blend_description: blend.name }) });
+      const fd = await buildSwatchForm(blend, false);
+      const { swatch_url } = await fetch(`${API_BASE}/api/visualizer/swatch`, {
+        method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd,
+      }).then(r => r.json());
+      if (!swatch_url) throw new Error('Swatch generation failed');
+      await fetch(`${API_BASE}/api/visualizer/send-swatch-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ swatch_url, lead_id: lead?.id, blend_description: blend.name }),
+      });
       setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailed: true } }));
     } catch (e) { setError(e.message); }
     finally { setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailing: false } })); }
