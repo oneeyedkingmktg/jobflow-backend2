@@ -15,8 +15,8 @@ let _nextId = 1;
 function newId() { return _nextId++; }
 
 // ── Canvas chip/flake blend preview ─────────────────────────────────────────
-// Jagged polygon chips, 100% coverage (no background showing), square canvas.
-// showLabels=true → color legend below; mini=true → smaller tiles.
+// Dominant color = solid background. Minority colors = large scattered flakes.
+// Matches real floor chip appearance: organic torn-edge polygons, varied sizes.
 function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "" }) {
   const canvasRef = useRef(null);
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
@@ -29,33 +29,25 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
     const W = canvas.width;
     const H = canvas.height;
 
-    // Build weighted color pool (600 entries for smooth distribution)
-    const pool = [];
-    for (const item of items) {
-      const count = Math.max(1, Math.round((parseFloat(item.percentage) / total) * 600));
-      for (let i = 0; i < count; i++) pool.push(item.hex);
-    }
-    // Fisher-Yates shuffle
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
+    // Sort descending so the largest % becomes the background
+    const sorted = [...items].sort((a, b) =>
+      (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0)
+    );
 
-    // Seed-based draw so we pull colors sequentially (not random index)
-    let poolIdx = 0;
-    const nextColor = () => pool[poolIdx++ % pool.length];
-
-    // Draw one jagged polygon chip centered at (x, y)
-    const drawChip = (x, y, rx, ry, angle) => {
-      const verts = 4 + Math.floor(Math.random() * 4); // 4–7 sides
+    // Draw one organic floor chip — irregular polygon with elongation + high radius variance
+    const drawFlake = (cx, cy, maxR) => {
+      const verts = 7 + Math.floor(Math.random() * 7);       // 7–14 vertices
+      const elongation = 0.28 + Math.random() * 0.85;         // squash/stretch ratio
+      const rot = Math.random() * Math.PI;
       ctx.beginPath();
       for (let i = 0; i < verts; i++) {
-        // Spread vertices unevenly around the perimeter for jagged look
-        const baseA = (i / verts) * Math.PI * 2 + angle;
-        const jitterA = baseA + (Math.random() - 0.5) * (Math.PI * 1.1 / verts);
-        const jitterR = 0.45 + Math.random() * 0.55;
-        const px = x + Math.cos(jitterA) * rx * jitterR;
-        const py = y + Math.sin(jitterA) * ry * jitterR;
+        const a = (i / verts) * Math.PI * 2;
+        const r = maxR * (0.12 + Math.random() * 0.88);       // high variance = torn edges
+        const lx = Math.cos(a) * r;
+        const ly = Math.sin(a) * r * elongation;
+        // Rotate the local (lx, ly) by rot
+        const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
+        const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       }
@@ -64,45 +56,46 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
       ctx.stroke();
     };
 
-    // Subtle dark edge so individual chips read even at 100% one color
-    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
-    ctx.lineWidth = 0.6;
+    // Subtle stroke so chips of the same color still read as separate pieces
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 0.7;
 
-    // ── Pass 1: dense offset-grid — guarantees full coverage ──────────────
-    // Fill dominant color first so any tiny sub-pixel gap matches a chip color
-    const dominant = items.reduce((a, b) =>
-      parseFloat(a.percentage) > parseFloat(b.percentage) ? a : b
-    );
-    ctx.fillStyle = dominant.hex;
+    // ── Background: fill entirely with dominant color ──────────────────────
+    ctx.fillStyle = sorted[0].hex;
     ctx.fillRect(0, 0, W, H);
 
-    const spacing = mini ? 5 : 9;
-    const maxRX   = mini ? 6 : 11;
-    const maxRY   = mini ? 4 : 7;
+    // Chip size params (scale with canvas)
+    const minR = mini ? 3  : 7;
+    const maxR = mini ? 10 : 22;
 
-    for (let row = -1; row < H / spacing + 2; row++) {
-      for (let col = -1; col < W / spacing + 2; col++) {
-        const x = col * spacing
-          + (row % 2 === 0 ? 0 : spacing * 0.5)
-          + (Math.random() - 0.5) * spacing * 0.6;
-        const y = row * spacing + (Math.random() - 0.5) * spacing * 0.6;
-        const rx = maxRX * (0.55 + Math.random() * 0.45);
-        const ry = maxRY * (0.55 + Math.random() * 0.45);
-        ctx.fillStyle = nextColor();
-        drawChip(x, y, rx, ry, Math.random() * Math.PI);
+    // ── Scatter chips for every non-dominant color ─────────────────────────
+    // count ≈ (pct / total) * scaleFactor, so a 24% color gets ~31 chips on 320px canvas
+    const scaleFactor = mini ? 18 : 130;
+
+    for (let ci = 1; ci < sorted.length; ci++) {
+      const color = sorted[ci];
+      const pct = (parseFloat(color.percentage) || 0) / total;
+      const count = Math.max(mini ? 2 : 6, Math.round(pct * scaleFactor));
+      ctx.fillStyle = color.hex;
+      for (let i = 0; i < count; i++) {
+        const x = (Math.random() * (W + maxR * 2)) - maxR;
+        const y = (Math.random() * (H + maxR * 2)) - maxR;
+        const r = minR + Math.random() * (maxR - minR);
+        drawFlake(x, y, r);
       }
     }
 
-    // ── Pass 2: random overlay for natural scatter ─────────────────────────
-    const overlay = mini ? 250 : 700;
-    for (let i = 0; i < overlay; i++) {
+    // ── Light scatter of dominant-color chips on top ───────────────────────
+    // Gives the base area visible chip texture (same colour, defined by stroke only)
+    ctx.fillStyle = sorted[0].hex;
+    const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25);
+    for (let i = 0; i < domCount; i++) {
       const x = Math.random() * W;
       const y = Math.random() * H;
-      const rx = maxRX * (0.35 + Math.random() * 0.65);
-      const ry = maxRY * (0.35 + Math.random() * 0.65);
-      ctx.fillStyle = nextColor();
-      drawChip(x, y, rx, ry, Math.random() * Math.PI);
+      const r = (minR + Math.random() * (maxR - minR)) * 0.7;
+      drawFlake(x, y, r);
     }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(items.map(i => `${i.hex}:${i.percentage}`))]);
 
