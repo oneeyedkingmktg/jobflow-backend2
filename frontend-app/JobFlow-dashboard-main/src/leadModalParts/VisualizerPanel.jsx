@@ -61,7 +61,12 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
       }
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
     };
+
+    // Subtle dark edge so individual chips read even at 100% one color
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+    ctx.lineWidth = 0.6;
 
     // ── Pass 1: dense offset-grid — guarantees full coverage ──────────────
     // Fill dominant color first so any tiny sub-pixel gap matches a chip color
