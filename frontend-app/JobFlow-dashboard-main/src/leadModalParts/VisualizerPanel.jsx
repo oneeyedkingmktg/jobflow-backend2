@@ -14,48 +14,94 @@ function getToken() { return localStorage.getItem("authToken"); }
 let _nextId = 1;
 function newId() { return _nextId++; }
 
-// ── Square swatch tile ───────────────────────────────────────────────────────
-function SquareSwatch({ recipe, className = "w-full h-full" }) {
+// ── Canvas chip/flake blend preview ─────────────────────────────────────────
+// Draws scattered chip shapes in each color proportional to percentage.
+// showLabels=true → percentage label row below; mini=true → smaller chips for tiles.
+function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "" }) {
+  const canvasRef = useRef(null);
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
   const total = items.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
-  return (
-    <div className={`flex overflow-hidden ${className}`}>
-      {items.map((c, i) => {
-        const pct = ((parseFloat(c.percentage) || 0) / total) * 100;
-        return <div key={i} style={{ background: c.hex, width: `${pct}%`, minWidth: 2 }} />;
-      })}
-    </div>
-  );
-}
 
-// ── Full-width live swatch bar with labels ───────────────────────────────────
-function SwatchBar({ recipe }) {
-  const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
-  if (!items.length) return (
-    <div className="w-full h-24 rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center">
-      <span className="text-xs text-gray-400">Add colors to see preview</span>
-    </div>
-  );
-  const total = items.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !items.length) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Concrete-gray base
+    ctx.fillStyle = '#c9c9c9';
+    ctx.fillRect(0, 0, W, H);
+
+    // Build weighted color pool
+    const pool = [];
+    for (const item of items) {
+      const count = Math.max(1, Math.round((parseFloat(item.percentage) / total) * 300));
+      for (let i = 0; i < count; i++) pool.push(item.hex);
+    }
+    // Fisher-Yates shuffle
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    const chipCount = mini ? 600 : 1800;
+    const maxRW = mini ? 3.5 : 6;
+    const maxRH = mini ? 2.5 : 4;
+
+    for (let i = 0; i < chipCount; i++) {
+      const hex = pool[i % pool.length];
+      const x = Math.random() * W;
+      const y = Math.random() * H;
+      const rw = 1.5 + Math.random() * maxRW;
+      const rh = 1.0 + Math.random() * maxRH;
+      const angle = Math.random() * Math.PI;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.globalAlpha = 0.88 + Math.random() * 0.12;
+      ctx.fillStyle = hex;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  // Re-render only when recipe identity changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(items.map(i => `${i.hex}:${i.percentage}`))]);
+
+  if (!items.length) {
+    return (
+      <div className={`rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center ${className}`} style={{ minHeight: mini ? 60 : 120 }}>
+        <span className="text-xs text-gray-400">{mini ? '' : 'Add colors to see preview'}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-      <div className="flex h-16">
-        {items.map((c, i) => {
-          const pct = ((parseFloat(c.percentage) || 0) / total) * 100;
-          return <div key={i} style={{ background: c.hex, width: `${pct}%`, minWidth: 3 }} title={`${c.name} – ${Math.round(pct)}%`} />;
-        })}
-      </div>
-      <div className="flex bg-white border-t border-gray-100">
-        {items.map((c, i) => {
-          const pct = ((parseFloat(c.percentage) || 0) / total) * 100;
-          return (
-            <div key={i} style={{ width: `${pct}%`, minWidth: 3 }} className="text-center py-1.5 overflow-hidden px-0.5">
-              <div className="text-xs font-bold text-gray-700 truncate leading-tight">{(c.name || '').split(' ').slice(-1)[0]}</div>
-              <div className="text-xs text-gray-400 leading-tight">{Math.round(pct)}%</div>
-            </div>
-          );
-        })}
-      </div>
+    <div className={`rounded-xl overflow-hidden border border-gray-200 shadow-sm ${className}`}>
+      <canvas
+        ref={canvasRef}
+        width={mini ? 160 : 480}
+        height={mini ? 100 : 180}
+        className="w-full block"
+        style={{ height: mini ? 80 : 160 }}
+      />
+      {showLabels && (
+        <div className="flex bg-white border-t border-gray-100">
+          {items.map((c, i) => {
+            const pct = Math.round((parseFloat(c.percentage) / total) * 100);
+            return (
+              <div key={i} style={{ width: `${(parseFloat(c.percentage) / total) * 100}%`, minWidth: 28 }} className="text-center py-1.5 overflow-hidden px-0.5">
+                <div className="w-3 h-3 rounded-full mx-auto mb-0.5 border border-gray-300" style={{ background: c.hex }} />
+                <div className="text-xs font-bold text-gray-700 truncate leading-tight">{(c.name || '').split(' ').slice(-1)[0]}</div>
+                <div className="text-xs text-gray-400 leading-tight">{pct}%</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -422,9 +468,10 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
                     {selectedLibColor && (
                       <div className="space-y-3">
-                        {selectedLibColor.reference_image_url && (
-                          <img src={selectedLibColor.reference_image_url} alt={selectedLibColor.name} className="w-full h-44 object-cover rounded-xl border border-gray-200" />
-                        )}
+                        {libRecipe.length > 0
+                          ? <ChipBlendPreview recipe={libRecipe} showLabels className="w-full" />
+                          : <div className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">Loading blend…</span></div>
+                        }
                         <input
                           type="text"
                           value={blendName}
@@ -457,7 +504,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {blendTab === 'custom' && (
                   <div className="space-y-3">
                     <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
-                    <SwatchBar recipe={customItems} />
+                    <ChipBlendPreview recipe={customItems} showLabels className="w-full" />
                     <input
                       type="text"
                       value={blendName}
@@ -496,10 +543,8 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                         const ss = swatchState[blend.id] || {};
                         return (
                           <div key={blend.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                            {/* Square color swatch */}
-                            <div className="aspect-square w-full">
-                              <SquareSwatch recipe={blend.recipe} className="w-full h-full" />
-                            </div>
+                            {/* Mini chip preview */}
+                            <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
                             {/* Blend name + actions */}
                             <div className="px-2 py-2 space-y-1.5">
                               <p className="text-xs font-bold text-gray-800 truncate">{blend.name}</p>
@@ -599,7 +644,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     <div key={blend.id} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-3">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                          <SquareSwatch recipe={blend.recipe} className="w-full h-full" />
+                          <ChipBlendPreview recipe={blend.recipe} mini className="w-full h-full" />
                         </div>
                         <span className="text-xs font-bold text-gray-800 truncate">{blend.name}</span>
                         {r.status === 'processing' && <span className="text-xs text-blue-400 animate-pulse ml-auto">{r.vizId ? 'Processing…' : 'Queued…'}</span>}
@@ -711,7 +756,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     className="w-4 h-4 accent-blue-500 flex-shrink-0"
                   />
                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                    <SquareSwatch recipe={blend.recipe} className="w-full h-full" />
+                    <ChipBlendPreview recipe={blend.recipe} mini className="w-full h-full" />
                   </div>
                   <span className="text-sm font-semibold text-gray-800 truncate">{blend.name}</span>
                 </label>
