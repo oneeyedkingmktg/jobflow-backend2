@@ -662,7 +662,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
       {/* ── SAVE BLEND MODAL ──────────────────────────────────────────────── */}
       {saveModal && (
-        <div className="fixed inset-0 z-60 bg-black/50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-4">
             <h3 className="text-sm font-bold text-gray-900">Save Blend</h3>
             <input
@@ -698,7 +698,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
       {/* ── BLEND SELECTION MODAL ─────────────────────────────────────────── */}
       {showSelectModal && (
-        <div className="fixed inset-0 z-60 bg-black/50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
             <h3 className="text-sm font-bold text-gray-900">Select Blends to Preview</h3>
             <div className="space-y-2 max-h-72 overflow-y-auto">
