@@ -81,9 +81,9 @@ function getRecipe(chipColorName) {
   }
 
   // Single primitive color match
-  for (const [, color] of colorMap) {
+  for (const [code, color] of colorMap) {
     if (color.name.toLowerCase() === key) {
-      return [{ rgb: color.rgb, weight: 1 }];
+      return [{ hex: color.hex, name: color.name, code, rgb: color.rgb, weight: 1 }];
     }
   }
 
