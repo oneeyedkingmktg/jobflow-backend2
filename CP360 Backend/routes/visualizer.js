@@ -550,12 +550,19 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
     })).filter(c => c.weight > 0);
     if (!converted.length) return res.status(400).json({ error: 'Recipe has no valid entries' });
 
+    // Ensure a proper Node Buffer regardless of multer version
+    const rawImageBuffer = Buffer.isBuffer(req.file.buffer)
+      ? req.file.buffer
+      : Buffer.from(req.file.buffer);
+
+    console.log(`[apply-internal] file: ${req.file.originalname}, size: ${rawImageBuffer.length}, mimetype: ${req.file.mimetype}`);
+
     const result = await compositeInternalBlend({
       leadId:        parseInt(lead_id),
       companyId,
       recipe:        converted,
       rawRecipe:     recipe,
-      rawImageBuffer: req.file.buffer,
+      rawImageBuffer,
     });
 
     res.json(result);

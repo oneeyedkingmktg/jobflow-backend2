@@ -32,13 +32,17 @@ const SIZES = [
 async function preprocessImage(inputBuffer) {
   let workingBuffer = inputBuffer;
 
-  // If sharp can't read the format, give a user-friendly error
+  if (!workingBuffer || workingBuffer.length === 0) {
+    throw Object.assign(new Error('No image data received. Please try uploading again.'), { userInput: true });
+  }
+
   let meta;
   try {
     meta = await sharp(workingBuffer).metadata();
-  } catch {
+  } catch (sharpErr) {
+    console.error('[preprocessImage] sharp failed — buffer size:', workingBuffer.length, 'first 12 bytes:', workingBuffer.slice(0, 12).toString('hex'), 'error:', sharpErr.message);
     throw Object.assign(
-      new Error('Could not read this photo. Please try a JPEG or PNG file.'),
+      new Error(`Photo could not be read: ${sharpErr.message}. Please try a JPEG or PNG.`),
       { userInput: true }
     );
   }
