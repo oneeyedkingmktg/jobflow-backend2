@@ -60,10 +60,11 @@ async function preprocessImage(inputBuffer) {
 
   const ratio = (meta.width || 1) / (meta.height || 1);
 
+  // Match output to input orientation — portrait in → portrait out, landscape in → landscape out
   let target;
-  if (ratio >= 1.2)       target = SIZES[0];
-  else if (ratio <= 0.85) target = SIZES[1];
-  else                    target = SIZES[2];
+  if (ratio > 1.0)      target = SIZES[0]; // landscape  → 1536×1024
+  else if (ratio < 1.0) target = SIZES[1]; // portrait   → 1024×1536
+  else                  target = SIZES[2]; // square     → 1024×1024
 
   const make = (w, h) =>
     sharp(workingBuffer)
@@ -74,8 +75,13 @@ async function preprocessImage(inputBuffer) {
       .toBuffer();
 
   let buf = await make(target.w, target.h);
-  if (buf.length > 4 * 1024 * 1024) buf = await make(1024, 1024);
-  return { buffer: buf, size: target.label };
+  // If PNG is still too large (>20MB OpenAI limit), halve dimensions keeping same ratio
+  let finalSize = target.label;
+  if (buf.length > 18 * 1024 * 1024) {
+    buf = await make(Math.round(target.w * 0.67), Math.round(target.h * 0.67));
+    // ratio is preserved so the same OpenAI size label is still correct
+  }
+  return { buffer: buf, size: finalSize };
 }
 
 async function uploadToR2(key, buffer, contentType = 'image/png') {
