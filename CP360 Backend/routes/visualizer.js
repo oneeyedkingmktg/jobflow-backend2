@@ -361,7 +361,6 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
     const W       = 960;
     const TITLE_H = 80;
     const CHIP_H  = W;          // square chip preview
-    const LEG_H   = 90;
     const xmlEsc  = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     // ── 1. Resize chip canvas to 960×960 ─────────────────────────────────
@@ -376,32 +375,42 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
       `</svg>`;
     const titleBuf = await sharp(Buffer.from(titleSvg)).resize(W, TITLE_H).png().toBuffer();
 
-    // ── 3. Legend bar — "■ F-code Name XX%" per color ────────────────────
-    const colW  = Math.floor(W / Math.max(sorted.length, 1));
-    const SQ    = 20;
-    const baseY = Math.round(LEG_H / 2);
+    // ── 3. Legend bar — wrapped grid, 3 columns, one row per 3 colors ───────
+    const COLS    = 3;
+    const ITEM_W  = Math.floor(W / COLS);   // 320px per column at W=960
+    const ROW_H   = 42;
+    const PAD_Y   = 16;
+    const SQ      = 20;
+    const numRows = Math.ceil(sorted.length / COLS);
+    const dynLegH = PAD_Y * 2 + numRows * ROW_H;
+
     let legendItems = '';
     sorted.forEach((c, i) => {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      const ox  = col * ITEM_W + 16;
+      const oy  = PAD_Y + row * ROW_H + Math.floor(ROW_H / 2);
+
       const pct      = Math.round((parseFloat(c.percentage) / total) * 100);
       const codePart = c.code || (c.name || '').match(/F-\d+/)?.[0] || '';
       const namePart = (c.name || '').split(' ')
         .filter(w => !/F-\d+/.test(w) && w.toLowerCase() !== 'torginol').join(' ');
       const label    = [codePart, namePart, `${pct}%`].filter(Boolean).join(' ');
-      const ox       = i * colW + 16;
+
       legendItems +=
-        `<rect x="${ox}" y="${baseY - SQ / 2}" width="${SQ}" height="${SQ}" fill="${c.hex}" rx="3"/>` +
-        `<text x="${ox + SQ + 8}" y="${baseY + 7}" font-family="Arial,sans-serif" ` +
+        `<rect x="${ox}" y="${oy - SQ / 2}" width="${SQ}" height="${SQ}" fill="${c.hex}" rx="3"/>` +
+        `<text x="${ox + SQ + 8}" y="${oy + 7}" font-family="Arial,sans-serif" ` +
           `font-size="22" fill="#374151">${xmlEsc(label)}</text>`;
     });
-    const legendSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${LEG_H}">` +
-      `<rect width="${W}" height="${LEG_H}" fill="#f5f6f7"/>` +
+    const legendSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${dynLegH}">` +
+      `<rect width="${W}" height="${dynLegH}" fill="#f5f6f7"/>` +
       `<line x1="0" y1="0" x2="${W}" y2="0" stroke="#e5e7eb" stroke-width="1"/>` +
       legendItems +
       `</svg>`;
-    const legendBuf = await sharp(Buffer.from(legendSvg)).resize(W, LEG_H).png().toBuffer();
+    const legendBuf = await sharp(Buffer.from(legendSvg)).resize(W, dynLegH).png().toBuffer();
 
     // ── 4. Composite title + chip + legend ────────────────────────────────
-    const totalH = TITLE_H + CHIP_H + LEG_H;
+    const totalH = TITLE_H + CHIP_H + dynLegH;
     const finalBuf = await sharp({
       create: { width: W, height: totalH, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
     }).composite([
