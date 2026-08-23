@@ -498,10 +498,138 @@ export function CostPerSaleContent({ companyId }) {
   );
 }
 
+// ─── Speed to Lead ────────────────────────────────────────────────────────────
+
+export function SpeedToLeadContent({ companyId }) {
+  const today = new Date();
+  const defaultEnd = today.toISOString().split('T')[0];
+  const defaultStart = new Date(today - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  function load(s, e) {
+    setLoading(true);
+    setError(null);
+    let url = `/api/reports/speed-to-lead?start=${s}&end=${e}`;
+    if (companyId) url += `&company_id=${companyId}`;
+    apiRequest(url)
+      .then((r) => { setData(r); setLoading(false); })
+      .catch((err) => { setError(err.message); setLoading(false); });
+  }
+
+  useEffect(() => { load(defaultStart, defaultEnd); }, [companyId]);
+
+  function fmtTime(minutes) {
+    if (minutes == null) return '—';
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h >= 48) return `${Math.floor(h / 24)}d ${h % 24}h`;
+    if (h >= 24) {
+      const rh = h % 24;
+      return rh ? `${Math.floor(h / 24)}d ${rh}h` : `${Math.floor(h / 24)}d`;
+    }
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  const STATUS_STYLE = {
+    'status_pre_lead': 'text-gray-600',
+    'lead':            'text-blue-700',
+    'appointment_set': 'text-purple-700',
+    'sold':            'text-green-700',
+    'not_sold':        'text-red-600',
+  };
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-3">
+        Average time from lead creation to first outbound call, by current status. Helps reveal whether faster response time correlates with higher conversion rates. Call data is pulled from GHL and cached — first run may take a moment.
+      </p>
+
+      <div className="flex gap-2 items-center mb-4 flex-wrap">
+        <input
+          type="date" value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+        />
+        <span className="text-xs text-gray-400">to</span>
+        <input
+          type="date" value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+        />
+        <button
+          onClick={() => load(startDate, endDate)}
+          className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium"
+        >
+          Run
+        </button>
+      </div>
+
+      {loading && (
+        <div>
+          <Spinner />
+          <p className="text-xs text-gray-400 text-center mt-2">
+            Fetching call data from GHL — first run may take a moment.
+          </p>
+        </div>
+      )}
+      {error && <ErrorMsg msg={error} />}
+      {!loading && !error && data && (
+        <>
+          {data.synced > 0 && (
+            <p className="text-xs text-blue-600 mb-2">
+              Synced {data.synced} new call record{data.synced !== 1 ? 's' : ''} from GHL.
+            </p>
+          )}
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">Status</th>
+                  <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                  <th className="text-right px-3 py-2 font-semibold">Called</th>
+                  <th className="text-right px-3 py-2 font-semibold">Avg Response</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.rows.map((r) => (
+                  <tr key={r.status} className="bg-white">
+                    <td className={`px-3 py-2.5 font-medium ${STATUS_STYLE[r.status] || 'text-gray-800'}`}>
+                      {r.label}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-gray-700">{r.count}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-500">{r.reached} of {r.count}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-900">{fmtTime(r.avgMinutes)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                  <td className="px-3 py-2.5 text-gray-900">All Statuses</td>
+                  <td className="px-3 py-2.5 text-right text-gray-900">{data.overall.count}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-700">{data.overall.reached} of {data.overall.count}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-900">{fmtTime(data.overall.avgMinutes)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Leads with no outbound call recorded in GHL are counted in totals but excluded from averages. Date range filters by lead creation date.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── report component map ─────────────────────────────────────────────────────
 
 export const REPORT_CONTENT = {
   automation_recovery: AutomationRecoveryContent,
   conversions_by_source: ConversionsBySourceContent,
   cost_per_sale: CostPerSaleContent,
+  speed_to_lead: SpeedToLeadContent,
 };

@@ -498,6 +498,12 @@ async function runMigrations() {
       UNIQUE(company_id, chip_color_id)
     )`,
     `CREATE INDEX IF NOT EXISTS company_chip_selections_company_idx ON company_chip_selections (company_id)`,
+    // Speed to lead — cache first outbound call timestamp per lead
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS first_call_at TIMESTAMPTZ`,
+    // Speed to lead report definition
+    `INSERT INTO report_definitions (key, name, description) VALUES
+      ('speed_to_lead', 'Speed to Lead', 'Average time from lead creation to first outbound call, broken down by current lead status.')
+    ON CONFLICT (key) DO NOTHING`,
   ];
   for (const sql of migrations) {
     try {

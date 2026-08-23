@@ -577,6 +577,108 @@ router.post('/orphan-resync', async (req, res) => {
 
 // ─── POST /api/reports/mark-junk ─────────────────────────────────────────────
 // Sets a lead's status to status_junk, excluding it from future orphan checks.
+// ─── GET /api/reports/speed-to-lead ─────────────────────────────────────────
+// Returns avg lead-to-first-outbound-call time, grouped by current status.
+// Fetches call data live from GHL on first run, then caches in leads.first_call_at.
+
+const TARGET_STATUSES = [
+  { status: 'status_pre_lead', label: 'Pre-Lead' },
+  { status: 'lead',            label: 'Lead' },
+  { status: 'appointment_set', label: 'Appt Booked' },
+  { status: 'sold',            label: 'Sold' },
+  { status: 'not_sold',        label: 'Not Sold' },
+];
+
+async function fetchAndCacheFirstCall(lead, company) {
+  try {
+    const convResult = await ghl.searchConversations(company, { contactId: lead.ghl_contact_id });
+    const conversations = convResult?.conversations || [];
+    if (!conversations.length) return null;
+
+    const msgResult = await ghl.getMessagesByConversationId(conversations[0].id, company, 100);
+    const messages = Array.isArray(msgResult?.messages) ? msgResult.messages
+      : Array.isArray(msgResult?.messages?.messages) ? msgResult.messages.messages : [];
+
+    const outboundCalls = messages.filter((m) =>
+      (m.type === 10 || m.messageType === 'TYPE_CALL') &&
+      (m.direction === 'outbound' || m.direction === 1)
+    );
+    if (!outboundCalls.length) return null;
+
+    outboundCalls.sort((a, b) => new Date(a.dateAdded) - new Date(b.dateAdded));
+    const firstCallAt = new Date(outboundCalls[0].dateAdded);
+
+    await pool.query(`UPDATE leads SET first_call_at = $1 WHERE id = $2`, [firstCallAt, lead.id]);
+    lead.first_call_at = firstCallAt;
+    return firstCallAt;
+  } catch (err) {
+    console.error(`[speed-to-lead] lead ${lead.id}:`, err.message);
+    return null;
+  }
+}
+
+router.get('/speed-to-lead', async (req, res) => {
+  try {
+    const companyId = companyIdFor(req);
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ error: 'start and end dates are required' });
+
+    const company = await loadCompanyWithGHL(companyId);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+
+    const statusList = TARGET_STATUSES.map((s) => s.status);
+    const placeholders = statusList.map((_, i) => `$${i + 3}`).join(',');
+
+    const leadsResult = await pool.query(
+      `SELECT id, status, created_at, ghl_contact_id, first_call_at
+       FROM leads
+       WHERE company_id = $1
+         AND deleted_at IS NULL
+         AND status IN (${placeholders})
+         AND created_at >= $2::timestamptz
+         AND created_at < ($3::date + INTERVAL '1 day')::timestamptz`,
+      [companyId, start, end, ...statusList]
+    );
+
+    const leads = leadsResult.rows;
+
+    // Fetch + cache first_call_at for leads that don't have it yet
+    const needsFetch = leads.filter((l) => l.ghl_contact_id && !l.first_call_at && company.ghl_api_key);
+    const BATCH = 5;
+    for (let i = 0; i < needsFetch.length; i += BATCH) {
+      await Promise.all(needsFetch.slice(i, i + BATCH).map((l) => fetchAndCacheFirstCall(l, company)));
+    }
+
+    // Aggregate by status
+    const rows = TARGET_STATUSES.map(({ status, label }) => {
+      const bucket = leads.filter((l) => l.status === status);
+      const reached = bucket.filter((l) => l.first_call_at);
+      let avgMinutes = null;
+      if (reached.length) {
+        const totalMs = reached.reduce((s, l) => s + (new Date(l.first_call_at) - new Date(l.created_at)), 0);
+        avgMinutes = Math.round(totalMs / reached.length / 60000);
+      }
+      return { status, label, count: bucket.length, reached: reached.length, avgMinutes };
+    });
+
+    const allReached = leads.filter((l) => l.first_call_at);
+    let overallAvg = null;
+    if (allReached.length) {
+      const totalMs = allReached.reduce((s, l) => s + (new Date(l.first_call_at) - new Date(l.created_at)), 0);
+      overallAvg = Math.round(totalMs / allReached.length / 60000);
+    }
+
+    res.json({
+      rows,
+      overall: { count: leads.length, reached: allReached.length, avgMinutes: overallAvg },
+      synced: needsFetch.length,
+    });
+  } catch (error) {
+    console.error('[GET /api/reports/speed-to-lead]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/mark-junk', async (req, res) => {
   try {
     if (req.user.role !== 'master') return res.status(403).json({ error: 'Master only' });
