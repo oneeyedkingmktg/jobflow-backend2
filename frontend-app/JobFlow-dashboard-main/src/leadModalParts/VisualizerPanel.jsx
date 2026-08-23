@@ -289,7 +289,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [view, setView] = useState('build'); // 'build' | 'photo' | 'results'
 
   // Builder
-  const [blendTab, setBlendTab] = useState('library');
+  const [blendTab, setBlendTab] = useState('standards'); // 'standards' | 'custom' | 'shortlist'
   const [libraryColors, setLibraryColors] = useState([]);
   const [primitives, setPrimitives] = useState([]);
   const [selectedLibColor, setSelectedLibColor] = useState(null);
@@ -309,7 +309,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [selectedBlendIds, setSelectedBlendIds] = useState(new Set());
 
   // Library UI
-  const [showOtherBlends, setShowOtherBlends] = useState(false);
+  const [showAllBlends, setShowAllBlends] = useState(false);
 
   // Photo & results
   const [photoFile, setPhotoFile] = useState(null);
@@ -324,11 +324,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [error, setError] = useState(null);
 
   const isBuilding = blendTab === 'custom' ? customItems.length > 0 : !!selectedLibColor;
-  const currentRecipe = blendTab === 'library' ? libRecipe : customItems;
+  const currentRecipe = blendTab === 'standards' ? libRecipe : customItems;
   const hasRecipe = currentRecipe.length > 0;
   const isEditing = editingId !== null;
   // Show session list only when NOT actively building/editing
-  const showSessionList = sessionBlends.length > 0 && !isBuilding && !isEditing;
+
 
   const leadEmail = lead?.email;
 
@@ -374,17 +374,17 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     }
 
     setSaveModal(null);
-    resetBuilder();
+    resetBuilder('shortlist');
     saveSwatchToDrive(savedBlend); // auto-save blend recipe to Drive
   };
 
-  const resetBuilder = () => {
+  const resetBuilder = (targetTab = 'standards') => {
     setEditingId(null);
     setBlendName('');
     setCustomItems([]);
     setSelectedLibColor(null);
     setLibRecipe([]);
-    setBlendTab('library');
+    setBlendTab(targetTab);
     setError(null);
   };
 
@@ -562,124 +562,132 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
             {/* ── BUILD VIEW ──────────────────────────────────────────── */}
             {view === 'build' && (
               <>
-                {/* Tab switcher — hidden while editing (keeps focus) */}
-                {!isEditing && (
-                  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-                    <button
-                      onClick={() => { setBlendTab('library'); setCustomItems([]); setBlendName(''); }}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'library' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-                    >
-                      Library Colors
-                    </button>
-                    <button
-                      onClick={() => setBlendTab('custom')}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-                    >
-                      Custom Blend
-                    </button>
-                  </div>
-                )}
+                {/* 3-tab switcher */}
+                <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => { setBlendTab('standards'); setCustomItems([]); setBlendName(''); }}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'standards' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Standard Colors
+                  </button>
+                  <button
+                    onClick={() => setBlendTab('custom')}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Custom Blend
+                  </button>
+                  <button
+                    onClick={() => setBlendTab('shortlist')}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'shortlist' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Shortlist{sessionBlends.length > 0 ? ` (${sessionBlends.length})` : ''}
+                  </button>
+                </div>
 
-                {/* Editing banner */}
-                {isEditing && (
-                  <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                    <span className="text-xs font-semibold text-blue-700">Editing: {sessionBlends.find(b => b.id === editingId)?.name}</span>
-                    <button onClick={resetBuilder} className="text-xs text-blue-400 hover:text-blue-600">Cancel</button>
-                  </div>
-                )}
-
-                {/* Library tab */}
-                {blendTab === 'library' && !isEditing && (
+                {/* ── STANDARD COLORS TAB ── */}
+                {blendTab === 'standards' && (
                   <div className="space-y-3">
-                    {libraryColors.length === 0 && (
-                      <div className="text-center py-6 text-xs text-gray-400">No library colors configured yet.</div>
-                    )}
+                    {(() => {
+                      const standards = libraryColors.filter(c => c.selected);
+                      const others    = libraryColors.filter(c => !c.selected);
+                      return (
+                        <>
+                          {standards.length === 0 && (
+                            <p className="text-xs text-gray-400 text-center py-6">No standard colors configured yet.</p>
+                          )}
 
-                    {/* Standards — top 8 library colors */}
-                    {libraryColors.length > 0 && (
-                      <>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Standards</p>
-                        <div className="grid grid-cols-4 gap-2">
-                          {libraryColors.slice(0, 8).map(c => (
-                            <button
-                              key={c.id}
-                              onClick={() => { setSelectedLibColor(c); setBlendName(c.name); setShowOtherBlends(false); }}
-                              className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
-                            >
-                              {c.reference_image_url
-                                ? <img src={c.reference_image_url} alt={c.name} className="w-full h-16 object-cover" />
-                                : <div className="w-full h-16 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
-                              <div className="px-1 py-1 bg-white">
-                                <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                          {/* Company standard blends — no scroll */}
+                          {standards.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2">
+                              {standards.map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => { setSelectedLibColor(c); setBlendName(c.name); setShowAllBlends(false); }}
+                                  className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                                >
+                                  {c.reference_image_url
+                                    ? <img src={c.reference_image_url} alt={c.name} className="w-full h-20 object-cover" />
+                                    : <div className="w-full h-20 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
+                                  <div className="px-1.5 py-1 bg-white">
+                                    <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
 
-                    {/* Other Stock Blends — remaining library colors, collapsed by default */}
-                    {libraryColors.length > 8 && (
-                      <div>
-                        <button
-                          onClick={() => setShowOtherBlends(p => !p)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition"
-                        >
-                          <span className="text-gray-400">{showOtherBlends ? '▲' : '▼'}</span>
-                          Other Stock Blends ({libraryColors.length - 8})
-                        </button>
-                        {showOtherBlends && (
-                          <div className="grid grid-cols-4 gap-2 mt-2 max-h-48 overflow-y-auto">
-                            {libraryColors.slice(8).map(c => (
+                          {/* See All Blends — collapsed by default, scrollable when open */}
+                          {others.length > 0 && (
+                            <div>
                               <button
-                                key={c.id}
-                                onClick={() => { setSelectedLibColor(c); setBlendName(c.name); }}
-                                className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                                onClick={() => { setShowAllBlends(p => !p); setSelectedLibColor(null); }}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:text-blue-700 transition"
                               >
-                                {c.reference_image_url
-                                  ? <img src={c.reference_image_url} alt={c.name} className="w-full h-16 object-cover" />
-                                  : <div className="w-full h-16 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
-                                <div className="px-1 py-1 bg-white">
-                                  <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
-                                </div>
+                                <span>{showAllBlends ? '▲' : '▼'}</span>
+                                {showAllBlends ? 'Hide' : 'See All Blends'} ({others.length} more)
                               </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                              {showAllBlends && (
+                                <div className="grid grid-cols-3 gap-2 mt-2 max-h-64 overflow-y-auto pr-0.5">
+                                  {others.map(c => (
+                                    <button
+                                      key={c.id}
+                                      onClick={() => { setSelectedLibColor(c); setBlendName(c.name); }}
+                                      className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                                    >
+                                      {c.reference_image_url
+                                        ? <img src={c.reference_image_url} alt={c.name} className="w-full h-20 object-cover" />
+                                        : <div className="w-full h-20 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
+                                      <div className="px-1.5 py-1 bg-white">
+                                        <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                    {/* Selected blend preview + actions */}
-                    {selectedLibColor && (
-                      <div className="space-y-3">
-                        {libRecipe.length > 0
-                          ? <ChipBlendPreview recipe={libRecipe} showLabels className="w-full" />
-                          : <div className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">Loading blend…</span></div>
-                        }
-                        <div className="flex gap-2">
-                          <button
-                            onClick={openSaveModal}
-                            disabled={!libRecipe.length}
-                            className="flex-1 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
-                          >
-                            Save Blend
-                          </button>
-                          <button
-                            onClick={customizeLibBlend}
-                            disabled={!libRecipe.length}
-                            className="flex-1 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
-                          >
-                            Customize →
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                          {/* Selected blend preview + actions */}
+                          {selectedLibColor && (
+                            <div className="space-y-3">
+                              {libRecipe.length > 0
+                                ? <ChipBlendPreview recipe={libRecipe} showLabels className="w-full" />
+                                : <div className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">Loading blend…</span></div>
+                              }
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={openSaveModal}
+                                  disabled={!libRecipe.length}
+                                  className="flex-1 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
+                                >
+                                  Save to Short List
+                                </button>
+                                <button
+                                  onClick={customizeLibBlend}
+                                  disabled={!libRecipe.length}
+                                  className="flex-1 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+                                >
+                                  Customize →
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
-                {/* Custom tab */}
+                {/* ── CUSTOM BLEND TAB ── */}
                 {blendTab === 'custom' && (
                   <div className="space-y-3">
+                    {/* Editing banner */}
+                    {isEditing && (
+                      <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                        <span className="text-xs font-semibold text-blue-700">Editing: {sessionBlends.find(b => b.id === editingId)?.name}</span>
+                        <button onClick={() => resetBuilder('shortlist')} className="text-xs text-blue-400 hover:text-blue-600">Cancel</button>
+                      </div>
+                    )}
                     <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
                     {customItems.length > 0 && <ChipBlendPreview recipe={customItems} showLabels className="w-full" />}
                     <button
@@ -687,83 +695,60 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                       disabled={!customItems.length}
                       className="w-full py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
                     >
-                      Save Blend
+                      Save to Short List
                     </button>
                   </div>
                 )}
 
-                {error && <p className="text-xs text-red-500">{error}</p>}
-
-                {/* Session blend tile grid */}
-                {showSessionList && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Saved Blends</p>
-                      <button
-                        onClick={openSelectModal}
-                        className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-600 transition"
-                      >
-                        Apply to Photo →
-                      </button>
-                    </div>
-
-                    {/* 2-column tile grid, 4 rows visible (~320px) */}
-                    <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
-                      {sessionBlends.map(blend => {
-                        const ss = swatchState[blend.id] || {};
-                        return (
-                          <div key={blend.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                            {/* Mini chip preview */}
-                            <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
-                            {/* Blend name + actions */}
-                            <div className="px-2 py-2 space-y-1.5">
-                              <p className="text-xs font-bold text-gray-800 truncate">{blend.name}</p>
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => editBlend(blend)}
-                                  className="flex-1 py-1 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-100 transition"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => removeBlend(blend.id)}
-                                  className="px-2 py-1 text-xs text-gray-300 hover:text-red-400 border border-gray-200 rounded bg-white transition"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              {canEdit && (
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => saveSwatchToDrive(blend)}
-                                    disabled={ss.saving || ss.saved}
-                                    className="flex-1 py-1 text-xs font-semibold bg-white border border-gray-200 text-gray-500 rounded hover:bg-gray-100 transition disabled:opacity-50"
-                                  >
-                                    {ss.saved ? '✓ Saved' : ss.saving ? '…' : 'Swatch →Drive'}
-                                  </button>
-                                  {leadEmail && (
+                {/* ── SHORTLIST TAB ── */}
+                {blendTab === 'shortlist' && (
+                  <div className="space-y-3">
+                    {sessionBlends.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-6">No blends saved yet. Pick a standard color or build a custom blend.</p>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">{sessionBlends.length} Blend{sessionBlends.length !== 1 ? 's' : ''}</p>
+                          <button
+                            onClick={openSelectModal}
+                            className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-600 transition"
+                          >
+                            Apply to Photo →
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+                          {sessionBlends.map(blend => {
+                            const ss = swatchState[blend.id] || {};
+                            return (
+                              <div key={blend.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                                <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
+                                <div className="px-2 py-2 space-y-1.5">
+                                  <p className="text-xs font-bold text-gray-800 truncate">{blend.name}</p>
+                                  <p className="text-xs text-gray-400">{ss.saved ? '✓ Saved to Drive' : ss.saving ? 'Saving…' : ''}</p>
+                                  <div className="flex gap-1">
+                                    <button onClick={() => editBlend(blend)} className="flex-1 py-1 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-100 transition">Edit</button>
+                                    <button onClick={() => removeBlend(blend.id)} className="px-2 py-1 text-xs text-gray-300 hover:text-red-400 border border-gray-200 rounded bg-white transition">✕</button>
+                                  </div>
+                                  {canEdit && leadEmail && (
                                     <button
                                       onClick={() => emailSwatch(blend)}
                                       disabled={ss.emailing || ss.emailed}
-                                      className="flex-1 py-1 text-xs font-semibold bg-white border border-gray-200 text-gray-500 rounded hover:bg-gray-100 transition disabled:opacity-50"
+                                      className="w-full py-1 text-xs font-semibold bg-white border border-gray-200 text-gray-500 rounded hover:bg-gray-100 transition disabled:opacity-50"
                                     >
-                                      {ss.emailed ? '✓ Sent' : ss.emailing ? '…' : 'Email'}
+                                      {ss.emailed ? '✓ Emailed' : ss.emailing ? '…' : 'Email Swatch'}
                                     </button>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* Prompt to add first blend */}
-                {sessionBlends.length === 0 && !isBuilding && !isEditing && blendTab === 'library' && !selectedLibColor && (
-                  <p className="text-xs text-gray-400 text-center py-2">Select a library color above, or switch to Custom Blend to build your own.</p>
-                )}
+                {error && <p className="text-xs text-red-500">{error}</p>}
               </>
             )}
 

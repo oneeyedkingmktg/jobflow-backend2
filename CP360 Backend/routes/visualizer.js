@@ -421,7 +421,7 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
       const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
       const fileName = `Blend Recipe - ${label} (${date}).png`;
       resolveLeadFolder(parseInt(lead_id), { create: true })
-        .then(leadFolder => getOrCreateFolder('Blend Recipes', leadFolder.id))
+        .then(leadFolder => getOrCreateFolder('Custom Blends', leadFolder.id))
         .then(subFolder  => uploadFileToFolder(subFolder.id, fileName, 'image/png', finalBuf))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
     }
