@@ -12,7 +12,7 @@ const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { generateVisualization, compositeCustomBlend, compositeInternalBlend } = require('../visualizer/renderingService');
 const { getAllPrimitives, hexToRgb, getRecipe } = require('../visualizer/chipColorData');
-const { resolveLeadFolder, uploadFileToFolder } = require('../controllers/googleDrive');
+const { resolveLeadFolder, uploadFileToFolder, getOrCreateFolder } = require('../controllers/googleDrive');
 const { sendVisualizationEmail, sendSwatchEmail } = require('../services/email');
 const sharp = require('sharp');
 const axios = require('axios');
@@ -415,13 +415,14 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
     await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: finalBuf, ContentType: 'image/png' }));
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
-    // ── 6. Async Drive save ───────────────────────────────────────────────
+    // ── 6. Async Drive save → "Blend Recipes" subfolder ─────────────────
     if (lead_id) {
       const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
-      const fileName = `Blend Swatch - ${label} (${date}).png`;
+      const fileName = `Blend Recipe - ${label} (${date}).png`;
       resolveLeadFolder(parseInt(lead_id), { create: true })
-        .then(folder => uploadFileToFolder(folder.id, fileName, 'image/png', finalBuf))
+        .then(leadFolder => getOrCreateFolder('Blend Recipes', leadFolder.id))
+        .then(subFolder  => uploadFileToFolder(subFolder.id, fileName, 'image/png', finalBuf))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
     }
 

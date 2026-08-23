@@ -157,15 +157,18 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
         height={px}
         className="w-full aspect-square block"
       />
-      {showLabels && (
-        <div className="flex bg-white border-t border-gray-100">
+      {showLabels && items.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 px-2.5 py-2 bg-white border-t border-gray-100">
           {items.map((c, i) => {
-            const pct = Math.round((parseFloat(c.percentage) / total) * 100);
+            const pct  = Math.round((parseFloat(c.percentage) / total) * 100);
+            const code = c.code || (c.name || '').match(/F-\d+/)?.[0] || '';
+            const name = (c.name || '').split(' ').filter(w => !/F-\d+/.test(w) && w.toLowerCase() !== 'torginol').join(' ') || code;
             return (
-              <div key={i} style={{ width: `${(parseFloat(c.percentage) / total) * 100}%`, minWidth: 32 }} className="text-center py-1.5 overflow-hidden px-0.5">
-                <div className="w-3 h-3 rounded-sm mx-auto mb-0.5 border border-gray-300" style={{ background: c.hex }} />
-                <div className="text-xs font-bold text-gray-700 truncate leading-tight">{(c.name || '').split(' ').slice(-1)[0]}</div>
-                <div className="text-xs text-gray-400 leading-tight">{pct}%</div>
+              <div key={i} className="flex items-center gap-1 text-xs">
+                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0 border border-gray-200" style={{ background: c.hex }} />
+                {code && <span className="font-mono text-gray-400">{code}</span>}
+                <span className="font-semibold text-gray-700">{name}</span>
+                <span className="text-gray-400">{pct}%</span>
               </div>
             );
           })}
@@ -178,6 +181,7 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
 // ── Custom blend builder (color picker + sliders) ────────────────────────────
 function CustomBlendBuilder({ primitives, items, setItems }) {
   const [search, setSearch] = useState('');
+  const [showPicker, setShowPicker] = useState(items.length === 0);
 
   const filtered = search
     ? primitives.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase()))
@@ -242,6 +246,15 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
           ))}
         </div>
       )}
+      {items.length > 0 && (
+        <button
+          onClick={() => setShowPicker(p => !p)}
+          className="w-full py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition"
+        >
+          {showPicker ? '▲ Hide Color Picker' : '+ Add Color'}
+        </button>
+      )}
+      {showPicker && (
       <input
         type="text"
         placeholder="Search Torginol colors…"
@@ -249,7 +262,9 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
         onChange={e => setSearch(e.target.value)}
         className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
-      <div className="grid grid-cols-8 gap-1 max-h-32 overflow-y-auto">
+      )}
+      {showPicker && (
+      <div className="grid grid-cols-6 gap-1 max-h-32 overflow-y-auto">
         {filtered.map(p => {
           const sel = !!items.find(c => c.hex === p.hex);
           return (
@@ -263,7 +278,8 @@ function CustomBlendBuilder({ primitives, items, setItems }) {
           );
         })}
       </div>
-      {!items.length && <p className="text-xs text-gray-400 text-center">Tap a color to add it to the blend</p>}
+      )}
+      {showPicker && !items.length && <p className="text-xs text-gray-400 text-center">Tap a color to add it to the blend</p>}
     </div>
   );
 }
@@ -343,19 +359,23 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     setSaveModal({ mode: isEditing ? 'edit' : 'new', proposedName: name });
   };
 
-  // Commit a save (called from modal)
+  // Commit a save (called from modal) — auto-saves swatch to Drive
   const commitSave = (asNew) => {
     const name = saveModal.proposedName.trim() || `Blend ${sessionBlends.length + 1}`;
     const recipe = currentRecipe.map(r => ({ ...r }));
 
+    let savedBlend;
     if (!asNew && isEditing) {
-      setSessionBlends(prev => prev.map(b => b.id === editingId ? { ...b, name, recipe } : b));
+      savedBlend = { id: editingId, name, recipe };
+      setSessionBlends(prev => prev.map(b => b.id === editingId ? savedBlend : b));
     } else {
-      setSessionBlends(prev => [...prev, { id: newId(), name, recipe }]);
+      savedBlend = { id: newId(), name, recipe };
+      setSessionBlends(prev => [...prev, savedBlend]);
     }
 
     setSaveModal(null);
     resetBuilder();
+    saveSwatchToDrive(savedBlend); // auto-save blend recipe to Drive
   };
 
   const resetBuilder = () => {
@@ -636,13 +656,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                           ? <ChipBlendPreview recipe={libRecipe} showLabels className="w-full" />
                           : <div className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">Loading blend…</span></div>
                         }
-                        <input
-                          type="text"
-                          value={blendName}
-                          onChange={e => setBlendName(e.target.value)}
-                          placeholder="Blend name"
-                          className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
                         <div className="flex gap-2">
                           <button
                             onClick={openSaveModal}
@@ -668,14 +681,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {blendTab === 'custom' && (
                   <div className="space-y-3">
                     <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
-                    <ChipBlendPreview recipe={customItems} showLabels className="w-full" />
-                    <input
-                      type="text"
-                      value={blendName}
-                      onChange={e => setBlendName(e.target.value)}
-                      placeholder="Blend name (e.g. Light Gray Mix)"
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
+                    {customItems.length > 0 && <ChipBlendPreview recipe={customItems} showLabels className="w-full" />}
                     <button
                       onClick={openSaveModal}
                       disabled={!customItems.length}
