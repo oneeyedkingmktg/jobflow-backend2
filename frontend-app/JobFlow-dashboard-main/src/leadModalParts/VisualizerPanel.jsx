@@ -32,72 +32,94 @@ function _mkRand(seed) {
 }
 
 // ── Shared chip rendering logic ───────────────────────────────────────────────
-// Uses a seeded RNG derived from the recipe so screen preview == saved image.
-// Positions are normalized (0–1) then scaled, so layout is canvas-size-independent.
+// ALL colors rendered as dense interlocking chips — no background fill with a color.
+// Grid-based placement guarantees full coverage; proportional cell assignment
+// guarantees correct color ratios. Seeded PRNG makes preview == saved image.
 function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
   if (!items.length) return;
   const total = items.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
-  const sorted = [...items].sort((a, b) =>
-    (parseFloat(b.percentage) || 0) - (parseFloat(a.percentage) || 0)
-  );
 
-  // Seed from recipe content — identical recipe → identical layout
   const seed = _hash(items.map(r => `${r.hex}:${Math.round(parseFloat(r.percentage))}`).join(','));
   const rand = _mkRand(seed);
 
-  // Border: scale with canvas, always visible (minimum 0.5px)
-  ctx.strokeStyle = 'rgba(0,0,0,0.30)';
-  ctx.lineWidth = Math.max(0.5, W * 0.002);
+  // Neutral base catches tiny gaps at canvas edges
+  ctx.fillStyle = '#c9c6c1';
+  ctx.fillRect(0, 0, W, H);
 
-  const drawFlake = (cxN, cyN, rN) => {
+  // Grid dimensions — coarser grid = bigger, chunkier chips
+  const cols = mini ? 8 : 13;
+  const rows = mini ? 8 : 13;
+  const totalCells = cols * rows;
+
+  // Proportional color assignment: each color gets exactly its share of cells
+  const cells = [];
+  let assigned = 0;
+  for (let ci = 0; ci < items.length; ci++) {
+    const pct = (parseFloat(items[ci].percentage) || 0) / total;
+    const count = ci === items.length - 1
+      ? totalCells - assigned
+      : Math.round(pct * totalCells);
+    for (let k = 0; k < count; k++) cells.push(items[ci].hex);
+    assigned += count;
+  }
+  // Fisher-Yates shuffle — natural random spatial mix
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+
+  // Chip size: large enough to overlap neighbors → no gaps
+  const minRN = mini ? 0.058 : 0.044;
+  const maxRN = mini ? 0.115 : 0.092;
+
+  ctx.lineWidth = Math.max(0.8, W * 0.0022);
+
+  const drawChip = (cxN, cyN, rN, hex) => {
     const cx = cxN * W;
     const cy = cyN * H;
     const maxR = rN * W;
-    const verts = 7 + Math.floor(rand() * 7);
-    const elongation = 0.28 + rand() * 0.85;
+    const verts = 5 + Math.floor(rand() * 4);     // 5–8 vertices: shard-like
+    const scaleY = 0.42 + rand() * 0.68;           // squished/stretched for variety
     const rot = rand() * Math.PI;
     ctx.beginPath();
     for (let i = 0; i < verts; i++) {
-      const a = (i / verts) * Math.PI * 2;
-      const r = maxR * (0.12 + rand() * 0.88);
+      // Uneven angle spacing → jagged broken-shard silhouette
+      const baseA = (i / verts) * Math.PI * 2;
+      const jitter = (rand() - 0.5) * (Math.PI / verts) * 1.5;
+      const a = baseA + jitter;
+      const r = maxR * (0.42 + rand() * 0.58);
       const lx = Math.cos(a) * r;
-      const ly = Math.sin(a) * r * elongation;
+      const ly = Math.sin(a) * r * scaleY;
       const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
       const py = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
+    ctx.fillStyle = hex;
     ctx.fill();
-    ctx.stroke(); // border on every flake, always
+    ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+    ctx.stroke();
   };
 
-  ctx.fillStyle = sorted[0].hex;
-  ctx.fillRect(0, 0, W, H);
-
-  // Normalized chip radius range — same visual size ratio at any canvas resolution
-  const minRN = mini ? 0.025 : 0.022;
-  const maxRN = mini ? 0.083 : 0.069;
-  const scaleFactor = mini ? 18 : 130;
-
-  for (let ci = 1; ci < sorted.length; ci++) {
-    const color = sorted[ci];
-    const pct = (parseFloat(color.percentage) || 0) / total;
-    const count = Math.max(mini ? 2 : 6, Math.round(pct * scaleFactor));
-    ctx.fillStyle = color.hex;
-    for (let i = 0; i < count; i++) {
-      const xN = (rand() * (1 + maxRN * 2)) - maxRN;
-      const yN = (rand() * (1 + maxRN * 2)) - maxRN;
-      drawFlake(xN, yN, minRN + rand() * (maxRN - minRN));
+  // Primary pass: one chip per grid cell, position jittered within cell
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const hex = cells[row * cols + col];
+      const cellW = 1.0 / cols;
+      const cellH = 1.0 / rows;
+      const xN = (col + 0.12 + rand() * 0.76) * cellW;
+      const yN = (row + 0.12 + rand() * 0.76) * cellH;
+      drawChip(xN, yN, minRN + rand() * (maxRN - minRN), hex);
     }
   }
 
-  // Dominant-color top pass — stroked border makes chips visible against same-color base
-  ctx.fillStyle = sorted[0].hex;
-  const domCount = mini ? 4 : Math.round(((parseFloat(sorted[0].percentage) || 0) / total) * 25);
-  for (let i = 0; i < domCount; i++) {
-    drawFlake(rand(), rand(), (minRN + rand() * (maxRN - minRN)) * 0.7);
+  // Fill pass: smaller chips scatter into any remaining gaps
+  const fillCount = mini ? 18 : 55;
+  for (let i = 0; i < fillCount; i++) {
+    const fi = Math.floor(rand() * items.length);
+    drawChip(rand(), rand(), (minRN + rand() * (maxRN - minRN)) * 0.58, items[fi].hex);
   }
 }
 
