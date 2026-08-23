@@ -555,8 +555,6 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
       ? req.file.buffer
       : Buffer.from(req.file.buffer);
 
-    console.log(`[apply-internal] file: ${req.file.originalname}, size: ${rawImageBuffer.length}, mimetype: ${req.file.mimetype}`);
-
     const result = await compositeInternalBlend({
       leadId:        parseInt(lead_id),
       companyId,

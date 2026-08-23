@@ -36,13 +36,24 @@ async function preprocessImage(inputBuffer) {
     throw Object.assign(new Error('No image data received. Please try uploading again.'), { userInput: true });
   }
 
+  // Detect HEIC/HEIF by ftyp box + brand — sharp cannot reliably decode these
+  if (workingBuffer.length >= 12 && workingBuffer.slice(4, 8).toString('ascii') === 'ftyp') {
+    const brand = workingBuffer.slice(8, 12).toString('ascii').toLowerCase();
+    if (brand.startsWith('hei') || brand.startsWith('hev') || brand === 'mif1') {
+      throw Object.assign(
+        new Error('Your photo is in HEIC format, which is not supported. On iPhone, go to Settings → Camera → Formats → Most Compatible to shoot in JPEG instead, then retake the photo.'),
+        { userInput: true }
+      );
+    }
+  }
+
   let meta;
   try {
     meta = await sharp(workingBuffer).metadata();
   } catch (sharpErr) {
-    console.error('[preprocessImage] sharp failed — buffer size:', workingBuffer.length, 'first 12 bytes:', workingBuffer.slice(0, 12).toString('hex'), 'error:', sharpErr.message);
+    console.error('[preprocessImage] sharp failed:', sharpErr.message, 'buffer size:', workingBuffer.length);
     throw Object.assign(
-      new Error(`Photo could not be read: ${sharpErr.message}. Please try a JPEG or PNG.`),
+      new Error('Could not read this photo. Please try a JPEG or PNG file.'),
       { userInput: true }
     );
   }
