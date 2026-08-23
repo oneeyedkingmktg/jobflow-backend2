@@ -20,6 +20,22 @@ function buildPrompt(chipColor) {
   );
 }
 
+function buildPromptFromRecipe(recipe) {
+  const colorDesc = recipe
+    .map(r => `${Math.round(parseFloat(r.percentage) || 0)}% ${r.hex}`)
+    .join(', ');
+  return (
+    `This is a photo of a garage. Replace ONLY the concrete floor with a professional ` +
+    `decorative epoxy floor coating. Color blend: a custom vinyl chip mix — ${colorDesc}. ` +
+    `Apply a dense full-broadcast vinyl chip finish. Each individual chip flake must be ` +
+    `very fine grain — approximately 3 to 5 millimeters in diameter, tightly packed. ` +
+    `Preserve the original perspective, lighting, shadows, and floor reflections exactly. ` +
+    `Keep all walls, garage doors, ceiling, cars, shelving, cabinets, tools, and all other ` +
+    `objects completely unchanged. Change only the floor surface. ` +
+    `The result must look like a real professional photograph of a completed epoxy floor installation.`
+  );
+}
+
 async function generate({ imageBuffer, chipColor, size }) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -30,6 +46,7 @@ async function generate({ imageBuffer, chipColor, size }) {
     model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
     image: imageFile,
     prompt: buildPrompt(chipColor),
+    quality: 'high',
     n: 1,
     size: size || '1536x1024',
   });
@@ -64,4 +81,36 @@ function downloadUrl(url) {
   });
 }
 
-module.exports = { generate };
+async function generateFromRecipe({ imageBuffer, recipe, size }) {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const { toFile } = require('openai');
+  const imageFile = await toFile(imageBuffer, 'floor.png', { type: 'image/png' });
+
+  const response = await client.images.edit({
+    model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
+    image: imageFile,
+    prompt: buildPromptFromRecipe(recipe),
+    quality: 'high',
+    n: 1,
+    size: size || '1536x1024',
+  });
+
+  const item = response.data[0];
+
+  let buffer;
+  if (item.b64_json) {
+    buffer = Buffer.from(item.b64_json, 'base64');
+  } else if (item.url) {
+    buffer = await downloadUrl(item.url);
+  } else {
+    throw new Error('OpenAI returned neither b64_json nor url');
+  }
+
+  return {
+    buffer,
+    provider: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
+  };
+}
+
+module.exports = { generate, generateFromRecipe };

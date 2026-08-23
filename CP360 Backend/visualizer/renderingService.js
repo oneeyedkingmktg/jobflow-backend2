@@ -274,19 +274,48 @@ async function compositeCustomBlend({ sourceVisualizationId, companyId, recipe }
 
 // ── Internal CRM blend (full pipeline, new photo, background) ─────────────────
 // recipe: [{ rgb: {r,g,b}, weight: 0–1 }] (already converted from hex)
+// rawRecipe: [{ hex, percentage }] — original form, used for OpenAI path
 // Returns { visualization_id } immediately; pipeline runs in background.
 
-async function compositeInternalBlend({ leadId, companyId, recipe, rawImageBuffer }) {
+async function compositeInternalBlend({ leadId, companyId, recipe, rawRecipe, rawImageBuffer }) {
+  const useOpenAI = process.env.VISUALIZATION_PROVIDER === 'openai';
+  const provider = useOpenAI ? 'openai-internal' : 'compositing-internal';
+
   const { rows } = await db.query(
     `INSERT INTO visualizations (company_id, lead_id, rendering_provider, status)
-     VALUES ($1, $2, 'compositing-internal', 'processing') RETURNING id`,
-    [companyId, leadId || null]
+     VALUES ($1, $2, $3, 'processing') RETURNING id`,
+    [companyId, leadId || null, provider]
   );
   const visualizationId = rows[0].id;
 
   setImmediate(async () => {
     try {
-      const { buffer: processedBuffer } = await preprocessImage(rawImageBuffer);
+      const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
+
+      const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
+      const originalUrl = await uploadToR2(originalKey, processedBuffer);
+      await db.query(
+        `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
+        [originalKey, originalUrl, visualizationId]
+      );
+
+      if (useOpenAI) {
+        const result = await openAIProvider.generateFromRecipe({
+          imageBuffer: processedBuffer,
+          recipe: rawRecipe || recipe.map(c => ({ hex: `#${Math.round(c.rgb.r).toString(16).padStart(2,'0')}${Math.round(c.rgb.g).toString(16).padStart(2,'0')}${Math.round(c.rgb.b).toString(16).padStart(2,'0')}`, percentage: Math.round(c.weight * 100) })),
+          size,
+        });
+        const generatedKey = `visualizer/generated/${companyId}/${uuid()}.png`;
+        const generatedUrl = await uploadToR2(generatedKey, result.buffer);
+        await db.query(
+          `UPDATE visualizations
+           SET status='complete', generated_image_key=$1, generated_image_url=$2,
+               rendering_provider=$3, completed_at=NOW()
+           WHERE id=$4`,
+          [generatedKey, generatedUrl, result.provider, visualizationId]
+        );
+        return;
+      }
 
       const { runPreflightChecks } = require('./preflightChecks');
       const preflightFail = await runPreflightChecks(processedBuffer);
@@ -297,13 +326,6 @@ async function compositeInternalBlend({ leadId, companyId, recipe, rawImageBuffe
         );
         return;
       }
-
-      const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
-      const originalUrl = await uploadToR2(originalKey, processedBuffer);
-      await db.query(
-        `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
-        [originalKey, originalUrl, visualizationId]
-      );
 
       const { width, height } = await sharp(processedBuffer).metadata();
       const segResult = await segmentFloor(originalUrl, width, height);

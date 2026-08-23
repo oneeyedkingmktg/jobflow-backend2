@@ -508,6 +508,7 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
       leadId:        parseInt(lead_id),
       companyId,
       recipe:        converted,
+      rawRecipe:     recipe,
       rawImageBuffer: req.file.buffer,
     });
 
