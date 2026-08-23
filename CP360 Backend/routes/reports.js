@@ -649,7 +649,8 @@ router.get('/speed-to-lead', async (req, res) => {
     const placeholders = statusList.map((_, i) => `$${i + 4}`).join(',');
 
     const leadsResult = await pool.query(
-      `SELECT id, full_name, status, created_at, ghl_contact_id, first_call_at
+      `SELECT id, full_name, status, created_at, ghl_contact_id, first_call_at,
+              appt_set_at, sold_at
        FROM leads
        WHERE company_id = $1
          AND deleted_at IS NULL
@@ -677,6 +678,44 @@ router.get('/speed-to-lead', async (req, res) => {
       l._rawMins = Math.round((called - created) / 60000);
       l._bizMins = callableMinutes(created, called);
     }
+
+    // Response-time conversion buckets
+    const RESPONSE_BUCKETS = [
+      { label: '0–5 min',      minM: 0,    maxM: 5 },
+      { label: '6–15 min',     minM: 6,    maxM: 15 },
+      { label: '16–60 min',    minM: 16,   maxM: 60 },
+      { label: '1–4 biz hrs',  minM: 61,   maxM: 240 },
+      { label: '4–8 biz hrs',  minM: 241,  maxM: 480 },
+      { label: '8–16 biz hrs', minM: 481,  maxM: 960 },
+      { label: '16+ biz hrs',  minM: 961,  maxM: null },
+      { label: 'Never Called', minM: null, maxM: null },
+    ];
+    const APPT_STATUSES = new Set(['appointment_set', 'sold', 'not_sold', 'complete']);
+    const SOLD_STATUSES = new Set(['sold', 'complete']);
+    const pct = (n, d) => d > 0 ? Math.round(n * 1000 / d) / 10 : 0;
+
+    const buckets = RESPONSE_BUCKETS.map(({ label, minM, maxM }) => {
+      let slice;
+      if (minM === null) {
+        slice = leads.filter((l) => !l.first_call_at);
+      } else if (maxM === null) {
+        slice = leads.filter((l) => l.first_call_at && l._bizMins >= minM);
+      } else {
+        slice = leads.filter((l) => l.first_call_at && l._bizMins >= minM && l._bizMins <= maxM);
+      }
+      const count  = slice.length;
+      const appts  = slice.filter((l) => l.appt_set_at  || APPT_STATUSES.has(l.status)).length;
+      const sales  = slice.filter((l) => l.sold_at       || SOLD_STATUSES.has(l.status)).length;
+      return {
+        label,
+        count,
+        pctOfLeads:    pct(count, leads.length),
+        appts,
+        sales,
+        leadToApptPct: pct(appts, count),
+        leadToSalePct: pct(sales, count),
+      };
+    });
 
     // Aggregate by status (averages use callable/business minutes)
     const rows = TARGET_STATUSES.map(({ status, label }) => {
@@ -728,6 +767,7 @@ router.get('/speed-to-lead', async (req, res) => {
     res.json({
       rows,
       overall: { count: leads.length, reached: allReached.length, avgMinutes: overallAvg, avgBizMinutes: overallBizAvg },
+      buckets,
       synced: needsFetch.length,
       detail,
     });

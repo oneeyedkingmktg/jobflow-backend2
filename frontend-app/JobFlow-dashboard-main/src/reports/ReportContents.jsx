@@ -620,11 +620,48 @@ export function SpeedToLeadContent({ companyId }) {
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Biz Hrs excludes business hours (9am–5pm) when the crew is on job sites. Raw is total clock time. Leads with no outbound call recorded are counted in totals but excluded from averages. Log sorted slowest-to-fastest by Biz Hrs. Amber rows contain after-hours or weekend activity.
+            Biz Hrs excludes business hours (9am–5pm) when the crew is on job sites. Raw is total clock time. Leads with no outbound call recorded are counted in totals but excluded from averages.
           </p>
 
+          {data.buckets && (
+            <div className="mt-5">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Response Time vs. Conversion</div>
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">First Call</th>
+                      <th className="text-right px-3 py-2 font-semibold">Leads</th>
+                      <th className="text-right px-3 py-2 font-semibold">% of Leads</th>
+                      <th className="text-right px-3 py-2 font-semibold">Appts</th>
+                      <th className="text-right px-3 py-2 font-semibold">Sales</th>
+                      <th className="text-right px-3 py-2 font-semibold">Lead→Appt</th>
+                      <th className="text-right px-3 py-2 font-semibold">Lead→Sale</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {data.buckets.map((b, i) => (
+                      <tr key={i} className={b.label === 'Never Called' ? 'bg-gray-50' : 'bg-white'}>
+                        <td className="px-3 py-2.5 font-medium text-gray-800 whitespace-nowrap">{b.label}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-700">{b.count}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-500">{b.pctOfLeads.toFixed(1)}%</td>
+                        <td className="px-3 py-2.5 text-right text-gray-700">{b.appts}</td>
+                        <td className="px-3 py-2.5 text-right text-gray-700">{b.sales}</td>
+                        <td className="px-3 py-2.5 text-right font-medium text-gray-900">{b.count > 0 ? `${b.leadToApptPct.toFixed(1)}%` : '—'}</td>
+                        <td className="px-3 py-2.5 text-right font-medium text-gray-900">{b.count > 0 ? `${b.leadToSalePct.toFixed(1)}%` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Appointments = reached appt stage or later. Sales = ultimately sold. Buckets use biz-hrs response time (excluding 9am–5pm). All lead counts sum to the total above.
+              </p>
+            </div>
+          )}
+
           {data.detail && data.detail.length > 0 && (
-            <ExpandableDetail label="Lead-by-Lead Call Log" rows={data.detail.length}>
+            <ExpandableDetail label="Lead-by-Lead Call Log (sorted slowest → fastest biz hrs)" rows={data.detail.length}>
               <div className="overflow-x-auto rounded-lg border border-gray-200 mt-1">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 text-gray-500 sticky top-0">
