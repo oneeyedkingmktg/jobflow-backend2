@@ -37,10 +37,14 @@ async function preprocessImage(inputBuffer) {
   let workingBuffer = inputBuffer;
 
   if (isHeic(inputBuffer)) {
-    const { heicTo } = require('heic-convert');
-    workingBuffer = Buffer.from(
-      await heicTo({ buffer: inputBuffer, format: 'JPEG', quality: 0.9 })
-    );
+    try {
+      workingBuffer = await sharp(inputBuffer).jpeg({ quality: 90 }).toBuffer();
+    } catch {
+      throw Object.assign(
+        new Error('HEIC photos are not supported on this device. Please convert to JPEG or PNG and try again.'),
+        { userInput: true }
+      );
+    }
   }
 
   const meta  = await sharp(workingBuffer).metadata();
