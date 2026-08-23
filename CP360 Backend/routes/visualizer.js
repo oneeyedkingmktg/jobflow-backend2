@@ -475,6 +475,52 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/visualizer/save-viz-to-drive — save before + after images to Drive
+// Body: { visualization_id, blend_name }
+// Saves to: Lead Folder → Custom Blends → Image Mockups
+router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
+  const { visualization_id, blend_name } = req.body;
+  if (!visualization_id) return res.status(400).json({ error: 'visualization_id required' });
+
+  try {
+    const companyId = req.user.company_id;
+
+    const { rows } = await db.query(
+      `SELECT id, lead_id, original_image_url, generated_image_url
+       FROM visualizations WHERE id=$1 AND company_id=$2`,
+      [visualization_id, companyId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Visualization not found' });
+
+    const viz = rows[0];
+    if (!viz.lead_id)              return res.status(400).json({ error: 'Visualization has no associated lead' });
+    if (!viz.original_image_url)   return res.status(400).json({ error: 'Before image not available' });
+    if (!viz.generated_image_url)  return res.status(400).json({ error: 'Generated image not ready' });
+
+    const name = (blend_name || 'Custom Blend').replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
+
+    // Download both images in parallel
+    const [beforeBuf, afterBuf] = await Promise.all([
+      axios.get(viz.original_image_url,  { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
+      axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
+    ]);
+
+    const leadFolder      = await resolveLeadFolder(viz.lead_id, { create: true });
+    const customBlends    = await getOrCreateFolder('Custom Blends',  leadFolder.id);
+    const imageMockups    = await getOrCreateFolder('Image Mockups',  customBlends.id);
+
+    await Promise.all([
+      uploadFileToFolder(imageMockups.id, `Image 1 - ${name} - Before.png`, 'image/png', beforeBuf),
+      uploadFileToFolder(imageMockups.id, `Image 1 - ${name} - After.png`,  'image/png', afterBuf),
+    ]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /visualizer/save-viz-to-drive error:', err);
+    res.status(500).json({ error: err.message || 'Failed to save to Drive' });
+  }
+});
+
 // POST /api/visualizer/apply-internal — upload photo + recipe, run composite pipeline in background
 // Multipart: image file + recipe (JSON string) + lead_id + company_id
 router.post('/apply-internal', authenticateToken, upload.single('image'), async (req, res) => {

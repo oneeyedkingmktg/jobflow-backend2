@@ -466,9 +466,10 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   }, [JSON.stringify(Object.entries(results).map(([id, r]) => [id, r.vizId, r.status]))]);
 
   const saveVizToDrive = async (blendId, vizId) => {
+    const blendName = sessionBlends.find(b => b.id === blendId)?.name || 'Custom Blend';
     setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: true } }));
     try {
-      await apiRequest('/api/visualizer/lead', { method: 'POST', body: JSON.stringify({ visualization_id: vizId, company_id: lead.company_id || lead.companyId, name: lead.name }) });
+      await apiRequest('/api/visualizer/save-viz-to-drive', { method: 'POST', body: JSON.stringify({ visualization_id: vizId, blend_name: blendName }) });
       setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savedDrive: true } }));
     } catch (e) { setError(e.message); }
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: false } })); }
