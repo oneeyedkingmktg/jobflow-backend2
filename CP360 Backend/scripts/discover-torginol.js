@@ -147,6 +147,8 @@ async function main() {
 
   const missing = [];
   for (const slug of categorySlugs) {
+    // Skip category/type pages — only keep individual blend products
+    if (slug.endsWith('-flooring') || slug === 'product-library') continue;
     const approxName = (await slugToName(slug)).toLowerCase();
     const inDb = dbNames.has(approxName) || dbRows.some(r => r.name.includes(slug.replace(/-/g, ' ')));
     if (!inDb) missing.push(slug);
