@@ -620,7 +620,7 @@ export function SpeedToLeadContent({ companyId }) {
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Biz Hrs counts only time inside the callable window (5pm–9am). Raw is clock time. Leads with no outbound call recorded are counted in totals but excluded from averages. Log sorted slowest-to-fastest by Biz Hrs. Amber rows contain after-hours or weekend activity.
+            Biz Hrs excludes business hours (9am–5pm) when the crew is on job sites. Raw is total clock time. Leads with no outbound call recorded are counted in totals but excluded from averages. Log sorted slowest-to-fastest by Biz Hrs. Amber rows contain after-hours or weekend activity.
           </p>
 
           {data.detail && data.detail.length > 0 && (

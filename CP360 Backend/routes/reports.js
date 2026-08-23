@@ -581,8 +581,8 @@ router.post('/orphan-resync', async (req, res) => {
 // Returns avg lead-to-first-outbound-call time, grouped by current status.
 // Fetches call data live from GHL on first run, then caches in leads.first_call_at.
 
-// Count only minutes inside the callable window (5pm–9am).
-// Excludes 9am–5pm each calendar day — that's when the crew is on job sites.
+// Excludes business hours (9am–5pm) from elapsed time each calendar day.
+// The crew is on job sites during business hours and can only return calls outside them.
 function callableMinutes(start, end) {
   if (end <= start) return 0;
   const total = Math.round((end - start) / 60000);
