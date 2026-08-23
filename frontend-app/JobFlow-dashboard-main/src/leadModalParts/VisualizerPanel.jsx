@@ -292,6 +292,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [showSelectModal, setShowSelectModal] = useState(false);
   const [selectedBlendIds, setSelectedBlendIds] = useState(new Set());
 
+  // Library UI
+  const [showOtherBlends, setShowOtherBlends] = useState(false);
+
   // Photo & results
   const [photoFile, setPhotoFile] = useState(null);
   const fileRef = useRef();
@@ -568,26 +571,65 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {/* Library tab */}
                 {blendTab === 'library' && !isEditing && (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2 max-h-52 overflow-y-auto">
-                      {libraryColors.map(c => (
-                        <button
-                          key={c.id}
-                          onClick={() => { setSelectedLibColor(c); setBlendName(c.name); }}
-                          className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
-                        >
-                          {c.reference_image_url
-                            ? <img src={c.reference_image_url} alt={c.name} className="w-full h-20 object-cover" />
-                            : <div className="w-full h-20 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No image</span></div>}
-                          <div className="px-1.5 py-1 bg-white">
-                            <p className="text-xs font-semibold text-gray-800 truncate">{c.name}</p>
-                          </div>
-                        </button>
-                      ))}
-                      {libraryColors.length === 0 && (
-                        <div className="col-span-3 text-center py-6 text-xs text-gray-400">No library colors configured yet.</div>
-                      )}
-                    </div>
+                    {libraryColors.length === 0 && (
+                      <div className="text-center py-6 text-xs text-gray-400">No library colors configured yet.</div>
+                    )}
 
+                    {/* Standards — top 8 library colors */}
+                    {libraryColors.length > 0 && (
+                      <>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Standards</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {libraryColors.slice(0, 8).map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => { setSelectedLibColor(c); setBlendName(c.name); setShowOtherBlends(false); }}
+                              className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                            >
+                              {c.reference_image_url
+                                ? <img src={c.reference_image_url} alt={c.name} className="w-full h-16 object-cover" />
+                                : <div className="w-full h-16 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
+                              <div className="px-1 py-1 bg-white">
+                                <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Other Stock Blends — remaining library colors, collapsed by default */}
+                    {libraryColors.length > 8 && (
+                      <div>
+                        <button
+                          onClick={() => setShowOtherBlends(p => !p)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition"
+                        >
+                          <span className="text-gray-400">{showOtherBlends ? '▲' : '▼'}</span>
+                          Other Stock Blends ({libraryColors.length - 8})
+                        </button>
+                        {showOtherBlends && (
+                          <div className="grid grid-cols-4 gap-2 mt-2 max-h-48 overflow-y-auto">
+                            {libraryColors.slice(8).map(c => (
+                              <button
+                                key={c.id}
+                                onClick={() => { setSelectedLibColor(c); setBlendName(c.name); }}
+                                className={`rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === c.id ? 'border-blue-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                              >
+                                {c.reference_image_url
+                                  ? <img src={c.reference_image_url} alt={c.name} className="w-full h-16 object-cover" />
+                                  : <div className="w-full h-16 bg-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">No img</span></div>}
+                                <div className="px-1 py-1 bg-white">
+                                  <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{c.name}</p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selected blend preview + actions */}
                     {selectedLibColor && (
                       <div className="space-y-3">
                         {libRecipe.length > 0
