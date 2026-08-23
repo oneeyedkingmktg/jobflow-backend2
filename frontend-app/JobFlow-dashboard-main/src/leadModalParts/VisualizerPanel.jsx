@@ -64,15 +64,15 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const minRN = mini ? 0.052 : 0.040;
   const maxRN = mini ? 0.108 : 0.088;
 
-  ctx.lineWidth = Math.max(0.8, W * 0.002);
+  ctx.lineWidth = Math.max(0.4, W * 0.001);
 
   const drawChip = (xN, yN, rN, hex) => {
     const cx = xN * W;
     const cy = yN * H;
     const maxR = rN * W;
-    const verts = 5 + Math.floor(rand() * 4);  // 5–8 vertices: broken shard
-    const scaleY = 0.50 + rand() * 0.60;        // aspect ratio 0.5–1.1
-    const rot = rand() * Math.PI;
+    const verts = 5 + Math.floor(rand() * 4);   // 5–8 vertices: broken shard
+    const scaleY = 0.50 + rand() * 0.60;         // aspect ratio 0.5–1.1
+    const rot = rand() * Math.PI * 2;             // full 360° — no directional bias
     ctx.beginPath();
     for (let i = 0; i < verts; i++) {
       const baseA = (i / verts) * Math.PI * 2;
@@ -90,20 +90,29 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
     ctx.closePath();
     ctx.fillStyle = hex;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
     ctx.stroke();
   };
 
-  // Stratified scatter: each chip gets its own grid cell + random offset within it
-  // ensures spatial spread with no large uncovered zones
+  // Pre-compute chip positions (stratified for coverage) then shuffle draw order
+  // so no row/column directional layering artifact appears
   const gridSize = Math.ceil(Math.sqrt(totalChips));
+  const chips = [];
   for (let i = 0; i < totalChips; i++) {
     const col = i % gridSize;
     const row = Math.floor(i / gridSize);
-    const xN = (col + rand()) / gridSize;
-    const yN = (row + rand()) / gridSize;
-    drawChip(xN, yN, minRN + rand() * (maxRN - minRN), colorList[i]);
+    chips.push({
+      xN: (col + rand()) / gridSize,
+      yN: (row + rand()) / gridSize,
+      rN: minRN + rand() * (maxRN - minRN),
+      hex: colorList[i],
+    });
   }
+  for (let i = chips.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [chips[i], chips[j]] = [chips[j], chips[i]];
+  }
+  for (const c of chips) drawChip(c.xN, c.yN, c.rN, c.hex);
 }
 
 // Renders recipe to an off-screen canvas and returns a PNG Blob (for swatch upload).
