@@ -32,9 +32,9 @@ function _mkRand(seed) {
 }
 
 // ── Shared chip rendering logic ───────────────────────────────────────────────
-// ALL colors rendered as dense interlocking chips — no background fill with a color.
-// Grid-based placement guarantees full coverage; proportional cell assignment
-// guarantees correct color ratios. Seeded PRNG makes preview == saved image.
+// Simulates real broadcast chip scatter: high chip count (~5x canvas area)
+// guarantees no background shows through. All colors rendered as chips.
+// Seeded PRNG + normalized coords = preview matches saved image exactly.
 function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
   if (!items.length) return;
@@ -43,52 +43,43 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const seed = _hash(items.map(r => `${r.hex}:${Math.round(parseFloat(r.percentage))}`).join(','));
   const rand = _mkRand(seed);
 
-  // Neutral base catches tiny gaps at canvas edges
-  ctx.fillStyle = '#c9c6c1';
-  ctx.fillRect(0, 0, W, H);
+  // ~5x canvas area coverage factor — no gaps possible even with irregular shapes
+  const totalChips = mini ? 200 : 560;
 
-  // Grid dimensions — coarser grid = bigger, chunkier chips
-  const cols = mini ? 8 : 13;
-  const rows = mini ? 8 : 13;
-  const totalCells = cols * rows;
-
-  // Proportional color assignment: each color gets exactly its share of cells
-  const cells = [];
+  // Pre-assign colors proportionally then Fisher-Yates shuffle
+  const colorList = [];
   let assigned = 0;
   for (let ci = 0; ci < items.length; ci++) {
     const pct = (parseFloat(items[ci].percentage) || 0) / total;
-    const count = ci === items.length - 1
-      ? totalCells - assigned
-      : Math.round(pct * totalCells);
-    for (let k = 0; k < count; k++) cells.push(items[ci].hex);
+    const count = ci === items.length - 1 ? totalChips - assigned : Math.round(pct * totalChips);
+    for (let k = 0; k < count; k++) colorList.push(items[ci].hex);
     assigned += count;
   }
-  // Fisher-Yates shuffle — natural random spatial mix
-  for (let i = cells.length - 1; i > 0; i--) {
+  for (let i = colorList.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
-    [cells[i], cells[j]] = [cells[j], cells[i]];
+    [colorList[i], colorList[j]] = [colorList[j], colorList[i]];
   }
 
-  // Chip size: large enough to overlap neighbors → no gaps
-  const minRN = mini ? 0.058 : 0.044;
-  const maxRN = mini ? 0.115 : 0.092;
+  // Chip radius 4–9% of canvas width
+  const minRN = mini ? 0.052 : 0.040;
+  const maxRN = mini ? 0.108 : 0.088;
 
-  ctx.lineWidth = Math.max(0.8, W * 0.0022);
+  ctx.lineWidth = Math.max(0.8, W * 0.002);
 
-  const drawChip = (cxN, cyN, rN, hex) => {
-    const cx = cxN * W;
-    const cy = cyN * H;
+  const drawChip = (xN, yN, rN, hex) => {
+    const cx = xN * W;
+    const cy = yN * H;
     const maxR = rN * W;
-    const verts = 5 + Math.floor(rand() * 4);     // 5–8 vertices: shard-like
-    const scaleY = 0.42 + rand() * 0.68;           // squished/stretched for variety
+    const verts = 5 + Math.floor(rand() * 4);  // 5–8 vertices: broken shard
+    const scaleY = 0.50 + rand() * 0.60;        // aspect ratio 0.5–1.1
     const rot = rand() * Math.PI;
     ctx.beginPath();
     for (let i = 0; i < verts; i++) {
-      // Uneven angle spacing → jagged broken-shard silhouette
       const baseA = (i / verts) * Math.PI * 2;
-      const jitter = (rand() - 0.5) * (Math.PI / verts) * 1.5;
+      const jitter = (rand() - 0.5) * (Math.PI / verts) * 1.3;
       const a = baseA + jitter;
-      const r = maxR * (0.42 + rand() * 0.58);
+      // 65–100% of maxR keeps shapes convex-ish — avoids deep star-point concavities
+      const r = maxR * (0.65 + rand() * 0.35);
       const lx = Math.cos(a) * r;
       const ly = Math.sin(a) * r * scaleY;
       const px = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
@@ -99,27 +90,19 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
     ctx.closePath();
     ctx.fillStyle = hex;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
     ctx.stroke();
   };
 
-  // Primary pass: one chip per grid cell, position jittered within cell
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const hex = cells[row * cols + col];
-      const cellW = 1.0 / cols;
-      const cellH = 1.0 / rows;
-      const xN = (col + 0.12 + rand() * 0.76) * cellW;
-      const yN = (row + 0.12 + rand() * 0.76) * cellH;
-      drawChip(xN, yN, minRN + rand() * (maxRN - minRN), hex);
-    }
-  }
-
-  // Fill pass: smaller chips scatter into any remaining gaps
-  const fillCount = mini ? 18 : 55;
-  for (let i = 0; i < fillCount; i++) {
-    const fi = Math.floor(rand() * items.length);
-    drawChip(rand(), rand(), (minRN + rand() * (maxRN - minRN)) * 0.58, items[fi].hex);
+  // Stratified scatter: each chip gets its own grid cell + random offset within it
+  // ensures spatial spread with no large uncovered zones
+  const gridSize = Math.ceil(Math.sqrt(totalChips));
+  for (let i = 0; i < totalChips; i++) {
+    const col = i % gridSize;
+    const row = Math.floor(i / gridSize);
+    const xN = (col + rand()) / gridSize;
+    const yN = (row + rand()) / gridSize;
+    drawChip(xN, yN, minRN + rand() * (maxRN - minRN), colorList[i]);
   }
 }
 
