@@ -630,7 +630,7 @@ router.get('/speed-to-lead', async (req, res) => {
     const placeholders = statusList.map((_, i) => `$${i + 4}`).join(',');
 
     const leadsResult = await pool.query(
-      `SELECT id, status, created_at, ghl_contact_id, first_call_at
+      `SELECT id, full_name, status, created_at, ghl_contact_id, first_call_at
        FROM leads
        WHERE company_id = $1
          AND deleted_at IS NULL
@@ -668,10 +668,40 @@ router.get('/speed-to-lead', async (req, res) => {
       overallAvg = Math.round(totalMs / allReached.length / 60000);
     }
 
+    // Per-lead detail log for diagnostic use
+    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const detail = allReached.map((l) => {
+      const created = new Date(l.created_at);
+      const called  = new Date(l.first_call_at);
+      const minutesToCall = Math.round((called - created) / 60000);
+      const createdHour = created.getHours();
+      const calledHour  = called.getHours();
+      const afterHoursLead = createdHour >= 22 || createdHour < 10;
+      const afterHoursCall = calledHour  >= 22 || calledHour  < 10;
+      const weekendLead = created.getDay() === 0 || created.getDay() === 6;
+      const weekendCall = called.getDay()  === 0 || called.getDay()  === 6;
+      return {
+        id: l.id,
+        name: l.full_name || `Lead #${l.id}`,
+        status: TARGET_STATUSES.find((s) => s.status === l.status)?.label || l.status,
+        createdAt: l.created_at,
+        createdDay: DAYS[created.getDay()],
+        firstCallAt: l.first_call_at,
+        calledDay: DAYS[called.getDay()],
+        minutesToCall,
+        afterHoursLead,
+        afterHoursCall,
+        weekendLead,
+        weekendCall,
+        flagged: afterHoursLead || afterHoursCall || weekendLead || weekendCall,
+      };
+    }).sort((a, b) => b.minutesToCall - a.minutesToCall);
+
     res.json({
       rows,
       overall: { count: leads.length, reached: allReached.length, avgMinutes: overallAvg },
       synced: needsFetch.length,
+      detail,
     });
   } catch (error) {
     console.error('[GET /api/reports/speed-to-lead]', error);

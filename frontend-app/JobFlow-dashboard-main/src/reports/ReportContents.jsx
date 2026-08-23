@@ -619,6 +619,55 @@ export function SpeedToLeadContent({ companyId }) {
           <p className="text-xs text-gray-400 mt-2">
             Leads with no outbound call recorded in GHL are counted in totals but excluded from averages. Date range filters by lead creation date.
           </p>
+
+          {data.detail && data.detail.length > 0 && (
+            <ExpandableDetail label="Lead-by-Lead Call Log" rows={data.detail.length}>
+              <div className="overflow-x-auto rounded-lg border border-gray-200 mt-1">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold">Name</th>
+                      <th className="text-left px-3 py-2 font-semibold">Status</th>
+                      <th className="text-left px-3 py-2 font-semibold">Lead In</th>
+                      <th className="text-left px-3 py-2 font-semibold">First Call</th>
+                      <th className="text-right px-3 py-2 font-semibold">Response</th>
+                      <th className="text-center px-3 py-2 font-semibold">Flags</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {data.detail.map((r) => {
+                      const fmtDT = (iso, day) => {
+                        const d = new Date(iso);
+                        return `${day} ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                      };
+                      const flags = [
+                        r.afterHoursLead && 'Lead after-hrs',
+                        r.weekendLead    && 'Lead weekend',
+                        r.afterHoursCall && 'Call after-hrs',
+                        r.weekendCall    && 'Call weekend',
+                      ].filter(Boolean);
+                      return (
+                        <tr key={r.id} className={r.flagged ? 'bg-amber-50' : 'bg-white'}>
+                          <td className="px-3 py-2">
+                            <ContactLink id={r.id} name={r.name} />
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">{r.status}</td>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDT(r.createdAt, r.createdDay)}</td>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDT(r.firstCallAt, r.calledDay)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">{fmtTime(r.minutesToCall)}</td>
+                          <td className="px-3 py-2 text-center">
+                            {flags.length > 0 && (
+                              <span className="text-amber-700 font-medium">{flags.join(' · ')}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </ExpandableDetail>
+          )}
         </>
       )}
     </div>
