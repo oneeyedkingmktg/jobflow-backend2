@@ -43,8 +43,10 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   const seed = _hash(items.map(r => `${r.hex}:${Math.round(parseFloat(r.percentage))}`).join(','));
   const rand = _mkRand(seed);
 
-  // ~5x canvas area coverage factor — no gaps possible even with irregular shapes
-  const totalChips = mini ? 200 : 560;
+  // Use a perfect square chip count so the stratified grid fills every cell — no empty bottom rows
+  const baseChips = mini ? 196 : 576; // 14² or 24² — perfect squares
+  const gridSize  = Math.round(Math.sqrt(baseChips));
+  const totalChips = gridSize * gridSize;
 
   // Pre-assign colors proportionally then Fisher-Yates shuffle
   const colorList = [];
@@ -95,8 +97,6 @@ function renderChipsToCtx(ctx, W, H, recipe, mini = false) {
   };
 
   // Pre-compute chip positions (stratified for coverage) then shuffle draw order
-  // so no row/column directional layering artifact appears
-  const gridSize = Math.ceil(Math.sqrt(totalChips));
   const chips = [];
   for (let i = 0; i < totalChips; i++) {
     const col = i % gridSize;
@@ -748,7 +748,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                               <div key={blend.id} className={`rounded-xl border-2 overflow-hidden transition ${checked ? 'border-blue-400' : 'border-gray-200'} bg-gray-50`}>
                                 {/* Chip preview with checkbox overlay */}
                                 <div className="relative">
-                                  <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
+                                  <ChipBlendPreview recipe={blend.recipe} className="w-full" />
                                   <button
                                     onClick={() => toggleBlendSelect(blend.id)}
                                     className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition ${checked ? 'bg-blue-500 border-blue-500' : 'bg-white/80 border-gray-400'}`}
