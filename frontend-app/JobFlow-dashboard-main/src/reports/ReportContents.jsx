@@ -593,7 +593,8 @@ export function SpeedToLeadContent({ companyId }) {
                   <th className="text-left px-3 py-2 font-semibold">Status</th>
                   <th className="text-right px-3 py-2 font-semibold">Leads</th>
                   <th className="text-right px-3 py-2 font-semibold">Called</th>
-                  <th className="text-right px-3 py-2 font-semibold">Avg Response</th>
+                  <th className="text-right px-3 py-2 font-semibold">Raw</th>
+                  <th className="text-right px-3 py-2 font-semibold">Biz Hrs</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -604,20 +605,22 @@ export function SpeedToLeadContent({ companyId }) {
                     </td>
                     <td className="px-3 py-2.5 text-right text-gray-700">{r.count}</td>
                     <td className="px-3 py-2.5 text-right text-gray-500">{r.reached} of {r.count}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-gray-900">{fmtTime(r.avgMinutes)}</td>
+                    <td className="px-3 py-2.5 text-right text-gray-400">{fmtTime(r.avgMinutes)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-900">{fmtTime(r.avgBizMinutes)}</td>
                   </tr>
                 ))}
                 <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                   <td className="px-3 py-2.5 text-gray-900">All Statuses</td>
                   <td className="px-3 py-2.5 text-right text-gray-900">{data.overall.count}</td>
                   <td className="px-3 py-2.5 text-right text-gray-700">{data.overall.reached} of {data.overall.count}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-900">{fmtTime(data.overall.avgMinutes)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-400">{fmtTime(data.overall.avgMinutes)}</td>
+                  <td className="px-3 py-2.5 text-right text-gray-900">{fmtTime(data.overall.avgBizMinutes)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Leads with no outbound call recorded in GHL are counted in totals but excluded from averages. Date range filters by lead creation date.
+            Biz Hrs counts only time inside the callable window (5pm–9am). Raw is clock time. Leads with no outbound call recorded are counted in totals but excluded from averages. Log sorted slowest-to-fastest by Biz Hrs. Amber rows contain after-hours or weekend activity.
           </p>
 
           {data.detail && data.detail.length > 0 && (
@@ -630,7 +633,8 @@ export function SpeedToLeadContent({ companyId }) {
                       <th className="text-left px-3 py-2 font-semibold">Status</th>
                       <th className="text-left px-3 py-2 font-semibold">Lead In</th>
                       <th className="text-left px-3 py-2 font-semibold">First Call</th>
-                      <th className="text-right px-3 py-2 font-semibold">Response</th>
+                      <th className="text-right px-3 py-2 font-semibold">Raw</th>
+                      <th className="text-right px-3 py-2 font-semibold">Biz Hrs</th>
                       <th className="text-center px-3 py-2 font-semibold">Flags</th>
                     </tr>
                   </thead>
@@ -654,7 +658,8 @@ export function SpeedToLeadContent({ companyId }) {
                           <td className="px-3 py-2 text-gray-500">{r.status}</td>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDT(r.createdAt, r.createdDay)}</td>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDT(r.firstCallAt, r.calledDay)}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">{fmtTime(r.minutesToCall)}</td>
+                          <td className="px-3 py-2 text-right text-gray-400 whitespace-nowrap">{fmtTime(r.minutesToCall)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap">{fmtTime(r.bizMinutesToCall)}</td>
                           <td className="px-3 py-2 text-center">
                             {flags.length > 0 && (
                               <span className="text-amber-700 font-medium">{flags.join(' · ')}</span>

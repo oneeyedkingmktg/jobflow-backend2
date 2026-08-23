@@ -581,6 +581,25 @@ router.post('/orphan-resync', async (req, res) => {
 // Returns avg lead-to-first-outbound-call time, grouped by current status.
 // Fetches call data live from GHL on first run, then caches in leads.first_call_at.
 
+// Count only minutes inside the callable window (5pm–9am).
+// Excludes 9am–5pm each calendar day — that's when the crew is on job sites.
+function callableMinutes(start, end) {
+  if (end <= start) return 0;
+  const total = Math.round((end - start) / 60000);
+  let excluded = 0;
+  const cur = new Date(start); cur.setHours(0, 0, 0, 0);
+  const last = new Date(end);  last.setHours(0, 0, 0, 0);
+  while (cur <= last) {
+    const blockStart = new Date(cur); blockStart.setHours(9,  0, 0, 0);
+    const blockEnd   = new Date(cur); blockEnd.setHours(17, 0, 0, 0);
+    const oStart = Math.max(start.getTime(), blockStart.getTime());
+    const oEnd   = Math.min(end.getTime(),   blockEnd.getTime());
+    if (oEnd > oStart) excluded += Math.round((oEnd - oStart) / 60000);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return Math.max(0, total - excluded);
+}
+
 const TARGET_STATUSES = [
   { status: 'status_pre_lead', label: 'Pre-Lead' },
   { status: 'lead',            label: 'Lead' },
@@ -649,35 +668,43 @@ router.get('/speed-to-lead', async (req, res) => {
       await Promise.all(needsFetch.slice(i, i + BATCH).map((l) => fetchAndCacheFirstCall(l, company)));
     }
 
-    // Aggregate by status
-    const rows = TARGET_STATUSES.map(({ status, label }) => {
-      const bucket = leads.filter((l) => l.status === status);
-      const reached = bucket.filter((l) => l.first_call_at);
-      let avgMinutes = null;
-      if (reached.length) {
-        const totalMs = reached.reduce((s, l) => s + (new Date(l.first_call_at) - new Date(l.created_at)), 0);
-        avgMinutes = Math.round(totalMs / reached.length / 60000);
-      }
-      return { status, label, count: bucket.length, reached: reached.length, avgMinutes };
-    });
-
     const allReached = leads.filter((l) => l.first_call_at);
-    let overallAvg = null;
-    if (allReached.length) {
-      const totalMs = allReached.reduce((s, l) => s + (new Date(l.first_call_at) - new Date(l.created_at)), 0);
-      overallAvg = Math.round(totalMs / allReached.length / 60000);
+
+    // Pre-compute raw + callable minutes for every reached lead
+    for (const l of allReached) {
+      const created = new Date(l.created_at);
+      const called  = new Date(l.first_call_at);
+      l._rawMins = Math.round((called - created) / 60000);
+      l._bizMins = callableMinutes(created, called);
     }
 
-    // Per-lead detail log for diagnostic use
+    // Aggregate by status (averages use callable/business minutes)
+    const rows = TARGET_STATUSES.map(({ status, label }) => {
+      const bucket  = leads.filter((l) => l.status === status);
+      const reached = bucket.filter((l) => l.first_call_at);
+      let avgMinutes = null, avgBizMinutes = null;
+      if (reached.length) {
+        avgMinutes    = Math.round(reached.reduce((s, l) => s + l._rawMins, 0) / reached.length);
+        avgBizMinutes = Math.round(reached.reduce((s, l) => s + l._bizMins, 0) / reached.length);
+      }
+      return { status, label, count: bucket.length, reached: reached.length, avgMinutes, avgBizMinutes };
+    });
+
+    let overallAvg = null, overallBizAvg = null;
+    if (allReached.length) {
+      overallAvg    = Math.round(allReached.reduce((s, l) => s + l._rawMins, 0) / allReached.length);
+      overallBizAvg = Math.round(allReached.reduce((s, l) => s + l._bizMins, 0) / allReached.length);
+    }
+
+    // Per-lead detail log
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const detail = allReached.map((l) => {
       const created = new Date(l.created_at);
       const called  = new Date(l.first_call_at);
-      const minutesToCall = Math.round((called - created) / 60000);
       const createdHour = created.getHours();
       const calledHour  = called.getHours();
-      const afterHoursLead = createdHour >= 22 || createdHour < 10;
-      const afterHoursCall = calledHour  >= 22 || calledHour  < 10;
+      const afterHoursLead = createdHour >= 17 || createdHour < 9;
+      const afterHoursCall = calledHour  >= 17 || calledHour  < 9;
       const weekendLead = created.getDay() === 0 || created.getDay() === 6;
       const weekendCall = called.getDay()  === 0 || called.getDay()  === 6;
       return {
@@ -688,18 +715,19 @@ router.get('/speed-to-lead', async (req, res) => {
         createdDay: DAYS[created.getDay()],
         firstCallAt: l.first_call_at,
         calledDay: DAYS[called.getDay()],
-        minutesToCall,
+        minutesToCall: l._rawMins,
+        bizMinutesToCall: l._bizMins,
         afterHoursLead,
         afterHoursCall,
         weekendLead,
         weekendCall,
         flagged: afterHoursLead || afterHoursCall || weekendLead || weekendCall,
       };
-    }).sort((a, b) => b.minutesToCall - a.minutesToCall);
+    }).sort((a, b) => b.bizMinutesToCall - a.bizMinutesToCall);
 
     res.json({
       rows,
-      overall: { count: leads.length, reached: allReached.length, avgMinutes: overallAvg },
+      overall: { count: leads.length, reached: allReached.length, avgMinutes: overallAvg, avgBizMinutes: overallBizAvg },
       synced: needsFetch.length,
       detail,
     });
