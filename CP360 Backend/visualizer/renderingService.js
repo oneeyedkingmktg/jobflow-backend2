@@ -29,25 +29,20 @@ const SIZES = [
   { w: 1024, h: 1024, label: '1024x1024' },
 ];
 
-function isHeic(buffer) {
-  return buffer.length > 8 && buffer.slice(4, 8).toString('ascii') === 'ftyp';
-}
-
 async function preprocessImage(inputBuffer) {
   let workingBuffer = inputBuffer;
 
-  if (isHeic(inputBuffer)) {
-    try {
-      workingBuffer = await sharp(inputBuffer).jpeg({ quality: 90 }).toBuffer();
-    } catch {
-      throw Object.assign(
-        new Error('HEIC photos are not supported on this device. Please convert to JPEG or PNG and try again.'),
-        { userInput: true }
-      );
-    }
+  // If sharp can't read the format, give a user-friendly error
+  let meta;
+  try {
+    meta = await sharp(workingBuffer).metadata();
+  } catch {
+    throw Object.assign(
+      new Error('Could not read this photo. Please try a JPEG or PNG file.'),
+      { userInput: true }
+    );
   }
 
-  const meta  = await sharp(workingBuffer).metadata();
   const ratio = (meta.width || 1) / (meta.height || 1);
 
   let target;
