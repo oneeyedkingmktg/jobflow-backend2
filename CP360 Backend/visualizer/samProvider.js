@@ -77,8 +77,7 @@ async function analyzeMask(maskBuffer) {
   const mean     = channels[0].mean; // 0–255
   const coverage = mean / 255;       // 0.0–1.0
 
-  if (coverage < 0.01) throw userFail('no_floor'); // essentially empty
-  if (coverage > 0.92) throw userFail('floor_unclear');
+  if (coverage < 0.005) throw userFail('no_floor'); // essentially empty
 
   return { coverage };
 }
@@ -145,12 +144,13 @@ async function segmentFloor(imageUrl) {
 
   console.log(`[SAM2] ${maskUrls.length} masks; best floor score: ${bestScore.toFixed(3)} (mask ${bestIdx})`);
 
-  if (bestScore < 0.01) throw userFail('no_floor');
+  if (bestScore < 0.005) throw userFail('no_floor');
 
   const maskBuffer = maskBuffers[bestIdx];
   const { coverage } = await analyzeMask(maskBuffer);
 
-  if (coverage > 0.95) throw userFail('floor_unclear');
+  // Only reject if coverage is essentially the full image (SAM returned a full-frame mask)
+  if (coverage > 0.97) throw userFail('floor_unclear');
 
   return { maskBuffer, coverage };
 }

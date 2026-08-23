@@ -37,9 +37,9 @@ async function preprocessImage(inputBuffer) {
   let workingBuffer = inputBuffer;
 
   if (isHeic(inputBuffer)) {
-    const heicConvert = require('heic-convert');
+    const { heicTo } = require('heic-convert');
     workingBuffer = Buffer.from(
-      await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.9 })
+      await heicTo({ buffer: inputBuffer, format: 'JPEG', quality: 0.9 })
     );
   }
 
