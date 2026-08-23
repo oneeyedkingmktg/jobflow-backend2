@@ -58,7 +58,12 @@ async function preprocessImage(inputBuffer) {
     );
   }
 
-  const ratio = (meta.width || 1) / (meta.height || 1);
+  let imgW = meta.width  || 1;
+  let imgH = meta.height || 1;
+  // EXIF orientations 5–8 are 90°/270° rotations — swap to get true display dimensions
+  // (sharp.metadata() returns raw pixel dims, not display dims)
+  if (meta.orientation >= 5 && meta.orientation <= 8) [imgW, imgH] = [imgH, imgW];
+  const ratio = imgW / imgH;
 
   // Match output to input orientation — portrait in → portrait out, landscape in → landscape out
   let target;

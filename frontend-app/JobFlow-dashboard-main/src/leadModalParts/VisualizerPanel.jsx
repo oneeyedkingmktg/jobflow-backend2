@@ -315,6 +315,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [results, setResults] = useState({});
   const [actionState, setActionState] = useState({});
 
+  // Drive save modal
+  const [driveModal, setDriveModal] = useState(null); // null | { vizId, blendId, blendName }
+  const [driveModalName, setDriveModalName] = useState('');
+  const [savedBeforeNames, setSavedBeforeNames] = useState(new Set());
+
   // Swatch action state per blend id
   const [swatchState, setSwatchState] = useState({});
 
@@ -341,6 +346,17 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       .then(d => setLibRecipe(d.recipe || []))
       .catch(() => setLibRecipe([]));
   }, [selectedLibColor?.id]);
+
+  // Load saved blends from DB when visualizer opens
+  useEffect(() => {
+    if (!lead?.id) return;
+    apiRequest(`/api/visualizer/lead-blends?lead_id=${lead.id}`)
+      .then(d => {
+        const loaded = (d.blends || []).map(b => ({ id: newId(), name: b.name, recipe: b.recipe }));
+        if (loaded.length) setSessionBlends(loaded);
+      })
+      .catch(() => {});
+  }, [lead?.id]);
 
   // Customize library blend → fork into custom tab
   const customizeLibBlend = () => {
@@ -465,12 +481,26 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(Object.entries(results).map(([id, r]) => [id, r.vizId, r.status]))]);
 
-  const saveVizToDrive = async (blendId, vizId) => {
+  const saveVizToDrive = (blendId, vizId) => {
     const blendName = sessionBlends.find(b => b.id === blendId)?.name || 'Custom Blend';
+    setDriveModalName('');
+    setDriveModal({ vizId, blendId, blendName });
+  };
+
+  const confirmDriveSave = async () => {
+    if (!driveModal) return;
+    const { vizId, blendName } = driveModal;
+    const saveAsName = driveModalName.trim() || blendName || 'Session';
+    const skipBefore = savedBeforeNames.has(saveAsName);
+    setDriveModal(null);
     setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: true } }));
     try {
-      await apiRequest('/api/visualizer/save-viz-to-drive', { method: 'POST', body: JSON.stringify({ visualization_id: vizId, blend_name: blendName }) });
+      await apiRequest('/api/visualizer/save-viz-to-drive', {
+        method: 'POST',
+        body: JSON.stringify({ visualization_id: vizId, blend_name: blendName, save_as_name: saveAsName, skip_before: skipBefore }),
+      });
       setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savedDrive: true } }));
+      setSavedBeforeNames(prev => new Set([...prev, saveAsName]));
     } catch (e) { setError(e.message); }
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: false } })); }
   };
@@ -905,6 +935,32 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               <button onClick={() => setSaveModal(null)} className="w-full py-2 text-xs text-gray-400 hover:text-gray-600">
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DRIVE SAVE MODAL ─────────────────────────────────────────────── */}
+      {driveModal && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-3">
+            <h3 className="text-sm font-bold text-gray-900">Save to Drive</h3>
+            <p className="text-xs text-gray-500">Give this session a name — a folder will be created containing the Before photo and each saved blend variation.</p>
+            <input
+              type="text"
+              value={driveModalName}
+              onChange={e => setDriveModalName(e.target.value)}
+              placeholder={driveModal.blendName || 'Session name'}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && confirmDriveSave()}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            {savedBeforeNames.has((driveModalName.trim() || driveModal.blendName || 'Session')) && (
+              <p className="text-xs text-blue-500">Before image already saved for this session — only the After will be added.</p>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setDriveModal(null)} className="flex-1 py-2 text-sm font-semibold bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancel</button>
+              <button onClick={confirmDriveSave} className="flex-1 py-2 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition">Save</button>
             </div>
           </div>
         </div>

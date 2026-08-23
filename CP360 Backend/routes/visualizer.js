@@ -415,7 +415,7 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
     await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: finalBuf, ContentType: 'image/png' }));
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
-    // ── 6. Async Drive save → "Blend Recipes" subfolder ─────────────────
+    // ── 6. Async Drive save → "Custom Blends" subfolder ─────────────────
     if (lead_id) {
       const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
@@ -424,6 +424,13 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
         .then(leadFolder => getOrCreateFolder('Custom Blends', leadFolder.id))
         .then(subFolder  => uploadFileToFolder(subFolder.id, fileName, 'image/png', finalBuf))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
+
+      // Save recipe to DB so it reloads on next visualizer open
+      const cleanRecipe = recipe.map(({ hex, name, code, percentage }) => ({ hex, name, code, percentage }));
+      db.query(
+        `INSERT INTO lead_blend_recipes (lead_id, company_id, name, recipe) VALUES ($1,$2,$3,$4)`,
+        [parseInt(lead_id), companyId, blend_name || 'Custom Blend', JSON.stringify(cleanRecipe)]
+      ).catch(err => console.error('[Swatch] DB recipe save failed:', err.message));
     }
 
     res.json({ swatch_url: swatchUrl });
@@ -475,12 +482,14 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/visualizer/save-viz-to-drive — save before + after images to Drive
-// Body: { visualization_id, blend_name }
-// Saves to: Lead Folder → Custom Blends → Image Mockups
+// POST /api/visualizer/save-viz-to-drive
+// Body: { visualization_id, blend_name, save_as_name, skip_before? }
+// Structure: Lead → Custom Blends → Image Mockups → [save_as_name]/ → Before.png + [blend_name].png
 router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
-  const { visualization_id, blend_name } = req.body;
-  if (!visualization_id) return res.status(400).json({ error: 'visualization_id required' });
+  const { visualization_id, blend_name, save_as_name, skip_before } = req.body;
+  if (!visualization_id || !save_as_name) {
+    return res.status(400).json({ error: 'visualization_id and save_as_name required' });
+  }
 
   try {
     const companyId = req.user.company_id;
@@ -493,31 +502,63 @@ router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Visualization not found' });
 
     const viz = rows[0];
-    if (!viz.lead_id)              return res.status(400).json({ error: 'Visualization has no associated lead' });
-    if (!viz.original_image_url)   return res.status(400).json({ error: 'Before image not available' });
-    if (!viz.generated_image_url)  return res.status(400).json({ error: 'Generated image not ready' });
+    if (!viz.lead_id)             return res.status(400).json({ error: 'Visualization has no associated lead' });
+    if (!viz.generated_image_url) return res.status(400).json({ error: 'Generated image not ready' });
 
-    const name = (blend_name || 'Custom Blend').replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
+    const safeName  = save_as_name.replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
+    const safeBlend = (blend_name || 'After').replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
 
-    // Download both images in parallel
-    const [beforeBuf, afterBuf] = await Promise.all([
-      axios.get(viz.original_image_url,  { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
-      axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
-    ]);
+    // Download only what we need
+    const toFetch = skip_before
+      ? [axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => [null, Buffer.from(r.data)])]
+      : [Promise.all([
+          viz.original_image_url
+            ? axios.get(viz.original_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data))
+            : Promise.resolve(null),
+          axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
+        ])];
 
-    const leadFolder      = await resolveLeadFolder(viz.lead_id, { create: true });
-    const customBlends    = await getOrCreateFolder('Custom Blends',  leadFolder.id);
-    const imageMockups    = await getOrCreateFolder('Image Mockups',  customBlends.id);
+    const [beforeBuf, afterBuf] = skip_before
+      ? [null, (await axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 })).data]
+      : await Promise.all([
+          viz.original_image_url
+            ? axios.get(viz.original_image_url,  { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data))
+            : Promise.resolve(null),
+          axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
+        ]);
 
-    await Promise.all([
-      uploadFileToFolder(imageMockups.id, `Image 1 - ${name} - Before.png`, 'image/png', beforeBuf),
-      uploadFileToFolder(imageMockups.id, `Image 1 - ${name} - After.png`,  'image/png', afterBuf),
-    ]);
+    const leadFolder    = await resolveLeadFolder(viz.lead_id, { create: true });
+    const customBlends  = await getOrCreateFolder('Custom Blends',  leadFolder.id);
+    const imageMockups  = await getOrCreateFolder('Image Mockups',  customBlends.id);
+    const sessionFolder = await getOrCreateFolder(safeName, imageMockups.id);
+
+    const uploads = [uploadFileToFolder(sessionFolder.id, `${safeBlend}.png`, 'image/png', Buffer.from(afterBuf))];
+    if (!skip_before && beforeBuf) {
+      uploads.push(uploadFileToFolder(sessionFolder.id, 'Before.png', 'image/png', beforeBuf));
+    }
+    await Promise.all(uploads);
 
     res.json({ ok: true });
   } catch (err) {
     console.error('POST /visualizer/save-viz-to-drive error:', err);
     res.status(500).json({ error: err.message || 'Failed to save to Drive' });
+  }
+});
+
+// GET /api/visualizer/lead-blends — load saved blend recipes for a lead (populated on swatch save)
+router.get('/lead-blends', authenticateToken, async (req, res) => {
+  const { lead_id } = req.query;
+  if (!lead_id) return res.status(400).json({ error: 'lead_id required' });
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, recipe FROM lead_blend_recipes
+       WHERE lead_id=$1 AND company_id=$2 ORDER BY created_at`,
+      [parseInt(lead_id), req.user.company_id]
+    );
+    res.json({ blends: rows });
+  } catch (err) {
+    console.error('GET /visualizer/lead-blends error:', err);
+    res.status(500).json({ error: 'Failed to load blends' });
   }
 });
 
