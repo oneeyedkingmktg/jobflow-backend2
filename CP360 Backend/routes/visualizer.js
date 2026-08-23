@@ -545,6 +545,57 @@ router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Company-level saved custom blends ─────────────────────────────────────────
+
+// GET /api/visualizer/company-blends
+router.get('/company-blends', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, name, recipe, created_at FROM company_custom_blends
+       WHERE company_id=$1 ORDER BY created_at`,
+      [req.user.company_id]
+    );
+    res.json({ blends: rows });
+  } catch (err) {
+    console.error('GET /visualizer/company-blends error:', err);
+    res.status(500).json({ error: 'Failed to load company blends' });
+  }
+});
+
+// POST /api/visualizer/company-blends — save a custom blend globally for this company
+// Body: { name, recipe }
+router.post('/company-blends', authenticateToken, async (req, res) => {
+  const { name, recipe } = req.body;
+  if (!name || !Array.isArray(recipe) || !recipe.length) {
+    return res.status(400).json({ error: 'name and recipe required' });
+  }
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO company_custom_blends (company_id, name, recipe)
+       VALUES ($1, $2, $3) RETURNING id, name, recipe, created_at`,
+      [req.user.company_id, name.slice(0, 100), JSON.stringify(recipe)]
+    );
+    res.json({ blend: rows[0] });
+  } catch (err) {
+    console.error('POST /visualizer/company-blends error:', err);
+    res.status(500).json({ error: 'Failed to save blend' });
+  }
+});
+
+// DELETE /api/visualizer/company-blends/:id
+router.delete('/company-blends/:id', authenticateToken, async (req, res) => {
+  try {
+    await db.query(
+      `DELETE FROM company_custom_blends WHERE id=$1 AND company_id=$2`,
+      [req.params.id, req.user.company_id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /visualizer/company-blends error:', err);
+    res.status(500).json({ error: 'Failed to delete blend' });
+  }
+});
+
 // GET /api/visualizer/lead-blends — load saved blend recipes for a lead (populated on swatch save)
 router.get('/lead-blends', authenticateToken, async (req, res) => {
   const { lead_id } = req.query;

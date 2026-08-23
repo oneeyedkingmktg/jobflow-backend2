@@ -127,7 +127,7 @@ function renderChipsToBlob(recipe, size = 960) {
 }
 
 // ── Canvas chip/flake blend preview ─────────────────────────────────────────
-function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "" }) {
+function ChipBlendPreview({ recipe, showLabels = false, mini = false, className = "", placeholder = "Add colors to see preview" }) {
   const canvasRef = useRef(null);
   const items = recipe.filter(r => (parseFloat(r.percentage) || 0) > 0);
   const total = items.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0) || 1;
@@ -142,7 +142,7 @@ function ChipBlendPreview({ recipe, showLabels = false, mini = false, className 
   if (!items.length) {
     return (
       <div className={`rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center aspect-square ${className}`}>
-        <span className="text-xs text-gray-400">{mini ? '' : 'Add colors to see preview'}</span>
+        <span className="text-xs text-gray-400">{mini ? '' : placeholder}</span>
       </div>
     );
   }
@@ -320,6 +320,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [driveModalName, setDriveModalName] = useState('');
   const [savedBeforeNames, setSavedBeforeNames] = useState(new Set());
 
+  // Company-level saved custom blends + search
+  const [blendSearch, setBlendSearch] = useState('');
+  const [companyBlends, setCompanyBlends] = useState([]);
+  const [showMyBlends, setShowMyBlends] = useState(false);
+
   // Swatch action state per blend id
   const [swatchState, setSwatchState] = useState({});
 
@@ -338,10 +343,13 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   useEffect(() => {
     apiRequest('/api/visualizer/admin/selections').then(d => setLibraryColors(d.colors || [])).catch(() => {});
     apiRequest('/api/visualizer/primitives').then(d => setPrimitives(d.colors || [])).catch(() => {});
+    apiRequest('/api/visualizer/company-blends').then(d => setCompanyBlends(d.blends || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selectedLibColor) { setLibRecipe([]); return; }
+    // Company-level saved blends carry their recipe directly — no API call needed
+    if (selectedLibColor._recipe) { setLibRecipe(selectedLibColor._recipe); return; }
     apiRequest(`/api/visualizer/recipe/${selectedLibColor.id}`)
       .then(d => setLibRecipe(d.recipe || []))
       .catch(() => setLibRecipe([]));
@@ -556,6 +564,34 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     finally { setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailing: false } })); }
   };
 
+  const saveToMyBlends = async () => {
+    if (!customItems.length) return;
+    const name = (blendName.trim() || `My Blend ${companyBlends.length + 1}`);
+    setSaveModal({ mode: 'myblend', proposedName: name });
+  };
+
+  const commitSaveToMyBlends = async (name) => {
+    try {
+      const data = await apiRequest('/api/visualizer/company-blends', {
+        method: 'POST',
+        body: JSON.stringify({ name, recipe: customItems }),
+      });
+      setCompanyBlends(prev => [...prev, data.blend]);
+      setSaveModal(null);
+    } catch (err) {
+      setError('Failed to save to My Blends. Please try again.');
+      setSaveModal(null);
+    }
+  };
+
+  const removeFromMyBlends = async (id) => {
+    try {
+      await apiRequest(`/api/visualizer/company-blends/${id}`, { method: 'DELETE' });
+      setCompanyBlends(prev => prev.filter(b => b.id !== id));
+      if (selectedLibColor?.id === `cb-${id}`) { setSelectedLibColor(null); }
+    } catch {}
+  };
+
   const processingCount = Object.values(results).filter(r => r.status === 'processing').length;
   const completeCount   = Object.values(results).filter(r => r.status === 'complete').length;
   const runningBlends   = sessionBlends.filter(b => results[b.id]);
@@ -610,16 +646,30 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {/* ── STANDARD COLORS TAB ── */}
                 {blendTab === 'standards' && (
                   <div className="space-y-3">
+                    {/* Search */}
+                    <input
+                      type="text"
+                      placeholder="Search blends…"
+                      value={blendSearch}
+                      onChange={e => { setBlendSearch(e.target.value); setSelectedLibColor(null); }}
+                      className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
                     {(() => {
-                      const standards = libraryColors.filter(c => c.selected);
-                      const others    = libraryColors.filter(c => !c.selected);
+                      const q = blendSearch.toLowerCase();
+                      const standards = libraryColors.filter(c => c.selected  && (!q || c.name.toLowerCase().includes(q)));
+                      const others    = libraryColors.filter(c => !c.selected && (!q || c.name.toLowerCase().includes(q)));
+                      const myBlends  = companyBlends.filter(b => !q || b.name.toLowerCase().includes(q));
+                      const noResults = q && !standards.length && !others.length && !myBlends.length;
                       return (
                         <>
-                          {standards.length === 0 && (
-                            <p className="text-xs text-gray-400 text-center py-6">No standard colors configured yet.</p>
+                          {!q && standards.length === 0 && (
+                            <p className="text-xs text-gray-400 text-center py-4">No standard colors configured yet.</p>
+                          )}
+                          {noResults && (
+                            <p className="text-xs text-gray-400 text-center py-4">No blends match "{blendSearch}"</p>
                           )}
 
-                          {/* Company standard blends — no scroll */}
+                          {/* Company standard blends */}
                           {standards.length > 0 && (
                             <div className="grid grid-cols-3 gap-2">
                               {standards.map(c => (
@@ -639,17 +689,17 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                             </div>
                           )}
 
-                          {/* See All Blends — collapsed by default, scrollable when open */}
+                          {/* See All Blends */}
                           {others.length > 0 && (
                             <div>
                               <button
                                 onClick={() => { setShowAllBlends(p => !p); setSelectedLibColor(null); }}
                                 className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:text-blue-700 transition"
                               >
-                                <span>{showAllBlends ? '▲' : '▼'}</span>
-                                {showAllBlends ? 'Hide' : 'See All Blends'} ({others.length} more)
+                                <span>{(showAllBlends || q) ? '▲' : '▼'}</span>
+                                {(showAllBlends || q) ? 'Hide' : 'See All Blends'} ({others.length} more)
                               </button>
-                              {showAllBlends && (
+                              {(showAllBlends || q) && (
                                 <div className="grid grid-cols-3 gap-2 mt-2 max-h-64 overflow-y-auto pr-0.5">
                                   {others.map(c => (
                                     <button
@@ -670,31 +720,77 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                             </div>
                           )}
 
-                          {/* Selected blend preview + actions */}
-                          {selectedLibColor && (
-                            <div className="space-y-3">
-                              {libRecipe.length > 0
-                                ? <ChipBlendPreview recipe={libRecipe} showLabels className="w-full" />
-                                : <div className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center"><span className="text-xs text-gray-400">Loading blend…</span></div>
-                              }
+                          {/* My Saved Custom Blends */}
+                          {companyBlends.length > 0 && (
+                            <div>
+                              <button
+                                onClick={() => setShowMyBlends(p => !p)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-green-600 hover:text-green-800 transition"
+                              >
+                                <span>{(showMyBlends || q) ? '▲' : '▼'}</span>
+                                My Saved Custom Blends ({companyBlends.length})
+                              </button>
+                              {(showMyBlends || q) && (
+                                <div className="grid grid-cols-3 gap-2 mt-2 max-h-64 overflow-y-auto pr-0.5">
+                                  {myBlends.map(b => (
+                                    <div key={b.id} className="relative group">
+                                      <button
+                                        onClick={() => {
+                                          setSelectedLibColor({ id: `cb-${b.id}`, name: b.name, _recipe: b.recipe });
+                                          setBlendName(b.name);
+                                        }}
+                                        className={`w-full rounded-xl border-2 overflow-hidden transition text-left ${selectedLibColor?.id === `cb-${b.id}` ? 'border-green-500 shadow-md' : 'border-transparent hover:border-gray-300'}`}
+                                      >
+                                        <div className="w-full h-20 overflow-hidden">
+                                          <ChipBlendPreview recipe={b.recipe} mini className="w-full" />
+                                        </div>
+                                        <div className="px-1.5 py-1 bg-white">
+                                          <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{b.name}</p>
+                                        </div>
+                                      </button>
+                                      <button
+                                        onClick={() => removeFromMyBlends(b.id)}
+                                        className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white/80 text-gray-300 hover:text-red-400 text-xs leading-none opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
+                                        title="Remove"
+                                      >×</button>
+                                    </div>
+                                  ))}
+                                  {myBlends.length === 0 && q && (
+                                    <p className="text-xs text-gray-400 col-span-3 text-center py-2">No saved blends match this search.</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Always-visible blend preview */}
+                          <div className="space-y-3 pt-1">
+                            <ChipBlendPreview
+                              recipe={libRecipe}
+                              showLabels={libRecipe.length > 0}
+                              className="w-full"
+                              placeholder="Select a blend for preview"
+                            />
+                            {selectedLibColor && libRecipe.length === 0 && (
+                              <p className="text-xs text-gray-400 text-center">Loading blend…</p>
+                            )}
+                            {selectedLibColor && libRecipe.length > 0 && (
                               <div className="flex gap-2">
                                 <button
                                   onClick={openSaveModal}
-                                  disabled={!libRecipe.length}
-                                  className="flex-1 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
+                                  className="flex-1 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                                 >
                                   Save to Short List
                                 </button>
                                 <button
                                   onClick={customizeLibBlend}
-                                  disabled={!libRecipe.length}
-                                  className="flex-1 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-40"
+                                  className="flex-1 py-2 text-xs font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
                                 >
                                   Customize →
                                 </button>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </>
                       );
                     })()}
@@ -712,14 +808,23 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                       </div>
                     )}
                     <CustomBlendBuilder primitives={primitives} items={customItems} setItems={setCustomItems} />
-                    {customItems.length > 0 && <ChipBlendPreview recipe={customItems} showLabels className="w-full" />}
-                    <button
-                      onClick={openSaveModal}
-                      disabled={!customItems.length}
-                      className="w-full py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
-                    >
-                      Save to Short List
-                    </button>
+                    <ChipBlendPreview recipe={customItems} showLabels className="w-full" />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={openSaveModal}
+                        disabled={!customItems.length}
+                        className="flex-1 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-40"
+                      >
+                        Save to Short List
+                      </button>
+                      <button
+                        onClick={saveToMyBlends}
+                        disabled={!customItems.length}
+                        className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-40"
+                      >
+                        Save to My Blends
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -899,7 +1004,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       {saveModal && (
         <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">{saveModal.mode === 'edit' ? 'Save Changes' : 'Name Your Blend'}</h3>
+            <h3 className="text-sm font-bold text-gray-900">
+              {saveModal.mode === 'edit' ? 'Save Changes' : saveModal.mode === 'myblend' ? 'Save to My Blends' : 'Name Your Blend'}
+            </h3>
             <input
               type="text"
               value={saveModal.proposedName}
@@ -908,6 +1015,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               autoFocus
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
+            {saveModal.mode === 'myblend' && (
+              <p className="text-xs text-gray-400">This blend will appear in your library across all leads.</p>
+            )}
             <div className="space-y-2">
               {saveModal.mode === 'edit' ? (
                 <>
@@ -924,6 +1034,13 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     Save as New Blend
                   </button>
                 </>
+              ) : saveModal.mode === 'myblend' ? (
+                <button
+                  onClick={() => commitSaveToMyBlends(saveModal.proposedName.trim() || `My Blend ${companyBlends.length + 1}`)}
+                  className="w-full py-2.5 text-sm font-semibold bg-green-600 text-white rounded-xl hover:bg-green-700 transition"
+                >
+                  Save to My Blends
+                </button>
               ) : (
                 <button
                   onClick={() => commitSave(true)}
