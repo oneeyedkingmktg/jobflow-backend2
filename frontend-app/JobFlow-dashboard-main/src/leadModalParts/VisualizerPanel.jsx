@@ -304,8 +304,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   // Session blends
   const [sessionBlends, setSessionBlends] = useState([]);
 
-  // Blend selection modal (shown before photo step)
-  const [showSelectModal, setShowSelectModal] = useState(false);
   const [selectedBlendIds, setSelectedBlendIds] = useState(new Set());
 
   // Library UI
@@ -375,6 +373,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
     setSaveModal(null);
     resetBuilder('shortlist');
+    setSelectedBlendIds(prev => new Set([...prev, savedBlend.id]));
     saveSwatchToDrive(savedBlend); // auto-save blend recipe to Drive
   };
 
@@ -401,13 +400,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     setResults(prev => { const r = { ...prev }; delete r[id]; return r; });
     setSelectedBlendIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     if (editingId === id) resetBuilder();
-  };
-
-  // Open blend selection modal before going to photo
-  const openSelectModal = () => {
-    // Pre-select all blends
-    setSelectedBlendIds(new Set(sessionBlends.map(b => b.id)));
-    setShowSelectModal(true);
   };
 
   const toggleBlendSelect = (id) => {
@@ -710,21 +702,33 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                         <div className="flex items-center justify-between">
                           <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">{sessionBlends.length} Blend{sessionBlends.length !== 1 ? 's' : ''}</p>
                           <button
-                            onClick={openSelectModal}
-                            className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-600 transition"
+                            onClick={() => setView('photo')}
+                            disabled={selectedBlendIds.size === 0}
+                            className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-40"
                           >
-                            Apply to Photo →
+                            Apply to Photo ({selectedBlendIds.size}) →
                           </button>
                         </div>
                         <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                           {sessionBlends.map(blend => {
-                            const ss = swatchState[blend.id] || {};
+                            const ss      = swatchState[blend.id] || {};
+                            const checked = selectedBlendIds.has(blend.id);
                             return (
-                              <div key={blend.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                                <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
+                              <div key={blend.id} className={`rounded-xl border-2 overflow-hidden transition ${checked ? 'border-blue-400' : 'border-gray-200'} bg-gray-50`}>
+                                {/* Chip preview with checkbox overlay */}
+                                <div className="relative">
+                                  <ChipBlendPreview recipe={blend.recipe} mini className="w-full" />
+                                  <button
+                                    onClick={() => toggleBlendSelect(blend.id)}
+                                    className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition ${checked ? 'bg-blue-500 border-blue-500' : 'bg-white/80 border-gray-400'}`}
+                                    title={checked ? 'Remove from photo' : 'Include in photo'}
+                                  >
+                                    {checked && <span className="text-white text-xs font-bold leading-none">✓</span>}
+                                  </button>
+                                </div>
                                 <div className="px-2 py-2 space-y-1.5">
                                   <p className="text-xs font-bold text-gray-800 truncate">{blend.name}</p>
-                                  <p className="text-xs text-gray-400">{ss.saved ? '✓ Saved to Drive' : ss.saving ? 'Saving…' : ''}</p>
+                                  <p className="text-xs text-gray-400 leading-tight">{ss.saved ? '✓ Saved to Drive' : ss.saving ? 'Saving…' : ''}</p>
                                   <div className="flex gap-1">
                                     <button onClick={() => editBlend(blend)} className="flex-1 py-1 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded hover:bg-gray-100 transition">Edit</button>
                                     <button onClick={() => removeBlend(blend.id)} className="px-2 py-1 text-xs text-gray-300 hover:text-red-400 border border-gray-200 rounded bg-white transition">✕</button>
@@ -864,7 +868,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       {saveModal && (
         <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">Save Blend</h3>
+            <h3 className="text-sm font-bold text-gray-900">{saveModal.mode === 'edit' ? 'Save Changes' : 'Name Your Blend'}</h3>
             <input
               type="text"
               value={saveModal.proposedName}
@@ -874,20 +878,29 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             <div className="space-y-2">
-              {saveModal.mode === 'edit' && (
+              {saveModal.mode === 'edit' ? (
+                <>
+                  <button
+                    onClick={() => commitSave(false)}
+                    className="w-full py-2.5 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition"
+                  >
+                    Save Changes to "{sessionBlends.find(b => b.id === editingId)?.name}"
+                  </button>
+                  <button
+                    onClick={() => commitSave(true)}
+                    className="w-full py-2.5 text-sm font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
+                  >
+                    Save as New Blend
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={() => commitSave(false)}
+                  onClick={() => commitSave(true)}
                   className="w-full py-2.5 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition"
                 >
-                  Update "{sessionBlends.find(b => b.id === editingId)?.name}"
+                  Add to Short List
                 </button>
               )}
-              <button
-                onClick={() => commitSave(true)}
-                className={`w-full py-2.5 text-sm font-semibold rounded-xl transition ${saveModal.mode === 'edit' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-              >
-                {saveModal.mode === 'edit' ? 'Save as New Blend' : 'Save Blend'}
-              </button>
               <button onClick={() => setSaveModal(null)} className="w-full py-2 text-xs text-gray-400 hover:text-gray-600">
                 Cancel
               </button>
@@ -896,42 +909,6 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
         </div>
       )}
 
-      {/* ── BLEND SELECTION MODAL ─────────────────────────────────────────── */}
-      {showSelectModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">Select Blends to Preview</h3>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {sessionBlends.map(blend => (
-                <label key={blend.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-xl hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={selectedBlendIds.has(blend.id)}
-                    onChange={() => toggleBlendSelect(blend.id)}
-                    className="w-4 h-4 accent-blue-500 flex-shrink-0"
-                  />
-                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                    <ChipBlendPreview recipe={blend.recipe} mini className="w-full h-full" />
-                  </div>
-                  <span className="text-sm font-semibold text-gray-800 truncate">{blend.name}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setShowSelectModal(false)} className="flex-1 py-2 text-sm text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition">
-                Cancel
-              </button>
-              <button
-                onClick={() => { setShowSelectModal(false); setView('photo'); }}
-                disabled={selectedBlendIds.size === 0}
-                className="flex-1 py-2 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition disabled:opacity-50"
-              >
-                Continue ({selectedBlendIds.size})
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
