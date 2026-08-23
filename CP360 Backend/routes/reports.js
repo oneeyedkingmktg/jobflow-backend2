@@ -627,7 +627,7 @@ router.get('/speed-to-lead', async (req, res) => {
     if (!company) return res.status(404).json({ error: 'Company not found' });
 
     const statusList = TARGET_STATUSES.map((s) => s.status);
-    const placeholders = statusList.map((_, i) => `$${i + 3}`).join(',');
+    const placeholders = statusList.map((_, i) => `$${i + 4}`).join(',');
 
     const leadsResult = await pool.query(
       `SELECT id, status, created_at, ghl_contact_id, first_call_at
