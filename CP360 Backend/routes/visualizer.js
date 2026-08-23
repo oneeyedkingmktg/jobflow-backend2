@@ -625,7 +625,7 @@ router.get('/lead-blends', authenticateToken, async (req, res) => {
 // POST /api/visualizer/apply-internal — upload photo + recipe, run composite pipeline in background
 // Multipart: image file + recipe (JSON string) + lead_id + company_id
 router.post('/apply-internal', authenticateToken, upload.single('image'), async (req, res) => {
-  const { lead_id, recipe: recipeJson } = req.body;
+  const { lead_id, recipe: recipeJson, blend_name } = req.body;
   if (!lead_id || !recipeJson || !req.file) {
     return res.status(400).json({ error: 'lead_id, recipe, and image required' });
   }
@@ -662,12 +662,34 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
       recipe:        converted,
       rawRecipe:     recipe,
       rawImageBuffer,
+      blendName:     blend_name || null,
     });
 
     res.json(result);
   } catch (err) {
     console.error('POST /visualizer/apply-internal error:', err);
     res.status(500).json({ error: 'Failed to start visualization' });
+  }
+});
+
+// GET /api/visualizer/lead-mockups?lead_id=X — completed mockups for a lead
+router.get('/lead-mockups', authenticateToken, async (req, res) => {
+  const { lead_id } = req.query;
+  if (!lead_id) return res.status(400).json({ error: 'lead_id required' });
+
+  try {
+    const companyId = req.user.company_id;
+    const { rows } = await db.query(
+      `SELECT id, generated_image_url, original_image_url, blend_name, completed_at, rendering_provider
+       FROM visualizations
+       WHERE lead_id=$1 AND company_id=$2 AND status='complete' AND generated_image_url IS NOT NULL
+       ORDER BY completed_at DESC`,
+      [lead_id, companyId]
+    );
+    res.json({ mockups: rows });
+  } catch (err) {
+    console.error('GET /visualizer/lead-mockups error:', err);
+    res.status(500).json({ error: 'Failed to load mockups' });
   }
 });
 

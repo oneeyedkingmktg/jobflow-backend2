@@ -328,6 +328,15 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   // Swatch action state per blend id
   const [swatchState, setSwatchState] = useState({});
 
+  // Previously-generated mockups for this lead
+  const [mockups, setMockups] = useState([]);
+  // Blend shown in fullscreen chip preview (shortlist single-click)
+  const [previewBlend, setPreviewBlend] = useState(null);
+  // URL shown in fullscreen image overlay (mockups tap)
+  const [fullscreenImage, setFullscreenImage] = useState(null);
+  // Timer refs for single vs double-click on shortlist tiles
+  const clickTimersRef = useRef({});
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -355,7 +364,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       .catch(() => setLibRecipe([]));
   }, [selectedLibColor?.id]);
 
-  // Load saved blends from DB when visualizer opens
+  // Load saved blends + past mockups from DB when visualizer opens
   useEffect(() => {
     if (!lead?.id) return;
     apiRequest(`/api/visualizer/lead-blends?lead_id=${lead.id}`)
@@ -363,6 +372,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
         const loaded = (d.blends || []).map(b => ({ id: newId(), name: b.name, recipe: b.recipe }));
         if (loaded.length) setSessionBlends(loaded);
       })
+      .catch(() => {});
+    apiRequest(`/api/visualizer/lead-mockups?lead_id=${lead.id}`)
+      .then(d => setMockups(d.mockups || []))
       .catch(() => {});
   }, [lead?.id]);
 
@@ -434,6 +446,20 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     });
   };
 
+  // Single click → open blend preview; double click → toggle selection
+  const handleTileClick = (blend) => {
+    if (clickTimersRef.current[blend.id]) {
+      clearTimeout(clickTimersRef.current[blend.id]);
+      delete clickTimersRef.current[blend.id];
+      toggleBlendSelect(blend.id);
+    } else {
+      clickTimersRef.current[blend.id] = setTimeout(() => {
+        delete clickTimersRef.current[blend.id];
+        setPreviewBlend(blend);
+      }, 280);
+    }
+  };
+
   // Apply selected blends to photo
   const applyBlends = async () => {
     const blendsToRun = sessionBlends.filter(b => selectedBlendIds.has(b.id));
@@ -451,6 +477,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       const fd = new FormData();
       fd.append('image', photoFile);
       fd.append('lead_id', lead.id);
+      fd.append('blend_name', blend.name);
       fd.append('recipe', JSON.stringify(blend.recipe.map(r => ({ hex: r.hex, percentage: r.percentage }))));
 
       fetch(`${API_BASE}/api/visualizer/apply-internal`, {
@@ -479,6 +506,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
           const data = await apiRequest(`/api/visualizer/status/${r.vizId}`);
           if (data.status === 'complete') {
             setResults(prev => ({ ...prev, [blendId]: { ...prev[blendId], status: 'complete', generated: data.generated_image_url, original: data.original_image_url } }));
+            setMockups(prev => {
+              if (prev.some(m => m.id === data.id)) return prev;
+              const blName = sessionBlends.find(b => String(b.id) === String(blendId))?.name || null;
+              return [{ id: data.id, generated_image_url: data.generated_image_url, original_image_url: data.original_image_url, blend_name: blName, completed_at: new Date().toISOString() }, ...prev];
+            });
           } else if (data.status === 'failed') {
             setResults(prev => ({ ...prev, [blendId]: { ...prev[blendId], status: 'failed', error: data.error_message || 'Failed' } }));
           }
@@ -621,25 +653,31 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
             {/* ── BUILD VIEW ──────────────────────────────────────────── */}
             {view === 'build' && (
               <>
-                {/* 3-tab switcher */}
-                <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+                {/* 4-tab switcher */}
+                <div className="flex gap-0.5 bg-gray-100 p-1 rounded-xl">
                   <button
                     onClick={() => { setBlendTab('standards'); setCustomItems([]); setBlendName(''); }}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'standards' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    Standard Colors
+                    Standards
                   </button>
                   <button
                     onClick={() => setBlendTab('custom')}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'custom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    Custom Blend
+                    Custom
                   </button>
                   <button
                     onClick={() => setBlendTab('shortlist')}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'shortlist' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    Shortlist{sessionBlends.length > 0 ? ` (${sessionBlends.length})` : ''}
+                    List{sessionBlends.length > 0 ? ` (${sessionBlends.length})` : ''}
+                  </button>
+                  <button
+                    onClick={() => setBlendTab('mockups')}
+                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'mockups' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Mockups{mockups.length > 0 ? ` (${mockups.length})` : ''}
                   </button>
                 </div>
 
@@ -851,16 +889,17 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                             const checked = selectedBlendIds.has(blend.id);
                             return (
                               <div key={blend.id} className={`rounded-xl border-2 overflow-hidden transition ${checked ? 'border-blue-400' : 'border-gray-200'} bg-gray-50`}>
-                                {/* Chip preview with checkbox overlay */}
-                                <div className="relative">
+                                {/* Chip preview — single tap: open preview, double tap: toggle selection */}
+                                <div className="relative cursor-pointer" onClick={() => handleTileClick(blend)}>
                                   <ChipBlendPreview recipe={blend.recipe} className="w-full" />
-                                  <button
-                                    onClick={() => toggleBlendSelect(blend.id)}
-                                    className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition ${checked ? 'bg-blue-500 border-blue-500' : 'bg-white/80 border-gray-400'}`}
-                                    title={checked ? 'Remove from photo' : 'Include in photo'}
-                                  >
-                                    {checked && <span className="text-white text-xs font-bold leading-none">✓</span>}
-                                  </button>
+                                  {checked && (
+                                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded bg-blue-500 border-2 border-blue-500 flex items-center justify-center pointer-events-none">
+                                      <span className="text-white text-xs font-bold leading-none">✓</span>
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-1 left-0 right-0 flex justify-center pointer-events-none">
+                                    <span className="text-white/60 text-[9px] bg-black/20 rounded px-1">tap · ·tap to select</span>
+                                  </div>
                                 </div>
                                 <div className="px-2 py-2 space-y-1.5">
                                   <p className="text-xs font-bold text-gray-800 truncate">{blend.name}</p>
@@ -884,6 +923,31 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                           })}
                         </div>
                       </>
+                    )}
+                  </div>
+                )}
+
+                {/* ── MOCKUPS TAB ── */}
+                {blendTab === 'mockups' && (
+                  <div className="space-y-3">
+                    {mockups.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-6">No mockups yet. Apply blends to a photo to create visualizations.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+                        {mockups.map(m => (
+                          <div
+                            key={m.id}
+                            className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer hover:border-blue-300 transition"
+                            onClick={() => setFullscreenImage(m.generated_image_url)}
+                          >
+                            <img src={m.generated_image_url} alt={m.blend_name || 'Mockup'} className="w-full aspect-square object-cover" />
+                            <div className="px-2 py-1.5">
+                              <p className="text-xs font-bold text-gray-800 truncate">{m.blend_name || 'Mockup'}</p>
+                              <p className="text-xs text-gray-400">{m.completed_at ? new Date(m.completed_at).toLocaleDateString() : ''}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1054,6 +1118,36 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── BLEND PREVIEW MODAL (shortlist single-click) ─────────────────── */}
+      {previewBlend && (
+        <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center px-4" onClick={() => setPreviewBlend(null)}>
+          <div className="bg-white rounded-2xl p-4 w-full max-w-xs shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-900">{previewBlend.name}</h3>
+              <button onClick={() => setPreviewBlend(null)} className="text-gray-300 hover:text-gray-500 text-xl font-light leading-none">×</button>
+            </div>
+            <ChipBlendPreview recipe={previewBlend.recipe} showLabels className="w-full" />
+            <button
+              onClick={() => { toggleBlendSelect(previewBlend.id); setPreviewBlend(null); }}
+              className={`w-full mt-3 py-2 text-xs font-semibold rounded-xl transition ${selectedBlendIds.has(previewBlend.id) ? 'bg-blue-50 text-blue-600 border border-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+            >
+              {selectedBlendIds.has(previewBlend.id) ? '✓ Selected for Photo — Tap to Deselect' : 'Select for Photo'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── FULLSCREEN MOCKUP IMAGE ─────────────────────────────────────── */}
+      {fullscreenImage && (
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4" onClick={() => setFullscreenImage(null)}>
+          <img src={fullscreenImage} alt="Mockup" className="max-w-full max-h-full rounded-xl object-contain" />
+          <button
+            onClick={() => setFullscreenImage(null)}
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center text-lg font-light hover:bg-white/40 transition"
+          >×</button>
         </div>
       )}
 

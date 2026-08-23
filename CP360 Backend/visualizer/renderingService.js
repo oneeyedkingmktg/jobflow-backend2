@@ -302,14 +302,14 @@ async function compositeCustomBlend({ sourceVisualizationId, companyId, recipe }
 // rawRecipe: [{ hex, percentage }] — original form, used for OpenAI path
 // Returns { visualization_id } immediately; pipeline runs in background.
 
-async function compositeInternalBlend({ leadId, companyId, recipe, rawRecipe, rawImageBuffer }) {
+async function compositeInternalBlend({ leadId, companyId, recipe, rawRecipe, rawImageBuffer, blendName }) {
   const useOpenAI = process.env.VISUALIZATION_PROVIDER === 'openai';
   const provider = useOpenAI ? 'openai-internal' : 'compositing-internal';
 
   const { rows } = await db.query(
-    `INSERT INTO visualizations (company_id, lead_id, rendering_provider, status)
-     VALUES ($1, $2, $3, 'processing') RETURNING id`,
-    [companyId, leadId || null, provider]
+    `INSERT INTO visualizations (company_id, lead_id, rendering_provider, status, blend_name)
+     VALUES ($1, $2, $3, 'processing', $4) RETURNING id`,
+    [companyId, leadId || null, provider, blendName || null]
   );
   const visualizationId = rows[0].id;
 
