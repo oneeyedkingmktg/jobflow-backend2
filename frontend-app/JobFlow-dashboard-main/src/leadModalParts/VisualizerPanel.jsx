@@ -320,6 +320,9 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   const [driveModalName, setDriveModalName] = useState('');
   const [savedBeforeNames, setSavedBeforeNames] = useState(new Set());
 
+  // Email viz modal — confirm/edit email before sending
+  const [emailVizModal, setEmailVizModal] = useState(null); // null | { blendId, vizId, email }
+
   // Company-level saved custom blends + search
   const [blendSearch, setBlendSearch] = useState('');
   const [companyBlends, setCompanyBlends] = useState([]);
@@ -506,11 +509,18 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
           const data = await apiRequest(`/api/visualizer/status/${r.vizId}`);
           if (data.status === 'complete') {
             setResults(prev => ({ ...prev, [blendId]: { ...prev[blendId], status: 'complete', generated: data.generated_image_url, original: data.original_image_url } }));
+            const blName = sessionBlends.find(b => String(b.id) === String(blendId))?.name || null;
             setMockups(prev => {
               if (prev.some(m => m.id === data.id)) return prev;
-              const blName = sessionBlends.find(b => String(b.id) === String(blendId))?.name || null;
               return [{ id: data.id, generated_image_url: data.generated_image_url, original_image_url: data.original_image_url, blend_name: blName, completed_at: new Date().toISOString() }, ...prev];
             });
+            // Auto-save to Drive
+            if (blName) {
+              apiRequest('/api/visualizer/save-viz-to-drive', {
+                method: 'POST',
+                body: JSON.stringify({ visualization_id: data.id, blend_name: blName, save_as_name: blName }),
+              }).catch(() => {});
+            }
           } else if (data.status === 'failed') {
             setResults(prev => ({ ...prev, [blendId]: { ...prev[blendId], status: 'failed', error: data.error_message || 'Failed' } }));
           }
@@ -545,10 +555,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: false } })); }
   };
 
-  const emailViz = async (blendId, vizId) => {
+  const emailViz = async (blendId, vizId, toEmail) => {
+    setEmailVizModal(null);
     setActionState(p => ({ ...p, [vizId]: { ...p[vizId], emailing: true } }));
     try {
-      await apiRequest('/api/visualizer/send-email', { method: 'POST', body: JSON.stringify({ visualization_id: vizId, company_id: lead.company_id || lead.companyId, customer_email: leadEmail, customer_name: lead.name }) });
+      await apiRequest('/api/visualizer/send-email', { method: 'POST', body: JSON.stringify({ visualization_id: vizId, company_id: lead.company_id || lead.companyId, customer_email: toEmail || leadEmail, customer_name: lead.name }) });
       setActionState(p => ({ ...p, [vizId]: { ...p[vizId], emailed: true } }));
     } catch (e) { setError(e.message); }
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], emailing: false } })); }
@@ -659,7 +670,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     onClick={() => { setBlendTab('standards'); setCustomItems([]); setBlendName(''); }}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'standards' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    Standards
+                    Standard
                   </button>
                   <button
                     onClick={() => setBlendTab('custom')}
@@ -671,13 +682,13 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     onClick={() => setBlendTab('shortlist')}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'shortlist' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    List{sessionBlends.length > 0 ? ` (${sessionBlends.length})` : ''}
+                    Blends{sessionBlends.length > 0 ? ` (${sessionBlends.length})` : ''}
                   </button>
                   <button
                     onClick={() => setBlendTab('mockups')}
                     className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${blendTab === 'mockups' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
                   >
-                    Mockups{mockups.length > 0 ? ` (${mockups.length})` : ''}
+                    Previews{mockups.length > 0 ? ` (${mockups.length})` : ''}
                   </button>
                 </div>
 
@@ -931,7 +942,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 {blendTab === 'mockups' && (
                   <div className="space-y-3">
                     {mockups.length === 0 ? (
-                      <p className="text-xs text-gray-400 text-center py-6">No mockups yet. Apply blends to a photo to create visualizations.</p>
+                      <p className="text-xs text-gray-400 text-center py-6">No floor previews yet. Apply blends to a photo to create visualizations.</p>
                     ) : (
                       <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                         {mockups.map(m => (
@@ -971,7 +982,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 >
                   {photoFile
                     ? <p className="text-sm font-semibold text-gray-700">{photoFile.name}</p>
-                    : <><p className="text-sm font-semibold text-gray-500">Tap to select photo</p><p className="text-xs text-gray-400 mt-1">JPG, PNG, or HEIC • Up to 20MB</p></>}
+                    : <><p className="text-sm font-semibold text-gray-500">Tap to select photo</p><p className="text-xs text-gray-400 mt-1">JPG or PNG • Up to 20MB</p></>}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*,.heic" className="hidden" onChange={e => setPhotoFile(e.target.files[0] || null)} />
                 {error && <p className="text-xs text-red-500">{error}</p>}
@@ -1039,7 +1050,11 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                                 {as.savedDrive ? '✓ Saved' : as.savingDrive ? '…' : 'Save to Drive'}
                               </button>
                               {leadEmail && (
-                                <button onClick={() => emailViz(blend.id, r.vizId)} disabled={as.emailing || as.emailed} className="flex-1 py-1.5 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition disabled:opacity-50">
+                                <button
+                                  onClick={() => !as.emailed && !as.emailing && setEmailVizModal({ blendId: blend.id, vizId: r.vizId, email: leadEmail })}
+                                  disabled={as.emailing || as.emailed}
+                                  className="flex-1 py-1.5 text-xs font-semibold bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition disabled:opacity-50"
+                                >
                                   {as.emailed ? '✓ Emailed' : as.emailing ? '…' : 'Email Customer'}
                                 </button>
                               )}
@@ -1115,6 +1130,34 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               )}
               <button onClick={() => setSaveModal(null)} className="w-full py-2 text-xs text-gray-400 hover:text-gray-600">
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EMAIL VIZ CONFIRMATION MODAL ─────────────────────────────────── */}
+      {emailVizModal && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4" onClick={() => setEmailVizModal(null)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-900">Send Floor Preview</h3>
+            <p className="text-xs text-gray-500">Confirm or edit the customer's email address.</p>
+            <input
+              type="email"
+              value={emailVizModal.email}
+              onChange={e => setEmailVizModal(m => ({ ...m, email: e.target.value }))}
+              autoFocus
+              placeholder="customer@email.com"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setEmailVizModal(null)} className="flex-1 py-2 text-sm font-semibold bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancel</button>
+              <button
+                onClick={() => emailViz(emailVizModal.blendId, emailVizModal.vizId, emailVizModal.email)}
+                disabled={!emailVizModal.email.trim()}
+                className="flex-1 py-2 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition disabled:opacity-40"
+              >
+                Send Email
               </button>
             </div>
           </div>

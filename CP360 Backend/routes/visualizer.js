@@ -424,13 +424,12 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
     await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: finalBuf, ContentType: 'image/png' }));
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
-    // ── 6. Async Drive save → "Custom Blends" subfolder ─────────────────
+    // ── 6. Async Drive save → "Visualizer" subfolder ─────────────────
     if (lead_id) {
-      const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
-      const fileName = `Blend Recipe - ${label} (${date}).png`;
+      const fileName = `${label} blend.png`;
       resolveLeadFolder(parseInt(lead_id), { create: true })
-        .then(leadFolder => getOrCreateFolder('Custom Blends', leadFolder.id))
+        .then(leadFolder => getOrCreateFolder('Visualizer', leadFolder.id))
         .then(subFolder  => uploadFileToFolder(subFolder.id, fileName, 'image/png', finalBuf))
         .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
 
@@ -493,7 +492,7 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
 
 // POST /api/visualizer/save-viz-to-drive
 // Body: { visualization_id, blend_name, save_as_name, skip_before? }
-// Structure: Lead → Custom Blends → Image Mockups → [save_as_name]/ → Before.png + [blend_name].png
+// Structure: Lead → Visualizer → Floor Previews → [save_as_name]/ → Before.png + [blend_name] blend.png
 router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
   const { visualization_id, blend_name, save_as_name, skip_before } = req.body;
   if (!visualization_id || !save_as_name) {
@@ -537,11 +536,11 @@ router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
         ]);
 
     const leadFolder    = await resolveLeadFolder(viz.lead_id, { create: true });
-    const customBlends  = await getOrCreateFolder('Custom Blends',  leadFolder.id);
-    const imageMockups  = await getOrCreateFolder('Image Mockups',  customBlends.id);
-    const sessionFolder = await getOrCreateFolder(safeName, imageMockups.id);
+    const vizFolder     = await getOrCreateFolder('Visualizer',    leadFolder.id);
+    const previewFolder = await getOrCreateFolder('Floor Previews', vizFolder.id);
+    const sessionFolder = await getOrCreateFolder(safeName, previewFolder.id);
 
-    const uploads = [uploadFileToFolder(sessionFolder.id, `${safeBlend}.png`, 'image/png', Buffer.from(afterBuf))];
+    const uploads = [uploadFileToFolder(sessionFolder.id, `${safeBlend} blend.png`, 'image/png', Buffer.from(afterBuf))];
     if (!skip_before && beforeBuf) {
       uploads.push(uploadFileToFolder(sessionFolder.id, 'Before.png', 'image/png', beforeBuf));
     }
