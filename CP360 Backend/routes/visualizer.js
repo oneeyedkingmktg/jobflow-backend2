@@ -538,11 +538,10 @@ router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
     const leadFolder    = await resolveLeadFolder(viz.lead_id, { create: true });
     const vizFolder     = await getOrCreateFolder('Visualizer',    leadFolder.id);
     const previewFolder = await getOrCreateFolder('Floor Previews', vizFolder.id);
-    const sessionFolder = await getOrCreateFolder(safeName, previewFolder.id);
 
-    const uploads = [uploadFileToFolder(sessionFolder.id, `${safeBlend} blend.png`, 'image/png', Buffer.from(afterBuf))];
+    const uploads = [uploadFileToFolder(previewFolder.id, `${safeBlend} blend.png`, 'image/png', Buffer.from(afterBuf))];
     if (!skip_before && beforeBuf) {
-      uploads.push(uploadFileToFolder(sessionFolder.id, 'Before.png', 'image/png', beforeBuf));
+      uploads.push(uploadFileToFolder(previewFolder.id, `${safeName} before.png`, 'image/png', beforeBuf));
     }
     await Promise.all(uploads);
 
