@@ -322,6 +322,8 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
   // Email viz modal — confirm/edit email before sending
   const [emailVizModal, setEmailVizModal] = useState(null); // null | { blendId, vizId, email }
+  // Email swatch modal
+  const [emailSwatchModal, setEmailSwatchModal] = useState(null); // null | { blend, email }
 
   // Company-level saved custom blends + search
   const [blendSearch, setBlendSearch] = useState('');
@@ -589,7 +591,8 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     finally { setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saving: false } })); }
   };
 
-  const emailSwatch = async (blend) => {
+  const emailSwatch = async (blend, toEmail) => {
+    setEmailSwatchModal(null);
     setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailing: true } }));
     try {
       const fd = await buildSwatchForm(blend, false);
@@ -600,7 +603,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
       await fetch(`${API_BASE}/api/visualizer/send-swatch-email`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ swatch_url, lead_id: lead?.id, blend_description: blend.name }),
+        body: JSON.stringify({ swatch_url, lead_id: lead?.id, blend_description: blend.name, customer_email: toEmail }),
       });
       setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], emailed: true } }));
     } catch (e) { setError(e.message); }
@@ -921,7 +924,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                                   </div>
                                   {canEdit && leadEmail && (
                                     <button
-                                      onClick={() => emailSwatch(blend)}
+                                      onClick={() => !ss.emailed && !ss.emailing && setEmailSwatchModal({ blend, email: leadEmail })}
                                       disabled={ss.emailing || ss.emailed}
                                       className="w-full py-1 text-xs font-semibold bg-white border border-gray-200 text-gray-500 rounded hover:bg-gray-100 transition disabled:opacity-50"
                                     >
@@ -1155,6 +1158,34 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
               <button
                 onClick={() => emailViz(emailVizModal.blendId, emailVizModal.vizId, emailVizModal.email)}
                 disabled={!emailVizModal.email.trim()}
+                className="flex-1 py-2 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition disabled:opacity-40"
+              >
+                Send Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── EMAIL SWATCH CONFIRMATION MODAL ──────────────────────────────── */}
+      {emailSwatchModal && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center px-4" onClick={() => setEmailSwatchModal(null)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-900">Email Blend Swatch</h3>
+            <p className="text-xs text-gray-500">Confirm or edit the customer's email address.</p>
+            <input
+              type="email"
+              value={emailSwatchModal.email}
+              onChange={e => setEmailSwatchModal(m => ({ ...m, email: e.target.value }))}
+              autoFocus
+              placeholder="customer@email.com"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setEmailSwatchModal(null)} className="flex-1 py-2 text-sm font-semibold bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition">Cancel</button>
+              <button
+                onClick={() => emailSwatch(emailSwatchModal.blend, emailSwatchModal.email)}
+                disabled={!emailSwatchModal.email.trim()}
                 className="flex-1 py-2 text-sm font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition disabled:opacity-40"
               >
                 Send Email

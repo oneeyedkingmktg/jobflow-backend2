@@ -282,8 +282,7 @@ router.post('/send-email', async (req, res) => {
   try {
     const vizRes = await db.query(
       `SELECT v.original_image_url, v.generated_image_url,
-              c.name AS company_name, c.phone AS company_phone,
-              c.primary_color, c.accent_color, c.logo_url
+              c.name AS company_name, c.phone AS company_phone
        FROM visualizations v
        JOIN companies c ON c.id = v.company_id
        WHERE v.id = $1 AND v.company_id = $2 AND v.status = 'complete'`,
@@ -298,9 +297,6 @@ router.post('/send-email', async (req, res) => {
       companyName:       row.company_name,
       originalImageUrl:  row.original_image_url,
       generatedImageUrl: row.generated_image_url,
-      primaryColor:      row.primary_color  || null,
-      accentColor:       row.accent_color   || null,
-      logoUrl:           row.logo_url       || null,
       companyPhone:      row.company_phone  || null,
     });
 
@@ -451,7 +447,7 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
 // POST /api/visualizer/send-swatch-email — email swatch PNG to customer from a lead record
 // Body: { swatch_url, lead_id, blend_description? }
 router.post('/send-swatch-email', authenticateToken, async (req, res) => {
-  const { swatch_url, lead_id, blend_description } = req.body;
+  const { swatch_url, lead_id, blend_description, customer_email: emailOverride } = req.body;
   if (!swatch_url || !lead_id) {
     return res.status(400).json({ error: 'swatch_url and lead_id required' });
   }
@@ -459,8 +455,7 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT l.name AS customer_name, l.email AS customer_email,
-              c.company_name, c.phone AS company_phone,
-              c.primary_color, c.accent_color, c.logo_url
+              c.company_name, c.phone AS company_phone
        FROM leads l
        JOIN companies c ON c.id = l.company_id
        WHERE l.id = $1 AND l.company_id = $2 AND l.deleted_at IS NULL`,
@@ -469,17 +464,15 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Lead not found' });
 
     const row = rows[0];
-    if (!row.customer_email) return res.status(400).json({ error: 'Lead has no email address on file' });
+    const toEmail = (emailOverride || '').trim() || row.customer_email;
+    if (!toEmail) return res.status(400).json({ error: 'No email address provided' });
 
     await sendSwatchEmail({
-      toEmail:          row.customer_email,
+      toEmail,
       customerName:     row.customer_name,
       companyName:      row.company_name,
       swatchUrl:        swatch_url,
       blendDescription: blend_description || null,
-      primaryColor:     row.primary_color  || null,
-      accentColor:      row.accent_color   || null,
-      logoUrl:          row.logo_url       || null,
       companyPhone:     row.company_phone  || null,
     });
 
