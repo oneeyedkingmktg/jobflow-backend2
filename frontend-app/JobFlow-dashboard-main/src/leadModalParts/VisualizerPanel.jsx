@@ -948,19 +948,32 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                       <p className="text-xs text-gray-400 text-center py-6">No floor previews yet. Apply blends to a photo to create visualizations.</p>
                     ) : (
                       <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
-                        {mockups.map(m => (
-                          <div
-                            key={m.id}
-                            className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer hover:border-blue-300 transition"
-                            onClick={() => setFullscreenImage(m.generated_image_url)}
-                          >
-                            <img src={m.generated_image_url} alt={m.blend_name || 'Mockup'} className="w-full aspect-square object-cover" />
-                            <div className="px-2 py-1.5">
-                              <p className="text-xs font-bold text-gray-800 truncate">{m.blend_name || 'Mockup'}</p>
-                              <p className="text-xs text-gray-400">{m.completed_at ? new Date(m.completed_at).toLocaleDateString() : ''}</p>
+                        {mockups.map(m => {
+                          const mas = actionState[m.id] || {};
+                          return (
+                            <div key={m.id} className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                              <img
+                                src={m.generated_image_url}
+                                alt={m.blend_name || 'Preview'}
+                                className="w-full aspect-square object-cover cursor-pointer hover:opacity-90 transition"
+                                onClick={() => setFullscreenImage(m.generated_image_url)}
+                              />
+                              <div className="px-2 py-1.5 space-y-1.5">
+                                <p className="text-xs font-bold text-gray-800 truncate">{m.blend_name || 'Floor Preview'}</p>
+                                <p className="text-xs text-gray-400">{m.completed_at ? new Date(m.completed_at).toLocaleDateString() : ''}</p>
+                                {leadEmail && (
+                                  <button
+                                    onClick={() => !mas.emailed && !mas.emailing && setEmailVizModal({ blendId: null, vizId: m.id, email: leadEmail })}
+                                    disabled={mas.emailing || mas.emailed}
+                                    className="w-full py-1 text-xs font-semibold bg-white border border-gray-200 text-gray-500 rounded hover:bg-gray-100 transition disabled:opacity-50"
+                                  >
+                                    {mas.emailed ? '✓ Emailed' : mas.emailing ? '…' : 'Email Customer'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
