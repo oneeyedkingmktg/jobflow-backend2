@@ -282,21 +282,30 @@ router.post('/send-email', async (req, res) => {
   try {
     const vizRes = await db.query(
       `SELECT v.original_image_url, v.generated_image_url,
-              c.name AS company_name, c.phone AS company_phone
+              c.name AS company_db_name, c.ghl_company_from_name, c.phone AS company_phone,
+              bcs.email_from_name, bcs.email_from_email, bcs.logo_url,
+              bcs.primary_color, bcs.accent_color
        FROM visualizations v
        JOIN companies c ON c.id = v.company_id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = v.company_id
        WHERE v.id = $1 AND v.company_id = $2 AND v.status = 'complete'`,
       [visualization_id, company_id]
     );
     if (!vizRes.rows.length) return res.status(404).json({ error: 'Visualization not found' });
 
     const row = vizRes.rows[0];
+    const companyName = row.ghl_company_from_name || row.company_db_name || '';
     await sendVisualizationEmail({
       toEmail:           customer_email,
       customerName:      customer_name || null,
-      companyName:       row.company_name,
+      companyName,
+      fromName:          row.email_from_name  || companyName || undefined,
+      fromEmail:         row.email_from_email || undefined,
       originalImageUrl:  row.original_image_url,
       generatedImageUrl: row.generated_image_url,
+      primaryColor:      row.primary_color  || null,
+      accentColor:       row.accent_color   || null,
+      logoUrl:           row.logo_url       || null,
       companyPhone:      row.company_phone  || null,
     });
 
@@ -455,9 +464,12 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT l.name AS customer_name, l.email AS customer_email,
-              c.company_name, c.phone AS company_phone
+              c.name AS company_db_name, c.ghl_company_from_name, c.phone AS company_phone,
+              bcs.email_from_name, bcs.email_from_email, bcs.logo_url,
+              bcs.primary_color, bcs.accent_color
        FROM leads l
        JOIN companies c ON c.id = l.company_id
+       LEFT JOIN bidder_company_settings bcs ON bcs.company_id = l.company_id
        WHERE l.id = $1 AND l.company_id = $2 AND l.deleted_at IS NULL`,
       [lead_id, req.user.company_id]
     );
@@ -467,12 +479,18 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
     const toEmail = (emailOverride || '').trim() || row.customer_email;
     if (!toEmail) return res.status(400).json({ error: 'No email address provided' });
 
+    const companyName = row.ghl_company_from_name || row.company_db_name || '';
     await sendSwatchEmail({
       toEmail,
       customerName:     row.customer_name,
-      companyName:      row.company_name,
+      companyName,
+      fromName:         row.email_from_name  || companyName || undefined,
+      fromEmail:        row.email_from_email || undefined,
       swatchUrl:        swatch_url,
       blendDescription: blend_description || null,
+      primaryColor:     row.primary_color  || null,
+      accentColor:      row.accent_color   || null,
+      logoUrl:          row.logo_url       || null,
       companyPhone:     row.company_phone  || null,
     });
 

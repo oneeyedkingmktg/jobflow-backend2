@@ -427,10 +427,12 @@ async function sendWarrantyEmail({
 
 async function sendVisualizationEmail({
   toEmail, customerName, companyName, originalImageUrl, generatedImageUrl,
+  fromName = null, fromEmail = null,
   primaryColor = null, accentColor = null, logoUrl = null, companyPhone = null,
 }) {
-  const displayName = companyName || 'CoatingPro360';
+  const displayName = fromName || companyName || 'CoatingPro360';
   const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo     = fromEmail || undefined;
   const HBG         = primaryColor || '#1d4ed8';
   const AC          = accentColor  || '#f97316';
   const useCustom   = !!(primaryColor && accentColor);
@@ -480,6 +482,7 @@ async function sendVisualizationEmail({
 
   await transporter.sendMail({
     from: fromHeader,
+    ...(replyTo && { replyTo }),
     to: toEmail,
     subject: `Your Floor Visualization from ${displayName}`,
     html,
@@ -488,10 +491,12 @@ async function sendVisualizationEmail({
 
 async function sendSwatchEmail({
   toEmail, customerName, companyName, swatchUrl, blendDescription,
+  fromName = null, fromEmail = null,
   primaryColor = null, accentColor = null, logoUrl = null, companyPhone = null,
 }) {
-  const displayName = companyName || 'CoatingPro360';
+  const displayName = fromName || companyName || 'CoatingPro360';
   const fromHeader  = `"${displayName}" <${process.env.SMTP_USER}>`;
+  const replyTo     = fromEmail || undefined;
   const HBG         = primaryColor || '#1d4ed8';
   const AC          = accentColor  || '#f97316';
   const useCustom   = !!(primaryColor && accentColor);
@@ -526,6 +531,7 @@ async function sendSwatchEmail({
 
   await transporter.sendMail({
     from: fromHeader,
+    ...(replyTo && { replyTo }),
     to: toEmail,
     subject: `Your Floor Chip Blend from ${displayName}`,
     html,
