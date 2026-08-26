@@ -310,7 +310,6 @@ const handleSaveGHLKeys = async () => {
       city: form.city || null,
       state: form.state || null,
       zip: form.zip || null,
-      suspended: form.suspended,
     };
 
     // Only include GHL fields if they have values (don't overwrite with null)
