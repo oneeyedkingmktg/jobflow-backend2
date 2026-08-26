@@ -77,8 +77,9 @@ ghl_install_description_template: company.ghl_install_description_template || ""
     setSuccess("");
 
     try {
+      const { suspended: _suspended, ...safeFormData } = formData;
       const payload = {
-        ...formData,
+        ...safeFormData,
         company_name: formData.name,
         name: formData.name,
       };
