@@ -301,16 +301,7 @@ const handleSaveGHLKeys = async () => {
     setSaving(true);
     setError("");
 
-    const payload = {
-      name: form.name,
-      phone: form.phone || null,
-      email: form.email || null,
-      website: form.website || null,
-      address: form.address || null,
-      city: form.city || null,
-      state: form.state || null,
-      zip: form.zip || null,
-    };
+    const payload = {};
 
     // Only include GHL fields if they have values (don't overwrite with null)
     if (ghlForm.ghlApiKey) {
