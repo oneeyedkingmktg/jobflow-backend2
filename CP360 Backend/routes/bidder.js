@@ -720,6 +720,7 @@ router.post('/library/item', async (req, res) => {
     const {
       category_id, name, description, default_unit_price = 0,
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
+      supplier, kit_price, sqft_per_kit,
     } = req.body;
 
     // Verify category belongs to this company
@@ -730,9 +731,9 @@ router.post('/library/item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Category not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order]
+      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -749,18 +750,20 @@ router.put('/library/item/:id', async (req, res) => {
     const {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
+      supplier, kit_price, sqft_per_kit,
     } = req.body;
 
     const result = await pool.query(
       `UPDATE bidder_library_items SET
         category_id = $1, name = $2, description = $3, default_unit_price = $4,
         default_unit_label = $5, is_included = $6, show_quantity = $7,
-        is_active = $8, sort_order = $9
-       WHERE id = $10 AND company_id = $11 RETURNING *`,
+        is_active = $8, sort_order = $9, supplier = $10, kit_price = $11, sqft_per_kit = $12
+       WHERE id = $13 AND company_id = $14 RETURNING *`,
       [
         category_id, name, clean(description), default_unit_price,
         clean(default_unit_label), is_included, show_quantity,
-        is_active, sort_order, req.params.id, companyId,
+        is_active, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null,
+        req.params.id, companyId,
       ]
     );
 

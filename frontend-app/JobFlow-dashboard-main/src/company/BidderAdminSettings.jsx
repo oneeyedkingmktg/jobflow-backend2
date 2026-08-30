@@ -201,9 +201,29 @@ export default function BidderAdminSettings({ companyId }) {
   }
 
   // ── Library item actions ───────────────────────────────────────────────────
+  async function handleReorderItem(catId, itemId, direction) {
+    const cat = library.find((c) => c.id === catId);
+    if (!cat) return;
+    const items = cat.items || [];
+    const idx = items.findIndex((i) => i.id === itemId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= items.length) return;
+    const item = items[idx];
+    const swap = items[swapIdx];
+    try {
+      await Promise.all([
+        BidderAPI.updateLibraryItem(item.id, { ...item, sort_order: swap.sort_order }, companyId),
+        BidderAPI.updateLibraryItem(swap.id, { ...swap, sort_order: item.sort_order }, companyId),
+      ]);
+      await loadLibrary();
+    } catch (e) {
+      alert('Failed to reorder items');
+    }
+  }
+
   function startAddItem(catId) {
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false });
+    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '' });
   }
 
   async function handleAddItem(catId) {
@@ -218,6 +238,9 @@ export default function BidderAdminSettings({ companyId }) {
         is_included: newItemForm.is_included || false,
         show_quantity: newItemForm.show_quantity || false,
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
+        supplier: newItemForm.supplier || null,
+        kit_price: newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null,
+        sqft_per_kit: newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null,
       }, companyId);
       setNewItemCatId(null);
       await loadLibrary();
@@ -238,6 +261,9 @@ export default function BidderAdminSettings({ companyId }) {
       is_active: item.is_active,
       category_id: item.category_id,
       sort_order: item.sort_order,
+      supplier: item.supplier || '',
+      kit_price: item.kit_price != null ? item.kit_price : '',
+      sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
     });
   }
 
@@ -246,6 +272,9 @@ export default function BidderAdminSettings({ companyId }) {
       await BidderAPI.updateLibraryItem(itemId, {
         ...editItemForm,
         default_unit_price: parseFloat(editItemForm.default_unit_price) || 0,
+        kit_price: editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null,
+        sqft_per_kit: editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null,
+        supplier: editItemForm.supplier || null,
       }, companyId);
       setEditItemId(null);
       await loadLibrary();
@@ -531,6 +560,20 @@ export default function BidderAdminSettings({ companyId }) {
                           <label className={labelCls}>Description</label>
                           <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                         </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className={labelCls}>Supplier</label>
+                            <input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Kit Price ($)</label>
+                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>SF per Kit</label>
+                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
+                          </div>
+                        </div>
                         <div className="flex gap-2">
                           <button onClick={() => handleSaveItem(item.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Save</button>
                           <button onClick={() => setEditItemId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
@@ -539,12 +582,31 @@ export default function BidderAdminSettings({ companyId }) {
                     ) : (
                       /* View row */
                       <div className="flex items-center gap-3">
+                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                          <button
+                            onClick={() => handleReorderItem(cat.id, item.id, 'up')}
+                            disabled={(cat.items || []).indexOf(item) === 0}
+                            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs"
+                            title="Move up"
+                          >▲</button>
+                          <button
+                            onClick={() => handleReorderItem(cat.id, item.id, 'down')}
+                            disabled={(cat.items || []).indexOf(item) === (cat.items || []).length - 1}
+                            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs"
+                            title="Move down"
+                          >▼</button>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm text-gray-800">{item.name}</span>
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
-                          {item.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
+                            {item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
+                            {item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
+                            {item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
+                          </div>
                         </div>
                         <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
                           ${parseFloat(item.default_unit_price || 0).toFixed(2)} {item.default_unit_label || ''}
@@ -576,6 +638,20 @@ export default function BidderAdminSettings({ companyId }) {
                     <div>
                       <label className={labelCls}>Description</label>
                       <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className={labelCls}>Supplier</label>
+                        <input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Kit Price ($)</label>
+                        <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>SF per Kit</label>
+                        <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleAddItem(cat.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Add Item</button>
