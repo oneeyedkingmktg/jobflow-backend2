@@ -646,10 +646,32 @@ router.get('/library', async (req, res) => {
       [companyId]
     );
 
+    // Attach components to system items
+    const systemIds = items.rows.filter((i) => i.is_system).map((i) => i.id);
+    let componentsBySystem = {};
+    if (systemIds.length > 0) {
+      const compRows = await pool.query(
+        `SELECT sc.system_item_id, sc.component_item_id, li.name, li.default_unit_price, li.default_unit_label
+         FROM bidder_library_system_components sc
+         JOIN bidder_library_items li ON li.id = sc.component_item_id
+         WHERE sc.system_item_id = ANY($1)
+         ORDER BY sc.sort_order, sc.id`,
+        [systemIds]
+      );
+      compRows.rows.forEach((r) => {
+        if (!componentsBySystem[r.system_item_id]) componentsBySystem[r.system_item_id] = [];
+        componentsBySystem[r.system_item_id].push(r);
+      });
+    }
+
+    const enrichedItems = items.rows.map((i) =>
+      i.is_system ? { ...i, components: componentsBySystem[i.id] || [] } : i
+    );
+
     // Group items under their categories
     const result = categories.rows.map((cat) => ({
       ...cat,
-      items: items.rows.filter((i) => i.category_id === cat.id),
+      items: enrichedItems.filter((i) => i.category_id === cat.id),
     }));
 
     res.json(result);
@@ -720,7 +742,7 @@ router.post('/library/item', async (req, res) => {
     const {
       category_id, name, description, default_unit_price = 0,
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
-      supplier, kit_price, sqft_per_kit,
+      supplier, kit_price, sqft_per_kit, is_system = false, component_ids = [],
     } = req.body;
 
     // Verify category belongs to this company
@@ -731,12 +753,23 @@ router.post('/library/item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Category not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null]
+      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system]
     );
 
-    res.status(201).json(result.rows[0]);
+    const newItem = result.rows[0];
+
+    if (is_system && component_ids.length > 0) {
+      for (let i = 0; i < component_ids.length; i++) {
+        await pool.query(
+          `INSERT INTO bidder_library_system_components (system_item_id, component_item_id, sort_order) VALUES ($1,$2,$3)`,
+          [newItem.id, component_ids[i], i]
+        );
+      }
+    }
+
+    res.status(201).json({ ...newItem, components: [] });
   } catch (err) {
     console.error('POST /bidder/library/item error:', err);
     res.status(500).json({ error: 'Failed to create library item' });
@@ -750,7 +783,7 @@ router.put('/library/item/:id', async (req, res) => {
     const {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
-      supplier, kit_price, sqft_per_kit,
+      supplier, kit_price, sqft_per_kit, is_system, component_ids,
     } = req.body;
 
     const result = await pool.query(
@@ -768,7 +801,19 @@ router.put('/library/item/:id', async (req, res) => {
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Library item not found' });
-    res.json(result.rows[0]);
+    const updated = result.rows[0];
+
+    if (updated.is_system && Array.isArray(component_ids)) {
+      await pool.query('DELETE FROM bidder_library_system_components WHERE system_item_id = $1', [updated.id]);
+      for (let i = 0; i < component_ids.length; i++) {
+        await pool.query(
+          `INSERT INTO bidder_library_system_components (system_item_id, component_item_id, sort_order) VALUES ($1,$2,$3)`,
+          [updated.id, component_ids[i], i]
+        );
+      }
+    }
+
+    res.json(updated);
   } catch (err) {
     console.error('PUT /bidder/library/item/:id error:', err);
     res.status(500).json({ error: 'Failed to update library item' });

@@ -29,6 +29,12 @@ export default function BidderAdminSettings({ companyId }) {
   const [newItemCatId, setNewItemCatId] = useState(null);
   const [newItemForm, setNewItemForm] = useState({});
 
+  // New system form per category
+  const [newSystemCatId, setNewSystemCatId] = useState(null);
+  const [newSystemForm, setNewSystemForm] = useState({});
+  // Edit system component IDs (used when editing a system item)
+  const [editSystemComponentIds, setEditSystemComponentIds] = useState([]);
+
   // ── Settings state ─────────────────────────────────────────────────────────
   const [settings, setSettings] = useState(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -222,8 +228,41 @@ export default function BidderAdminSettings({ companyId }) {
   }
 
   function startAddItem(catId) {
+    setNewSystemCatId(null);
     setNewItemCatId(catId);
     setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '' });
+  }
+
+  function startAddSystem(catId) {
+    setNewItemCatId(null);
+    setNewSystemCatId(catId);
+    setNewSystemForm({ name: '', description: '', default_unit_price: '', default_unit_label: '', componentIds: [] });
+  }
+
+  async function handleAddSystem(catId) {
+    if (!newSystemForm.name?.trim()) return;
+    try {
+      await BidderAPI.createLibraryItem({
+        category_id: catId,
+        name: newSystemForm.name.trim(),
+        description: newSystemForm.description || null,
+        default_unit_price: parseFloat(newSystemForm.default_unit_price) || 0,
+        default_unit_label: newSystemForm.default_unit_label || null,
+        is_system: true,
+        component_ids: newSystemForm.componentIds,
+        sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
+      }, companyId);
+      setNewSystemCatId(null);
+      await loadLibrary();
+    } catch (e) {
+      alert('Failed to add system');
+    }
+  }
+
+  function toggleSystemComponent(ids, setIds, itemId) {
+    setIds((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
+    );
   }
 
   async function handleAddItem(catId) {
@@ -264,7 +303,9 @@ export default function BidderAdminSettings({ companyId }) {
       supplier: item.supplier || '',
       kit_price: item.kit_price != null ? item.kit_price : '',
       sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
+      is_system: item.is_system || false,
     });
+    setEditSystemComponentIds((item.components || []).map((c) => c.component_item_id));
   }
 
   async function handleSaveItem(itemId) {
@@ -275,6 +316,7 @@ export default function BidderAdminSettings({ companyId }) {
         kit_price: editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null,
         sqft_per_kit: editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null,
         supplier: editItemForm.supplier || null,
+        component_ids: editItemForm.is_system ? editSystemComponentIds : undefined,
       }, companyId);
       setEditItemId(null);
       await loadLibrary();
@@ -560,20 +602,40 @@ export default function BidderAdminSettings({ companyId }) {
                           <label className={labelCls}>Description</label>
                           <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
+                        {editItemForm.is_system ? (
                           <div>
-                            <label className={labelCls}>Supplier</label>
-                            <input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                            <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(check all items that make up this system)</span></label>
+                            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                              {library.flatMap((c) => c.items.filter((i) => !i.is_system && i.id !== item.id).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                                <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                                  <input
+                                    type="checkbox"
+                                    checked={editSystemComponentIds.includes(i.id)}
+                                    onChange={() => setEditSystemComponentIds((prev) => prev.includes(i.id) ? prev.filter((x) => x !== i.id) : [...prev, i.id])}
+                                    className="w-4 h-4 flex-shrink-0"
+                                  />
+                                  <span className="text-xs text-gray-500 w-24 flex-shrink-0">{i.catName}</span>
+                                  <span className="text-sm text-gray-800">{i.name}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
-                          <div>
-                            <label className={labelCls}>Kit Price ($)</label>
-                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
+                        ) : (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className={labelCls}>Supplier</label>
+                              <input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Kit Price ($)</label>
+                              <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
+                            </div>
+                            <div>
+                              <label className={labelCls}>SF per Kit</label>
+                              <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
+                            </div>
                           </div>
-                          <div>
-                            <label className={labelCls}>SF per Kit</label>
-                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
-                          </div>
-                        </div>
+                        )}
                         <div className="flex gap-2">
                           <button onClick={() => handleSaveItem(item.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Save</button>
                           <button onClick={() => setEditItemId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
@@ -581,8 +643,8 @@ export default function BidderAdminSettings({ companyId }) {
                       </div>
                     ) : (
                       /* View row */
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col gap-0.5 flex-shrink-0 pt-0.5">
                           <button
                             onClick={() => handleReorderItem(cat.id, item.id, 'up')}
                             disabled={(cat.items || []).indexOf(item) === 0}
@@ -597,16 +659,32 @@ export default function BidderAdminSettings({ companyId }) {
                           >▼</button>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm text-gray-800">{item.name}</span>
+                            {item.is_system && (
+                              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">System</span>
+                            )}
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                            {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
-                            {item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
-                            {item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
-                            {item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
-                          </div>
+                          {item.is_system ? (
+                            <ul className="mt-1 space-y-0.5">
+                              {(item.components || []).map((c) => (
+                                <li key={c.component_item_id} className="text-xs text-gray-500 flex items-center gap-1">
+                                  <span className="text-gray-300">↳</span> {c.name}
+                                </li>
+                              ))}
+                              {(item.components || []).length === 0 && (
+                                <li className="text-xs text-gray-400 italic">No components selected</li>
+                              )}
+                            </ul>
+                          ) : (
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                              {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
+                              {item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
+                              {item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
+                              {item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
+                            </div>
+                          )}
                         </div>
                         <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
                           ${parseFloat(item.default_unit_price || 0).toFixed(2)} {item.default_unit_label || ''}
@@ -621,6 +699,7 @@ export default function BidderAdminSettings({ companyId }) {
                 {/* Add item row */}
                 {newItemCatId === cat.id ? (
                   <div className="px-4 py-3 bg-blue-50 space-y-3">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">New Item</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Name *</label>
@@ -658,9 +737,61 @@ export default function BidderAdminSettings({ companyId }) {
                       <button onClick={() => setNewItemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
                     </div>
                   </div>
+                ) : newSystemCatId === cat.id ? (
+                  <div className="px-4 py-3 bg-purple-50 space-y-3">
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New System</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>System Name *</label>
+                        <input className={inputCls} value={newSystemForm.name} onChange={(e) => setNewSystemForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. System ABC" autoFocus />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Bid Price</label>
+                        <input className={inputCls} type="number" step="0.01" value={newSystemForm.default_unit_price} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_price: e.target.value }))} placeholder="0.00" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Unit Label</label>
+                      <input className={inputCls} value={newSystemForm.default_unit_label} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Description (internal)</label>
+                      <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional notes" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
+                      <div className="border border-purple-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
+                        {library.flatMap((c) => c.items.filter((i) => !i.is_system).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                          <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50">
+                            <input
+                              type="checkbox"
+                              checked={newSystemForm.componentIds.includes(i.id)}
+                              onChange={() => setNewSystemForm((p) => ({
+                                ...p,
+                                componentIds: p.componentIds.includes(i.id)
+                                  ? p.componentIds.filter((x) => x !== i.id)
+                                  : [...p.componentIds, i.id],
+                              }))}
+                              className="w-4 h-4 flex-shrink-0"
+                            />
+                            <span className="text-xs text-gray-400 w-28 flex-shrink-0">{i.catName}</span>
+                            <span className="text-sm text-gray-800">{i.name}</span>
+                          </label>
+                        ))}
+                        {library.flatMap((c) => c.items.filter((i) => !i.is_system)).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-gray-400">No standard items in library yet.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleAddSystem(cat.id)} className="px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg">Add System</button>
+                      <button onClick={() => setNewSystemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="px-4 py-2">
+                  <div className="px-4 py-2 flex gap-4">
                     <button onClick={() => startAddItem(cat.id)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
+                    <button onClick={() => startAddSystem(cat.id)} className="text-sm text-purple-600 hover:underline">+ Add System</button>
                   </div>
                 )}
               </div>
