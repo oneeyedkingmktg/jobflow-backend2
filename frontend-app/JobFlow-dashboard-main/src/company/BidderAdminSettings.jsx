@@ -230,7 +230,7 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddItem(catId) {
     setNewSystemCatId(null);
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '' });
+    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false });
   }
 
   function startAddSystem(catId) {
@@ -277,9 +277,10 @@ export default function BidderAdminSettings({ companyId }) {
         is_included: newItemForm.is_included || false,
         show_quantity: newItemForm.show_quantity || false,
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
-        supplier: newItemForm.supplier || null,
-        kit_price: newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null,
-        sqft_per_kit: newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null,
+        is_charge_only: newItemForm.is_charge_only || false,
+        supplier: newItemForm.is_charge_only ? null : (newItemForm.supplier || null),
+        kit_price: newItemForm.is_charge_only ? null : (newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null),
+        sqft_per_kit: newItemForm.is_charge_only ? null : (newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null),
       }, companyId);
       setNewItemCatId(null);
       await loadLibrary();
@@ -304,6 +305,7 @@ export default function BidderAdminSettings({ companyId }) {
       kit_price: item.kit_price != null ? item.kit_price : '',
       sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
       is_system: item.is_system || false,
+      is_charge_only: item.is_charge_only || false,
     });
     setEditSystemComponentIds((item.components || []).map((c) => c.component_item_id));
   }
@@ -313,9 +315,10 @@ export default function BidderAdminSettings({ companyId }) {
       await BidderAPI.updateLibraryItem(itemId, {
         ...editItemForm,
         default_unit_price: parseFloat(editItemForm.default_unit_price) || 0,
-        kit_price: editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null,
-        sqft_per_kit: editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null,
-        supplier: editItemForm.supplier || null,
+        supplier: editItemForm.is_charge_only ? null : (editItemForm.supplier || null),
+        kit_price: editItemForm.is_charge_only ? null : (editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null),
+        sqft_per_kit: editItemForm.is_charge_only ? null : (editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null),
+        is_charge_only: editItemForm.is_charge_only || false,
         component_ids: editItemForm.is_system ? editSystemComponentIds : undefined,
       }, companyId);
       setEditItemId(null);
@@ -602,11 +605,22 @@ export default function BidderAdminSettings({ companyId }) {
                           <label className={labelCls}>Description</label>
                           <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                         </div>
+                        {!editItemForm.is_system && (
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editItemForm.is_charge_only || false}
+                              onChange={(e) => setEditItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))}
+                              className="w-4 h-4"
+                            />
+                            <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
+                          </label>
+                        )}
                         {editItemForm.is_system ? (
                           <div>
                             <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(check all items that make up this system)</span></label>
                             <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
-                              {library.flatMap((c) => c.items.filter((i) => !i.is_system && i.id !== item.id).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                              {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only && i.id !== item.id).map((i) => ({ ...i, catName: c.name }))).map((i) => (
                                 <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
                                   <input
                                     type="checkbox"
@@ -620,7 +634,7 @@ export default function BidderAdminSettings({ companyId }) {
                               ))}
                             </div>
                           </div>
-                        ) : (
+                        ) : !editItemForm.is_charge_only && (
                           <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className={labelCls}>Supplier</label>
@@ -664,6 +678,9 @@ export default function BidderAdminSettings({ companyId }) {
                             {item.is_system && (
                               <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">System</span>
                             )}
+                            {item.is_charge_only && (
+                              <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Charge Only</span>
+                            )}
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
                           {item.is_system ? (
@@ -680,9 +697,9 @@ export default function BidderAdminSettings({ companyId }) {
                           ) : (
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                               {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
-                              {item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
-                              {item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
-                              {item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
+                              {!item.is_charge_only && item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
+                              {!item.is_charge_only && item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
+                              {!item.is_charge_only && item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
                             </div>
                           )}
                         </div>
@@ -718,20 +735,31 @@ export default function BidderAdminSettings({ companyId }) {
                       <label className={labelCls}>Description</label>
                       <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className={labelCls}>Supplier</label>
-                        <input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newItemForm.is_charge_only || false}
+                        onChange={(e) => setNewItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
+                    </label>
+                    {!newItemForm.is_charge_only && (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className={labelCls}>Supplier</label>
+                          <input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Kit Price ($)</label>
+                          <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
+                        </div>
+                        <div>
+                          <label className={labelCls}>SF per Kit</label>
+                          <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
+                        </div>
                       </div>
-                      <div>
-                        <label className={labelCls}>Kit Price ($)</label>
-                        <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
-                      </div>
-                      <div>
-                        <label className={labelCls}>SF per Kit</label>
-                        <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
-                      </div>
-                    </div>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={() => handleAddItem(cat.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Add Item</button>
                       <button onClick={() => setNewItemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
@@ -761,7 +789,7 @@ export default function BidderAdminSettings({ companyId }) {
                     <div>
                       <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
                       <div className="border border-purple-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
-                        {library.flatMap((c) => c.items.filter((i) => !i.is_system).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                        {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only).map((i) => ({ ...i, catName: c.name }))).map((i) => (
                           <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50">
                             <input
                               type="checkbox"
