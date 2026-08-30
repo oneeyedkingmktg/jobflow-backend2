@@ -251,7 +251,7 @@ router.put('/proposal/:id', async (req, res) => {
       customer_notes, internal_notes, bid_total, down_payment_type = 'percent',
       down_payment_value = 50, down_payment_amount = 0, balance_due,
       payment_url, include_payment_button, proposal_design_id, salesman,
-      site_conditions, warranty_id,
+      site_conditions, warranty_id, override_total,
     } = req.body;
 
     // Auto-set accepted_date when status transitions to accepted and no date was provided
@@ -267,8 +267,9 @@ router.put('/proposal/:id', async (req, res) => {
         down_payment_amount = $15, balance_due = $16,
         payment_url = $17, include_payment_button = $18,
         proposal_design_id = $19, salesman = $20,
-        site_conditions = $21, warranty_id = $22, updated_at = NOW()
-       WHERE id = $23 AND ($24::integer IS NULL OR company_id = $24::integer)
+        site_conditions = $21, warranty_id = $22,
+        override_total = $23, updated_at = NOW()
+       WHERE id = $24 AND ($25::integer IS NULL OR company_id = $25::integer)
        RETURNING *`,
       [
         bid_name, clean(bid_description), status,
@@ -281,6 +282,7 @@ router.put('/proposal/:id', async (req, res) => {
         clean(proposal_design_id), salesman ?? null,
         site_conditions ? JSON.stringify(site_conditions) : '{}',
         warranty_id ? parseInt(warranty_id) : null,
+        override_total != null && override_total !== '' ? parseFloat(override_total) : null,
         id, companyId,
       ]
     );
@@ -2006,6 +2008,173 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/send-warranty-email error:', err);
     res.status(500).json({ error: 'Failed to send warranty email' });
+  }
+});
+
+// ============================================================================
+// GLOBAL SUPPLIERS (master-only)
+// ============================================================================
+
+// GET /api/bidder/global-suppliers
+router.get('/global-suppliers', requireRole('master'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM global_suppliers ORDER BY sort_order, name'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /bidder/global-suppliers error:', err);
+    res.status(500).json({ error: 'Failed to load suppliers' });
+  }
+});
+
+// POST /api/bidder/global-suppliers
+router.post('/global-suppliers', requireRole('master'), async (req, res) => {
+  try {
+    const { name, notes = null, sort_order = 0 } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const { rows } = await pool.query(
+      'INSERT INTO global_suppliers (name, notes, sort_order) VALUES ($1,$2,$3) RETURNING *',
+      [name.trim(), notes, sort_order]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('POST /bidder/global-suppliers error:', err);
+    res.status(500).json({ error: 'Failed to create supplier' });
+  }
+});
+
+// PUT /api/bidder/global-suppliers/:id
+router.put('/global-suppliers/:id', requireRole('master'), async (req, res) => {
+  try {
+    const { name, notes, is_active, sort_order } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE global_suppliers
+         SET name = COALESCE($1, name),
+             notes = $2,
+             is_active = COALESCE($3, is_active),
+             sort_order = COALESCE($4, sort_order)
+       WHERE id = $5 RETURNING *`,
+      [name?.trim() || null, notes ?? null, is_active ?? null, sort_order ?? null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Supplier not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /bidder/global-suppliers/:id error:', err);
+    res.status(500).json({ error: 'Failed to update supplier' });
+  }
+});
+
+// DELETE /api/bidder/global-suppliers/:id
+router.delete('/global-suppliers/:id', requireRole('master'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM global_suppliers WHERE id = $1 RETURNING id', [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Supplier not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /bidder/global-suppliers/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete supplier' });
+  }
+});
+
+// GET /api/bidder/global-suppliers/:supplierId/products
+router.get('/global-suppliers/:supplierId/products', requireRole('master'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM global_supplier_products WHERE supplier_id = $1 ORDER BY sort_order, name',
+      [req.params.supplierId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /bidder/global-suppliers/:supplierId/products error:', err);
+    res.status(500).json({ error: 'Failed to load products' });
+  }
+});
+
+// POST /api/bidder/global-suppliers/:supplierId/products
+router.post('/global-suppliers/:supplierId/products', requireRole('master'), async (req, res) => {
+  try {
+    const supplierId = parseInt(req.params.supplierId, 10);
+    const {
+      name, description = null,
+      default_unit_price = 0, default_unit_label = 'per sqft',
+      color = null, kit_price = null, sqft_per_kit = null,
+      is_charge_only = false, sort_order = 0,
+    } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const { rows } = await pool.query(
+      `INSERT INTO global_supplier_products
+         (supplier_id, name, description, default_unit_price, default_unit_label, color, kit_price, sqft_per_kit, is_charge_only, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [supplierId, name.trim(), description,
+       parseFloat(default_unit_price) || 0, default_unit_label,
+       color || null,
+       kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
+       sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
+       is_charge_only, sort_order]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('POST /bidder/global-suppliers/:supplierId/products error:', err);
+    res.status(500).json({ error: 'Failed to create product' });
+  }
+});
+
+// PUT /api/bidder/global-supplier-products/:id
+router.put('/global-supplier-products/:id', requireRole('master'), async (req, res) => {
+  try {
+    const {
+      name, description, default_unit_price, default_unit_label,
+      color, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
+    } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE global_supplier_products SET
+         name               = COALESCE($1, name),
+         description        = $2,
+         default_unit_price = COALESCE($3, default_unit_price),
+         default_unit_label = COALESCE($4, default_unit_label),
+         color              = $5,
+         kit_price          = $6,
+         sqft_per_kit       = $7,
+         is_charge_only     = COALESCE($8, is_charge_only),
+         is_active          = COALESCE($9, is_active),
+         sort_order         = COALESCE($10, sort_order)
+       WHERE id = $11 RETURNING *`,
+      [
+        name?.trim() || null,
+        description ?? null,
+        default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
+        default_unit_label || null,
+        color ?? null,
+        kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
+        sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
+        is_charge_only ?? null,
+        is_active ?? null,
+        sort_order ?? null,
+        req.params.id,
+      ]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Product not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /bidder/global-supplier-products/:id error:', err);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// DELETE /api/bidder/global-supplier-products/:id
+router.delete('/global-supplier-products/:id', requireRole('master'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM global_supplier_products WHERE id = $1 RETURNING id', [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Product not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /bidder/global-supplier-products/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete product' });
   }
 });
 

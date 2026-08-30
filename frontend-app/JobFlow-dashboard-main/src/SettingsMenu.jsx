@@ -11,7 +11,7 @@ import SettingsModal from "./SettingsModal";
 import CompanyWizard from "./CompanyWizard";
 import UserProfileModal from "./UserProfileModal";
 import NotificationSettings from "./components/NotificationSettings";
-import BidderMasterAdmin from "./components/BidderMasterAdmin";
+import GlobalSettings from "./components/GlobalSettings";
 import { canUseNotifications } from "./utils/platform";
 
 // IMPORT SCREENS
@@ -38,7 +38,7 @@ export default function SettingsMenu({ onRefresh }) {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showUserMgmt, setShowUserMgmt] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  const [showBidderAdmin, setShowBidderAdmin] = useState(false);
+  const [showGlobalSettings, setShowGlobalSettings] = useState(false);
 
   // 🔒 CRITICAL: normalize isMaster safely
   const isMasterUser =
@@ -79,9 +79,9 @@ const handleNotificationSettings = () => {
   setShowNotificationSettings(true);
 };
 
-  const handleBidderAdmin = () => {
+  const handleGlobalSettings = () => {
     setShowMenu(false);
-    setShowBidderAdmin(true);
+    setShowGlobalSettings(true);
   };
 
     const handleRefresh = () => {
@@ -208,10 +208,10 @@ const handleNotificationSettings = () => {
                       Manage Users
                     </button>
                     <button
-                      onClick={handleBidderAdmin}
+                      onClick={handleGlobalSettings}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 font-medium hover:bg-gray-50 transition"
                     >
-                      Bidder Admin
+                      Global Settings
                     </button>
                     <button
                       onClick={handleMyProfile} 
@@ -331,10 +331,10 @@ const handleNotificationSettings = () => {
 
       {/* MODALS */}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {showBidderAdmin && (
+      {showGlobalSettings && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[999] p-4 overflow-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-auto">
-            <BidderMasterAdmin onBack={() => setShowBidderAdmin(false)} />
+            <GlobalSettings onBack={() => setShowGlobalSettings(false)} />
           </div>
         </div>
       )}

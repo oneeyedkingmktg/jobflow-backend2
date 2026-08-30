@@ -420,6 +420,16 @@ export const BidderAPI = {
   updateWarranty: (id, data, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteWarranty: (id, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
   sendWarrantyEmail: (id, email) => apiRequest(`/api/bidder/proposal/${id}/send-warranty-email`, { method: 'POST', body: JSON.stringify({ email }) }),
+
+  // Global supplier catalog (master-only)
+  getGlobalSuppliers: () => apiRequest('/api/bidder/global-suppliers'),
+  createGlobalSupplier: (data) => apiRequest('/api/bidder/global-suppliers', { method: 'POST', body: JSON.stringify(data) }),
+  updateGlobalSupplier: (id, data) => apiRequest(`/api/bidder/global-suppliers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGlobalSupplier: (id) => apiRequest(`/api/bidder/global-suppliers/${id}`, { method: 'DELETE' }),
+  getSupplierProducts: (supplierId) => apiRequest(`/api/bidder/global-suppliers/${supplierId}/products`),
+  createSupplierProduct: (supplierId, data) => apiRequest(`/api/bidder/global-suppliers/${supplierId}/products`, { method: 'POST', body: JSON.stringify(data) }),
+  updateSupplierProduct: (id, data) => apiRequest(`/api/bidder/global-supplier-products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSupplierProduct: (id) => apiRequest(`/api/bidder/global-supplier-products/${id}`, { method: 'DELETE' }),
 };
 
 /* ============================================================================
