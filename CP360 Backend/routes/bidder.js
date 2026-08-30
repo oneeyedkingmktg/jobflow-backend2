@@ -321,6 +321,7 @@ router.post('/item', async (req, res) => {
       unit_price = 0, unit_label, quantity, line_total = 0,
       is_included = false, is_optional = false, is_freeform = false,
       breakout_price = false, show_price = true, show_quantity = true, sort_order = 0,
+      color,
     } = req.body;
 
     // Verify proposal belongs to this company
@@ -335,12 +336,12 @@ router.post('/item', async (req, res) => {
       `INSERT INTO bidder_proposal_items (
         proposal_id, library_item_id, category_name, name, description,
         unit_price, unit_label, quantity, line_total, is_included,
-        is_optional, is_freeform, breakout_price, sort_order
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        is_optional, is_freeform, breakout_price, sort_order, color
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         proposal_id, clean(library_item_id), clean(category_name), name, clean(description),
         unit_price, clean(unit_label), clean(quantity), line_total, is_included,
-        is_optional, is_freeform, breakout_price, sort_order,
+        is_optional, is_freeform, breakout_price, sort_order, clean(color) || null,
       ]
     );
 
@@ -358,47 +359,26 @@ router.put('/item/:id', async (req, res) => {
     const {
       category_name, name, description, unit_price, unit_label,
       quantity, line_total, is_included, is_optional, is_accepted,
-      breakout_price, show_price, show_quantity, sort_order,
+      breakout_price, show_price, show_quantity, sort_order, color,
     } = req.body;
 
-    let result;
-    try {
-      result = await pool.query(
-        `UPDATE bidder_proposal_items pi
-         SET category_name = $1, name = $2, description = $3, unit_price = $4,
-             unit_label = $5, quantity = $6, line_total = $7, is_included = $8,
-             is_optional = $9, is_accepted = $10, breakout_price = $11, sort_order = $12,
-             show_price = $13, show_quantity = $14
-         FROM bidder_proposals p
-         WHERE pi.id = $15 AND pi.proposal_id = p.id AND ($16::integer IS NULL OR p.company_id = $16::integer)
-         RETURNING pi.*`,
-        [
-          clean(category_name), name, clean(description), unit_price,
-          clean(unit_label), clean(quantity), line_total, is_included,
-          is_optional, clean(is_accepted), breakout_price ?? false, sort_order,
-          show_price ?? true, show_quantity ?? true,
-          req.params.id, companyId,
-        ]
-      );
-    } catch (e) {
-      if (e.message && e.message.includes('column') && e.message.includes('does not exist')) {
-        result = await pool.query(
-          `UPDATE bidder_proposal_items pi
-           SET category_name = $1, name = $2, description = $3, unit_price = $4,
-               unit_label = $5, quantity = $6, line_total = $7, is_included = $8,
-               is_optional = $9, is_accepted = $10, breakout_price = $11, sort_order = $12
-           FROM bidder_proposals p
-           WHERE pi.id = $13 AND pi.proposal_id = p.id AND ($14::integer IS NULL OR p.company_id = $14::integer)
-           RETURNING pi.*`,
-          [
-            clean(category_name), name, clean(description), unit_price,
-            clean(unit_label), clean(quantity), line_total, is_included,
-            is_optional, clean(is_accepted), breakout_price ?? false, sort_order,
-            req.params.id, companyId,
-          ]
-        );
-      } else { throw e; }
-    }
+    const result = await pool.query(
+      `UPDATE bidder_proposal_items pi
+       SET category_name = $1, name = $2, description = $3, unit_price = $4,
+           unit_label = $5, quantity = $6, line_total = $7, is_included = $8,
+           is_optional = $9, is_accepted = $10, breakout_price = $11, sort_order = $12,
+           show_price = $13, show_quantity = $14, color = $15
+       FROM bidder_proposals p
+       WHERE pi.id = $16 AND pi.proposal_id = p.id AND ($17::integer IS NULL OR p.company_id = $17::integer)
+       RETURNING pi.*`,
+      [
+        clean(category_name), name, clean(description), unit_price,
+        clean(unit_label), clean(quantity), line_total, is_included,
+        is_optional, clean(is_accepted), breakout_price ?? false, sort_order,
+        show_price ?? true, show_quantity ?? true, clean(color) || null,
+        req.params.id, companyId,
+      ]
+    );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Item not found' });
     res.json(result.rows[0]);
@@ -773,15 +753,15 @@ router.post('/library/import', csvUpload.single('csv'), async (req, res) => {
       await pool.query(
         `INSERT INTO bidder_library_items
           (category_id, company_id, name, description, default_unit_price, default_unit_label,
-           supplier, kit_price, sqft_per_kit, is_charge_only, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           supplier, kit_price, sqft_per_kit, is_charge_only, color, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
           cat.id, companyId, name,
           get('description') || null,
           unitPrice,
           get('default_unit_label') || null,
           supplier, kitPrice, sqftPerKit,
-          isChargeOnly, sortOrder,
+          isChargeOnly, get('color') || null, sortOrder,
         ]
       );
       created++;
@@ -856,7 +836,7 @@ router.post('/library/item', async (req, res) => {
       category_id, name, description, default_unit_price = 0,
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
       supplier, kit_price, sqft_per_kit, is_system = false, component_ids = [],
-      is_charge_only = false,
+      is_charge_only = false, color,
     } = req.body;
 
     // Verify category belongs to this company
@@ -867,9 +847,9 @@ router.post('/library/item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Category not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only]
+      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null]
     );
 
     const newItem = result.rows[0];
@@ -897,7 +877,7 @@ router.put('/library/item/:id', async (req, res) => {
     const {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
-      supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only,
+      supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color,
     } = req.body;
 
     const result = await pool.query(
@@ -905,13 +885,13 @@ router.put('/library/item/:id', async (req, res) => {
         category_id = $1, name = $2, description = $3, default_unit_price = $4,
         default_unit_label = $5, is_included = $6, show_quantity = $7,
         is_active = $8, sort_order = $9, supplier = $10, kit_price = $11, sqft_per_kit = $12,
-        is_charge_only = $13
-       WHERE id = $14 AND company_id = $15 RETURNING *`,
+        is_charge_only = $13, color = $14
+       WHERE id = $15 AND company_id = $16 RETURNING *`,
       [
         category_id, name, clean(description), default_unit_price,
         clean(default_unit_label), is_included, show_quantity,
         is_active, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null,
-        is_charge_only ?? false, req.params.id, companyId,
+        is_charge_only ?? false, clean(color) || null, req.params.id, companyId,
       ]
     );
 

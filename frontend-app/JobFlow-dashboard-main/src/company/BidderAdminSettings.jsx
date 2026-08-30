@@ -234,13 +234,13 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddItem(catId) {
     setNewSystemCatId(null);
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false });
+    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '' });
   }
 
   function startAddSystem(catId) {
     setNewItemCatId(null);
     setNewSystemCatId(catId);
-    setNewSystemForm({ name: '', description: '', default_unit_price: '', default_unit_label: '', componentIds: [] });
+    setNewSystemForm({ name: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [] });
   }
 
   async function handleAddSystem(catId) {
@@ -252,6 +252,7 @@ export default function BidderAdminSettings({ companyId }) {
         description: newSystemForm.description || null,
         default_unit_price: parseFloat(newSystemForm.default_unit_price) || 0,
         default_unit_label: newSystemForm.default_unit_label || null,
+        color: newSystemForm.color || null,
         is_system: true,
         component_ids: newSystemForm.componentIds,
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
@@ -282,6 +283,7 @@ export default function BidderAdminSettings({ companyId }) {
         show_quantity: newItemForm.show_quantity || false,
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
         is_charge_only: newItemForm.is_charge_only || false,
+        color: newItemForm.color || null,
         supplier: newItemForm.is_charge_only ? null : (newItemForm.supplier || null),
         kit_price: newItemForm.is_charge_only ? null : (newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null),
         sqft_per_kit: newItemForm.is_charge_only ? null : (newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null),
@@ -310,6 +312,7 @@ export default function BidderAdminSettings({ companyId }) {
       sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
       is_system: item.is_system || false,
       is_charge_only: item.is_charge_only || false,
+      color: item.color || '',
     });
     setEditSystemComponentIds((item.components || []).map((c) => c.component_item_id));
   }
@@ -319,6 +322,7 @@ export default function BidderAdminSettings({ companyId }) {
       await BidderAPI.updateLibraryItem(itemId, {
         ...editItemForm,
         default_unit_price: parseFloat(editItemForm.default_unit_price) || 0,
+        color: editItemForm.color || null,
         supplier: editItemForm.is_charge_only ? null : (editItemForm.supplier || null),
         kit_price: editItemForm.is_charge_only ? null : (editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null),
         sqft_per_kit: editItemForm.is_charge_only ? null : (editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null),
@@ -526,9 +530,9 @@ export default function BidderAdminSettings({ companyId }) {
   // ── Render: Library ────────────────────────────────────────────────────────
   // ── CSV import / template ──────────────────────────────────────────────────
   function downloadTemplate() {
-    const headers = 'category,name,description,default_unit_price,default_unit_label,supplier,kit_price,sqft_per_kit,is_charge_only';
-    const example = 'Coating Systems,PA 552 Polyaspartic,Polyaspartic topcoat,1.25,per sqft,Sherwin-Williams,45.00,400,no\n' +
-                    'Prep Work,Coat Wooden Steps,Charge for coating wooden steps,50.00,per step,,,, yes';
+    const headers = 'category,name,description,default_unit_price,default_unit_label,color,supplier,kit_price,sqft_per_kit,is_charge_only';
+    const example = 'Coating Systems,PA 552 Polyaspartic,Polyaspartic topcoat,1.25,per sqft,Slate Gray,Sherwin-Williams,45.00,400,no\n' +
+                    'Prep Work,Coat Wooden Steps,Charge for coating wooden steps,50.00,per step,,,,,yes';
     const blob = new Blob([headers + '\n' + example], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -678,9 +682,15 @@ export default function BidderAdminSettings({ companyId }) {
                           <label className={labelCls}>Unit Label</label>
                           <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                         </div>
-                        <div>
-                          <label className={labelCls}>Description</label>
-                          <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>Description</label>
+                            <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Color</label>
+                            <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                          </div>
                         </div>
                         {!editItemForm.is_system && (
                           <label className="flex items-center gap-3 cursor-pointer">
@@ -760,6 +770,12 @@ export default function BidderAdminSettings({ companyId }) {
                             )}
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
+                          {item.color && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-gray-500 font-medium">Color:</span>
+                              <span className="text-xs text-gray-700">{item.color}</span>
+                            </div>
+                          )}
                           {item.is_system ? (
                             <ul className="mt-1 space-y-0.5">
                               {(item.components || []).map((c) => (
@@ -808,9 +824,15 @@ export default function BidderAdminSettings({ companyId }) {
                       <label className={labelCls}>Unit Label</label>
                       <input className={inputCls} value={newItemForm.default_unit_label} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                     </div>
-                    <div>
-                      <label className={labelCls}>Description</label>
-                      <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Description</label>
+                        <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Color</label>
+                        <input className={inputCls} value={newItemForm.color} onChange={(e) => setNewItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                      </div>
                     </div>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -859,9 +881,15 @@ export default function BidderAdminSettings({ companyId }) {
                       <label className={labelCls}>Unit Label</label>
                       <input className={inputCls} value={newSystemForm.default_unit_label} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                     </div>
-                    <div>
-                      <label className={labelCls}>Description (internal)</label>
-                      <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional notes" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Description (internal)</label>
+                        <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional notes" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Color</label>
+                        <input className={inputCls} value={newSystemForm.color} onChange={(e) => setNewSystemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                      </div>
                     </div>
                     <div>
                       <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>

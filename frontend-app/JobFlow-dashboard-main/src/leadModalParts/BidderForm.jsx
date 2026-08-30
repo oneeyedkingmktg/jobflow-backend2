@@ -123,7 +123,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       // Library items (non-freeform only)
       const map = {};
       (p.items || []).filter(item => !item.is_freeform && item.library_item_id).forEach((item) => {
-        map[item.library_item_id] = { ...item, _price: item.unit_price, _desc: item.description || '', _qty: item.quantity || 1 };
+        map[item.library_item_id] = { ...item, _price: item.unit_price, _desc: item.description || '', _qty: item.quantity || 1, _color: item.color || '' };
       });
       setCheckedMap(map);
       setCustomItems((p.customItems || []).map(i => ({ ...i, _desc: i.description, _qty: i.quantity, _price: i.price_each, _note: i.subtotal_note || '' })));
@@ -202,8 +202,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         name: libItem.name, description: libItem.description || '', unit_price: libItem.default_unit_price,
         unit_label: libItem.default_unit_label, quantity: 1, line_total: lineTotal,
         is_included: libItem.is_included, is_optional: false, breakout_price: false, sort_order: sortOrder,
+        color: libItem.color || null,
       });
-      setCheckedMap(prev => ({ ...prev, [libItem.id]: { ...newItem, _price: newItem.unit_price, _desc: newItem.description || '', _qty: 1 } }));
+      setCheckedMap(prev => ({ ...prev, [libItem.id]: { ...newItem, _price: newItem.unit_price, _desc: newItem.description || '', _qty: 1, _color: newItem.color || '' } }));
     } catch (e) { alert('Failed to add item'); }
   }
 
@@ -334,6 +335,15 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       await BidderAPI.updateItem(item.id, { ...item, description: item._desc });
       setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, description: item._desc } }));
     } catch (e) { console.error('Failed to update item desc', e); }
+  }
+
+  async function handleItemColorBlur(libItemId) {
+    const item = checkedMap[libItemId];
+    if (!item) return;
+    try {
+      await BidderAPI.updateItem(item.id, { ...item, color: item._color || null });
+      setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, color: item._color || null } }));
+    } catch (e) { console.error('Failed to update item color', e); }
   }
 
   // ── Custom items ──────────────────────────────────────────────────────────
@@ -776,11 +786,18 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                             </label>
                           </div>
                         )}
-                        <input className="mt-1 w-full px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
-                          placeholder="Description (optional)" value={pi._desc}
-                          disabled={isLocked}
-                          onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _desc: e.target.value } }))}
-                          onBlur={() => handleItemDescBlur(libItemId)} />
+                        <div className="mt-1 flex gap-2">
+                          <input className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
+                            placeholder="Color" value={pi._color || ''}
+                            disabled={isLocked}
+                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _color: e.target.value } }))}
+                            onBlur={() => handleItemColorBlur(libItemId)} />
+                          <input className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"
+                            placeholder="Description (optional)" value={pi._desc}
+                            disabled={isLocked}
+                            onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _desc: e.target.value } }))}
+                            onBlur={() => handleItemDescBlur(libItemId)} />
+                        </div>
                       </div>
                     );
                   }
