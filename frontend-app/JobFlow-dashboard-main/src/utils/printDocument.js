@@ -298,6 +298,7 @@ function _printProposalStyled({
         <td style="${TD}">
           <div style="font-weight:600;">${item.name}</div>
           ${(item._desc || item.description) ? `<div style="font-size:8.5pt;color:#888;margin-top:2px;">${item._desc || item.description}</div>` : ''}
+          ${(item._color || item.color) ? `<div style="font-size:8.5pt;color:#555;margin-top:2px;">Color: ${item._color || item.color}</div>` : ''}
         </td>
         <td style="${TDR}">${showQty ? qty : ''}</td>
         <td style="${TDR}">${showPrice ? fmt(item._price ?? item.unit_price) : ''}</td>

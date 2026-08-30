@@ -689,6 +689,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                           <td className="px-4 py-2.5">
                             <div className="font-semibold text-gray-900">{item.name}</div>
                             {item.description && <div className="text-xs text-gray-400 mt-0.5">{item.description}</div>}
+                            {item.color && <div className="text-xs text-gray-500 mt-0.5">Color: {item.color}</div>}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-600">{item.show_quantity !== false ? item.quantity : ''}</td>
                           <td className="px-4 py-2.5 text-right text-gray-600">{item.show_price !== false ? fmt(item.unit_price) : ''}</td>
