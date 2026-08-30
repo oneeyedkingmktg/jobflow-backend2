@@ -140,7 +140,22 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       } else {
         setPaySchedule(schedules.map(ps => ({ ...ps, _desc: ps.description, _val: ps.amount_value, _type: ps.amount_type })));
       }
-      setOverrideTotal(p.override_total != null ? String(p.override_total) : '');
+      if (p.override_total != null) {
+        setOverrideTotal(String(p.override_total));
+      } else {
+        // Fallback: if bid_total differs from calculated total, it was manually overridden
+        // before the override_total column existed — restore it so the field shows correctly.
+        const rawItems   = (p.items || []).filter(i => !i.is_freeform && i.library_item_id);
+        const rawCustom  = (p.customItems || []).filter(i => !i.is_subtotal);
+        const rawPreDisc = [...rawItems, ...rawCustom].reduce((a, i) => a + (parseFloat(i.line_total) || 0), 0);
+        const rawDiscAmt = (p.discounts || []).reduce((a, d) => {
+          if (d.discount_type === 'dollar') return a + (parseFloat(d.discount_amount) || 0);
+          return a + (rawPreDisc * ((parseFloat(d.discount_value) || 0) / 100));
+        }, 0);
+        const rawCalc  = rawPreDisc - rawDiscAmt;
+        const stored   = parseFloat(p.bid_total) || 0;
+        setOverrideTotal(stored > 0 && Math.abs(stored - rawCalc) > 0.01 ? String(stored) : '');
+      }
     } catch (e) {
       console.error('Failed to load proposal', e);
     } finally {

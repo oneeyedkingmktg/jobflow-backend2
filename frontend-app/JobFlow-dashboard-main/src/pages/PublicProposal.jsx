@@ -114,7 +114,12 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     return a + (d.discount_type === 'dollar' ? val : preDiscount * (val / 100));
   }, 0);
   const calcBidTotal = preDiscount - discountTotal;
-  const bidTotal   = proposal.override_total != null ? parseFloat(proposal.override_total) : calcBidTotal;
+  // Use override_total if explicitly set; fall back to stored bid_total (reflects any
+  // override saved before the override_total column existed); recalculate only if neither is set.
+  const storedBid = parseFloat(proposal.bid_total) || 0;
+  const bidTotal = proposal.override_total != null
+    ? parseFloat(proposal.override_total)
+    : storedBid > 0 ? storedBid : calcBidTotal;
   const payTotal   = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
   const balanceDue = bidTotal - payTotal;
 
