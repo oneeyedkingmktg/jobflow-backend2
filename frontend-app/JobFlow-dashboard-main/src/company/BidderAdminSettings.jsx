@@ -64,8 +64,6 @@ export default function BidderAdminSettings({ companyId }) {
     try {
       const data = await BidderAPI.getLibrary(companyId);
       setLibrary(data);
-      // Auto-expand first category
-      if (data.length > 0) setExpandedCats({ [data[0].id]: true });
     } catch (e) {
       console.error('Failed to load library', e);
     } finally {
@@ -182,6 +180,23 @@ export default function BidderAdminSettings({ companyId }) {
       await loadLibrary();
     } catch (e) {
       alert('Failed to delete category');
+    }
+  }
+
+  async function handleReorderCategory(catId, direction) {
+    const idx = library.findIndex((c) => c.id === catId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= library.length) return;
+    const cat = library[idx];
+    const swap = library[swapIdx];
+    try {
+      await Promise.all([
+        BidderAPI.updateCategory(cat.id, { name: cat.name, sort_order: swap.sort_order, is_active: cat.is_active }, companyId),
+        BidderAPI.updateCategory(swap.id, { name: swap.name, sort_order: cat.sort_order, is_active: swap.is_active }, companyId),
+      ]);
+      await loadLibrary();
+    } catch (e) {
+      alert('Failed to reorder categories');
     }
   }
 
@@ -462,6 +477,18 @@ export default function BidderAdminSettings({ companyId }) {
                     {cat.name}
                     <span className="text-gray-400 font-normal text-xs">({cat.items?.length || 0} items)</span>
                   </button>
+                  <button
+                    onClick={() => handleReorderCategory(cat.id, 'up')}
+                    disabled={library.indexOf(cat) === 0}
+                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                    title="Move up"
+                  >▲</button>
+                  <button
+                    onClick={() => handleReorderCategory(cat.id, 'down')}
+                    disabled={library.indexOf(cat) === library.length - 1}
+                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                    title="Move down"
+                  >▼</button>
                   <button
                     onClick={() => { setEditCatId(cat.id); setEditCatName(cat.name); }}
                     className="text-xs text-blue-600 hover:underline px-2"
