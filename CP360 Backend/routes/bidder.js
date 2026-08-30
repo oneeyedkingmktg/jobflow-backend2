@@ -681,6 +681,119 @@ router.get('/library', async (req, res) => {
   }
 });
 
+// POST /api/bidder/library/import — CSV bulk import
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const rows = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (ch === ',' && !inQuote) {
+        cols.push(cur.trim()); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+router.post('/library/import', csvUpload.single('csv'), async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const text = req.file.buffer.toString('utf8');
+    const rows = parseCSV(text);
+    if (rows.length < 2) return res.status(400).json({ error: 'CSV is empty or has no data rows' });
+
+    const headers = rows[0].map((h) => h.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''));
+    const idx = (name) => headers.indexOf(name);
+
+    // Validate required headers
+    if (idx('category') === -1 || idx('name') === -1) {
+      return res.status(400).json({ error: 'CSV must have at least "category" and "name" columns' });
+    }
+
+    // Fetch existing categories for this company
+    const catResult = await pool.query(
+      'SELECT * FROM bidder_categories WHERE company_id = $1 ORDER BY sort_order, id',
+      [companyId]
+    );
+    const categoryCache = {};
+    catResult.rows.forEach((c) => { categoryCache[c.name.toLowerCase()] = c; });
+
+    let created = 0, skipped = 0, errors = [];
+
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (row.every((c) => !c)) continue; // blank row
+
+      const get = (col) => (idx(col) !== -1 ? (row[idx(col)] || '').trim() : '');
+      const catName = get('category');
+      const name    = get('name');
+
+      if (!catName || !name) { skipped++; errors.push(`Row ${r + 1}: missing category or name`); continue; }
+
+      // Find or create category
+      let cat = categoryCache[catName.toLowerCase()];
+      if (!cat) {
+        const newCat = await pool.query(
+          'INSERT INTO bidder_categories (company_id, name, sort_order) VALUES ($1,$2,$3) RETURNING *',
+          [companyId, catName, Object.keys(categoryCache).length]
+        );
+        cat = newCat.rows[0];
+        categoryCache[catName.toLowerCase()] = cat;
+      }
+
+      const isChargeOnly = /^(yes|true|1)$/i.test(get('is_charge_only'));
+      const unitPrice    = parseFloat(get('default_unit_price')) || 0;
+      const kitPrice     = !isChargeOnly && get('kit_price') ? parseFloat(get('kit_price')) || null : null;
+      const sqftPerKit   = !isChargeOnly && get('sqft_per_kit') ? parseFloat(get('sqft_per_kit')) || null : null;
+      const supplier     = isChargeOnly ? null : (get('supplier') || null);
+
+      // Count existing items in this category for sort_order
+      const countRes = await pool.query(
+        'SELECT COUNT(*) FROM bidder_library_items WHERE category_id = $1 AND company_id = $2',
+        [cat.id, companyId]
+      );
+      const sortOrder = parseInt(countRes.rows[0].count, 10);
+
+      await pool.query(
+        `INSERT INTO bidder_library_items
+          (category_id, company_id, name, description, default_unit_price, default_unit_label,
+           supplier, kit_price, sqft_per_kit, is_charge_only, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          cat.id, companyId, name,
+          get('description') || null,
+          unitPrice,
+          get('default_unit_label') || null,
+          supplier, kitPrice, sqftPerKit,
+          isChargeOnly, sortOrder,
+        ]
+      );
+      created++;
+    }
+
+    res.json({ created, skipped, errors });
+  } catch (err) {
+    console.error('POST /bidder/library/import error:', err);
+    res.status(500).json({ error: 'Import failed' });
+  }
+});
+
 // POST /api/bidder/library/category
 router.post('/library/category', async (req, res) => {
   try {

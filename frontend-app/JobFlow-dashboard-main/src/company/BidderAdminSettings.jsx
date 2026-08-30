@@ -35,6 +35,10 @@ export default function BidderAdminSettings({ companyId }) {
   // Edit system component IDs (used when editing a system item)
   const [editSystemComponentIds, setEditSystemComponentIds] = useState([]);
 
+  // CSV import
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { created, skipped, errors }
+
   // ── Settings state ─────────────────────────────────────────────────────────
   const [settings, setSettings] = useState(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -520,11 +524,84 @@ export default function BidderAdminSettings({ companyId }) {
   const labelCls = 'block text-xs font-semibold text-gray-500 uppercase mb-1';
 
   // ── Render: Library ────────────────────────────────────────────────────────
+  // ── CSV import / template ──────────────────────────────────────────────────
+  function downloadTemplate() {
+    const headers = 'category,name,description,default_unit_price,default_unit_label,supplier,kit_price,sqft_per_kit,is_charge_only';
+    const example = 'Coating Systems,PA 552 Polyaspartic,Polyaspartic topcoat,1.25,per sqft,Sherwin-Williams,45.00,400,no\n' +
+                    'Prep Work,Coat Wooden Steps,Charge for coating wooden steps,50.00,per step,,,, yes';
+    const blob = new Blob([headers + '\n' + example], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'item_library_template.csv';
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  async function handleImportCSV(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('csv', file);
+      const qs = companyId ? `?company_id=${companyId}` : '';
+      const res = await fetch(
+        `${import.meta.env.APP_URL || import.meta.env.VITE_API_URL}/api/bidder/library/import${qs}`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      setImportResult(data);
+      await loadLibrary();
+    } catch (err) {
+      setImportResult({ error: err.message });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const renderLibrary = () => {
     if (libraryLoading) return <p className="text-sm text-gray-500">Loading library…</p>;
 
     return (
       <div className="space-y-4">
+
+        {/* Import / Template bar */}
+        <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-auto">Bulk Import</span>
+          <button
+            onClick={downloadTemplate}
+            className="text-xs text-blue-600 hover:underline font-medium"
+          >
+            Download Template CSV
+          </button>
+          <label className={`text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition ${importing ? 'bg-gray-200 text-gray-400 pointer-events-none' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+            {importing ? 'Importing…' : 'Upload CSV'}
+            <input type="file" accept=".csv,text/csv" onChange={handleImportCSV} className="sr-only" />
+          </label>
+        </div>
+
+        {/* Import result */}
+        {importResult && (
+          <div className={`rounded-xl px-4 py-3 text-sm border ${importResult.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-800'}`}>
+            {importResult.error ? (
+              <p>{importResult.error}</p>
+            ) : (
+              <>
+                <p className="font-semibold">{importResult.created} item{importResult.created !== 1 ? 's' : ''} imported{importResult.skipped > 0 ? `, ${importResult.skipped} skipped` : ''}.</p>
+                {importResult.errors?.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 text-xs text-red-600">
+                    {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                )}
+              </>
+            )}
+            <button onClick={() => setImportResult(null)} className="mt-1 text-xs underline opacity-60 hover:opacity-100">Dismiss</button>
+          </div>
+        )}
+
         {library.map((cat) => (
           <div key={cat.id} className="border border-gray-200 rounded-xl overflow-hidden">
             {/* Category header */}
