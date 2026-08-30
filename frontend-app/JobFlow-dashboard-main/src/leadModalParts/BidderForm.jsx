@@ -52,6 +52,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [showSiteCondModal,  setShowSiteCondModal]  = useState(false);
   const [showWarrantyModal,  setShowWarrantyModal]  = useState(false);
 
+  // ── Override total ────────────────────────────────────────────────────────
+  const [overrideTotal, setOverrideTotal] = useState('');
+
   // ── Items ─────────────────────────────────────────────────────────────────
   const [checkedMap, setCheckedMap]         = useState({}); // library_item_id → proposal_item row
   const [customItems, setCustomItems]       = useState([]);
@@ -137,6 +140,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       } else {
         setPaySchedule(schedules.map(ps => ({ ...ps, _desc: ps.description, _val: ps.amount_value, _type: ps.amount_type })));
       }
+      setOverrideTotal(p.override_total != null ? String(p.override_total) : '');
     } catch (e) {
       console.error('Failed to load proposal', e);
     } finally {
@@ -155,14 +159,15 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   }, 0);
 
   const bidTotal = preDiscountTotal - discountTotal;
+  const effectiveBidTotal = overrideTotal !== '' ? (parseFloat(overrideTotal) || 0) : bidTotal;
 
-  // Payment schedule: recalculate amount_calculated from current bidTotal
+  // Payment schedule: recalculate amount_calculated from current effectiveBidTotal
   const calcPayAmt = (ps) => ps._type === 'dollar'
     ? parseFloat(ps._val) || 0
-    : bidTotal * ((parseFloat(ps._val) || 0) / 100);
+    : effectiveBidTotal * ((parseFloat(ps._val) || 0) / 100);
 
   const payTotal   = paySchedule.reduce((a, ps) => a + calcPayAmt(ps), 0);
-  const balanceDue = bidTotal - payTotal;
+  const balanceDue = effectiveBidTotal - payTotal;
 
   // Lock everything except payment schedule once accepted
   const isLocked = hdr.status === 'accepted';
@@ -518,7 +523,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     try {
       await BidderAPI.updateProposal(proposalId, {
         ...hdr,
-        bid_total:   bidTotal,
+        override_total: overrideTotal !== '' ? parseFloat(overrideTotal) || 0 : null,
+        bid_total:   effectiveBidTotal,
         balance_due: balanceDue,
       });
       setProposal(prev => ({
@@ -528,7 +534,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         status:          hdr.status,
         customer_notes:  hdr.customer_notes,
         salesman:        hdr.salesman,
-        bid_total:       bidTotal,
+        override_total:  overrideTotal !== '' ? parseFloat(overrideTotal) || 0 : null,
+        bid_total:       effectiveBidTotal,
         balance_due:     balanceDue,
       }));
       setSaveMsg('Saved');
@@ -543,7 +550,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   async function handleSaveAndExit(fn) {
     setSaving(true);
     try {
-      await BidderAPI.updateProposal(proposalId, { ...hdr, bid_total: bidTotal, balance_due: balanceDue });
+      await BidderAPI.updateProposal(proposalId, { ...hdr, override_total: overrideTotal !== '' ? parseFloat(overrideTotal) || 0 : null, bid_total: effectiveBidTotal, balance_due: balanceDue });
       fn?.();
     } catch (e) {
       setSaveMsg('Failed to save');
@@ -951,8 +958,23 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 <span>Discounts</span><span className="font-semibold">-{fmt(discountTotal)}</span>
               </div>
             )}
+            <div className="flex justify-between text-gray-400 text-sm border-t border-gray-200 pt-2 mt-1">
+              <span>Calculated Total</span><span>{fmt(bidTotal)}</span>
+            </div>
+            <div className="flex justify-between items-center gap-3">
+              <span className="text-sm text-gray-700 shrink-0">Override Total</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Enter manual price..."
+                value={overrideTotal}
+                onChange={e => setOverrideTotal(e.target.value)}
+                className="w-40 text-right border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
             <div className="flex justify-between text-gray-900 font-bold text-base border-t border-gray-200 pt-2 mt-1">
-              <span>Bid Total</span><span>{fmt(bidTotal)}</span>
+              <span>Bid Total</span><span>{fmt(effectiveBidTotal)}</span>
             </div>
           </div>
         </section>}
@@ -1119,7 +1141,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       {showDocsModal && (() => {
         const printData = {
           proposal, checkedMap, customItems, discounts, paySchedule,
-          lead, company, bidTotal, preDiscountTotal, discountTotal, balanceDue,
+          lead, company, bidTotal: effectiveBidTotal, preDiscountTotal, discountTotal, balanceDue,
           proposalTopText: companySettings?.proposal_top_text || '',
           invoiceTopText: companySettings?.invoice_top_text || '',
           designId: proposal.proposal_design_id || companySettings?.preferred_proposal_design_id || null,

@@ -113,7 +113,8 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     const val = parseFloat(d.discount_value) || 0;
     return a + (d.discount_type === 'dollar' ? val : preDiscount * (val / 100));
   }, 0);
-  const bidTotal   = preDiscount - discountTotal;
+  const calcBidTotal = preDiscount - discountTotal;
+  const bidTotal   = proposal.override_total != null ? parseFloat(proposal.override_total) : calcBidTotal;
   const payTotal   = paymentSchedules.reduce((a, ps) => a + calcAmt(ps, bidTotal), 0);
   const balanceDue = bidTotal - payTotal;
 
