@@ -2100,17 +2100,17 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
     const {
       name, description = null,
       default_unit_price = 0, default_unit_label = 'per sqft',
-      color = null, kit_price = null, sqft_per_kit = null,
+      color = null, sku = null, kit_price = null, sqft_per_kit = null,
       is_charge_only = false, sort_order = 0,
     } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     const { rows } = await pool.query(
       `INSERT INTO global_supplier_products
-         (supplier_id, name, description, default_unit_price, default_unit_label, color, kit_price, sqft_per_kit, is_charge_only, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+         (supplier_id, name, description, default_unit_price, default_unit_label, color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [supplierId, name.trim(), description,
        parseFloat(default_unit_price) || 0, default_unit_label,
-       color || null,
+       color || null, sku || null,
        kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
        sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
        is_charge_only, sort_order]
@@ -2127,7 +2127,7 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
   try {
     const {
       name, description, default_unit_price, default_unit_label,
-      color, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
+      color, sku, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
     } = req.body;
     const { rows } = await pool.query(
       `UPDATE global_supplier_products SET
@@ -2136,18 +2136,20 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
          default_unit_price = COALESCE($3, default_unit_price),
          default_unit_label = COALESCE($4, default_unit_label),
          color              = $5,
-         kit_price          = $6,
-         sqft_per_kit       = $7,
-         is_charge_only     = COALESCE($8, is_charge_only),
-         is_active          = COALESCE($9, is_active),
-         sort_order         = COALESCE($10, sort_order)
-       WHERE id = $11 RETURNING *`,
+         sku                = $6,
+         kit_price          = $7,
+         sqft_per_kit       = $8,
+         is_charge_only     = COALESCE($9, is_charge_only),
+         is_active          = COALESCE($10, is_active),
+         sort_order         = COALESCE($11, sort_order)
+       WHERE id = $12 RETURNING *`,
       [
         name?.trim() || null,
         description ?? null,
         default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
         default_unit_label || null,
         color ?? null,
+        sku ?? null,
         kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
         sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
         is_charge_only ?? null,

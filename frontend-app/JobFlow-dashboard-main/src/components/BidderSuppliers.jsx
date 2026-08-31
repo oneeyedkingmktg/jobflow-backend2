@@ -11,7 +11,7 @@ const UNIT_OPTIONS = ['per sqft', 'per kit', 'per gallon', 'per unit', 'flat fee
 const EMPTY_SUPPLIER = { name: '', notes: '' };
 const EMPTY_PRODUCT = {
   name: '', description: '', default_unit_price: '', default_unit_label: 'per sqft',
-  color: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
+  color: '', sku: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
 };
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
@@ -53,6 +53,10 @@ function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
         </div>
         {!form.is_charge_only && (
           <>
+            <div>
+              <label className={labelCls}>SKU</label>
+              <input className={inputCls} value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="e.g. SW-1234" />
+            </div>
             <div>
               <label className={labelCls}>Kit Price ($)</label>
               <input className={inputCls} type="number" min="0" step="0.01" value={form.kit_price} onChange={(e) => set('kit_price', e.target.value)} placeholder="0.00" />
@@ -207,6 +211,7 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                       default_unit_price: p.default_unit_price,
                       default_unit_label: p.default_unit_label || 'per sqft',
                       color: p.color || '',
+                      sku: p.sku || '',
                       kit_price: p.kit_price != null ? p.kit_price : '',
                       sqft_per_kit: p.sqft_per_kit != null ? p.sqft_per_kit : '',
                       is_charge_only: p.is_charge_only || false,
@@ -220,6 +225,9 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-gray-800 text-sm">{p.name}</span>
+                        {p.sku && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-mono">SKU: {p.sku}</span>
+                        )}
                         {p.color && (
                           <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{p.color}</span>
                         )}
