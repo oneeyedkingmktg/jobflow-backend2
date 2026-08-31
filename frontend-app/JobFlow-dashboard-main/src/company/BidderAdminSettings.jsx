@@ -234,7 +234,7 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddItem(catId) {
     setNewSystemCatId(null);
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '' });
+    setNewItemForm({ name: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '', sku: '' });
   }
 
   function startAddSystem(catId) {
@@ -285,6 +285,7 @@ export default function BidderAdminSettings({ companyId }) {
         is_charge_only: newItemForm.is_charge_only || false,
         color: newItemForm.color || null,
         supplier: newItemForm.is_charge_only ? null : (newItemForm.supplier || null),
+        sku: newItemForm.is_charge_only ? null : (newItemForm.sku || null),
         kit_price: newItemForm.is_charge_only ? null : (newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null),
         sqft_per_kit: newItemForm.is_charge_only ? null : (newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null),
       }, companyId);
@@ -308,6 +309,7 @@ export default function BidderAdminSettings({ companyId }) {
       category_id: item.category_id,
       sort_order: item.sort_order,
       supplier: item.supplier || '',
+      sku: item.sku || '',
       kit_price: item.kit_price != null ? item.kit_price : '',
       sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
       is_system: item.is_system || false,
@@ -324,6 +326,7 @@ export default function BidderAdminSettings({ companyId }) {
         default_unit_price: parseFloat(editItemForm.default_unit_price) || 0,
         color: editItemForm.color || null,
         supplier: editItemForm.is_charge_only ? null : (editItemForm.supplier || null),
+        sku: editItemForm.is_charge_only ? null : (editItemForm.sku || null),
         kit_price: editItemForm.is_charge_only ? null : (editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null),
         sqft_per_kit: editItemForm.is_charge_only ? null : (editItemForm.sqft_per_kit !== '' ? parseFloat(editItemForm.sqft_per_kit) : null),
         is_charge_only: editItemForm.is_charge_only || false,
@@ -722,10 +725,14 @@ export default function BidderAdminSettings({ companyId }) {
                             </div>
                           </div>
                         ) : !editItemForm.is_charge_only && (
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-4 gap-3">
                             <div>
                               <label className={labelCls}>Supplier</label>
                               <input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                            </div>
+                            <div>
+                              <label className={labelCls}>SKU</label>
+                              <input className={inputCls} value={editItemForm.sku} onChange={(e) => setEditItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" />
                             </div>
                             <div>
                               <label className={labelCls}>Kit Price ($)</label>
@@ -791,6 +798,7 @@ export default function BidderAdminSettings({ companyId }) {
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                               {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
                               {!item.is_charge_only && item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
+                              {!item.is_charge_only && item.sku && <span className="text-xs text-gray-400 font-mono">SKU: {item.sku}</span>}
                               {!item.is_charge_only && item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
                               {!item.is_charge_only && item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
                             </div>
@@ -844,10 +852,14 @@ export default function BidderAdminSettings({ companyId }) {
                       <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
                     </label>
                     {!newItemForm.is_charge_only && (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-4 gap-3">
                         <div>
                           <label className={labelCls}>Supplier</label>
                           <input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
+                        </div>
+                        <div>
+                          <label className={labelCls}>SKU</label>
+                          <input className={inputCls} value={newItemForm.sku} onChange={(e) => setNewItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" />
                         </div>
                         <div>
                           <label className={labelCls}>Kit Price ($)</label>
