@@ -744,6 +744,7 @@ router.post('/library/import', csvUpload.single('csv'), async (req, res) => {
       const kitPrice     = !isChargeOnly && get('kit_price') ? parseFloat(get('kit_price')) || null : null;
       const sqftPerKit   = !isChargeOnly && get('sqft_per_kit') ? parseFloat(get('sqft_per_kit')) || null : null;
       const supplier     = isChargeOnly ? null : (get('supplier') || null);
+      const sku          = isChargeOnly ? null : (get('sku') || null);
 
       // Count existing items in this category for sort_order
       const countRes = await pool.query(
@@ -755,14 +756,14 @@ router.post('/library/import', csvUpload.single('csv'), async (req, res) => {
       await pool.query(
         `INSERT INTO bidder_library_items
           (category_id, company_id, name, description, default_unit_price, default_unit_label,
-           supplier, kit_price, sqft_per_kit, is_charge_only, color, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+           supplier, sku, kit_price, sqft_per_kit, is_charge_only, color, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           cat.id, companyId, name,
           get('description') || null,
           unitPrice,
           get('default_unit_label') || null,
-          supplier, kitPrice, sqftPerKit,
+          supplier, sku, kitPrice, sqftPerKit,
           isChargeOnly, get('color') || null, sortOrder,
         ]
       );

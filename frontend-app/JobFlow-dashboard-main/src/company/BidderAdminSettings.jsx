@@ -533,9 +533,9 @@ export default function BidderAdminSettings({ companyId }) {
   // ── Render: Library ────────────────────────────────────────────────────────
   // ── CSV import / template ──────────────────────────────────────────────────
   function downloadTemplate() {
-    const headers = 'category,name,description,default_unit_price,default_unit_label,color,supplier,kit_price,sqft_per_kit,is_charge_only';
-    const example = 'Coating Systems,PA 552 Polyaspartic,Polyaspartic topcoat,1.25,per sqft,Slate Gray,Sherwin-Williams,45.00,400,no\n' +
-                    'Prep Work,Coat Wooden Steps,Charge for coating wooden steps,50.00,per step,,,,,yes';
+    const headers = 'category,name,description,default_unit_price,default_unit_label,color,supplier,sku,kit_price,sqft_per_kit,is_charge_only';
+    const example = 'Coating Systems,PA 552 Polyaspartic,Polyaspartic topcoat,1.25,per sqft,Slate Gray,Sherwin-Williams,SW-1234,45.00,400,no\n' +
+                    'Prep Work,Coat Wooden Steps,Charge for coating wooden steps,50.00,per step,,,,,,yes';
     const blob = new Blob([headers + '\n' + example], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
