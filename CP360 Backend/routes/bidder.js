@@ -656,6 +656,40 @@ router.get('/library', async (req, res) => {
       items: enrichedItems.filter((i) => i.category_id === cat.id),
     }));
 
+    // Append enabled global supplier catalogs as read-only categories
+    const enabledSuppliers = await pool.query(
+      `SELECT gs.* FROM company_supplier_access csa
+       JOIN global_suppliers gs ON gs.id = csa.supplier_id
+       WHERE csa.company_id = $1 AND gs.is_active = true
+       ORDER BY gs.sort_order, gs.name`,
+      [companyId]
+    );
+    if (enabledSuppliers.rows.length > 0) {
+      const supplierIds = enabledSuppliers.rows.map((s) => s.id);
+      const supplierProducts = await pool.query(
+        `SELECT * FROM global_supplier_products
+         WHERE supplier_id = ANY($1) AND is_active = true
+         ORDER BY supplier_id, sort_order, name`,
+        [supplierIds]
+      );
+      const productsBySupplierId = {};
+      supplierProducts.rows.forEach((p) => {
+        if (!productsBySupplierId[p.supplier_id]) productsBySupplierId[p.supplier_id] = [];
+        productsBySupplierId[p.supplier_id].push(p);
+      });
+      enabledSuppliers.rows.forEach((s) => {
+        result.push({
+          ...s,
+          id: `supplier_${s.id}`,
+          is_supplier_catalog: true,
+          items: (productsBySupplierId[s.id] || []).map((p) => ({
+            ...p,
+            is_supplier_product: true,
+          })),
+        });
+      });
+    }
+
     res.json(result);
   } catch (err) {
     console.error('GET /bidder/library error:', err);
