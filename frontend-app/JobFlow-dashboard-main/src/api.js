@@ -421,6 +421,10 @@ export const BidderAPI = {
   deleteWarranty: (id, companyId) => apiRequest(`/api/bidder/warranties/${id}${companyId ? `?company_id=${companyId}` : ''}`, { method: 'DELETE' }),
   sendWarrantyEmail: (id, email) => apiRequest(`/api/bidder/proposal/${id}/send-warranty-email`, { method: 'POST', body: JSON.stringify({ email }) }),
 
+  // Company supplier access (master-only)
+  getCompanySuppliers: (companyId) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`),
+  setCompanySuppliers: (companyId, supplierIds) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`, { method: 'PUT', body: JSON.stringify({ supplier_ids: supplierIds }) }),
+
   // Global supplier catalog (master-only)
   getGlobalSuppliers: () => apiRequest('/api/bidder/global-suppliers'),
   createGlobalSupplier: (data) => apiRequest('/api/bidder/global-suppliers', { method: 'POST', body: JSON.stringify(data) }),

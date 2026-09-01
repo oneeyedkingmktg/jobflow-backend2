@@ -5,9 +5,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { BidderAPI, CompaniesAPI } from '../api';
+import { useAuth } from '../AuthContext';
 
 
 export default function BidderAdminSettings({ companyId }) {
+  const { user, isMaster } = useAuth();
+  const isMasterUser = typeof isMaster === 'function' ? isMaster() : Boolean(isMaster);
+
   // ── Library state ──────────────────────────────────────────────────────────
   const [library, setLibrary] = useState([]);         // [{id, name, items:[...]}, ...]
   const [libraryLoading, setLibraryLoading] = useState(true);
@@ -52,6 +56,13 @@ export default function BidderAdminSettings({ companyId }) {
   const [enablingBidder, setEnablingBidder] = useState(false);
   const [enableMsg, setEnableMsg]           = useState('');
 
+  // ── Supplier access (master-only) ──────────────────────────────────────────
+  const [allSuppliers, setAllSuppliers] = useState([]);
+  const [enabledSupplierIds, setEnabledSupplierIds] = useState([]);
+  const [supplierLoading, setSupplierLoading] = useState(false);
+  const [supplierSaving, setSupplierSaving] = useState(false);
+  const [supplierMsg, setSupplierMsg] = useState('');
+
   // ── Active section ─────────────────────────────────────────────────────────
   const [section, setSection] = useState('library');
 
@@ -67,6 +78,7 @@ export default function BidderAdminSettings({ companyId }) {
         if (c) setBidderEnabled(c.bidderEnabled ?? c.bidder_enabled ?? false);
       }).catch(() => {});
     }
+    if (isMasterUser && companyId) loadSupplierAccess();
   }, [companyId]);
 
   async function loadLibrary() {
@@ -136,6 +148,44 @@ export default function BidderAdminSettings({ companyId }) {
       console.error('Failed to load warranties', e);
     } finally {
       setWarrantiesLoading(false);
+    }
+  }
+
+  // ── Supplier access (master-only) ──────────────────────────────────────────
+  async function loadSupplierAccess() {
+    setSupplierLoading(true);
+    try {
+      const [all, enabled] = await Promise.all([
+        BidderAPI.getGlobalSuppliers(),
+        BidderAPI.getCompanySuppliers(companyId),
+      ]);
+      setAllSuppliers(all);
+      setEnabledSupplierIds(enabled);
+    } catch (e) {
+      console.error('Failed to load supplier access', e);
+    } finally {
+      setSupplierLoading(false);
+    }
+  }
+
+  function toggleSupplier(id) {
+    setEnabledSupplierIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+    setSupplierMsg('');
+  }
+
+  async function handleSaveSuppliers() {
+    setSupplierSaving(true);
+    setSupplierMsg('');
+    try {
+      await BidderAPI.setCompanySuppliers(companyId, enabledSupplierIds);
+      setSupplierMsg('Saved');
+      setTimeout(() => setSupplierMsg(''), 2000);
+    } catch (e) {
+      setSupplierMsg('Failed to save');
+    } finally {
+      setSupplierSaving(false);
     }
   }
 
@@ -1269,6 +1319,71 @@ export default function BidderAdminSettings({ companyId }) {
     );
   };
 
+  const renderSuppliers = () => {
+    if (supplierLoading) return <p className="text-sm text-gray-500 py-6">Loading suppliers…</p>;
+
+    const activeSuppliers = allSuppliers.filter((s) => s.is_active);
+
+    if (activeSuppliers.length === 0) {
+      return (
+        <div className="py-10 text-center text-gray-400 text-sm">
+          No global suppliers have been created yet. Add them in Global Settings → Bidder Suppliers.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Check which suppliers this company can use in their bidder. Enabled suppliers and their product catalogs become available when building proposals.
+        </p>
+
+        <div className="space-y-2">
+          {activeSuppliers.map((s) => {
+            const isEnabled = enabledSupplierIds.includes(s.id);
+            return (
+              <label
+                key={s.id}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
+                  isEnabled ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isEnabled}
+                  onChange={() => toggleSupplier(s.id)}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-gray-800 text-sm">{s.name}</span>
+                  {s.notes && <p className="text-xs text-gray-500 mt-0.5">{s.notes}</p>}
+                </div>
+                {isEnabled && (
+                  <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium shrink-0">Active</span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={handleSaveSuppliers}
+            disabled={supplierSaving}
+            className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {supplierSaving ? 'Saving…' : 'Save Supplier Access'}
+          </button>
+          {supplierMsg && (
+            <span className={`text-sm font-medium ${supplierMsg === 'Saved' ? 'text-green-600' : 'text-red-500'}`}>
+              {supplierMsg}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderSettings = () => {
     if (settingsLoading) return <p className="text-sm text-gray-500">Loading settings…</p>;
 
@@ -1628,17 +1743,21 @@ export default function BidderAdminSettings({ companyId }) {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button className={tabBtn(section === 'library')} onClick={() => setSection('library')}>Item Library</button>
         <button className={tabBtn(section === 'warranties')} onClick={() => setSection('warranties')}>Warranties</button>
         <button className={tabBtn(section === 'settings')} onClick={() => setSection('settings')}>Settings</button>
         <button className={tabBtn(section === 'design')} onClick={() => setSection('design')}>Design</button>
+        {isMasterUser && (
+          <button className={tabBtn(section === 'suppliers')} onClick={() => setSection('suppliers')}>Suppliers</button>
+        )}
       </div>
 
       {section === 'library'    && renderLibrary()}
       {section === 'warranties' && renderWarranties()}
       {section === 'settings'   && renderSettings()}
       {section === 'design'     && renderDesign()}
+      {section === 'suppliers'  && isMasterUser && renderSuppliers()}
     </div>
   );
 }
