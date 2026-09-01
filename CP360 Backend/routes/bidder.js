@@ -656,40 +656,6 @@ router.get('/library', async (req, res) => {
       items: enrichedItems.filter((i) => i.category_id === cat.id),
     }));
 
-    // Append enabled global supplier catalogs as read-only categories
-    const enabledSuppliers = await pool.query(
-      `SELECT gs.* FROM company_supplier_access csa
-       JOIN global_suppliers gs ON gs.id = csa.supplier_id
-       WHERE csa.company_id = $1 AND gs.is_active = true
-       ORDER BY gs.sort_order, gs.name`,
-      [companyId]
-    );
-    if (enabledSuppliers.rows.length > 0) {
-      const supplierIds = enabledSuppliers.rows.map((s) => s.id);
-      const supplierProducts = await pool.query(
-        `SELECT * FROM global_supplier_products
-         WHERE supplier_id = ANY($1) AND is_active = true
-         ORDER BY supplier_id, sort_order, name`,
-        [supplierIds]
-      );
-      const productsBySupplierId = {};
-      supplierProducts.rows.forEach((p) => {
-        if (!productsBySupplierId[p.supplier_id]) productsBySupplierId[p.supplier_id] = [];
-        productsBySupplierId[p.supplier_id].push(p);
-      });
-      enabledSuppliers.rows.forEach((s) => {
-        result.push({
-          ...s,
-          id: `supplier_${s.id}`,
-          is_supplier_catalog: true,
-          items: (productsBySupplierId[s.id] || []).map((p) => ({
-            ...p,
-            is_supplier_product: true,
-          })),
-        });
-      });
-    }
-
     res.json(result);
   } catch (err) {
     console.error('GET /bidder/library error:', err);
@@ -2069,19 +2035,70 @@ router.get('/company-suppliers', requireRole('master'), async (req, res) => {
 });
 
 // PUT /api/bidder/company-suppliers?company_id=X — body: { supplier_ids: [1,2,3] }
+// On enable: copies supplier products into the company's real bidder library (editable).
+// On disable: removes access record only — company keeps any items already copied.
 router.put('/company-suppliers', requireRole('master'), async (req, res) => {
   try {
-    const companyId = req.query.company_id;
+    const companyId = parseInt(req.query.company_id, 10);
     if (!companyId) return res.status(400).json({ error: 'company_id required' });
     const { supplier_ids = [] } = req.body;
 
+    // Fetch which suppliers were already enabled (to find newly added ones)
+    const existing = await pool.query(
+      'SELECT supplier_id FROM company_supplier_access WHERE company_id = $1',
+      [companyId]
+    );
+    const existingIds = new Set(existing.rows.map((r) => r.supplier_id));
+    const newlyEnabled = supplier_ids.filter((sid) => !existingIds.has(sid));
+
     await pool.transaction(async (client) => {
+      // Replace access records
       await client.query('DELETE FROM company_supplier_access WHERE company_id = $1', [companyId]);
       for (const sid of supplier_ids) {
         await client.query(
           'INSERT INTO company_supplier_access (company_id, supplier_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
           [companyId, sid]
         );
+      }
+
+      // For each newly enabled supplier, copy products into the company's real library
+      for (const sid of newlyEnabled) {
+        // Skip if category already exists for this supplier (re-enable after disable)
+        const existingCat = await client.query(
+          'SELECT id FROM bidder_categories WHERE company_id = $1 AND source_supplier_id = $2',
+          [companyId, sid]
+        );
+        if (existingCat.rows.length > 0) continue;
+
+        // Get supplier info + products
+        const supplier = (await client.query('SELECT * FROM global_suppliers WHERE id = $1', [sid])).rows[0];
+        if (!supplier) continue;
+        const products = (await client.query(
+          'SELECT * FROM global_supplier_products WHERE supplier_id = $1 AND is_active = true ORDER BY sort_order, name',
+          [sid]
+        )).rows;
+
+        // Create category in company's library
+        const catSortOrder = (await client.query(
+          'SELECT COUNT(*) FROM bidder_categories WHERE company_id = $1', [companyId]
+        )).rows[0].count;
+        const cat = (await client.query(
+          'INSERT INTO bidder_categories (company_id, name, sort_order, source_supplier_id) VALUES ($1,$2,$3,$4) RETURNING id',
+          [companyId, supplier.name, catSortOrder, sid]
+        )).rows[0];
+
+        // Copy each product as a real editable library item
+        for (let i = 0; i < products.length; i++) {
+          const p = products[i];
+          await client.query(
+            `INSERT INTO bidder_library_items
+               (category_id, company_id, name, description, default_unit_price, default_unit_label,
+                color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
+             p.color, p.sku, p.kit_price, p.sqft_per_kit, p.is_charge_only, i]
+          );
+        }
       }
     });
 

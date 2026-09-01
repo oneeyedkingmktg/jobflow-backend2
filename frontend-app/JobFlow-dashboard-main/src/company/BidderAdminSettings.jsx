@@ -661,10 +661,10 @@ export default function BidderAdminSettings({ companyId }) {
         )}
 
         {library.map((cat) => (
-          <div key={cat.id} className={`border rounded-xl overflow-hidden ${cat.is_supplier_catalog ? 'border-emerald-200' : 'border-gray-200'}`}>
+          <div key={cat.id} className={`border rounded-xl overflow-hidden ${cat.source_supplier_id ? 'border-emerald-200' : 'border-gray-200'}`}>
             {/* Category header */}
-            <div className={`flex items-center gap-2 px-4 py-3 border-b ${cat.is_supplier_catalog ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
-              {!cat.is_supplier_catalog && editCatId === cat.id ? (
+            <div className={`flex items-center gap-2 px-4 py-3 border-b ${cat.source_supplier_id ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+              {editCatId === cat.id ? (
                 <>
                   <input
                     className="flex-1 px-2 py-1 border rounded text-sm"
@@ -685,38 +685,34 @@ export default function BidderAdminSettings({ companyId }) {
                     <span className={`transition-transform ${expandedCats[cat.id] ? 'rotate-90' : ''}`}>▶</span>
                     {cat.name}
                     <span className="text-gray-400 font-normal text-xs">({cat.items?.length || 0} items)</span>
-                    {cat.is_supplier_catalog && (
-                      <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">Supplier Catalog</span>
+                    {cat.source_supplier_id && (
+                      <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">Supplier</span>
                     )}
                   </button>
-                  {!cat.is_supplier_catalog && (
-                    <>
-                      <button
-                        onClick={() => handleReorderCategory(cat.id, 'up')}
-                        disabled={library.filter(c => !c.is_supplier_catalog).indexOf(cat) === 0}
-                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
-                        title="Move up"
-                      >▲</button>
-                      <button
-                        onClick={() => handleReorderCategory(cat.id, 'down')}
-                        disabled={library.filter(c => !c.is_supplier_catalog).indexOf(cat) === library.filter(c => !c.is_supplier_catalog).length - 1}
-                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
-                        title="Move down"
-                      >▼</button>
-                      <button
-                        onClick={() => { setEditCatId(cat.id); setEditCatName(cat.name); }}
-                        className="text-xs text-blue-600 hover:underline px-2"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCategory(cat.id)}
-                        className="text-xs text-red-500 hover:underline px-2"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleReorderCategory(cat.id, 'up')}
+                    disabled={library.indexOf(cat) === 0}
+                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                    title="Move up"
+                  >▲</button>
+                  <button
+                    onClick={() => handleReorderCategory(cat.id, 'down')}
+                    disabled={library.indexOf(cat) === library.length - 1}
+                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                    title="Move down"
+                  >▼</button>
+                  <button
+                    onClick={() => { setEditCatId(cat.id); setEditCatName(cat.name); }}
+                    className="text-xs text-blue-600 hover:underline px-2"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="text-xs text-red-500 hover:underline px-2"
+                  >
+                    Delete
+                  </button>
                 </>
               )}
             </div>
@@ -726,28 +722,7 @@ export default function BidderAdminSettings({ companyId }) {
               <div className="divide-y divide-gray-100">
                 {(cat.items || []).map((item) => (
                   <div key={item.id} className="px-4 py-3">
-                    {item.is_supplier_product ? (
-                      /* Supplier catalog item — read-only */
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-gray-800">{item.name}</span>
-                            {item.sku && <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-full">SKU: {item.sku}</span>}
-                            {item.color && <span className="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">{item.color}</span>}
-                            {item.is_charge_only && <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Charge Only</span>}
-                          </div>
-                          {item.description && <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>}
-                          <div className="flex flex-wrap gap-x-3 mt-0.5 text-xs text-gray-400">
-                            {!item.is_charge_only && item.kit_price != null && <span>Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
-                            {!item.is_charge_only && item.sqft_per_kit != null && <span>{parseFloat(item.sqft_per_kit)} sf/kit</span>}
-                          </div>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          ${parseFloat(item.default_unit_price || 0).toFixed(2)}
-                          <span className="text-xs font-normal text-gray-400 ml-1">{item.default_unit_label}</span>
-                        </span>
-                      </div>
-                    ) : editItemId === item.id ? (
+                    {editItemId === item.id ? (
                       /* Edit row */
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
@@ -986,7 +961,7 @@ export default function BidderAdminSettings({ companyId }) {
                     <div>
                       <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
                       <div className="border border-purple-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
-                        {library.flatMap((c) => c.is_supplier_catalog ? [] : c.items.filter((i) => !i.is_system && !i.is_charge_only).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                        {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only).map((i) => ({ ...i, catName: c.name }))).map((i) => (
                           <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50">
                             <input
                               type="checkbox"
@@ -1003,7 +978,7 @@ export default function BidderAdminSettings({ companyId }) {
                             <span className="text-sm text-gray-800">{i.name}</span>
                           </label>
                         ))}
-                        {library.flatMap((c) => c.is_supplier_catalog ? [] : c.items.filter((i) => !i.is_system)).length === 0 && (
+                        {library.flatMap((c) => c.items.filter((i) => !i.is_system)).length === 0 && (
                           <p className="px-3 py-2 text-xs text-gray-400">No standard items in library yet.</p>
                         )}
                       </div>
@@ -1013,12 +988,12 @@ export default function BidderAdminSettings({ companyId }) {
                       <button onClick={() => setNewSystemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
                     </div>
                   </div>
-                ) : !cat.is_supplier_catalog ? (
+                ) : (
                   <div className="px-4 py-2 flex gap-4">
                     <button onClick={() => startAddItem(cat.id)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
                     <button onClick={() => startAddSystem(cat.id)} className="text-sm text-purple-600 hover:underline">+ Add System</button>
                   </div>
-                ) : null}
+                )}
               </div>
             )}
           </div>
