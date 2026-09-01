@@ -2070,28 +2070,25 @@ router.get('/company-suppliers', requireRole('master'), async (req, res) => {
 
 // PUT /api/bidder/company-suppliers?company_id=X — body: { supplier_ids: [1,2,3] }
 router.put('/company-suppliers', requireRole('master'), async (req, res) => {
-  const client = await pool.connect();
   try {
     const companyId = req.query.company_id;
     if (!companyId) return res.status(400).json({ error: 'company_id required' });
     const { supplier_ids = [] } = req.body;
 
-    await client.query('BEGIN');
-    await client.query('DELETE FROM company_supplier_access WHERE company_id = $1', [companyId]);
-    for (const sid of supplier_ids) {
-      await client.query(
-        'INSERT INTO company_supplier_access (company_id, supplier_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-        [companyId, sid]
-      );
-    }
-    await client.query('COMMIT');
+    await pool.transaction(async (client) => {
+      await client.query('DELETE FROM company_supplier_access WHERE company_id = $1', [companyId]);
+      for (const sid of supplier_ids) {
+        await client.query(
+          'INSERT INTO company_supplier_access (company_id, supplier_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [companyId, sid]
+        );
+      }
+    });
+
     res.json({ success: true, enabled: supplier_ids.length });
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('PUT /bidder/company-suppliers error:', err);
     res.status(500).json({ error: 'Failed to update supplier access' });
-  } finally {
-    client.release();
   }
 });
 
