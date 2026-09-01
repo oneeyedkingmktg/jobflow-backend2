@@ -2087,17 +2087,50 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
           [companyId, supplier.name, catSortOrder, sid]
         )).rows[0];
 
-        // Copy each product as a real editable library item
-        for (let i = 0; i < products.length; i++) {
-          const p = products[i];
-          await client.query(
+        // Copy regular (non-system) products first so systems can reference them
+        const regularProducts = products.filter((p) => !p.is_system);
+        const systemProducts  = products.filter((p) => p.is_system);
+        const globalIdToLibItemId = {};
+
+        for (let i = 0; i < regularProducts.length; i++) {
+          const p = regularProducts[i];
+          const ins = await client.query(
             `INSERT INTO bidder_library_items
                (category_id, company_id, name, description, default_unit_price, default_unit_label,
-                color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+                color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order, source_supplier_product_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
             [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
-             p.color, p.sku, p.kit_price, p.sqft_per_kit, p.is_charge_only, i]
+             p.color, p.sku, p.kit_price, p.sqft_per_kit, p.is_charge_only, i, p.id]
           );
+          globalIdToLibItemId[p.id] = ins.rows[0].id;
+        }
+
+        // Now copy system products and wire their components
+        for (let i = 0; i < systemProducts.length; i++) {
+          const p = systemProducts[i];
+          const components = (await client.query(
+            'SELECT component_product_id, sort_order FROM global_supplier_system_components WHERE system_product_id = $1 ORDER BY sort_order',
+            [p.id]
+          )).rows;
+
+          const sysItem = (await client.query(
+            `INSERT INTO bidder_library_items
+               (category_id, company_id, name, description, default_unit_price, default_unit_label,
+                color, sku, is_system, sort_order, source_supplier_product_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10) RETURNING id`,
+            [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
+             p.color, p.sku, regularProducts.length + i, p.id]
+          )).rows[0];
+
+          for (let ci = 0; ci < components.length; ci++) {
+            const libCompId = globalIdToLibItemId[components[ci].component_product_id];
+            if (libCompId) {
+              await client.query(
+                'INSERT INTO bidder_library_system_components (system_item_id, component_item_id, sort_order) VALUES ($1,$2,$3)',
+                [sysItem.id, libCompId, ci]
+              );
+            }
+          }
         }
       }
     });
@@ -2177,21 +2210,99 @@ router.delete('/global-suppliers/:id', requireRole('master'), async (req, res) =
   }
 });
 
-// GET /api/bidder/global-suppliers/:supplierId/products
+// ── Shared helper: push one global supplier product to all enabled companies ──
+async function pushProductToEnabledCompanies(client, supplierId, product) {
+  const companies = await client.query(
+    `SELECT csa.company_id, bc.id AS cat_id
+     FROM company_supplier_access csa
+     JOIN bidder_categories bc ON bc.company_id = csa.company_id AND bc.source_supplier_id = csa.supplier_id
+     WHERE csa.supplier_id = $1`,
+    [supplierId]
+  );
+  for (const co of companies.rows) {
+    const sortOrder = parseInt((await client.query(
+      'SELECT COUNT(*) FROM bidder_library_items WHERE category_id = $1', [co.cat_id]
+    )).rows[0].count, 10);
+
+    if (product.is_system) {
+      const comps = (await client.query(
+        'SELECT component_product_id, sort_order FROM global_supplier_system_components WHERE system_product_id = $1 ORDER BY sort_order',
+        [product.id]
+      )).rows;
+
+      const sysItem = (await client.query(
+        `INSERT INTO bidder_library_items
+           (category_id, company_id, name, description, default_unit_price, default_unit_label,
+            color, sku, is_system, sort_order, source_supplier_product_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10) RETURNING id`,
+        [co.cat_id, co.company_id, product.name, product.description,
+         product.default_unit_price, product.default_unit_label,
+         product.color || null, product.sku || null, sortOrder, product.id]
+      )).rows[0];
+
+      for (let ci = 0; ci < comps.length; ci++) {
+        const libComp = (await client.query(
+          'SELECT id FROM bidder_library_items WHERE company_id = $1 AND source_supplier_product_id = $2 LIMIT 1',
+          [co.company_id, comps[ci].component_product_id]
+        )).rows[0];
+        if (libComp) {
+          await client.query(
+            'INSERT INTO bidder_library_system_components (system_item_id, component_item_id, sort_order) VALUES ($1,$2,$3)',
+            [sysItem.id, libComp.id, ci]
+          );
+        }
+      }
+    } else {
+      await client.query(
+        `INSERT INTO bidder_library_items
+           (category_id, company_id, name, description, default_unit_price, default_unit_label,
+            color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order, source_supplier_product_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        [co.cat_id, co.company_id, product.name, product.description,
+         product.default_unit_price, product.default_unit_label,
+         product.color || null, product.sku || null,
+         product.kit_price ?? null, product.sqft_per_kit ?? null,
+         product.is_charge_only, sortOrder, product.id]
+      );
+    }
+  }
+}
+
+// GET /api/bidder/global-suppliers/:supplierId/products  (includes system components)
 router.get('/global-suppliers/:supplierId/products', requireRole('master'), async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM global_supplier_products WHERE supplier_id = $1 ORDER BY sort_order, name',
+    const products = (await pool.query(
+      'SELECT * FROM global_supplier_products WHERE supplier_id = $1 ORDER BY is_system, sort_order, name',
       [req.params.supplierId]
-    );
-    res.json(rows);
+    )).rows;
+
+    const systemIds = products.filter((p) => p.is_system).map((p) => p.id);
+    let componentsBySystem = {};
+    if (systemIds.length > 0) {
+      const compRows = (await pool.query(
+        `SELECT sc.system_product_id, sc.component_product_id, gsp.name
+         FROM global_supplier_system_components sc
+         JOIN global_supplier_products gsp ON gsp.id = sc.component_product_id
+         WHERE sc.system_product_id = ANY($1)
+         ORDER BY sc.sort_order`,
+        [systemIds]
+      )).rows;
+      compRows.forEach((r) => {
+        if (!componentsBySystem[r.system_product_id]) componentsBySystem[r.system_product_id] = [];
+        componentsBySystem[r.system_product_id].push(r);
+      });
+    }
+
+    res.json(products.map((p) =>
+      p.is_system ? { ...p, components: componentsBySystem[p.id] || [] } : p
+    ));
   } catch (err) {
     console.error('GET /bidder/global-suppliers/:supplierId/products error:', err);
     res.status(500).json({ error: 'Failed to load products' });
   }
 });
 
-// POST /api/bidder/global-suppliers/:supplierId/products
+// POST /api/bidder/global-suppliers/:supplierId/products  (regular item or system)
 router.post('/global-suppliers/:supplierId/products', requireRole('master'), async (req, res) => {
   try {
     const supplierId = parseInt(req.params.supplierId, 10);
@@ -2199,66 +2310,98 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       name, description = null,
       default_unit_price = 0, default_unit_label = 'per sqft',
       color = null, sku = null, kit_price = null, sqft_per_kit = null,
-      is_charge_only = false, sort_order = 0,
+      is_charge_only = false, is_system = false, component_ids = [], sort_order = 0,
     } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
-    const { rows } = await pool.query(
-      `INSERT INTO global_supplier_products
-         (supplier_id, name, description, default_unit_price, default_unit_label, color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [supplierId, name.trim(), description,
-       parseFloat(default_unit_price) || 0, default_unit_label,
-       color || null, sku || null,
-       kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
-       sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
-       is_charge_only, sort_order]
-    );
-    res.status(201).json(rows[0]);
+
+    let newProduct;
+    await pool.transaction(async (client) => {
+      const ins = await client.query(
+        `INSERT INTO global_supplier_products
+           (supplier_id, name, description, default_unit_price, default_unit_label,
+            color, sku, kit_price, sqft_per_kit, is_charge_only, is_system, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        [supplierId, name.trim(), description,
+         parseFloat(default_unit_price) || 0, default_unit_label,
+         color || null, sku || null,
+         !is_system && kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
+         !is_system && sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
+         is_charge_only, is_system, sort_order]
+      );
+      newProduct = ins.rows[0];
+
+      if (is_system && component_ids.length > 0) {
+        for (let i = 0; i < component_ids.length; i++) {
+          await client.query(
+            'INSERT INTO global_supplier_system_components (system_product_id, component_product_id, sort_order) VALUES ($1,$2,$3)',
+            [newProduct.id, component_ids[i], i]
+          );
+        }
+      }
+
+      // Push to all companies that have this supplier enabled
+      await pushProductToEnabledCompanies(client, supplierId, newProduct);
+    });
+
+    res.status(201).json(newProduct);
   } catch (err) {
     console.error('POST /bidder/global-suppliers/:supplierId/products error:', err);
     res.status(500).json({ error: 'Failed to create product' });
   }
 });
 
-// PUT /api/bidder/global-supplier-products/:id
+// PUT /api/bidder/global-supplier-products/:id  (updates global record + system components)
 router.put('/global-supplier-products/:id', requireRole('master'), async (req, res) => {
   try {
     const {
       name, description, default_unit_price, default_unit_label,
       color, sku, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
+      component_ids,
     } = req.body;
-    const { rows } = await pool.query(
-      `UPDATE global_supplier_products SET
-         name               = COALESCE($1, name),
-         description        = $2,
-         default_unit_price = COALESCE($3, default_unit_price),
-         default_unit_label = COALESCE($4, default_unit_label),
-         color              = $5,
-         sku                = $6,
-         kit_price          = $7,
-         sqft_per_kit       = $8,
-         is_charge_only     = COALESCE($9, is_charge_only),
-         is_active          = COALESCE($10, is_active),
-         sort_order         = COALESCE($11, sort_order)
-       WHERE id = $12 RETURNING *`,
-      [
-        name?.trim() || null,
-        description ?? null,
-        default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
-        default_unit_label || null,
-        color ?? null,
-        sku ?? null,
-        kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
-        sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
-        is_charge_only ?? null,
-        is_active ?? null,
-        sort_order ?? null,
-        req.params.id,
-      ]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'Product not found' });
-    res.json(rows[0]);
+
+    let updated;
+    await pool.transaction(async (client) => {
+      const res2 = await client.query(
+        `UPDATE global_supplier_products SET
+           name               = COALESCE($1, name),
+           description        = $2,
+           default_unit_price = COALESCE($3, default_unit_price),
+           default_unit_label = COALESCE($4, default_unit_label),
+           color              = $5,
+           sku                = $6,
+           kit_price          = $7,
+           sqft_per_kit       = $8,
+           is_charge_only     = COALESCE($9, is_charge_only),
+           is_active          = COALESCE($10, is_active),
+           sort_order         = COALESCE($11, sort_order)
+         WHERE id = $12 RETURNING *`,
+        [
+          name?.trim() || null, description ?? null,
+          default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
+          default_unit_label || null, color ?? null, sku ?? null,
+          kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
+          sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
+          is_charge_only ?? null, is_active ?? null, sort_order ?? null,
+          req.params.id,
+        ]
+      );
+      if (!res2.rows.length) throw Object.assign(new Error('not found'), { status: 404 });
+      updated = res2.rows[0];
+
+      if (updated.is_system && Array.isArray(component_ids)) {
+        await client.query('DELETE FROM global_supplier_system_components WHERE system_product_id = $1', [updated.id]);
+        for (let i = 0; i < component_ids.length; i++) {
+          await client.query(
+            'INSERT INTO global_supplier_system_components (system_product_id, component_product_id, sort_order) VALUES ($1,$2,$3)',
+            [updated.id, component_ids[i], i]
+          );
+        }
+      }
+    });
+
+    res.json(updated);
   } catch (err) {
+    if (err.status === 404) return res.status(404).json({ error: 'Product not found' });
     console.error('PUT /bidder/global-supplier-products/:id error:', err);
     res.status(500).json({ error: 'Failed to update product' });
   }
