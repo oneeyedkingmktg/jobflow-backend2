@@ -182,6 +182,7 @@ export default function BidderAdminSettings({ companyId }) {
       await BidderAPI.setCompanySuppliers(companyId, enabledSupplierIds);
       setSupplierMsg('Saved');
       setTimeout(() => setSupplierMsg(''), 2000);
+      loadLibrary();
     } catch (e) {
       setSupplierMsg('Failed to save');
     } finally {
