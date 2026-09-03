@@ -2385,7 +2385,7 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
           kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
           sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
           is_charge_only ?? null, is_active ?? null, sort_order ?? null,
-          internal_name !== undefined ? (internal_name || null) : undefined,
+          internal_name ?? null,
           req.params.id,
         ]
       );

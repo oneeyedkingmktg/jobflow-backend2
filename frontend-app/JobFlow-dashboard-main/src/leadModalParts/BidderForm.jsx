@@ -61,6 +61,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [discounts,   setDiscounts]         = useState([]);
   const [paySchedule, setPaySchedule]       = useState([]);
   const [showItemPicker,   setShowItemPicker]   = useState(false);
+  const [itemSearch,       setItemSearch]       = useState('');
   const [showDocsModal,    setShowDocsModal]    = useState(false);
   const [showExitModal,    setShowExitModal]    = useState(false);
   const [exitFn,           setExitFn]           = useState(null);
@@ -884,22 +885,106 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             library.length === 0 ? (
               <p className="text-sm text-gray-400 mt-2">No items in library. Add items in Company Settings → Bidder.</p>
             ) : showItemPicker ? (
-              <div className="mt-2 flex items-center gap-2">
-                <select className={`flex-1 ${inputCls}`} defaultValue="" onChange={handlePickItem} autoFocus>
-                  <option value="" disabled>— Select item —</option>
-                  <option value="__subtotal__">── Insert Subtotal Line ──</option>
-                  <option value="__note__">── Note / Comment ──</option>
-                  {library.map(cat => (
-                    <optgroup key={cat.id} label={cat.name}>
-                      {(cat.items || []).filter(i => i.is_active !== false).map(i => (
-                        <option key={i.id} value={`${cat.id}::${i.id}`}>
-                          {i.is_system ? `⬡ ${i.internal_name || i.name}` : i.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <button onClick={() => setShowItemPicker(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+              <div className="mt-2 border border-gray-200 rounded-xl shadow-lg bg-white overflow-hidden">
+                {/* Search */}
+                <div className="px-3 py-2.5 border-b border-gray-100">
+                  <input
+                    autoFocus
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="Search items…"
+                    value={itemSearch}
+                    onChange={e => setItemSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="max-h-72 overflow-y-auto">
+                  {/* Special rows */}
+                  {!itemSearch && (
+                    <>
+                      <button
+                        onClick={() => addFromPicker('__subtotal__', nextSortOrder())}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                      >
+                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-semibold shrink-0">Subtotal</span>
+                        <span className="text-sm text-gray-500 italic">Insert subtotal divider</span>
+                      </button>
+                      <button
+                        onClick={() => addFromPicker('__note__', nextSortOrder())}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                      >
+                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
+                        <span className="text-sm text-gray-500 italic">Note / comment line</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Library items by category */}
+                  {library.map(cat => {
+                    const q = itemSearch.toLowerCase();
+                    const visibleItems = (cat.items || []).filter(i => {
+                      if (i.is_active === false) return false;
+                      if (!q) return true;
+                      return (
+                        i.name.toLowerCase().includes(q) ||
+                        (i.internal_name || '').toLowerCase().includes(q) ||
+                        (i.description || '').toLowerCase().includes(q)
+                      );
+                    });
+                    if (visibleItems.length === 0) return null;
+                    return (
+                      <div key={cat.id}>
+                        <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">
+                          {cat.name}
+                        </div>
+                        {visibleItems.map(i => (
+                          <button
+                            key={i.id}
+                            onClick={async () => {
+                              setShowItemPicker(false);
+                              setItemSearch('');
+                              await addFromPicker(`${cat.id}::${i.id}`, nextSortOrder());
+                            }}
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center gap-2.5 border-b border-gray-50"
+                          >
+                            {i.is_system ? (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold shrink-0">⬡ System</span>
+                            ) : i.is_charge_only ? (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">⚡ Charge</span>
+                            ) : (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
+                            )}
+                            <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
+                              {i.is_system ? (i.internal_name || i.name) : i.name}
+                            </span>
+                            {i.is_system && i.internal_name && (
+                              <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[120px]">→ {i.name}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+
+                  {itemSearch && library.every(cat =>
+                    (cat.items || []).filter(i => i.is_active !== false).every(i => {
+                      const q = itemSearch.toLowerCase();
+                      return !i.name.toLowerCase().includes(q) &&
+                             !(i.internal_name || '').toLowerCase().includes(q) &&
+                             !(i.description || '').toLowerCase().includes(q);
+                    })
+                  ) && (
+                    <p className="text-sm text-gray-400 italic px-4 py-4 text-center">No items match "{itemSearch}"</p>
+                  )}
+                </div>
+
+                <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 flex justify-end">
+                  <button
+                    onClick={() => { setShowItemPicker(false); setItemSearch(''); }}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="mt-3 flex gap-3">
