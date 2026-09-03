@@ -954,11 +954,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
                             )}
                             <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
-                              {i.is_system
-                                ? (i.internal_name || <span className="italic text-gray-400">No internal name — edit to add</span>)
-                                : i.name}
+                              {i.internal_name || i.name}
                             </span>
-                            {i.is_system && (
+                            {i.internal_name && (
                               <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[140px]">
                                 → {i.name}
                               </span>

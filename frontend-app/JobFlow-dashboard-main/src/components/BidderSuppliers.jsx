@@ -10,11 +10,13 @@ const UNIT_OPTIONS = ['per sqft', 'per kit', 'per gallon', 'per unit', 'flat fee
 
 const EMPTY_SUPPLIER = { name: '', notes: '' };
 const EMPTY_PRODUCT = {
-  name: '', description: '', default_unit_price: '', default_unit_label: 'per sqft',
+  name: '', internal_name: '', internal_description: '', description: '',
+  default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
 };
 const EMPTY_SYSTEM = {
-  name: '', internal_name: '', description: '', default_unit_price: '', default_unit_label: 'per sqft',
+  name: '', internal_name: '', internal_description: '', description: '',
+  default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', component_ids: [],
 };
 
@@ -30,12 +32,20 @@ function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label className={labelCls}>Product Name *</label>
+          <label className={labelCls}>Product Name * <span className="normal-case text-gray-400 font-normal">— shown on proposal</span></label>
           <input className={inputCls} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Polyaspartic Base Coat" />
         </div>
         <div className="col-span-2">
-          <label className={labelCls}>Description</label>
-          <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional description" />
+          <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+          <input className={inputCls} value={form.internal_name} onChange={(e) => set('internal_name', e.target.value)} placeholder="e.g. SW Poly Base — Low Moisture" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— shown on proposal</span></label>
+          <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional proposal description" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
+          <input className={inputCls} value={form.internal_description} onChange={(e) => set('internal_description', e.target.value)} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
         </div>
         <div>
           <label className={labelCls}>Unit Price ($)</label>
@@ -118,8 +128,12 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, 
           <input className={inputCls} value={form.internal_name} onChange={(e) => set('internal_name', e.target.value)} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
         </div>
         <div className="col-span-2">
-          <label className={labelCls}>Description</label>
+          <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— shown on proposal</span></label>
           <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional description shown on proposal" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
+          <input className={inputCls} value={form.internal_description || ''} onChange={(e) => set('internal_description', e.target.value)} placeholder="e.g. Application notes, mix ratios, installer tips" />
         </div>
         <div>
           <label className={labelCls}>System Price ($)</label>
@@ -326,6 +340,8 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                       key={p.id}
                       initial={{
                         name: p.name,
+                        internal_name: p.internal_name || '',
+                        internal_description: p.internal_description || '',
                         description: p.description || '',
                         default_unit_price: p.default_unit_price,
                         default_unit_label: p.default_unit_label || 'per sqft',
@@ -383,6 +399,7 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                       initial={{
                         name: p.name,
                         internal_name: p.internal_name || '',
+                        internal_description: p.internal_description || '',
                         description: p.description || '',
                         default_unit_price: p.default_unit_price,
                         default_unit_label: p.default_unit_label || 'per sqft',
@@ -419,13 +436,15 @@ function ProductRow({ p, onEdit, onDelete }) {
     <div className="flex items-start gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-gray-800 text-sm">{p.name}</span>
+          <span className="font-medium text-gray-800 text-sm">{p.internal_name || p.name}</span>
           {p.sku && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-mono">SKU: {p.sku}</span>}
           {p.color && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{p.color}</span>}
           {p.is_charge_only && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-full">Service charge</span>}
           {!p.is_active && <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inactive</span>}
         </div>
-        {p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
+        {p.internal_name && <p className="text-xs text-blue-600 mt-0.5">Proposal name: {p.name}</p>}
+        {p.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{p.internal_description}</p>}
+        {!p.internal_description && p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
         <div className="flex gap-3 mt-1 text-xs text-gray-500 flex-wrap">
           <span>${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
           {p.kit_price != null && <span>Kit: ${parseFloat(p.kit_price).toFixed(2)}</span>}
@@ -455,7 +474,8 @@ function SystemRow({ p, onEdit, onDelete }) {
         {p.internal_name && (
           <p className="text-xs text-purple-600 mt-0.5">Proposal name: {p.name}</p>
         )}
-        {p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
+        {p.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{p.internal_description}</p>}
+        {!p.internal_description && p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
         <div className="flex gap-3 mt-1 text-xs text-gray-500">
           <span>${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
         </div>
