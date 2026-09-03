@@ -2401,6 +2401,14 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
           );
         }
       }
+
+      // Cascade name + internal_name changes to company library copies
+      await client.query(
+        `UPDATE bidder_library_items
+         SET name = $1, internal_name = $2
+         WHERE source_supplier_product_id = $3`,
+        [updated.name, updated.internal_name, updated.id]
+      );
     });
 
     res.json(updated);
