@@ -839,7 +839,7 @@ router.post('/library/item', async (req, res) => {
       category_id, name, description, default_unit_price = 0,
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
       supplier, kit_price, sqft_per_kit, is_system = false, component_ids = [],
-      is_charge_only = false, color, sku,
+      is_charge_only = false, color, sku, internal_name,
     } = req.body;
 
     // Verify category belongs to this company
@@ -850,9 +850,9 @@ router.post('/library/item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Category not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color, sku)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null)]
+      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color, sku, internal_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null), is_system ? (clean(internal_name) || null) : null]
     );
 
     const newItem = result.rows[0];
@@ -880,7 +880,7 @@ router.put('/library/item/:id', async (req, res) => {
     const {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
-      supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color, sku,
+      supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color, sku, internal_name,
     } = req.body;
 
     const result = await pool.query(
@@ -888,14 +888,15 @@ router.put('/library/item/:id', async (req, res) => {
         category_id = $1, name = $2, description = $3, default_unit_price = $4,
         default_unit_label = $5, is_included = $6, show_quantity = $7,
         is_active = $8, sort_order = $9, supplier = $10, kit_price = $11, sqft_per_kit = $12,
-        is_charge_only = $13, color = $14, sku = $15
-       WHERE id = $16 AND company_id = $17 RETURNING *`,
+        is_charge_only = $13, color = $14, sku = $15, internal_name = $16
+       WHERE id = $17 AND company_id = $18 RETURNING *`,
       [
         category_id, name, clean(description), default_unit_price,
         clean(default_unit_label), is_included, show_quantity,
         is_active, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null,
         is_charge_only ?? false, clean(color) || null,
         (is_charge_only ?? false) ? null : (clean(sku) || null),
+        (is_system ?? false) ? (clean(internal_name) || null) : null,
         req.params.id, companyId,
       ]
     );
@@ -2116,10 +2117,10 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
           const sysItem = (await client.query(
             `INSERT INTO bidder_library_items
                (category_id, company_id, name, description, default_unit_price, default_unit_label,
-                color, sku, is_system, sort_order, source_supplier_product_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10) RETURNING id`,
+                color, sku, is_system, sort_order, source_supplier_product_id, internal_name)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11) RETURNING id`,
             [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
-             p.color, p.sku, regularProducts.length + i, p.id]
+             p.color, p.sku, regularProducts.length + i, p.id, p.internal_name || null]
           )).rows[0];
 
           for (let ci = 0; ci < components.length; ci++) {
@@ -2233,11 +2234,11 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
       const sysItem = (await client.query(
         `INSERT INTO bidder_library_items
            (category_id, company_id, name, description, default_unit_price, default_unit_label,
-            color, sku, is_system, sort_order, source_supplier_product_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10) RETURNING id`,
+            color, sku, is_system, sort_order, source_supplier_product_id, internal_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11) RETURNING id`,
         [co.cat_id, co.company_id, product.name, product.description,
          product.default_unit_price, product.default_unit_label,
-         product.color || null, product.sku || null, sortOrder, product.id]
+         product.color || null, product.sku || null, sortOrder, product.id, product.internal_name || null]
       )).rows[0];
 
       for (let ci = 0; ci < comps.length; ci++) {
@@ -2311,6 +2312,7 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       default_unit_price = 0, default_unit_label = 'per sqft',
       color = null, sku = null, kit_price = null, sqft_per_kit = null,
       is_charge_only = false, is_system = false, component_ids = [], sort_order = 0,
+      internal_name = null,
     } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
 
@@ -2319,14 +2321,14 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       const ins = await client.query(
         `INSERT INTO global_supplier_products
            (supplier_id, name, description, default_unit_price, default_unit_label,
-            color, sku, kit_price, sqft_per_kit, is_charge_only, is_system, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+            color, sku, kit_price, sqft_per_kit, is_charge_only, is_system, sort_order, internal_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
         [supplierId, name.trim(), description,
          parseFloat(default_unit_price) || 0, default_unit_label,
          color || null, sku || null,
          !is_system && kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
          !is_system && sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
-         is_charge_only, is_system, sort_order]
+         is_charge_only, is_system, sort_order, is_system ? (internal_name || null) : null]
       );
       newProduct = ins.rows[0];
 
@@ -2356,7 +2358,7 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
     const {
       name, description, default_unit_price, default_unit_label,
       color, sku, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
-      component_ids,
+      component_ids, internal_name,
     } = req.body;
 
     let updated;
@@ -2373,8 +2375,9 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
            sqft_per_kit       = $8,
            is_charge_only     = COALESCE($9, is_charge_only),
            is_active          = COALESCE($10, is_active),
-           sort_order         = COALESCE($11, sort_order)
-         WHERE id = $12 RETURNING *`,
+           sort_order         = COALESCE($11, sort_order),
+           internal_name      = $12
+         WHERE id = $13 RETURNING *`,
         [
           name?.trim() || null, description ?? null,
           default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
@@ -2382,6 +2385,7 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
           kit_price !== undefined && kit_price !== '' ? parseFloat(kit_price) : null,
           sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
           is_charge_only ?? null, is_active ?? null, sort_order ?? null,
+          internal_name !== undefined ? (internal_name || null) : undefined,
           req.params.id,
         ]
       );

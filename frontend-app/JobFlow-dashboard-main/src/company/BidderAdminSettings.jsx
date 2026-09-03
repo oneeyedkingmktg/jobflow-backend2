@@ -291,7 +291,7 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddSystem(catId) {
     setNewItemCatId(null);
     setNewSystemCatId(catId);
-    setNewSystemForm({ name: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [] });
+    setNewSystemForm({ name: '', internal_name: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [] });
   }
 
   async function handleAddSystem(catId) {
@@ -300,6 +300,7 @@ export default function BidderAdminSettings({ companyId }) {
       await BidderAPI.createLibraryItem({
         category_id: catId,
         name: newSystemForm.name.trim(),
+        internal_name: newSystemForm.internal_name?.trim() || null,
         description: newSystemForm.description || null,
         default_unit_price: parseFloat(newSystemForm.default_unit_price) || 0,
         default_unit_label: newSystemForm.default_unit_label || null,
@@ -351,6 +352,7 @@ export default function BidderAdminSettings({ companyId }) {
     setEditItemId(item.id);
     setEditItemForm({
       name: item.name,
+      internal_name: item.internal_name || '',
       description: item.description || '',
       default_unit_price: item.default_unit_price,
       default_unit_label: item.default_unit_label || '',
@@ -376,6 +378,7 @@ export default function BidderAdminSettings({ companyId }) {
         ...editItemForm,
         default_unit_price: parseFloat(editItemForm.default_unit_price) || 0,
         color: editItemForm.color || null,
+        internal_name: editItemForm.is_system ? (editItemForm.internal_name?.trim() || null) : null,
         supplier: editItemForm.is_charge_only ? null : (editItemForm.supplier || null),
         sku: editItemForm.is_charge_only ? null : (editItemForm.sku || null),
         kit_price: editItemForm.is_charge_only ? null : (editItemForm.kit_price !== '' ? parseFloat(editItemForm.kit_price) : null),
@@ -727,7 +730,7 @@ export default function BidderAdminSettings({ companyId }) {
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className={labelCls}>Name *</label>
+                            <label className={labelCls}>{editItemForm.is_system ? 'Proposal Name *' : 'Name *'}</label>
                             <input className={inputCls} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
                           </div>
                           <div>
@@ -735,6 +738,12 @@ export default function BidderAdminSettings({ companyId }) {
                             <input className={inputCls} type="number" step="0.01" value={editItemForm.default_unit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
                           </div>
                         </div>
+                        {editItemForm.is_system && (
+                          <div>
+                            <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+                            <input className={inputCls} value={editItemForm.internal_name} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
+                          </div>
+                        )}
                         <div>
                           <label className={labelCls}>Unit Label</label>
                           <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
@@ -822,15 +831,20 @@ export default function BidderAdminSettings({ companyId }) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-gray-800">{item.name}</span>
+                            <span className="font-medium text-sm text-gray-800">
+                              {item.is_system ? (item.internal_name || item.name) : item.name}
+                            </span>
                             {item.is_system && (
-                              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">System</span>
+                              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">⬡ System</span>
                             )}
                             {item.is_charge_only && (
                               <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Charge Only</span>
                             )}
                             {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
                           </div>
+                          {item.is_system && item.internal_name && (
+                            <p className="text-xs text-purple-600 mt-0.5">Proposal: {item.name}</p>
+                          )}
                           {item.color && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="text-xs text-gray-500 font-medium">Color:</span>
@@ -936,8 +950,8 @@ export default function BidderAdminSettings({ companyId }) {
                     <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New System</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={labelCls}>System Name *</label>
-                        <input className={inputCls} value={newSystemForm.name} onChange={(e) => setNewSystemForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. System ABC" autoFocus />
+                        <label className={labelCls}>Proposal Name * <span className="normal-case text-gray-400 font-normal">— on proposal</span></label>
+                        <input className={inputCls} value={newSystemForm.name} onChange={(e) => setNewSystemForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Full Broadcast Decorative Flake" autoFocus />
                       </div>
                       <div>
                         <label className={labelCls}>Bid Price</label>
@@ -945,13 +959,17 @@ export default function BidderAdminSettings({ companyId }) {
                       </div>
                     </div>
                     <div>
+                      <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+                      <input className={inputCls} value={newSystemForm.internal_name} onChange={(e) => setNewSystemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
+                    </div>
+                    <div>
                       <label className={labelCls}>Unit Label</label>
                       <input className={inputCls} value={newSystemForm.default_unit_label} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={labelCls}>Description (internal)</label>
-                        <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional notes" />
+                        <label className={labelCls}>Description</label>
+                        <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional — shown on proposal" />
                       </div>
                       <div>
                         <label className={labelCls}>Color</label>
@@ -989,9 +1007,13 @@ export default function BidderAdminSettings({ companyId }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="px-4 py-2 flex gap-4">
-                    <button onClick={() => startAddItem(cat.id)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
-                    <button onClick={() => startAddSystem(cat.id)} className="text-sm text-purple-600 hover:underline">+ Add System</button>
+                  <div className="px-4 py-2 flex gap-3">
+                    <button onClick={() => startAddItem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                      <span>📦</span> Add Product
+                    </button>
+                    <button onClick={() => startAddSystem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-50">
+                      <span>⬡</span> Add System
+                    </button>
                   </div>
                 )}
               </div>

@@ -892,7 +892,9 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   {library.map(cat => (
                     <optgroup key={cat.id} label={cat.name}>
                       {(cat.items || []).filter(i => i.is_active !== false).map(i => (
-                        <option key={i.id} value={`${cat.id}::${i.id}`}>{i.name}</option>
+                        <option key={i.id} value={`${cat.id}::${i.id}`}>
+                          {i.is_system ? `⬡ ${i.internal_name || i.name}` : i.name}
+                        </option>
                       ))}
                     </optgroup>
                   ))}

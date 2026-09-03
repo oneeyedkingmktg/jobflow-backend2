@@ -14,7 +14,7 @@ const EMPTY_PRODUCT = {
   color: '', sku: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
 };
 const EMPTY_SYSTEM = {
-  name: '', description: '', default_unit_price: '', default_unit_label: 'per sqft',
+  name: '', internal_name: '', description: '', default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', component_ids: [],
 };
 
@@ -110,12 +110,16 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, 
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label className={labelCls}>System Name *</label>
-          <input className={inputCls} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Full Polyaspartic System" />
+          <label className={labelCls}>Proposal Name * <span className="normal-case text-gray-400 font-normal">— shown on customer proposal</span></label>
+          <input className={inputCls} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Full Broadcast Decorative Flake" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Internal Name * <span className="normal-case text-gray-400 font-normal">— shown in bidder item picker</span></label>
+          <input className={inputCls} value={form.internal_name} onChange={(e) => set('internal_name', e.target.value)} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
         </div>
         <div className="col-span-2">
           <label className={labelCls}>Description</label>
-          <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional description" />
+          <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional description shown on proposal" />
         </div>
         <div>
           <label className={labelCls}>System Price ($)</label>
@@ -166,7 +170,7 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, 
       <div className="flex gap-2 pt-1">
         <button
           onClick={() => onSave({ ...form, is_system: true })}
-          disabled={saving || !form.name.trim() || form.component_ids.length === 0}
+          disabled={saving || !form.name.trim() || !form.internal_name.trim() || form.component_ids.length === 0}
           className="px-4 py-1.5 bg-purple-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50 hover:bg-purple-700"
         >
           {saving ? 'Saving…' : 'Save System'}
@@ -378,6 +382,7 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                       key={p.id}
                       initial={{
                         name: p.name,
+                        internal_name: p.internal_name || '',
                         description: p.description || '',
                         default_unit_price: p.default_unit_price,
                         default_unit_label: p.default_unit_label || 'per sqft',
@@ -441,12 +446,15 @@ function SystemRow({ p, onEdit, onDelete }) {
     <div className="flex items-start gap-3 bg-white border border-purple-200 rounded-lg px-4 py-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-gray-800 text-sm">{p.name}</span>
+          <span className="font-medium text-gray-800 text-sm">{p.internal_name || p.name}</span>
           <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">System</span>
           {p.sku && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-mono">SKU: {p.sku}</span>}
           {p.color && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{p.color}</span>}
           {!p.is_active && <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inactive</span>}
         </div>
+        {p.internal_name && (
+          <p className="text-xs text-purple-600 mt-0.5">Proposal name: {p.name}</p>
+        )}
         {p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
         <div className="flex gap-3 mt-1 text-xs text-gray-500">
           <span>${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
