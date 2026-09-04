@@ -62,6 +62,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [paySchedule, setPaySchedule]       = useState([]);
   const [showItemPicker,   setShowItemPicker]   = useState(false);
   const [itemSearch,       setItemSearch]       = useState('');
+  const [pickerSections,   setPickerSections]   = useState({});
   const [showDocsModal,    setShowDocsModal]    = useState(false);
   const [showExitModal,    setShowExitModal]    = useState(false);
   const [exitFn,           setExitFn]           = useState(null);
@@ -921,62 +922,114 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   {/* Library items by category */}
                   {library.map(cat => {
                     const q = itemSearch.toLowerCase();
-                    const visibleItems = (cat.items || []).filter(i => {
-                      if (i.is_active === false) return false;
-                      if (!q) return true;
-                      return (
+                    const activeItems = (cat.items || []).filter(i => i.is_active !== false);
+                    const itemBtn = (i) => (
+                      <button
+                        key={i.id}
+                        onClick={async () => {
+                          setShowItemPicker(false);
+                          setItemSearch('');
+                          await addFromPicker(`${cat.id}::${i.id}`, nextSortOrder());
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center gap-2.5 border-b border-gray-50"
+                      >
+                        {i.is_system ? (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold shrink-0">⬡ System</span>
+                        ) : i.is_charge_only ? (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">⚡ Charge</span>
+                        ) : (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
+                        )}
+                        <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
+                          {i.internal_name || i.name}
+                        </span>
+                        {i.internal_name && (
+                          <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[140px]">→ {i.name}</span>
+                        )}
+                      </button>
+                    );
+
+                    if (q) {
+                      const matched = activeItems.filter(i =>
                         i.name.toLowerCase().includes(q) ||
                         (i.internal_name || '').toLowerCase().includes(q) ||
                         (i.description || '').toLowerCase().includes(q)
                       );
-                    });
-                    if (visibleItems.length === 0) return null;
+                      if (!matched.length) return null;
+                      return (
+                        <div key={cat.id}>
+                          <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+                          {matched.map(itemBtn)}
+                        </div>
+                      );
+                    }
+
+                    const catSystems  = activeItems.filter(i => i.is_system);
+                    const catProducts = activeItems.filter(i => !i.is_system && !i.is_charge_only);
+                    const catCharges  = activeItems.filter(i => i.is_charge_only);
+                    if (!activeItems.length) return null;
+
+                    const sectionToggle = (key) => setPickerSections(p => ({ ...p, [key]: !p[key] }));
+                    const sectionOpen = (key) => !!pickerSections[key];
+                    const secChevron = (open) => (
+                      <svg className={`w-2.5 h-2.5 text-gray-300 transition-transform flex-shrink-0 ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    );
+
                     return (
                       <div key={cat.id}>
-                        <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">
-                          {cat.name}
-                        </div>
-                        {visibleItems.map(i => (
-                          <button
-                            key={i.id}
-                            onClick={async () => {
-                              setShowItemPicker(false);
-                              setItemSearch('');
-                              await addFromPicker(`${cat.id}::${i.id}`, nextSortOrder());
-                            }}
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center gap-2.5 border-b border-gray-50"
-                          >
-                            {i.is_system ? (
-                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold shrink-0">⬡ System</span>
-                            ) : i.is_charge_only ? (
-                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">⚡ Charge</span>
-                            ) : (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
-                            )}
-                            <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
-                              {i.internal_name || i.name}
-                            </span>
-                            {i.internal_name && (
-                              <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[140px]">
-                                → {i.name}
-                              </span>
-                            )}
-                          </button>
-                        ))}
+                        <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+
+                        {catSystems.length > 0 && (
+                          <div>
+                            <button onClick={() => sectionToggle(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-purple-50 border-b border-gray-50">
+                              {secChevron(sectionOpen(`${cat.id}-sys`))}
+                              <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">⬡ Systems</span>
+                              <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
+                            </button>
+                            {sectionOpen(`${cat.id}-sys`) && catSystems.map(itemBtn)}
+                          </div>
+                        )}
+
+                        {catProducts.length > 0 && (
+                          <div>
+                            <button onClick={() => sectionToggle(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-50">
+                              {secChevron(sectionOpen(`${cat.id}-prod`))}
+                              <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">📦 Products</span>
+                              <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
+                            </button>
+                            {sectionOpen(`${cat.id}-prod`) && catProducts.map(itemBtn)}
+                          </div>
+                        )}
+
+                        {catCharges.length > 0 && (
+                          <div>
+                            <button onClick={() => sectionToggle(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-amber-50 border-b border-gray-50">
+                              {secChevron(sectionOpen(`${cat.id}-chg`))}
+                              <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">⚡ Charges</span>
+                              <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
+                            </button>
+                            {sectionOpen(`${cat.id}-chg`) && catCharges.map(itemBtn)}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
 
-                  {itemSearch && library.every(cat =>
-                    (cat.items || []).filter(i => i.is_active !== false).every(i => {
-                      const q = itemSearch.toLowerCase();
-                      return !i.name.toLowerCase().includes(q) &&
-                             !(i.internal_name || '').toLowerCase().includes(q) &&
-                             !(i.description || '').toLowerCase().includes(q);
-                    })
-                  ) && (
-                    <p className="text-sm text-gray-400 italic px-4 py-4 text-center">No items match "{itemSearch}"</p>
-                  )}
+                  {itemSearch && (() => {
+                    const q = itemSearch.toLowerCase();
+                    const anyMatch = library.some(cat =>
+                      (cat.items || []).filter(i => i.is_active !== false).some(i =>
+                        i.name.toLowerCase().includes(q) ||
+                        (i.internal_name || '').toLowerCase().includes(q) ||
+                        (i.description || '').toLowerCase().includes(q)
+                      )
+                    );
+                    return !anyMatch && (
+                      <p className="text-sm text-gray-400 italic px-4 py-4 text-center">No items match "{itemSearch}"</p>
+                    );
+                  })()}
                 </div>
 
                 <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 flex justify-end">

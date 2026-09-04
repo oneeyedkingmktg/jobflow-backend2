@@ -206,6 +206,8 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
   const [addingSystem, setAddingSystem] = useState(false);
   const [editProductId, setEditProductId] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [showProducts, setShowProducts] = useState(false);
+  const [showSystems, setShowSystems] = useState(false);
 
   // Non-system, non-charge-only products available as system components
   const componentOptions = products.filter((p) => !p.is_system && !p.is_charge_only);
@@ -307,123 +309,144 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
 
       {/* Products panel */}
       {open && (
-        <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-4">
+        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-2">
 
-          {/* ── Regular Products ── */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-500 uppercase">Products</span>
-              {!addingProduct && !addingSystem && (
-                <button onClick={startAddProduct} className="text-xs text-blue-600 border border-blue-200 px-3 py-1 rounded-lg hover:bg-blue-50">
-                  + Add Product
-                </button>
-              )}
-            </div>
-
-            {addingProduct && (
-              <ProductForm
-                onSave={handleSaveProduct}
-                onCancel={() => setAddingProduct(false)}
-                saving={savingProduct}
-              />
-            )}
-
-            {loadingProducts ? (
-              <p className="text-sm text-gray-400">Loading…</p>
-            ) : regularProducts.length === 0 && !addingProduct ? (
-              <p className="text-sm text-gray-400 italic">No products yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {regularProducts.map((p) =>
-                  editProductId === p.id ? (
-                    <ProductForm
-                      key={p.id}
-                      initial={{
-                        name: p.name,
-                        internal_name: p.internal_name || '',
-                        internal_description: p.internal_description || '',
-                        description: p.description || '',
-                        default_unit_price: p.default_unit_price,
-                        default_unit_label: p.default_unit_label || 'per sqft',
-                        color: p.color || '',
-                        sku: p.sku || '',
-                        kit_price: p.kit_price != null ? p.kit_price : '',
-                        sqft_per_kit: p.sqft_per_kit != null ? p.sqft_per_kit : '',
-                        is_charge_only: p.is_charge_only || false,
-                      }}
-                      onSave={(form) => handleUpdateProduct(p.id, form)}
-                      onCancel={() => setEditProductId(null)}
-                      saving={savingProduct}
-                    />
-                  ) : (
-                    <ProductRow
-                      key={p.id}
-                      p={p}
-                      onEdit={() => { setEditProductId(p.id); setAddingProduct(false); setAddingSystem(false); }}
-                      onDelete={() => handleDeleteProduct(p.id, p.name)}
-                    />
-                  )
+          {/* ── Systems dropdown ── */}
+          <div className="border border-purple-100 rounded-lg overflow-hidden bg-white">
+            <button
+              onClick={() => setShowSystems((p) => !p)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-purple-50 text-left"
+            >
+              <svg className={`w-3.5 h-3.5 text-purple-300 transition-transform flex-shrink-0 ${showSystems ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">⬡ Systems</span>
+              <span className="text-xs text-gray-400 font-normal ml-1">({systemProducts.length})</span>
+            </button>
+            {showSystems && (
+              <div className="border-t border-purple-100 p-3 space-y-2">
+                {loadingProducts ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : systemProducts.length === 0 && !addingSystem ? (
+                  <p className="text-sm text-gray-400 italic px-1">No systems yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {systemProducts.map((p) =>
+                      editProductId === p.id ? (
+                        <SystemForm
+                          key={p.id}
+                          initial={{
+                            name: p.name,
+                            internal_name: p.internal_name || '',
+                            internal_description: p.internal_description || '',
+                            description: p.description || '',
+                            default_unit_price: p.default_unit_price,
+                            default_unit_label: p.default_unit_label || 'per sqft',
+                            color: p.color || '',
+                            sku: p.sku || '',
+                            component_ids: (p.components || []).map((c) => c.component_product_id),
+                          }}
+                          availableComponents={componentOptions}
+                          onSave={(form) => handleUpdateProduct(p.id, form)}
+                          onCancel={() => setEditProductId(null)}
+                          saving={savingProduct}
+                        />
+                      ) : (
+                        <SystemRow
+                          key={p.id}
+                          p={p}
+                          onEdit={() => { setEditProductId(p.id); setAddingProduct(false); setAddingSystem(false); }}
+                          onDelete={() => handleDeleteProduct(p.id, p.name)}
+                        />
+                      )
+                    )}
+                  </div>
+                )}
+                {addingSystem && (
+                  <SystemForm
+                    availableComponents={componentOptions}
+                    onSave={handleSaveProduct}
+                    onCancel={() => setAddingSystem(false)}
+                    saving={savingProduct}
+                  />
+                )}
+                {!addingProduct && !addingSystem && (
+                  <button onClick={startAddSystem} className="mt-1 text-xs text-purple-600 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-50">
+                    + Add System
+                  </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* ── Systems ── */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-600 uppercase">Systems</span>
-              {!addingProduct && !addingSystem && (
-                <button onClick={startAddSystem} className="text-xs text-purple-600 border border-purple-200 px-3 py-1 rounded-lg hover:bg-purple-50">
-                  + Add System
-                </button>
-              )}
-            </div>
-
-            {addingSystem && (
-              <SystemForm
-                availableComponents={componentOptions}
-                onSave={handleSaveProduct}
-                onCancel={() => setAddingSystem(false)}
-                saving={savingProduct}
-              />
-            )}
-
-            {systemProducts.length === 0 && !addingSystem ? (
-              <p className="text-sm text-gray-400 italic">No systems yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {systemProducts.map((p) =>
-                  editProductId === p.id ? (
-                    <SystemForm
-                      key={p.id}
-                      initial={{
-                        name: p.name,
-                        internal_name: p.internal_name || '',
-                        internal_description: p.internal_description || '',
-                        description: p.description || '',
-                        default_unit_price: p.default_unit_price,
-                        default_unit_label: p.default_unit_label || 'per sqft',
-                        color: p.color || '',
-                        sku: p.sku || '',
-                        component_ids: (p.components || []).map((c) => c.component_product_id),
-                      }}
-                      availableComponents={componentOptions}
-                      onSave={(form) => handleUpdateProduct(p.id, form)}
-                      onCancel={() => setEditProductId(null)}
-                      saving={savingProduct}
-                    />
-                  ) : (
-                    <SystemRow
-                      key={p.id}
-                      p={p}
-                      onEdit={() => { setEditProductId(p.id); setAddingProduct(false); setAddingSystem(false); }}
-                      onDelete={() => handleDeleteProduct(p.id, p.name)}
-                    />
-                  )
+          {/* ── Products dropdown ── */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <button
+              onClick={() => setShowProducts((p) => !p)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 text-left"
+            >
+              <svg className={`w-3.5 h-3.5 text-gray-300 transition-transform flex-shrink-0 ${showProducts ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">📦 Products</span>
+              <span className="text-xs text-gray-400 font-normal ml-1">({regularProducts.length})</span>
+            </button>
+            {showProducts && (
+              <div className="border-t border-gray-100 p-3 space-y-2">
+                {loadingProducts ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : regularProducts.length === 0 && !addingProduct ? (
+                  <p className="text-sm text-gray-400 italic px-1">No products yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {regularProducts.map((p) =>
+                      editProductId === p.id ? (
+                        <ProductForm
+                          key={p.id}
+                          initial={{
+                            name: p.name,
+                            internal_name: p.internal_name || '',
+                            internal_description: p.internal_description || '',
+                            description: p.description || '',
+                            default_unit_price: p.default_unit_price,
+                            default_unit_label: p.default_unit_label || 'per sqft',
+                            color: p.color || '',
+                            sku: p.sku || '',
+                            kit_price: p.kit_price != null ? p.kit_price : '',
+                            sqft_per_kit: p.sqft_per_kit != null ? p.sqft_per_kit : '',
+                            is_charge_only: p.is_charge_only || false,
+                          }}
+                          onSave={(form) => handleUpdateProduct(p.id, form)}
+                          onCancel={() => setEditProductId(null)}
+                          saving={savingProduct}
+                        />
+                      ) : (
+                        <ProductRow
+                          key={p.id}
+                          p={p}
+                          onEdit={() => { setEditProductId(p.id); setAddingProduct(false); setAddingSystem(false); }}
+                          onDelete={() => handleDeleteProduct(p.id, p.name)}
+                        />
+                      )
+                    )}
+                  </div>
+                )}
+                {addingProduct && (
+                  <ProductForm
+                    onSave={handleSaveProduct}
+                    onCancel={() => setAddingProduct(false)}
+                    saving={savingProduct}
+                  />
+                )}
+                {!addingProduct && !addingSystem && (
+                  <button onClick={startAddProduct} className="mt-1 text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                    + Add Product
+                  </button>
                 )}
               </div>
             )}
           </div>
+
         </div>
       )}
     </div>

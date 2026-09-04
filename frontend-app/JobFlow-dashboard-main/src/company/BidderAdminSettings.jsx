@@ -39,6 +39,10 @@ export default function BidderAdminSettings({ companyId }) {
   // Edit system component IDs (used when editing a system item)
   const [editSystemComponentIds, setEditSystemComponentIds] = useState([]);
 
+  // Sub-section open state: keyed by `${catId}-sys`, `${catId}-prod`, `${catId}-chg`
+  const [openSections, setOpenSections] = useState({});
+  const toggleSection = (key) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
+
   // CSV import
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null); // { created, skipped, errors }
@@ -725,325 +729,305 @@ export default function BidderAdminSettings({ companyId }) {
               )}
             </div>
 
-            {/* Items */}
-            {expandedCats[cat.id] && (
-              <div className="divide-y divide-gray-100">
-                {(cat.items || []).map((item) => (
-                  <div key={item.id} className="px-4 py-3">
-                    {editItemId === item.id ? (
-                      /* Edit row */
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>{editItemForm.is_system ? 'Proposal Name *' : 'Name *'}</label>
-                            <input className={inputCls} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Default Price</label>
-                            <input className={inputCls} type="number" step="0.01" value={editItemForm.default_unit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
-                          </div>
+            {/* Items — grouped by type */}
+            {expandedCats[cat.id] && (() => {
+              const catSystems  = (cat.items || []).filter((i) => i.is_system);
+              const catProducts = (cat.items || []).filter((i) => !i.is_system && !i.is_charge_only);
+              const catCharges  = (cat.items || []).filter((i) => i.is_charge_only);
+              const sysOpen  = !!openSections[`${cat.id}-sys`];
+              const prodOpen = !!openSections[`${cat.id}-prod`];
+              const chgOpen  = !!openSections[`${cat.id}-chg`];
+              const chevron = (open) => (
+                <svg className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              );
+              const renderItem = (item) => (
+                <div key={item.id} className="px-4 py-3 border-t border-gray-100">
+                  {editItemId === item.id ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>{editItemForm.is_system ? 'Proposal Name *' : 'Name *'}</label>
+                          <input className={inputCls} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
                         </div>
                         <div>
-                          <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
-                          <input className={inputCls} value={editItemForm.internal_name} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
-                          <input className={inputCls} value={editItemForm.internal_description || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Unit Label</label>
-                          <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>Description</label>
-                            <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Color</label>
-                            <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
-                          </div>
-                        </div>
-                        {!editItemForm.is_system && (
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={editItemForm.is_charge_only || false}
-                              onChange={(e) => setEditItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
-                          </label>
-                        )}
-                        {editItemForm.is_system ? (
-                          <div>
-                            <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(check all items that make up this system)</span></label>
-                            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
-                              {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only && i.id !== item.id).map((i) => ({ ...i, catName: c.name }))).map((i) => (
-                                <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
-                                  <input
-                                    type="checkbox"
-                                    checked={editSystemComponentIds.includes(i.id)}
-                                    onChange={() => setEditSystemComponentIds((prev) => prev.includes(i.id) ? prev.filter((x) => x !== i.id) : [...prev, i.id])}
-                                    className="w-4 h-4 flex-shrink-0"
-                                  />
-                                  <span className="text-xs text-gray-500 w-24 flex-shrink-0">{i.catName}</span>
-                                  <span className="text-sm text-gray-800">{i.name}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ) : !editItemForm.is_charge_only && (
-                          <div className="grid grid-cols-4 gap-3">
-                            <div>
-                              <label className={labelCls}>Supplier</label>
-                              <input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
-                            </div>
-                            <div>
-                              <label className={labelCls}>SKU</label>
-                              <input className={inputCls} value={editItemForm.sku} onChange={(e) => setEditItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" />
-                            </div>
-                            <div>
-                              <label className={labelCls}>Kit Price ($)</label>
-                              <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
-                            </div>
-                            <div>
-                              <label className={labelCls}>SF per Kit</label>
-                              <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex gap-2">
-                          <button onClick={() => handleSaveItem(item.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Save</button>
-                          <button onClick={() => setEditItemId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                          <label className={labelCls}>Default Price</label>
+                          <input className={inputCls} type="number" step="0.01" value={editItemForm.default_unit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
                         </div>
                       </div>
-                    ) : (
-                      /* View row */
-                      <div className="flex items-start gap-3">
-                        <div className="flex flex-col gap-0.5 flex-shrink-0 pt-0.5">
-                          <button
-                            onClick={() => handleReorderItem(cat.id, item.id, 'up')}
-                            disabled={(cat.items || []).indexOf(item) === 0}
-                            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs"
-                            title="Move up"
-                          >▲</button>
-                          <button
-                            onClick={() => handleReorderItem(cat.id, item.id, 'down')}
-                            disabled={(cat.items || []).indexOf(item) === (cat.items || []).length - 1}
-                            className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs"
-                            title="Move down"
-                          >▼</button>
+                      <div>
+                        <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+                        <input className={inputCls} value={editItemForm.internal_name} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
+                        <input className={inputCls} value={editItemForm.internal_description || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Unit Label</label>
+                        <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Description</label>
+                          <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-gray-800">
-                              {item.internal_name || item.name}
-                            </span>
-                            {item.is_system && (
-                              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">⬡ System</span>
-                            )}
-                            {item.is_charge_only && (
-                              <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Charge Only</span>
-                            )}
-                            {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
+                        <div>
+                          <label className={labelCls}>Color</label>
+                          <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                        </div>
+                      </div>
+                      {!editItemForm.is_system && (
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input type="checkbox" checked={editItemForm.is_charge_only || false} onChange={(e) => setEditItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))} className="w-4 h-4" />
+                          <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
+                        </label>
+                      )}
+                      {editItemForm.is_system ? (
+                        <div>
+                          <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(check all items that make up this system)</span></label>
+                          <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                            {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only && i.id !== item.id).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                              <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                                <input type="checkbox" checked={editSystemComponentIds.includes(i.id)} onChange={() => setEditSystemComponentIds((prev) => prev.includes(i.id) ? prev.filter((x) => x !== i.id) : [...prev, i.id])} className="w-4 h-4 flex-shrink-0" />
+                                <span className="text-xs text-gray-500 w-24 flex-shrink-0">{i.catName}</span>
+                                <span className="text-sm text-gray-800">{i.name}</span>
+                              </label>
+                            ))}
                           </div>
-                          {item.internal_name && (
-                            <p className="text-xs text-purple-600 mt-0.5">Proposal: {item.name}</p>
-                          )}
-                          {item.internal_description && (
-                            <p className="text-xs text-gray-400 italic mt-0.5">{item.internal_description}</p>
-                          )}
-                          {item.color && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-xs text-gray-500 font-medium">Color:</span>
-                              <span className="text-xs text-gray-700">{item.color}</span>
-                            </div>
-                          )}
-                          {item.is_system ? (
-                            <ul className="mt-1 space-y-0.5">
-                              {(item.components || []).map((c) => (
-                                <li key={c.component_item_id} className="text-xs text-gray-500 flex items-center gap-1">
-                                  <span className="text-gray-300">↳</span> {c.name}
-                                </li>
-                              ))}
-                              {(item.components || []).length === 0 && (
-                                <li className="text-xs text-gray-400 italic">No components selected</li>
-                              )}
-                            </ul>
-                          ) : (
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                              {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
-                              {!item.is_charge_only && item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
-                              {!item.is_charge_only && item.sku && <span className="text-xs text-gray-400 font-mono">SKU: {item.sku}</span>}
-                              {!item.is_charge_only && item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
-                              {!item.is_charge_only && item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
-                            </div>
-                          )}
                         </div>
-                        <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                          ${parseFloat(item.default_unit_price || 0).toFixed(2)} {item.default_unit_label || ''}
-                        </span>
-                        <button onClick={() => startEditItem(item)} className="text-xs text-blue-600 hover:underline px-2">Edit</button>
-                        <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-red-500 hover:underline px-2">Del</button>
+                      ) : !editItemForm.is_charge_only && (
+                        <div className="grid grid-cols-4 gap-3">
+                          <div><label className={labelCls}>Supplier</label><input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" /></div>
+                          <div><label className={labelCls}>SKU</label><input className={inputCls} value={editItemForm.sku} onChange={(e) => setEditItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" /></div>
+                          <div><label className={labelCls}>Kit Price ($)</label><input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" /></div>
+                          <div><label className={labelCls}>SF per Kit</label><input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" /></div>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveItem(item.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Save</button>
+                        <button onClick={() => setEditItemId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col gap-0.5 flex-shrink-0 pt-0.5">
+                        <button onClick={() => handleReorderItem(cat.id, item.id, 'up')} disabled={(cat.items || []).indexOf(item) === 0} className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs" title="Move up">▲</button>
+                        <button onClick={() => handleReorderItem(cat.id, item.id, 'down')} disabled={(cat.items || []).indexOf(item) === (cat.items || []).length - 1} className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs" title="Move down">▼</button>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm text-gray-800">{item.internal_name || item.name}</span>
+                          {!item.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
+                        </div>
+                        {item.internal_name && <p className="text-xs text-purple-600 mt-0.5">Proposal: {item.name}</p>}
+                        {item.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{item.internal_description}</p>}
+                        {item.color && <p className="text-xs text-gray-500 mt-0.5">Color: {item.color}</p>}
+                        {item.is_system ? (
+                          <ul className="mt-1 space-y-0.5">
+                            {(item.components || []).map((c) => (
+                              <li key={c.component_item_id} className="text-xs text-gray-500 flex items-center gap-1"><span className="text-gray-300">↳</span> {c.name}</li>
+                            ))}
+                            {(item.components || []).length === 0 && <li className="text-xs text-gray-400 italic">No components selected</li>}
+                          </ul>
+                        ) : (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
+                            {!item.is_charge_only && item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
+                            {!item.is_charge_only && item.sku && <span className="text-xs text-gray-400 font-mono">SKU: {item.sku}</span>}
+                            {!item.is_charge_only && item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
+                            {!item.is_charge_only && item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">${parseFloat(item.default_unit_price || 0).toFixed(2)} {item.default_unit_label || ''}</span>
+                      <button onClick={() => startEditItem(item)} className="text-xs text-blue-600 hover:underline px-2">Edit</button>
+                      <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-red-500 hover:underline px-2">Del</button>
+                    </div>
+                  )}
+                </div>
+              );
+
+              return (
+                <div className="divide-y divide-gray-100">
+
+                  {/* ── Systems ── */}
+                  <div>
+                    <button onClick={() => toggleSection(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-purple-50 text-left">
+                      {chevron(sysOpen)}
+                      <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">⬡ Systems</span>
+                      <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
+                    </button>
+                    {sysOpen && (
+                      <div>
+                        {catSystems.length === 0 && newSystemCatId !== cat.id && (
+                          <p className="px-4 py-2.5 text-xs text-gray-400 italic">No systems yet.</p>
+                        )}
+                        {catSystems.map(renderItem)}
+                        {newSystemCatId === cat.id ? (
+                          <div className="px-4 py-3 bg-purple-50 border-t border-gray-100 space-y-3">
+                            <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New System</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Proposal Name * <span className="normal-case text-gray-400 font-normal">— on proposal</span></label>
+                                <input className={inputCls} value={newSystemForm.name} onChange={(e) => setNewSystemForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Full Broadcast Decorative Flake" autoFocus />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Bid Price</label>
+                                <input className={inputCls} type="number" step="0.01" value={newSystemForm.default_unit_price} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_price: e.target.value }))} placeholder="0.00" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+                              <input className={inputCls} value={newSystemForm.internal_name} onChange={(e) => setNewSystemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Unit Label</label>
+                              <input className={inputCls} value={newSystemForm.default_unit_label} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
+                                <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional — shown on proposal" />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal only</span></label>
+                                <input className={inputCls} value={newSystemForm.internal_description} onChange={(e) => setNewSystemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="Notes for staff" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Color</label>
+                                <input className={inputCls} value={newSystemForm.color} onChange={(e) => setNewSystemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
+                              <div className="border border-purple-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
+                                {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only).map((i) => ({ ...i, catName: c.name }))).map((i) => (
+                                  <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50">
+                                    <input type="checkbox" checked={newSystemForm.componentIds.includes(i.id)} onChange={() => setNewSystemForm((p) => ({ ...p, componentIds: p.componentIds.includes(i.id) ? p.componentIds.filter((x) => x !== i.id) : [...p.componentIds, i.id] }))} className="w-4 h-4 flex-shrink-0" />
+                                    <span className="text-xs text-gray-400 w-28 flex-shrink-0">{i.catName}</span>
+                                    <span className="text-sm text-gray-800">{i.name}</span>
+                                  </label>
+                                ))}
+                                {library.flatMap((c) => c.items.filter((i) => !i.is_system)).length === 0 && (
+                                  <p className="px-3 py-2 text-xs text-gray-400">No standard items in library yet.</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleAddSystem(cat.id)} className="px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg">Add System</button>
+                              <button onClick={() => setNewSystemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="px-4 py-2 border-t border-gray-100">
+                            <button onClick={() => startAddSystem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-50">
+                              <span>⬡</span> Add System
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                ))}
 
-
-                {/* Add item row */}
-                {newItemCatId === cat.id ? (
-                  <div className="px-4 py-3 bg-blue-50 space-y-3">
-                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">New Item</p>
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* ── Products ── */}
+                  <div>
+                    <button onClick={() => toggleSection(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-blue-50 text-left">
+                      {chevron(prodOpen)}
+                      <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">📦 Products</span>
+                      <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
+                    </button>
+                    {prodOpen && (
                       <div>
-                        <label className={labelCls}>Name * <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
-                        <input className={inputCls} value={newItemForm.name} onChange={(e) => setNewItemForm((p) => ({ ...p, name: e.target.value }))} autoFocus />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Default Price</label>
-                        <input className={inputCls} type="number" step="0.01" value={newItemForm.default_unit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
-                      <input className={inputCls} value={newItemForm.internal_name} onChange={(e) => setNewItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="Optional — if blank, proposal name is used" />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Unit Label</label>
-                      <input className={inputCls} value={newItemForm.default_unit_label} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
-                        <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal only</span></label>
-                        <input className={inputCls} value={newItemForm.internal_description} onChange={(e) => setNewItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="Notes for staff" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Color</label>
-                        <input className={inputCls} value={newItemForm.color} onChange={(e) => setNewItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newItemForm.is_charge_only || false}
-                        onChange={(e) => setNewItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
-                    </label>
-                    {!newItemForm.is_charge_only && (
-                      <div className="grid grid-cols-4 gap-3">
-                        <div>
-                          <label className={labelCls}>Supplier</label>
-                          <input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>SKU</label>
-                          <input className={inputCls} value={newItemForm.sku} onChange={(e) => setNewItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Kit Price ($)</label>
-                          <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>SF per Kit</label>
-                          <input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <button onClick={() => handleAddItem(cat.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Add Item</button>
-                      <button onClick={() => setNewItemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
-                    </div>
-                  </div>
-                ) : newSystemCatId === cat.id ? (
-                  <div className="px-4 py-3 bg-purple-50 space-y-3">
-                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">New System</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Proposal Name * <span className="normal-case text-gray-400 font-normal">— on proposal</span></label>
-                        <input className={inputCls} value={newSystemForm.name} onChange={(e) => setNewSystemForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Full Broadcast Decorative Flake" autoFocus />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Bid Price</label>
-                        <input className={inputCls} type="number" step="0.01" value={newSystemForm.default_unit_price} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_price: e.target.value }))} placeholder="0.00" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
-                      <input className={inputCls} value={newSystemForm.internal_name} onChange={(e) => setNewSystemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Unit Label</label>
-                      <input className={inputCls} value={newSystemForm.default_unit_label} onChange={(e) => setNewSystemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
-                        <input className={inputCls} value={newSystemForm.description} onChange={(e) => setNewSystemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional — shown on proposal" />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal only</span></label>
-                        <input className={inputCls} value={newSystemForm.internal_description} onChange={(e) => setNewSystemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="Notes for staff" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Color</label>
-                        <input className={inputCls} value={newSystemForm.color} onChange={(e) => setNewSystemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
-                      <div className="border border-purple-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto bg-white">
-                        {library.flatMap((c) => c.items.filter((i) => !i.is_system && !i.is_charge_only).map((i) => ({ ...i, catName: c.name }))).map((i) => (
-                          <label key={i.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50">
-                            <input
-                              type="checkbox"
-                              checked={newSystemForm.componentIds.includes(i.id)}
-                              onChange={() => setNewSystemForm((p) => ({
-                                ...p,
-                                componentIds: p.componentIds.includes(i.id)
-                                  ? p.componentIds.filter((x) => x !== i.id)
-                                  : [...p.componentIds, i.id],
-                              }))}
-                              className="w-4 h-4 flex-shrink-0"
-                            />
-                            <span className="text-xs text-gray-400 w-28 flex-shrink-0">{i.catName}</span>
-                            <span className="text-sm text-gray-800">{i.name}</span>
-                          </label>
-                        ))}
-                        {library.flatMap((c) => c.items.filter((i) => !i.is_system)).length === 0 && (
-                          <p className="px-3 py-2 text-xs text-gray-400">No standard items in library yet.</p>
+                        {catProducts.length === 0 && newItemCatId !== cat.id && (
+                          <p className="px-4 py-2.5 text-xs text-gray-400 italic">No products yet.</p>
+                        )}
+                        {catProducts.map(renderItem)}
+                        {newItemCatId === cat.id ? (
+                          <div className="px-4 py-3 bg-blue-50 border-t border-gray-100 space-y-3">
+                            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">New Product</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Name * <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
+                                <input className={inputCls} value={newItemForm.name} onChange={(e) => setNewItemForm((p) => ({ ...p, name: e.target.value }))} autoFocus />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Default Price</label>
+                                <input className={inputCls} type="number" step="0.01" value={newItemForm.default_unit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_price: e.target.value }))} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
+                              <input className={inputCls} value={newItemForm.internal_name} onChange={(e) => setNewItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="Optional — if blank, proposal name is used" />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Unit Label</label>
+                              <input className={inputCls} value={newItemForm.default_unit_label} onChange={(e) => setNewItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— proposal</span></label>
+                                <input className={inputCls} value={newItemForm.description} onChange={(e) => setNewItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional" />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal only</span></label>
+                                <input className={inputCls} value={newItemForm.internal_description} onChange={(e) => setNewItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="Notes for staff" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={labelCls}>Color</label>
+                                <input className={inputCls} value={newItemForm.color} onChange={(e) => setNewItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                              </div>
+                            </div>
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <input type="checkbox" checked={newItemForm.is_charge_only || false} onChange={(e) => setNewItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))} className="w-4 h-4" />
+                              <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
+                            </label>
+                            {!newItemForm.is_charge_only && (
+                              <div className="grid grid-cols-4 gap-3">
+                                <div><label className={labelCls}>Supplier</label><input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" /></div>
+                                <div><label className={labelCls}>SKU</label><input className={inputCls} value={newItemForm.sku} onChange={(e) => setNewItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" /></div>
+                                <div><label className={labelCls}>Kit Price ($)</label><input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" /></div>
+                                <div><label className={labelCls}>SF per Kit</label><input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" /></div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <button onClick={() => handleAddItem(cat.id)} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Add Item</button>
+                              <button onClick={() => setNewItemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="px-4 py-2 border-t border-gray-100">
+                            <button onClick={() => startAddItem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                              <span>📦</span> Add Product
+                            </button>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleAddSystem(cat.id)} className="px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg">Add System</button>
-                      <button onClick={() => setNewSystemCatId(null)} className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg">Cancel</button>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="px-4 py-2 flex gap-3">
-                    <button onClick={() => startAddItem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
-                      <span>📦</span> Add Product
-                    </button>
-                    <button onClick={() => startAddSystem(cat.id)} className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-50">
-                      <span>⬡</span> Add System
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+
+                  {/* ── Charges ── */}
+                  {catCharges.length > 0 && (
+                    <div>
+                      <button onClick={() => toggleSection(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-amber-50 text-left">
+                        {chevron(chgOpen)}
+                        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">⚡ Charges</span>
+                        <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
+                      </button>
+                      {chgOpen && (
+                        <div>{catCharges.map(renderItem)}</div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()}
           </div>
         ))}
 
