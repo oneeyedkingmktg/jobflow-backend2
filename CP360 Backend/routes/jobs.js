@@ -60,7 +60,7 @@ router.get("/", async (req, res) => {
 
     const result = await db.query(
       `SELECT j.*,
-              u.full_name AS salesman_name,
+              u.name AS salesman_name,
               c.name AS crew_name
          FROM jobs j
          LEFT JOIN users u ON u.id = j.assigned_salesman_id
