@@ -65,6 +65,7 @@ const holidaysRoutes = require("./routes/holidays");
 const blockedTimesRoutes = require("./routes/blockedTimes");
 const timeTrackingRoutes = require("./routes/timeTracking");
 const jobReportsRoutes = require("./routes/jobReports");
+const jobsRoutes = require("./routes/jobs");
 
 
 
@@ -120,6 +121,7 @@ app.use("/api/holidays", holidaysRoutes);
 app.use("/api/blocked-times", blockedTimesRoutes);
 app.use("/api/time", timeTrackingRoutes);
 app.use("/api/job-reports", authenticateToken, jobReportsRoutes);
+app.use("/api/jobs", jobsRoutes);
 
 
 

@@ -592,3 +592,32 @@ export const JobReportsAPI = {
       method: "DELETE",
     }),
 };
+
+/* ============================================================================
+   JOBS (per-lead opportunities)
+============================================================================ */
+
+export const JobsAPI = {
+  getAll: (leadId, companyId) => {
+    const params = new URLSearchParams({ lead_id: leadId });
+    if (companyId) params.set("company_id", companyId);
+    return apiRequest(`/api/jobs?${params}`);
+  },
+
+  create: (data, companyId) =>
+    apiRequest(`/api/jobs${companyId ? `?company_id=${companyId}` : ""}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id, data, companyId) =>
+    apiRequest(`/api/jobs/${id}${companyId ? `?company_id=${companyId}` : ""}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id, companyId) =>
+    apiRequest(`/api/jobs/${id}${companyId ? `?company_id=${companyId}` : ""}`, {
+      method: "DELETE",
+    }),
+};
