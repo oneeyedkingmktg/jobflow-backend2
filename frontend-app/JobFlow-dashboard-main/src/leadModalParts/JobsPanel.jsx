@@ -220,10 +220,7 @@ export default function JobsPanel({ lead, onClose }) {
   const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
 
   const editForm = (
-    <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
-      <div className="text-sm font-bold text-indigo-800">
-        {editingId ? "Edit Project" : "New Project"}
-      </div>
+    <div className="space-y-3">
 
       {/* Project Name */}
       <div>
@@ -377,7 +374,7 @@ export default function JobsPanel({ lead, onClose }) {
 
       {/* Delete — inside the expanded form only */}
       {editingId && (
-        <div className="pt-1 border-t border-indigo-200">
+        <div className="pt-1 border-t border-gray-200">
           {deleteConfirm ? (
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-red-700 font-semibold">Delete this project?</span>
@@ -430,47 +427,41 @@ export default function JobsPanel({ lead, onClose }) {
             </div>
           ) : (
             <div className="space-y-3">
-              {jobs.map((job) =>
-                editingId === job.id ? (
-                  <div key={job.id}>{editForm}</div>
-                ) : (
-                  <div
-                    key={job.id}
-                    onClick={() => openCard(job)}
-                    className="p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 hover:border-indigo-200 transition"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 text-sm truncate">{job.jobName}</div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-500"}`}>
-                            {STATUS_LABELS[job.status] || job.status}
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  onClick={() => openCard(job)}
+                  className="p-4 bg-gray-50 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-100 hover:border-indigo-200 transition"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm truncate">{job.jobName}</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-500"}`}>
+                          {STATUS_LABELS[job.status] || job.status}
+                        </span>
+                        {job.projectType && (
+                          <span className="text-xs text-gray-500">{formatProjectType(job.projectType)}</span>
+                        )}
+                        {job.contractPrice && (
+                          <span className="text-xs text-gray-500">{money(job.contractPrice)}</span>
+                        )}
+                        {job.appointmentDate && (
+                          <span className="text-xs text-gray-400">
+                            Appt {new Date(job.appointmentDate).toLocaleDateString()}
                           </span>
-                          {job.projectType && (
-                            <span className="text-xs text-gray-500">{formatProjectType(job.projectType)}</span>
-                          )}
-                          {job.contractPrice && (
-                            <span className="text-xs text-gray-500">{money(job.contractPrice)}</span>
-                          )}
-                          {job.appointmentDate && (
-                            <span className="text-xs text-gray-400">
-                              Appt {new Date(job.appointmentDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                        {(job.notes || job.description) && (
-                          <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{job.notes || job.description}</p>
                         )}
                       </div>
-                      <span className="text-gray-400 text-xs mt-1 shrink-0">›</span>
+                      {(job.notes || job.description) && (
+                        <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{job.notes || job.description}</p>
+                      )}
                     </div>
+                    <span className="text-gray-400 text-xs mt-1 shrink-0">›</span>
                   </div>
-                )
-              )}
+                </div>
+              ))}
             </div>
           )}
-
-          {isAddingNew && editForm}
 
           {!isAddingNew && !editingId && (
             <button onClick={openAdd}
@@ -488,6 +479,30 @@ export default function JobsPanel({ lead, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Project Edit / New Modal */}
+      {(editingId || isAddingNew) && (
+        <div className="fixed inset-0 z-[210] flex flex-col bg-black/60 backdrop-blur-sm">
+          <div className="flex flex-col bg-white w-full h-full max-w-lg mx-auto shadow-2xl md:rounded-2xl md:my-8 md:h-auto md:max-h-[90vh]">
+            <div className="bg-indigo-700 text-white px-6 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
+              <div>
+                <h2 className="text-lg font-bold">{isAddingNew ? "New Project" : "Edit Project"}</h2>
+                <p className="text-indigo-200 text-sm mt-0.5 truncate">{lead?.name}</p>
+              </div>
+              <button
+                onClick={isAddingNew ? cancelAdd : closeCard}
+                className="text-indigo-200 hover:text-white text-2xl leading-none px-2"
+              >×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded mb-4">{error}</div>
+              )}
+              {editForm}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* BidderPanel opens over the JobsPanel for the selected job */}
       {bidsJob && (
