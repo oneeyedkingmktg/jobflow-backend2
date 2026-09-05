@@ -1,8 +1,11 @@
 import React from "react";
 import { usePermission } from "../utils/usePermission";
+import { useCompany } from "../CompanyContext";
 
 export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhoneBlur, phoneWarning }) {
   const financialPermission = usePermission('financial_information');
+  const { currentCompany } = useCompany();
+  const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
   return (
     <div className="bg-white rounded-2xl border border-gray-200 px-5 py-5 shadow-sm space-y-4 text-sm text-gray-800">
 
@@ -117,16 +120,18 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhone
         </div>
       )}
 
-      {/* PROJECT TYPE */}
-      <div>
-        <label className="text-gray-500">Project Type</label>
-        <input
-          type="text"
-          value={form.projectType}
-          onChange={(e) => onChange("projectType", e.target.value)}
-          className="w-full mt-1 px-3 py-2 border rounded-lg"
-        />
-      </div>
+      {/* PROJECT TYPE — hidden when jobs enabled (managed per-job instead) */}
+      {!jobsEnabled && (
+        <div>
+          <label className="text-gray-500">Project Type</label>
+          <input
+            type="text"
+            value={form.projectType}
+            onChange={(e) => onChange("projectType", e.target.value)}
+            className="w-full mt-1 px-3 py-2 border rounded-lg"
+          />
+        </div>
+      )}
 
       {/* CONTRACT PRICE */}
       {financialPermission !== 'hide' && (

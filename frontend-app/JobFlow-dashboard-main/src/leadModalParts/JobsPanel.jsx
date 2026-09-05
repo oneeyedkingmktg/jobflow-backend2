@@ -1,39 +1,75 @@
 // ============================================================================
 // File: src/leadModalParts/JobsPanel.jsx
-// Multiple jobs per lead — click a card to expand/edit inline
+// Multiple jobs per lead — click card to expand/edit inline
 // ============================================================================
 
 import React, { useEffect, useState } from "react";
 import { JobsAPI } from "../api";
 import { useCompany } from "../CompanyContext";
 
-const STATUS_LABELS = {
-  appt_set: "Booked Appt",
-  sold: "Sold",
-  not_sold: "Not Sold",
-  complete: "Completed",
-};
+const PROJECT_TYPES = [
+  { value: "", label: "— Select Type —" },
+  { value: "garage_1", label: "1 Car Garage" },
+  { value: "garage_2", label: "2 Car Garage" },
+  { value: "garage_3", label: "3 Car Garage" },
+  { value: "garage_4", label: "4+ Car Garage" },
+  { value: "patio", label: "Patio" },
+  { value: "basement", label: "Basement" },
+  { value: "commercial", label: "Commercial" },
+  { value: "custom", label: "Custom Project" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "pending",   label: "Pending" },
+  { value: "appt_set",  label: "Booked Appt" },
+  { value: "sold",      label: "Sold" },
+  { value: "not_sold",  label: "Not Sold" },
+  { value: "complete",  label: "Completed" },
+];
 
 const STATUS_COLORS = {
+  pending:  "bg-purple-100 text-purple-700",
   appt_set: "bg-blue-100 text-blue-700",
-  sold: "bg-emerald-100 text-emerald-700",
+  sold:     "bg-emerald-100 text-emerald-700",
   not_sold: "bg-gray-100 text-gray-500",
   complete: "bg-slate-200 text-slate-700",
 };
 
-const EMPTY_FORM = {
-  job_name: "",
-  status: "appt_set",
-  contract_price: "",
-  start_date: "",
-  description: "",
+const STATUS_LABELS = {
+  pending:  "Pending",
+  appt_set: "Booked Appt",
+  sold:     "Sold",
+  not_sold: "Not Sold",
+  complete: "Completed",
 };
+
+function formatProjectType(type) {
+  if (!type) return null;
+  const found = PROJECT_TYPES.find((p) => p.value === type);
+  return found ? found.label : type;
+}
 
 function money(n) {
   const num = Number(n);
   if (!num) return null;
   return `$${Math.round(num).toLocaleString()}`;
 }
+
+const EMPTY_FORM = {
+  job_name: "",
+  project_type: "",
+  status: "pending",
+  appointment_date: "",
+  appointment_time: "",
+  install_date: "",
+  contract_price: "",
+  notes: "",
+  // jobsite address (prefilled from lead on add)
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+};
 
 export default function JobsPanel({ lead, onClose }) {
   const { currentCompany } = useCompany();
@@ -43,16 +79,14 @@ export default function JobsPanel({ lead, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // editingId: which job card is currently expanded (null = none)
   const [editingId, setEditingId] = useState(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showJobsiteAddress, setShowJobsiteAddress] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, [lead?.id]);
+  useEffect(() => { load(); }, [lead?.id]);
 
   const load = async () => {
     setLoading(true);
@@ -71,19 +105,28 @@ export default function JobsPanel({ lead, onClose }) {
     setEditingId(job.id);
     setIsAddingNew(false);
     setDeleteConfirm(false);
+    setShowJobsiteAddress(!!(job.address || job.city || job.state || job.zip));
     setError("");
     setForm({
       job_name: job.jobName || "",
-      status: job.status || "appt_set",
+      project_type: job.projectType || "",
+      status: job.status || "pending",
+      appointment_date: job.appointmentDate ? job.appointmentDate.split("T")[0] : "",
+      appointment_time: job.appointmentTime || "",
+      install_date: job.installDate ? job.installDate.split("T")[0] : "",
       contract_price: job.contractPrice != null ? String(job.contractPrice) : "",
-      start_date: job.startDate ? job.startDate.split("T")[0] : "",
-      description: job.description || "",
+      notes: job.notes || job.description || "",
+      address: job.address || "",
+      city: job.city || "",
+      state: job.state || "",
+      zip: job.zip || "",
     });
   };
 
   const closeCard = () => {
     setEditingId(null);
     setDeleteConfirm(false);
+    setShowJobsiteAddress(false);
     setForm(EMPTY_FORM);
     setError("");
   };
@@ -92,12 +135,21 @@ export default function JobsPanel({ lead, onClose }) {
     setIsAddingNew(true);
     setEditingId(null);
     setDeleteConfirm(false);
-    setForm(EMPTY_FORM);
+    setShowJobsiteAddress(false);
     setError("");
+    // Pre-fill jobsite address from contact
+    setForm({
+      ...EMPTY_FORM,
+      address: lead?.address || "",
+      city: lead?.city || "",
+      state: lead?.state || "",
+      zip: lead?.zip || "",
+    });
   };
 
   const cancelAdd = () => {
     setIsAddingNew(false);
+    setShowJobsiteAddress(false);
     setForm(EMPTY_FORM);
     setError("");
   };
@@ -113,10 +165,17 @@ export default function JobsPanel({ lead, onClose }) {
       const payload = {
         lead_id: lead.id,
         job_name: form.job_name.trim(),
+        project_type: form.project_type || null,
         status: form.status,
+        appointment_date: form.appointment_date || null,
+        appointment_time: form.appointment_time || null,
+        install_date: form.install_date || null,
         contract_price: form.contract_price ? parseFloat(form.contract_price) : null,
-        start_date: form.start_date || null,
-        description: form.description || null,
+        notes: form.notes || null,
+        address: form.address || null,
+        city: form.city || null,
+        state: form.state || null,
+        zip: form.zip || null,
       };
       if (editingId) {
         const res = await JobsAPI.update(editingId, payload, companyId);
@@ -145,117 +204,145 @@ export default function JobsPanel({ lead, onClose }) {
     }
   };
 
+  const f = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const inputCls = "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
+  const labelCls = "block text-xs font-semibold text-gray-700 mb-1";
+
   const editForm = (
     <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
       <div className="text-sm font-bold text-indigo-800">
         {editingId ? "Edit Job" : "New Job"}
       </div>
 
+      {/* Job Name */}
       <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-1">
-          Job Name <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={form.job_name}
-          onChange={(e) => setForm((p) => ({ ...p, job_name: e.target.value }))}
-          placeholder="e.g. Garage Floor — 3 Car"
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+        <label className={labelCls}>Job Name <span className="text-red-500">*</span></label>
+        <input type="text" value={form.job_name} onChange={f("job_name")}
+          placeholder="e.g. Garage Floor — 3 Car" className={inputCls} />
       </div>
 
+      {/* Project Type + Status */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
-            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {Object.entries(STATUS_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
+          <label className={labelCls}>Project Type</label>
+          <select value={form.project_type} onChange={f("project_type")} className={inputCls}>
+            {PROJECT_TYPES.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </div>
-
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">Contract Price</label>
-          <input
-            type="number"
-            value={form.contract_price}
-            onChange={(e) => setForm((p) => ({ ...p, contract_price: e.target.value }))}
-            placeholder="0"
-            min="0"
-            step="0.01"
-            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+          <label className={labelCls}>Status</label>
+          <select value={form.status} onChange={f("status")} className={inputCls}>
+            {STATUS_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
-        <input
-          type="date"
-          value={form.start_date}
-          onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+      {/* Appointment Date + Time */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Appointment Date</label>
+          <input type="date" value={form.appointment_date} onChange={f("appointment_date")} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Appointment Time</label>
+          <input type="time" value={form.appointment_time} onChange={f("appointment_time")} className={inputCls} />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-gray-700 mb-1">Notes</label>
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-          placeholder="Optional notes about this job…"
-          rows={2}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-        />
+      {/* Install Date + Contract Price */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Install Date</label>
+          <input type="date" value={form.install_date} onChange={f("install_date")} className={inputCls} />
+        </div>
+        <div>
+          <label className={labelCls}>Contract Price</label>
+          <input type="number" value={form.contract_price} onChange={f("contract_price")}
+            placeholder="0" min="0" step="0.01" className={inputCls} />
+        </div>
       </div>
 
+      {/* Notes */}
+      <div>
+        <label className={labelCls}>Notes</label>
+        <textarea value={form.notes} onChange={f("notes")}
+          placeholder="Optional notes…" rows={2}
+          className={`${inputCls} resize-none`} />
+      </div>
+
+      {/* Jobsite Address — small toggle */}
+      <div>
+        {!showJobsiteAddress ? (
+          <button
+            type="button"
+            onClick={() => setShowJobsiteAddress(true)}
+            className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 transition"
+          >
+            + Edit jobsite address
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-700">Jobsite Address</span>
+              <button
+                type="button"
+                onClick={() => setShowJobsiteAddress(false)}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                hide
+              </button>
+            </div>
+            <input type="text" value={form.address} onChange={f("address")}
+              placeholder="Street address" className={inputCls} />
+            <div className="grid grid-cols-3 gap-2">
+              <input type="text" value={form.city} onChange={f("city")}
+                placeholder="City" className={inputCls} />
+              <input type="text" value={form.state} onChange={f("state")}
+                placeholder="State" className={inputCls} />
+              <input type="text" value={form.zip} onChange={f("zip")}
+                placeholder="Zip" className={inputCls} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save / Cancel */}
       <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition"
-        >
+        <button onClick={handleSave} disabled={saving}
+          className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
           {saving ? "Saving…" : editingId ? "Save Changes" : "Add Job"}
         </button>
-        <button
-          onClick={editingId ? closeCard : cancelAdd}
-          disabled={saving}
-          className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition"
-        >
+        <button onClick={editingId ? closeCard : cancelAdd} disabled={saving}
+          className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
           Cancel
         </button>
       </div>
 
-      {/* Delete — only for existing jobs, lives inside the expanded form */}
+      {/* Delete — inside the expanded form only */}
       {editingId && (
         <div className="pt-1 border-t border-indigo-200">
           {deleteConfirm ? (
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-red-700 font-semibold">Delete this job?</span>
               <div className="flex gap-2">
-                <button
-                  onClick={handleDelete}
-                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition"
-                >
+                <button onClick={handleDelete}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition">
                   Yes, Delete
                 </button>
-                <button
-                  onClick={() => setDeleteConfirm(false)}
-                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300 transition"
-                >
+                <button onClick={() => setDeleteConfirm(false)}
+                  className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-300 transition">
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
-            <button
-              onClick={() => setDeleteConfirm(true)}
-              className="text-xs text-red-500 font-semibold hover:text-red-700 transition"
-            >
+            <button onClick={() => setDeleteConfirm(true)}
+              className="text-xs text-red-500 font-semibold hover:text-red-700 transition">
               Delete Job
             </button>
           )}
@@ -274,17 +361,13 @@ export default function JobsPanel({ lead, onClose }) {
             <h2 className="text-lg font-bold">Jobs</h2>
             <p className="text-indigo-200 text-sm mt-0.5 truncate">{lead?.name}</p>
           </div>
-          <button onClick={onClose} className="text-indigo-200 hover:text-white text-2xl leading-none px-2">
-            ×
-          </button>
+          <button onClick={onClose} className="text-indigo-200 hover:text-white text-2xl leading-none px-2">×</button>
         </div>
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded">
-              {error}
-            </div>
+            <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-800 text-sm rounded">{error}</div>
           )}
 
           {loading ? (
@@ -297,10 +380,8 @@ export default function JobsPanel({ lead, onClose }) {
             <div className="space-y-3">
               {jobs.map((job) =>
                 editingId === job.id ? (
-                  // EXPANDED — inline edit form
                   <div key={job.id}>{editForm}</div>
                 ) : (
-                  // COLLAPSED — clickable summary card
                   <div
                     key={job.id}
                     onClick={() => openCard(job)}
@@ -313,20 +394,20 @@ export default function JobsPanel({ lead, onClose }) {
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[job.status] || "bg-gray-100 text-gray-500"}`}>
                             {STATUS_LABELS[job.status] || job.status}
                           </span>
+                          {job.projectType && (
+                            <span className="text-xs text-gray-500">{formatProjectType(job.projectType)}</span>
+                          )}
                           {job.contractPrice && (
                             <span className="text-xs text-gray-500">{money(job.contractPrice)}</span>
                           )}
-                          {job.startDate && (
+                          {job.appointmentDate && (
                             <span className="text-xs text-gray-400">
-                              {new Date(job.startDate).toLocaleDateString()}
+                              Appt {new Date(job.appointmentDate).toLocaleDateString()}
                             </span>
                           )}
-                          {job.crewName && (
-                            <span className="text-xs text-indigo-600">{job.crewName}</span>
-                          )}
                         </div>
-                        {job.description && (
-                          <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{job.description}</p>
+                        {(job.notes || job.description) && (
+                          <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{job.notes || job.description}</p>
                         )}
                       </div>
                       <span className="text-gray-400 text-xs mt-1 shrink-0">›</span>
@@ -337,15 +418,11 @@ export default function JobsPanel({ lead, onClose }) {
             </div>
           )}
 
-          {/* ADD FORM */}
           {isAddingNew && editForm}
 
-          {/* ADD BUTTON — visible when not adding and no card is expanded */}
           {!isAddingNew && !editingId && (
-            <button
-              onClick={openAdd}
-              className="w-full py-3 bg-indigo-700 text-white rounded-xl font-semibold text-sm hover:bg-indigo-800 transition"
-            >
+            <button onClick={openAdd}
+              className="w-full py-3 bg-indigo-700 text-white rounded-xl font-semibold text-sm hover:bg-indigo-800 transition">
               + Add Job
             </button>
           )}
@@ -353,10 +430,8 @@ export default function JobsPanel({ lead, onClose }) {
 
         {/* FOOTER */}
         <div className="border-t px-6 py-4 bg-gray-50 shrink-0 md:rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition"
-          >
+          <button onClick={onClose}
+            className="w-full py-2.5 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 transition">
             Done
           </button>
         </div>

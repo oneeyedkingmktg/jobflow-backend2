@@ -379,6 +379,7 @@ const loadLeads = async () => {
         "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead").length,
         Leads: leads.filter((l) => !l.deletedAt && l.status === "lead").length,
         // Job-stage tabs count jobs by job status
+        Pending: jobs.filter((j) => j.status === "pending").length,
         "Booked Appt": jobs.filter((j) => j.status === "appt_set").length,
         Sold: jobs.filter((j) => j.status === "sold").length,
         "Not Sold": jobs.filter((j) => j.status === "not_sold").length,
@@ -402,8 +403,9 @@ const loadLeads = async () => {
   // Filtering
   // --------------------------------------------------
   // Job-mode tabs — these show job cards instead of lead cards when jobs_enabled
-  const JOB_TABS = new Set(["Booked Appt", "Sold", "Not Sold", "Completed"]);
+  const JOB_TABS = new Set(["Pending", "Booked Appt", "Sold", "Not Sold", "Completed"]);
   const JOB_STATUS_FOR_TAB = {
+    Pending: "pending",
     "Booked Appt": "appt_set",
     Sold: "sold",
     "Not Sold": "not_sold",
@@ -480,6 +482,7 @@ const loadLeads = async () => {
         counts={counts}
         onRefresh={loadLeads}
         isMasterAdmin={isMasterAdmin}
+        jobsEnabled={jobsEnabled}
         onJobReports={() => setShowJobReportPicker(true)}
 onAddLead={() => {
   if (isMasterAdmin) alert("Add Lead clicked! Company ID: " + currentCompany?.id);

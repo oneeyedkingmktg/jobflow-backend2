@@ -6,6 +6,7 @@ import { formatShortDate } from "./leadHelpers.js";
 import { formatTime } from "../utils/formatting.js";
 
 const STATUS_COLORS = {
+  pending:   "#7c3aed", // purple
   appt_set:  "#2563eb", // blue
   sold:      "#16a34a", // green
   not_sold:  "#6b7280", // gray
@@ -13,6 +14,7 @@ const STATUS_COLORS = {
 };
 
 const STATUS_LABELS = {
+  pending:  "Pending",
   appt_set: "Booked Appt",
   sold:     "Sold",
   not_sold: "Not Sold",

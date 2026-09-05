@@ -12,6 +12,7 @@ export default function LeadTabs({
   onRefresh,
   onJobReports,
   isMasterAdmin,
+  jobsEnabled,
 }) {
   const { user } = useAuth();
   const isEstimatorOnly = user?.planType === 'estimator_only';
@@ -22,6 +23,7 @@ export default function LeadTabs({
   const tabs = [
     "Pre-Leads",
     "Leads",
+    ...(jobsEnabled ? ["Pending"] : []),
     "Booked Appt",
     "Sold",
     "Not Sold",
@@ -34,12 +36,13 @@ export default function LeadTabs({
     ...(jobReportPerm !== 'hide' ? ["Job Reports"] : []),
   ];
 
-  const lockedTabs = ["Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All", "Calendar", "Sync Contacts", "Deleted"];
+  const lockedTabs = ["Leads", "Pending", "Booked Appt", "Sold", "Not Sold", "Completed", "All", "Calendar", "Sync Contacts", "Deleted"];
 
   const isStatusTab = (t) =>
     [
       "Pre-Leads",
       "Leads",
+      "Pending",
       "Booked Appt",
       "Sold",
       "Not Sold",
