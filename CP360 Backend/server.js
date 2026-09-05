@@ -506,6 +506,23 @@ async function runMigrations() {
     `INSERT INTO report_definitions (key, name, description) VALUES
       ('speed_to_lead', 'Speed to Lead', 'Average time from lead creation to first outbound call, broken down by current lead status.')
     ON CONFLICT (key) DO NOTHING`,
+    // Jobs model — company toggle
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS jobs_enabled BOOLEAN DEFAULT false`,
+    // Jobs model — project fields on jobs table
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS project_type VARCHAR(100)`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS notes TEXT`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS not_sold_reason TEXT`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appointment_date DATE`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appointment_time VARCHAR(20)`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appointment_salesman_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appointment_calendar_event_id TEXT`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_date DATE`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_end_date DATE`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_tentative BOOLEAN DEFAULT false`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_duration_days INTEGER DEFAULT 1`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_calendar_event_id TEXT`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ`,
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appt_set_at TIMESTAMPTZ`,
   ];
   for (const sql of migrations) {
     try {

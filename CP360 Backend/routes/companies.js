@@ -772,5 +772,106 @@ router.delete('/:id', requireRole('master'), async (req, res) => {
   }
 });
 
+// ============================================================================
+// POST /companies/:id/enable-jobs — master only
+// Runs once per company when jobs_enabled is first turned ON.
+// Creates one job per existing lead that has project data, copying all
+// project fields from the lead. Idempotent — skips leads that already
+// have a job. Does NOT alter lead data.
+// ============================================================================
+router.post('/:id/enable-jobs', requireRole('master'), async (req, res) => {
+  const companyId = parseInt(req.params.id, 10);
+  const client = await db.pool.connect();
+
+  const STATUS_MAP = {
+    new: 'appt_set',
+    lead: 'appt_set',
+    booked_appt: 'appt_set',
+    sold: 'sold',
+    complete: 'complete',
+    not_sold: 'not_sold',
+    status_junk: 'not_sold',
+  };
+
+  try {
+    await client.query('BEGIN');
+
+    // Fetch all non-deleted leads for this company that have project data
+    const { rows: leads } = await client.query(
+      `SELECT l.*
+         FROM leads l
+        WHERE l.company_id = $1
+          AND l.deleted_at IS NULL
+          AND (
+            l.appointment_date IS NOT NULL
+            OR l.install_date IS NOT NULL
+            OR l.contract_price IS NOT NULL
+            OR l.project_type IS NOT NULL
+            OR l.status NOT IN ('new', 'lead', 'pre_lead')
+          )`,
+      [companyId]
+    );
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const lead of leads) {
+      // Skip if this lead already has a job (idempotent)
+      const { rows: existing } = await client.query(
+        `SELECT id FROM jobs WHERE lead_id = $1 AND company_id = $2 AND deleted_at IS NULL LIMIT 1`,
+        [lead.id, companyId]
+      );
+      if (existing.length > 0) { skipped++; continue; }
+
+      const jobStatus = STATUS_MAP[lead.status] || 'appt_set';
+      const jobName = lead.project_type
+        ? lead.project_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        : 'Main Project';
+
+      await client.query(
+        `INSERT INTO jobs (
+           company_id, lead_id, job_number, job_name, status,
+           project_type, notes, not_sold_reason, contract_price,
+           appointment_date, appointment_time, appointment_salesman_id, appointment_calendar_event_id,
+           install_date, install_end_date, install_tentative, install_duration_days, install_calendar_event_id,
+           sold_at, appt_set_at,
+           created_by_user_id, created_at, updated_at
+         ) VALUES (
+           $1, $2, $3, $4, $5,
+           $6, $7, $8, $9,
+           $10, $11, $12, $13,
+           $14, $15, $16, $17, $18,
+           $19, $20,
+           $21, $22, NOW()
+         )`,
+        [
+          companyId, lead.id, `MIGRATED-${lead.id}`, jobName, jobStatus,
+          lead.project_type, lead.notes, lead.not_sold_reason, lead.contract_price,
+          lead.appointment_date, lead.appointment_time, lead.appointment_salesman_id, lead.appointment_calendar_event_id,
+          lead.install_date, lead.install_end_date, lead.install_tentative ?? false, lead.install_duration_days ?? 1, lead.install_calendar_event_id,
+          lead.sold_at, lead.appt_set_at,
+          lead.created_by_user_id, lead.created_at,
+        ]
+      );
+      created++;
+    }
+
+    // Mark company as jobs_enabled
+    await client.query(
+      `UPDATE companies SET jobs_enabled = true WHERE id = $1`,
+      [companyId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, created, skipped, total: leads.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('enable-jobs migration error:', err);
+    res.status(500).json({ error: 'Migration failed', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
 module.exports.decryptApiKey = decryptApiKey;

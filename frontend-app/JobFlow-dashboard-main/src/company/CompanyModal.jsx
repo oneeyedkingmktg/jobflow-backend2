@@ -62,6 +62,8 @@ export default function CompanyModal({
 
   // ORPHAN CHECK STATE
   const [orphanLoading, setOrphanLoading] = useState(false);
+  const [jobsMigrating, setJobsMigrating] = useState(false);
+  const [jobsMigrationResult, setJobsMigrationResult] = useState(null);
   const [orphanResults, setOrphanResults] = useState(null);
   const [orphanResyncStatus, setOrphanResyncStatus] = useState({});
   const [orphanJunkStatus, setOrphanJunkStatus] = useState({});
@@ -116,6 +118,7 @@ setForm({
   estimator_enabled: false,
   time_tracking_enabled: false,
   job_reports_enabled: false,
+  jobs_enabled: false,
   service_area_zips: "",
   est_push_title: "",
   est_push_body: "",
@@ -172,6 +175,7 @@ zip: company.zip || "",
   estimator_enabled: company.estimatorEnabled ?? company.estimator_enabled ?? false,
   time_tracking_enabled: company.timeTrackingEnabled ?? company.time_tracking_enabled ?? false,
   job_reports_enabled: company.jobReportsEnabled ?? company.job_reports_enabled ?? false,
+  jobs_enabled: company.jobsEnabled ?? company.jobs_enabled ?? false,
   est_push_title: company.est_push_title || company.estPushTitle || "",
   est_push_body: company.est_push_body || company.estPushBody || "",
   googleDriveBaseFolderId:
@@ -277,6 +281,7 @@ const rawZips = (form.service_area_zips || "").replace(/[\[\]\s]/g, " ");
         estimator_enabled: form.estimator_enabled,
         time_tracking_enabled: form.time_tracking_enabled,
         job_reports_enabled: form.job_reports_enabled,
+        jobs_enabled: form.jobs_enabled,
         est_push_title: form.est_push_title || null,
         est_push_body: form.est_push_body || null,
         timezone: form.timezone,
@@ -1050,6 +1055,49 @@ const handleSaveTracking = async () => {
                   <div className="text-sm text-gray-600">Enable job cost reports and materials tracking on leads</div>
                 </div>
               </label>
+            )}
+
+            {isMasterUser && (
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={form.jobs_enabled}
+                  disabled={jobsMigrating}
+                  onChange={async (e) => {
+                    const enabling = e.target.checked;
+                    handleChange("jobs_enabled", enabling);
+                    if (!enabling || !company?.id) return;
+                    // Turning ON — run migration immediately
+                    setJobsMigrating(true);
+                    setJobsMigrationResult(null);
+                    try {
+                      const res = await apiRequest(`/companies/${company.id}/enable-jobs`, { method: "POST" });
+                      setJobsMigrationResult({ ok: true, created: res.created, skipped: res.skipped });
+                    } catch (err) {
+                      setJobsMigrationResult({ ok: false, error: err.message });
+                      handleChange("jobs_enabled", false);
+                    } finally {
+                      setJobsMigrating(false);
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600 mt-0.5 cursor-pointer disabled:opacity-50"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-gray-900">Multi-Job Pipeline</div>
+                  <div className="text-sm text-gray-600">Enable multiple jobs per contact. Turning on runs a one-time migration that creates a job record for each existing lead.</div>
+                  {jobsMigrating && (
+                    <div className="text-xs text-indigo-600 mt-1">Running migration…</div>
+                  )}
+                  {jobsMigrationResult?.ok && (
+                    <div className="text-xs text-emerald-700 mt-1">
+                      Migration complete — {jobsMigrationResult.created} jobs created, {jobsMigrationResult.skipped} already had jobs.
+                    </div>
+                  )}
+                  {jobsMigrationResult?.ok === false && (
+                    <div className="text-xs text-red-600 mt-1">Migration failed: {jobsMigrationResult.error}</div>
+                  )}
+                </div>
+              </div>
             )}
 
             {form.plan_type === "estimator_only" && (
