@@ -317,6 +317,21 @@ router.put('/proposal/:id', async (req, res) => {
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+
+    // On acceptance, sync bid_total → contract_price on the job and on the lead
+    if (status === 'accepted' && bid_total != null) {
+      const { job_id: syncJobId, lead_id: syncLeadId } = result.rows[0];
+      const syncPrice = parseFloat(bid_total);
+      const syncs = [];
+      if (syncJobId) {
+        syncs.push(pool.query('UPDATE jobs SET contract_price = $1 WHERE id = $2', [syncPrice, syncJobId]));
+      }
+      if (syncLeadId) {
+        syncs.push(pool.query('UPDATE leads SET contract_price = $1 WHERE id = $2', [syncPrice, syncLeadId]));
+      }
+      await Promise.all(syncs);
+    }
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error('PUT /bidder/proposal/:id error:', err);
