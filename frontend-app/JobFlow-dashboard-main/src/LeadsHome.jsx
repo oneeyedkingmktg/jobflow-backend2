@@ -526,7 +526,7 @@ onAddLead={() => {
     <div className="py-10 text-center text-gray-600">Loading...</div>
   ) : jobsEnabled && JOB_TABS.has(activeTab) ? (
     filteredJobs.length === 0 ? (
-      <div className="py-10 text-center text-gray-500">No jobs found.</div>
+      <div className="py-10 text-center text-gray-500">No projects found.</div>
     ) : (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredJobs.map((job) => {

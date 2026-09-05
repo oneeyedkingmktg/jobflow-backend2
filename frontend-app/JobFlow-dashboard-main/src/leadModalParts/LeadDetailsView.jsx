@@ -309,14 +309,14 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Jobs — only visible when multi-job pipeline is enabled */}
+        {/* Projects — only visible when multi-project pipeline is enabled */}
         {!isEstimatorOnly && jobsEnabled && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowJobsPanel(true); }}
             className="px-3 py-3 bg-indigo-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-indigo-700 transition text-center leading-tight"
           >
-            Jobs
+            Projects
           </button>
         )}
 

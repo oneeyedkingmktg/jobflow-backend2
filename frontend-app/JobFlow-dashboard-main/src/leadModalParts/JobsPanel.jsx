@@ -214,12 +214,12 @@ export default function JobsPanel({ lead, onClose }) {
   const editForm = (
     <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
       <div className="text-sm font-bold text-indigo-800">
-        {editingId ? "Edit Job" : "New Job"}
+        {editingId ? "Edit Project" : "New Project"}
       </div>
 
-      {/* Job Name */}
+      {/* Project Name */}
       <div>
-        <label className={labelCls}>Job Name <span className="text-red-500">*</span></label>
+        <label className={labelCls}>Project Name <span className="text-red-500">*</span></label>
         <input type="text" value={form.job_name} onChange={f("job_name")}
           placeholder="e.g. Garage Floor — 3 Car" className={inputCls} />
       </div>
@@ -331,7 +331,7 @@ export default function JobsPanel({ lead, onClose }) {
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving}
           className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
-          {saving ? "Saving…" : editingId ? "Save Changes" : "Add Job"}
+          {saving ? "Saving…" : editingId ? "Save Changes" : "Add Project"}
         </button>
         <button onClick={editingId ? closeCard : cancelAdd} disabled={saving}
           className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
@@ -344,7 +344,7 @@ export default function JobsPanel({ lead, onClose }) {
         <div className="pt-1 border-t border-indigo-200">
           {deleteConfirm ? (
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-red-700 font-semibold">Delete this job?</span>
+              <span className="text-sm text-red-700 font-semibold">Delete this project?</span>
               <div className="flex gap-2">
                 <button onClick={handleDelete}
                   className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition">
@@ -359,7 +359,7 @@ export default function JobsPanel({ lead, onClose }) {
           ) : (
             <button onClick={() => setDeleteConfirm(true)}
               className="text-xs text-red-500 font-semibold hover:text-red-700 transition">
-              Delete Job
+              Delete Project
             </button>
           )}
         </div>
@@ -374,7 +374,7 @@ export default function JobsPanel({ lead, onClose }) {
         {/* HEADER */}
         <div className="bg-indigo-700 text-white px-6 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
           <div>
-            <h2 className="text-lg font-bold">Jobs</h2>
+            <h2 className="text-lg font-bold">Projects</h2>
             <p className="text-indigo-200 text-sm mt-0.5 truncate">{lead?.name}</p>
           </div>
           <button onClick={onClose} className="text-indigo-200 hover:text-white text-2xl leading-none px-2">×</button>
@@ -390,7 +390,7 @@ export default function JobsPanel({ lead, onClose }) {
             <div className="text-sm text-gray-400 text-center py-10">Loading…</div>
           ) : jobs.length === 0 && !isAddingNew ? (
             <div className="text-sm text-gray-400 text-center py-10 border border-dashed border-gray-200 rounded-xl">
-              No jobs yet. Add the first one below.
+              No projects yet. Add the first one below.
             </div>
           ) : (
             <div className="space-y-3">
@@ -439,7 +439,7 @@ export default function JobsPanel({ lead, onClose }) {
           {!isAddingNew && !editingId && (
             <button onClick={openAdd}
               className="w-full py-3 bg-indigo-700 text-white rounded-xl font-semibold text-sm hover:bg-indigo-800 transition">
-              + Add Job
+              + Add Project
             </button>
           )}
         </div>

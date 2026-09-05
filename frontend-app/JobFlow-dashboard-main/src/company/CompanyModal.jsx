@@ -1083,14 +1083,14 @@ const handleSaveTracking = async () => {
                   className="w-4 h-4 rounded border-gray-300 text-indigo-600 mt-0.5 cursor-pointer disabled:opacity-50"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-gray-900">Multi-Job Pipeline</div>
-                  <div className="text-sm text-gray-600">Enable multiple jobs per contact. Turning on runs a one-time migration that creates a job record for each existing lead.</div>
+                  <div className="text-sm font-semibold text-gray-900">Multi-Project Pipeline</div>
+                  <div className="text-sm text-gray-600">Enable multiple projects per contact. Turning on runs a one-time migration that creates a project record for each existing lead.</div>
                   {jobsMigrating && (
                     <div className="text-xs text-indigo-600 mt-1">Running migration…</div>
                   )}
                   {jobsMigrationResult?.ok && (
                     <div className="text-xs text-emerald-700 mt-1">
-                      Migration complete — {jobsMigrationResult.created} jobs created, {jobsMigrationResult.skipped} already had jobs.
+                      Migration complete — {jobsMigrationResult.created} projects created, {jobsMigrationResult.skipped} already had projects.
                     </div>
                   )}
                   {jobsMigrationResult?.ok === false && (
