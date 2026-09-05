@@ -113,7 +113,7 @@ export default function JobsPanel({ lead, onClose }) {
     setEditingId(job.id);
     setIsAddingNew(false);
     setDeleteConfirm(false);
-    setShowJobsiteAddress(!!(job.address || job.city || job.state || job.zip));
+    setShowJobsiteAddress(false);
     setError("");
     setForm({
       job_name: job.jobName || "",
@@ -352,7 +352,7 @@ export default function JobsPanel({ lead, onClose }) {
               className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
               {saving ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => handleSave(onClose)} disabled={saving}
+            <button onClick={() => handleSave(closeCard)} disabled={saving}
               className="flex-1 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800 disabled:opacity-50 transition">
               {saving ? "Saving…" : "Save & Exit"}
             </button>
