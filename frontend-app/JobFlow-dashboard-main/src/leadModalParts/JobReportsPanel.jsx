@@ -102,7 +102,7 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-gray-900 text-base">{isEdit ? "Edit Time Entry" : "Add Time Entry"}</h3>
@@ -243,7 +243,7 @@ function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, canEdit, 
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
         <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
           style={{ maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
           <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
@@ -348,7 +348,7 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
 
   return (
     <>
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
         <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
           style={{ maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
           <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
@@ -1032,7 +1032,7 @@ export default function JobReportsPanel({ lead, job, onClose }) {
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:bg-black/50 md:p-6">
+    <div className="fixed inset-0 z-[220] flex flex-col md:items-center md:justify-center md:bg-black/50 md:p-6">
       <div className="flex-1 md:flex-none bg-white flex flex-col overflow-hidden md:max-w-2xl md:w-full md:max-h-[90vh] md:rounded-2xl md:shadow-2xl">
       {/* Header */}
       <div className="bg-[#1a2e5a] text-white px-4 py-4 flex items-center gap-3 shrink-0">
