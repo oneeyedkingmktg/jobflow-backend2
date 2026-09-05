@@ -188,12 +188,14 @@ export default function JobsPanel({ lead, onClose }) {
       if (editingId) {
         const res = await JobsAPI.update(editingId, payload, companyId);
         setJobs((prev) => prev.map((j) => (j.id === editingId ? res.job : j)));
+        if (afterSave) afterSave();
       } else {
         const res = await JobsAPI.create(payload, companyId);
         setJobs((prev) => [...prev, res.job]);
-        cancelAdd();
+        // Transition into edit mode so action buttons appear; don't close form
+        setIsAddingNew(false);
+        setEditingId(res.job.id);
       }
-      if (afterSave) afterSave();
     } catch (err) {
       setError(err.message || "Failed to save job");
     } finally {
@@ -319,48 +321,59 @@ export default function JobsPanel({ lead, onClose }) {
         )}
       </div>
 
-      {/* Project action buttons — only on existing jobs */}
-      {editingId && (
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setBidsJob(job); }}
-            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
-          >
-            View / Create Bids
+      {/* Action buttons + save controls — layout differs for new vs existing */}
+      {editingId ? (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setBidsJob(job); }}
+              className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+            >
+              View / Create Bids
+            </button>
+            <button
+              type="button"
+              onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setLaborJob(job); }}
+              className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+            >
+              Manage Labor
+            </button>
+            <button
+              type="button"
+              onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setReportJob(job); }}
+              className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+            >
+              Project Report
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => handleSave()} disabled={saving}
+              className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => handleSave(onClose)} disabled={saving}
+              className="flex-1 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800 disabled:opacity-50 transition">
+              {saving ? "Saving…" : "Save & Exit"}
+            </button>
+            <button onClick={closeCard} disabled={saving}
+              className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => handleSave()} disabled={saving}
+            className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
+            {saving ? "Saving…" : "Add Project"}
           </button>
-          <button
-            type="button"
-            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setLaborJob(job); }}
-            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
-          >
-            Manage Labor
-          </button>
-          <button
-            type="button"
-            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setReportJob(job); }}
-            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
-          >
-            Project Report
+          <button onClick={cancelAdd} disabled={saving}
+            className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
+            Cancel
           </button>
         </div>
       )}
-
-      {/* Save / Save & Exit / Cancel */}
-      <div className="flex gap-2">
-        <button onClick={() => handleSave()} disabled={saving}
-          className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
-          {saving ? "Saving…" : editingId ? "Save" : "Add Project"}
-        </button>
-        <button onClick={() => handleSave(onClose)} disabled={saving}
-          className="flex-1 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800 disabled:opacity-50 transition">
-          {saving ? "Saving…" : "Save & Exit"}
-        </button>
-        <button onClick={editingId ? closeCard : cancelAdd} disabled={saving}
-          className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
-          Cancel
-        </button>
-      </div>
 
       {/* Delete — inside the expanded form only */}
       {editingId && (
