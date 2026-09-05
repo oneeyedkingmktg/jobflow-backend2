@@ -372,14 +372,13 @@ const loadLeads = async () => {
   // --------------------------------------------------
   // Counts
   // --------------------------------------------------
-  // Set of lead IDs that have at least one job (used to remove them from Pre-Lead/Lead tabs)
-  const leadIdsWithJobs = useMemo(() => new Set(jobs.map((j) => j.leadId)), [jobs]);
-
   const counts = useMemo(() => {
     if (jobsEnabled) {
       return {
-        "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead" && !leadIdsWithJobs.has(l.id)).length,
-        Leads: leads.filter((l) => !l.deletedAt && l.status === "lead" && !leadIdsWithJobs.has(l.id)).length,
+        // Pre-Lead/Lead show ALL contacts at those statuses regardless of whether they have jobs
+        "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead").length,
+        Leads: leads.filter((l) => !l.deletedAt && l.status === "lead").length,
+        // Job-stage tabs count jobs by job status
         "Booked Appt": jobs.filter((j) => j.status === "appt_set").length,
         Sold: jobs.filter((j) => j.status === "sold").length,
         "Not Sold": jobs.filter((j) => j.status === "not_sold").length,
@@ -398,7 +397,7 @@ const loadLeads = async () => {
       All: leads.filter((l) => !l.deletedAt && l.status !== "status_junk").length,
       Deleted: leads.filter((l) => l.deletedAt).length,
     };
-  }, [leads, jobs, jobsEnabled, leadIdsWithJobs]);
+  }, [leads, jobs, jobsEnabled]);
   // --------------------------------------------------
   // Filtering
   // --------------------------------------------------
@@ -429,14 +428,11 @@ const loadLeads = async () => {
         if (lead.deletedAt) return false;
       }
 
-      // In jobs mode, Pre-Leads and Leads tabs hide contacts that already have a job
-      const hasJob = jobsEnabled && leadIdsWithJobs.has(lead.id);
-
       const matchesTab =
         activeTab === "All" ||
         activeTab === "Deleted" ||
-        (activeTab === "Pre-Leads" && lead.status === "status_pre_lead" && !hasJob) ||
-        (activeTab === "Leads" && lead.status === "lead" && !hasJob) ||
+        (activeTab === "Pre-Leads" && lead.status === "status_pre_lead") ||
+        (activeTab === "Leads" && lead.status === "lead") ||
         (!jobsEnabled && activeTab === "Booked Appt" && lead.status === "appointment_set") ||
         (!jobsEnabled && activeTab === "Sold" && lead.status === "sold") ||
         (!jobsEnabled && activeTab === "Not Sold" && lead.status === "not_sold") ||
@@ -450,7 +446,7 @@ const loadLeads = async () => {
 
       return matchesTab && matchesSearch;
     });
-  }, [leads, activeTab, searchTerm, isMasterAdmin, includeJunk, jobsEnabled, leadIdsWithJobs]);
+  }, [leads, activeTab, searchTerm, isMasterAdmin, includeJunk, jobsEnabled]);
 
   const filteredJobs = useMemo(() => {
     if (!jobsEnabled || !JOB_TABS.has(activeTab)) return [];

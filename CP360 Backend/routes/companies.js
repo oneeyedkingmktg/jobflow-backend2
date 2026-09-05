@@ -796,19 +796,15 @@ router.post('/:id/enable-jobs', requireRole('master'), async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Fetch all non-deleted leads for this company that have project data
+    // Only migrate leads that have reached an actual project stage.
+    // Pre-leads and plain leads do NOT get auto-jobs — a job is created manually
+    // when the contractor starts working the project.
     const { rows: leads } = await client.query(
       `SELECT l.*
          FROM leads l
         WHERE l.company_id = $1
           AND l.deleted_at IS NULL
-          AND (
-            l.appointment_date IS NOT NULL
-            OR l.install_date IS NOT NULL
-            OR l.contract_price IS NOT NULL
-            OR l.project_type IS NOT NULL
-            OR l.status NOT IN ('new', 'lead', 'pre_lead')
-          )`,
+          AND l.status IN ('appointment_set', 'booked_appt', 'sold', 'not_sold', 'complete')`,
       [companyId]
     );
 
