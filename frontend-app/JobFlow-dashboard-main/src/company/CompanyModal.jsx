@@ -219,6 +219,12 @@ setGhlForm({
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
     sipDomain: company.sipDomain || company.sip_domain || "",
+    ghlPipelineId:   company.ghlPipelineId   || company.ghl_pipeline_id   || "",
+    ghlStagePending: company.ghlStagePending  || company.ghl_stage_pending  || "",
+    ghlStageApptSet: company.ghlStageApptSet  || company.ghl_stage_appt_set || "",
+    ghlStageSold:    company.ghlStageSold     || company.ghl_stage_sold     || "",
+    ghlStageNotSold: company.ghlStageNotSold  || company.ghl_stage_not_sold || "",
+    ghlStageComplete:company.ghlStageComplete || company.ghl_stage_complete || "",
   });
     
     console.log("🔍 setGhlForm called with data");
