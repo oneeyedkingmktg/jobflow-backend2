@@ -39,6 +39,7 @@ export default function LeadModal({
   onServiceCallsChange,
 }) {
   const { currentCompany } = useCompany();
+  const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
   const softphone = useSoftphone();
 
   const initialFormRef = useRef(null);
@@ -258,24 +259,29 @@ const handlePauseSave = (pauseFields) => {
 
 
           <div className="px-6 py-6 space-y-5">
-            <LeadStatusBar
-              form={form}
-              setForm={setForm}
-              onOpenNotSold={() => setShowNotSoldModal(true)}
-              onOpenApptModal={() => setShowApptModal(true)}
-              onOpenInstallModal={() => setShowDateModal("installDate")}
-            />
+            {/* Status bar + appointment section hidden in jobs mode — managed per-job */}
+            {!jobsEnabled && (
+              <LeadStatusBar
+                form={form}
+                setForm={setForm}
+                onOpenNotSold={() => setShowNotSoldModal(true)}
+                onOpenApptModal={() => setShowApptModal(true)}
+                onOpenInstallModal={() => setShowDateModal("installDate")}
+              />
+            )}
 
             <LeadAddressBox form={form} onOpenMaps={handleOpenMaps} />
 
             <LeadContactSection form={form} />
 
-            <LeadAppointmentSection
-              form={form}
-              setShowApptModal={setShowApptModal}
-              setShowDateModal={setShowDateModal}
-              onServiceCallsChange={onServiceCallsChange}
-            />
+            {!jobsEnabled && (
+              <LeadAppointmentSection
+                form={form}
+                setShowApptModal={setShowApptModal}
+                setShowDateModal={setShowDateModal}
+                onServiceCallsChange={onServiceCallsChange}
+              />
+            )}
 
             {isEditing ? (
               <LeadDetailsEdit

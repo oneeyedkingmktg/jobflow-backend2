@@ -137,14 +137,17 @@ const hasEstimate = form?.hasEstimate === true;
           </div>
         )}
 
-        <div>
-          <span className="text-gray-500 block">Project Type</span>
-          <span className="font-semibold break-words">
-            {formatProjectType(form.projectType)}
-          </span>
-        </div>
+        {/* Project type and contract price live on jobs when jobs_enabled */}
+        {!jobsEnabled && (
+          <div>
+            <span className="text-gray-500 block">Project Type</span>
+            <span className="font-semibold break-words">
+              {formatProjectType(form.projectType)}
+            </span>
+          </div>
+        )}
 
-        {financialPermission !== 'hide' && (
+        {!jobsEnabled && financialPermission !== 'hide' && (
           <div>
             <span className="text-gray-500 block">Contract Price</span>
             <span className="font-semibold break-words">
@@ -187,7 +190,7 @@ const hasEstimate = form?.hasEstimate === true;
           </span>
         </div>
 
-        {(form.dateCompleted || form.date_completed) && (
+        {!jobsEnabled && (form.dateCompleted || form.date_completed) && (
           <div>
             <span className="text-gray-500 block">Install Completed</span>
             <span className="font-semibold break-words">

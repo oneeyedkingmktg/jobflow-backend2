@@ -133,8 +133,8 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhone
         </div>
       )}
 
-      {/* CONTRACT PRICE */}
-      {financialPermission !== 'hide' && (
+      {/* CONTRACT PRICE — hidden when jobs_enabled (managed per-job) */}
+      {!jobsEnabled && financialPermission !== 'hide' && (
         <div>
           <label className="text-gray-500">Contract Price</label>
           {financialPermission === 'view' ? (
