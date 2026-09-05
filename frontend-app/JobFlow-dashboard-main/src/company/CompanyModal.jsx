@@ -7,7 +7,7 @@ console.log("📂 CompanyModal.jsx file loaded");
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
-import { apiRequest } from "../api";
+import { apiRequest, GhlAPI } from "../api";
 import { REPORT_CONTENT } from "../reports/ReportContents";
 import UsersHome from "../users/UsersHome";
 import EstimatorPricingModal from "./EstimatorPricingModal";
@@ -59,6 +59,11 @@ export default function CompanyModal({
   // REPORTS STATE
   const [reportDefs, setReportDefs] = useState(null);
   const [openReport, setOpenReport] = useState(null);
+
+  // PIPELINE STATE
+  const [pipelines, setPipelines] = useState([]);
+  const [pipelinesLoading, setPipelinesLoading] = useState(false);
+  const [pipelinesError, setPipelinesError] = useState("");
 
   // ORPHAN CHECK STATE
   const [orphanLoading, setOrphanLoading] = useState(false);
@@ -137,6 +142,12 @@ setGhlForm({
   ghlInstallTitleTemplate: "",
   ghlApptDescriptionTemplate: "",
   ghlInstallDescriptionTemplate: "",
+  ghlPipelineId: "",
+  ghlStagePending: "",
+  ghlStageApptSet: "",
+  ghlStageSold: "",
+  ghlStageNotSold: "",
+  ghlStageComplete: "",
 });
 
     setSuspendedTouched(false);
@@ -348,6 +359,12 @@ if (ghlForm.ghlInstallDescriptionTemplate) {
     
     payload.sip_domain = ghlForm.sipDomain || null;
     payload.google_drive_base_folder_id = form.googleDriveBaseFolderId || null;
+    payload.ghl_pipeline_id    = ghlForm.ghlPipelineId   || null;
+    payload.ghl_stage_pending  = ghlForm.ghlStagePending  || null;
+    payload.ghl_stage_appt_set = ghlForm.ghlStageApptSet  || null;
+    payload.ghl_stage_sold     = ghlForm.ghlStageSold     || null;
+    payload.ghl_stage_not_sold = ghlForm.ghlStageNotSold  || null;
+    payload.ghl_stage_complete = ghlForm.ghlStageComplete  || null;
 
     await onSave(payload);
     setError("");
@@ -1345,6 +1362,100 @@ const renderGHLKeys = () => {
           </div>
         </div>
 
+        {/* Pipeline / Opportunity Sync */}
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-gray-700">Project Pipeline Sync</h4>
+            <button
+              type="button"
+              disabled={pipelinesLoading}
+              onClick={async () => {
+                setPipelinesLoading(true);
+                setPipelinesError("");
+                try {
+                  const data = await GhlAPI.getPipelines(company?.id);
+                  const list = data?.pipelines || data?.pipeline || [];
+                  setPipelines(Array.isArray(list) ? list : []);
+                  if (!list.length) setPipelinesError("No pipelines found in this GHL location.");
+                } catch (e) {
+                  setPipelinesError("Failed to load pipelines. Check API key and location ID.");
+                } finally {
+                  setPipelinesLoading(false);
+                }
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {pipelinesLoading ? "Loading…" : "Load Pipelines"}
+            </button>
+          </div>
+
+          {pipelinesError && (
+            <p className="text-xs text-red-600 mb-3">{pipelinesError}</p>
+          )}
+
+          <p className="text-xs text-gray-500 mb-4">
+            When a project is created or its status changes, JobFlow will create or update a GHL opportunity in the selected pipeline.
+          </p>
+
+          {/* Pipeline selector */}
+          <div className="mb-3">
+            <div className={viewLabel}>PIPELINE</div>
+            {pipelines.length > 0 ? (
+              <select
+                className={editBox}
+                value={ghlForm.ghlPipelineId}
+                onChange={(e) => {
+                  handleGhlChange("ghlPipelineId", e.target.value);
+                  // Clear stage selections when pipeline changes
+                  ["ghlStagePending","ghlStageApptSet","ghlStageSold","ghlStageNotSold","ghlStageComplete"]
+                    .forEach(k => handleGhlChange(k, ""));
+                }}
+              >
+                <option value="">— Select a pipeline —</option>
+                {pipelines.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={editBox}
+                value={ghlForm.ghlPipelineId}
+                onChange={(e) => handleGhlChange("ghlPipelineId", e.target.value)}
+                placeholder="Click Load Pipelines or paste pipeline ID"
+              />
+            )}
+          </div>
+
+          {/* Stage mapping */}
+          {(() => {
+            const selectedPipeline = pipelines.find(p => p.id === ghlForm.ghlPipelineId);
+            const stages = selectedPipeline?.stages || [];
+            const StageSelect = ({ field, label }) => (
+              <div className="mb-2">
+                <div className={viewLabel}>{label}</div>
+                {stages.length > 0 ? (
+                  <select className={editBox} value={ghlForm[field]} onChange={(e) => handleGhlChange(field, e.target.value)}>
+                    <option value="">— Select stage —</option>
+                    {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                ) : (
+                  <input className={editBox} value={ghlForm[field]} onChange={(e) => handleGhlChange(field, e.target.value)} placeholder="Stage ID" />
+                )}
+              </div>
+            );
+            return (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Map each project status to a pipeline stage:</p>
+                <StageSelect field="ghlStagePending"  label="PENDING → STAGE" />
+                <StageSelect field="ghlStageApptSet"  label="BOOKED APPT → STAGE" />
+                <StageSelect field="ghlStageSold"     label="SOLD → STAGE" />
+                <StageSelect field="ghlStageNotSold"  label="NOT SOLD → STAGE" />
+                <StageSelect field="ghlStageComplete" label="COMPLETED → STAGE" />
+              </div>
+            );
+          })()}
+        </div>
+
       </div>
     );
   };
@@ -1392,6 +1503,12 @@ setGhlForm({
     ghlApptDescriptionTemplate: company.ghlApptDescriptionTemplate ?? "",
     ghlInstallDescriptionTemplate: company.ghlInstallDescriptionTemplate ?? "",
     sipDomain: company.sipDomain || company.sip_domain || "",
+    ghlPipelineId:   company.ghlPipelineId   || company.ghl_pipeline_id   || "",
+    ghlStagePending: company.ghlStagePending  || company.ghl_stage_pending  || "",
+    ghlStageApptSet: company.ghlStageApptSet  || company.ghl_stage_appt_set || "",
+    ghlStageSold:    company.ghlStageSold     || company.ghl_stage_sold     || "",
+    ghlStageNotSold: company.ghlStageNotSold  || company.ghl_stage_not_sold || "",
+    ghlStageComplete:company.ghlStageComplete || company.ghl_stage_complete || "",
   });
 }}
 

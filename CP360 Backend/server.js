@@ -527,6 +527,14 @@ async function runMigrations() {
     `ALTER TABLE lead_assignments ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
     `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
     `ALTER TABLE job_cost_entries ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
+    // Phase 6 — GHL opportunity sync
+    `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ghl_opportunity_id TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_pipeline_id TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_pending TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_appt_set TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_sold TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_not_sold TEXT`,
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_complete TEXT`,
   ];
   for (const sql of migrations) {
     try {

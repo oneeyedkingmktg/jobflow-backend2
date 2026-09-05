@@ -6,6 +6,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
+const ghlAPI = require("../controllers/ghlAPI");
 const { authenticateToken } = require("../middleware/auth");
 
 router.use(authenticateToken);
@@ -218,7 +219,43 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    res.status(201).json({ job: toCamel(result.rows[0]) });
+    const newJob = result.rows[0];
+    res.status(201).json({ job: toCamel(newJob) });
+
+    // GHL opportunity create — fire and forget after response sent
+    setImmediate(async () => {
+      try {
+        const [companyRow, leadRow] = await Promise.all([
+          db.query(
+            `SELECT ghl_api_key, ghl_location_id, ghl_pipeline_id, ghl_stage_pending
+               FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+            [companyId]
+          ),
+          db.query(
+            `SELECT ghl_contact_id FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+            [lead_id]
+          ),
+        ]);
+        const company = companyRow.rows[0];
+        const lead = leadRow.rows[0];
+        if (!company?.ghl_pipeline_id || !company?.ghl_stage_pending) return;
+        if (!lead?.ghl_contact_id) return;
+
+        const opp = await ghlAPI.createOpportunity(company, {
+          contactId: lead.ghl_contact_id,
+          pipelineId: company.ghl_pipeline_id,
+          stageId: company.ghl_stage_pending,
+          name: job_name.trim(),
+          monetaryValue: contract_price || null,
+        });
+        const oppId = opp?.opportunity?.id || opp?.id;
+        if (oppId) {
+          await db.query(`UPDATE jobs SET ghl_opportunity_id = $1 WHERE id = $2`, [oppId, newJob.id]);
+        }
+      } catch (e) {
+        console.error("GHL create opportunity error:", e.message);
+      }
+    });
   } catch (err) {
     console.error("POST /api/jobs error:", err);
     res.status(500).json({ error: "Failed to create job" });
@@ -310,7 +347,39 @@ router.put("/:id", async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: "Job not found" });
 
-    res.json({ job: toCamel(result.rows[0]) });
+    const updatedJob = result.rows[0];
+    res.json({ job: toCamel(updatedJob) });
+
+    // GHL stage sync on status change — fire and forget
+    if (status && updatedJob.ghl_opportunity_id) {
+      setImmediate(async () => {
+        try {
+          const companyRow = await db.query(
+            `SELECT ghl_api_key, ghl_location_id, ghl_pipeline_id,
+                    ghl_stage_pending, ghl_stage_appt_set, ghl_stage_sold,
+                    ghl_stage_not_sold, ghl_stage_complete
+               FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+            [companyId]
+          );
+          const company = companyRow.rows[0];
+          if (!company?.ghl_pipeline_id) return;
+
+          const stageMap = {
+            pending:  company.ghl_stage_pending,
+            appt_set: company.ghl_stage_appt_set,
+            sold:     company.ghl_stage_sold,
+            not_sold: company.ghl_stage_not_sold,
+            complete: company.ghl_stage_complete,
+          };
+          const stageId = stageMap[status];
+          if (!stageId) return;
+
+          await ghlAPI.updateOpportunityStage(company, updatedJob.ghl_opportunity_id, stageId);
+        } catch (e) {
+          console.error("GHL update opportunity stage error:", e.message);
+        }
+      });
+    }
   } catch (err) {
     console.error("PUT /api/jobs/:id error:", err);
     res.status(500).json({ error: "Failed to update job" });

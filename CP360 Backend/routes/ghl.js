@@ -87,6 +87,34 @@ router.get("/calendars", async (req, res) => {
 });
 
 // ============================================================================
+// LIST PIPELINES FOR A LOCATION
+// GET /ghl/pipelines — uses JWT auth, resolves company from token
+// ============================================================================
+
+router.get("/pipelines", async (req, res) => {
+  try {
+    const companyId =
+      req.user.role === "master"
+        ? parseInt(req.query.company_id, 10) || req.user.company_id
+        : req.user.company_id;
+
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const companyResult = await db.query(
+      `SELECT id, ghl_api_key, ghl_location_id FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+      [companyId]
+    );
+    if (!companyResult.rows.length) return res.status(404).json({ error: "Company not found" });
+
+    const result = await ghl.listPipelines(companyResult.rows[0]);
+    return res.json(result);
+  } catch (err) {
+    console.error("GHL pipelines error:", err);
+    return res.status(500).json({ error: "Failed to fetch GHL pipelines" });
+  }
+});
+
+// ============================================================================
 // SEARCH CONTACT BY PHONE
 // GET /ghl/search-by-phone?phone=xxx
 // ============================================================================

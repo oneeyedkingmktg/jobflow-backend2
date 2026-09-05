@@ -508,6 +508,12 @@ show_conversations = COALESCE($22, show_conversations),
   time_tracking_enabled = COALESCE($41, time_tracking_enabled),
   visualizer_enabled = COALESCE($43, visualizer_enabled),
   jobs_enabled = CASE WHEN $44::boolean IS NOT NULL THEN $44::boolean ELSE jobs_enabled END,
+  ghl_pipeline_id  = COALESCE($45, ghl_pipeline_id),
+  ghl_stage_pending  = COALESCE($46, ghl_stage_pending),
+  ghl_stage_appt_set = COALESCE($47, ghl_stage_appt_set),
+  ghl_stage_sold     = COALESCE($48, ghl_stage_sold),
+  ghl_stage_not_sold = COALESCE($49, ghl_stage_not_sold),
+  ghl_stage_complete = COALESCE($50, ghl_stage_complete),
   updated_at = CURRENT_TIMESTAMP
  WHERE id = $24 AND deleted_at IS NULL
  RETURNING *`
@@ -557,6 +563,12 @@ service_area_zips ? JSON.stringify(service_area_zips) : null, // $29
   zipsExplicitlyProvided,                                      // $42
   visualizer_enabled ?? null,                                  // $43
   typeof req.body.jobs_enabled === 'boolean' ? req.body.jobs_enabled : null, // $44
+  req.body.ghl_pipeline_id   || null,  // $45
+  req.body.ghl_stage_pending   || null, // $46
+  req.body.ghl_stage_appt_set  || null, // $47
+  req.body.ghl_stage_sold      || null, // $48
+  req.body.ghl_stage_not_sold  || null, // $49
+  req.body.ghl_stage_complete  || null, // $50
 ]
 
 );

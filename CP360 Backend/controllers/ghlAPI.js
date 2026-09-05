@@ -1631,9 +1631,40 @@ async function syncEventToCalendar(lead, company, calendarId, calendarType, cont
 // ----------------------------------------------------------------------------
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
+// ============================================================================
+// GHL OPPORTUNITY / PIPELINE API
+// ============================================================================
+
+async function listPipelines(company) {
+  return ghlRequest(company, `/opportunities/pipelines`, { method: "GET" });
+}
+
+async function createOpportunity(company, { contactId, pipelineId, stageId, name, monetaryValue }) {
+  const body = {
+    pipelineId,
+    locationId: company.ghl_location_id,
+    name,
+    pipelineStageId: stageId,
+    contactId,
+    status: "open",
+  };
+  if (monetaryValue != null && !isNaN(monetaryValue)) body.monetaryValue = parseFloat(monetaryValue);
+  return ghlRequest(company, `/opportunities/`, { method: "POST", body: JSON.stringify(body) });
+}
+
+async function updateOpportunityStage(company, opportunityId, stageId) {
+  return ghlRequest(company, `/opportunities/${opportunityId}`, {
+    method: "PUT",
+    body: JSON.stringify({ pipelineStageId: stageId }),
+  });
+}
+
 module.exports = {
   syncLeadCalendarEvent,
   listCalendars,
+  listPipelines,
+  createOpportunity,
+  updateOpportunityStage,
   deleteGhlContact,
   applyStatusTags,
   removeStatusTags,

@@ -446,6 +446,10 @@ export const GhlAPI = {
     const url = companyId ? `/ghl/calendars?company_id=${companyId}` : "/ghl/calendars";
     return apiRequest(url);
   },
+  getPipelines: (companyId) => {
+    const url = companyId ? `/ghl/pipelines?company_id=${companyId}` : "/ghl/pipelines";
+    return apiRequest(url);
+  },
 };
 
 /* ============================================================================
