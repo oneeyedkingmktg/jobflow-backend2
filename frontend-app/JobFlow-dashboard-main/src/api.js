@@ -598,6 +598,11 @@ export const JobReportsAPI = {
 ============================================================================ */
 
 export const JobsAPI = {
+  getPipeline: (companyId) => {
+    const params = companyId ? `?company_id=${companyId}` : "";
+    return apiRequest(`/api/jobs/pipeline${params}`);
+  },
+
   getAll: (leadId, companyId) => {
     const params = new URLSearchParams({ lead_id: leadId });
     if (companyId) params.set("company_id", companyId);

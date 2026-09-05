@@ -48,6 +48,75 @@ const toCamel = (row) => ({
 });
 
 // ============================================================================
+// GET /api/jobs/pipeline — all jobs for the pipeline view (with contact info)
+// Must be declared before /:id routes to avoid Express matching 'pipeline' as an id
+// ============================================================================
+router.get("/pipeline", async (req, res) => {
+  try {
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const result = await db.query(
+      `SELECT j.*,
+              l.full_name   AS contact_name,
+              l.first_name  AS contact_first_name,
+              l.last_name   AS contact_last_name,
+              l.phone       AS contact_phone,
+              l.city        AS contact_city,
+              l.state       AS contact_state,
+              l.email       AS contact_email,
+              l.ghl_contact_id,
+              u.name        AS salesman_name,
+              c.name        AS crew_name
+         FROM jobs j
+         JOIN leads l ON l.id = j.lead_id
+         LEFT JOIN users u ON u.id = j.appointment_salesman_id
+         LEFT JOIN crews c ON c.id = j.primary_crew_id
+        WHERE j.company_id = $1
+          AND j.deleted_at IS NULL
+          AND l.deleted_at IS NULL
+        ORDER BY j.created_at DESC`,
+      [companyId]
+    );
+
+    const jobs = result.rows.map((row) => ({
+      id: row.id,
+      companyId: row.company_id,
+      leadId: row.lead_id,
+      jobNumber: row.job_number,
+      jobName: row.job_name,
+      status: row.status,
+      projectType: row.project_type,
+      contractPrice: row.contract_price,
+      notes: row.notes,
+      notSoldReason: row.not_sold_reason,
+      appointmentDate: row.appointment_date,
+      appointmentTime: row.appointment_time,
+      installDate: row.install_date,
+      installEndDate: row.install_end_date,
+      installTentative: row.install_tentative,
+      installDurationDays: row.install_duration_days,
+      soldAt: row.sold_at,
+      createdAt: row.created_at,
+      // Contact info from leads join
+      contactName: row.contact_name || `${row.contact_first_name || ""} ${row.contact_last_name || ""}`.trim(),
+      contactPhone: row.contact_phone,
+      contactCity: row.contact_city,
+      contactState: row.contact_state,
+      contactEmail: row.contact_email,
+      ghlContactId: row.ghl_contact_id,
+      salesmanName: row.salesman_name,
+      crewName: row.crew_name,
+    }));
+
+    res.json({ jobs });
+  } catch (err) {
+    console.error("GET /api/jobs/pipeline error:", err);
+    res.status(500).json({ error: "Failed to load pipeline jobs" });
+  }
+});
+
+// ============================================================================
 // GET /api/jobs?lead_id=X — all jobs for a lead
 // ============================================================================
 router.get("/", async (req, res) => {

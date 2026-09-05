@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { apiRequest, LeadsAPI, CrewsAPI, UsersAPI, PermissionRolesAPI } from "./api";
+import { apiRequest, LeadsAPI, CrewsAPI, UsersAPI, PermissionRolesAPI, JobsAPI } from "./api";
 
 import LeadModal from "./LeadModal.jsx";
 import CalendarView from "./CalendarView.jsx";
@@ -21,6 +21,7 @@ import LeadTabs from "./leadComponents/LeadTabs.jsx";
 import JobReportPickerModal from "./leadModalParts/JobReportPickerModal.jsx";
 import LeadSearchBar from "./leadComponents/LeadSearchBar.jsx";
 import LeadCard from "./leadComponents/LeadCard.jsx";
+import JobPipelineCard from "./leadComponents/JobPipelineCard.jsx";
 
 import { normalizePhone } from "./leadComponents/leadHelpers.js";
 
@@ -159,7 +160,9 @@ export default function LeadsHome() {
   const isMasterAdmin = user?.role === "master";
 
   const [leads, setLeads] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [activeTab, setActiveTab] = useState("Pre-Leads");
+  const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
   const [selectedLead, setSelectedLead] = useState(null);
   const [isNewLead, setIsNewLead] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -198,6 +201,16 @@ const loadLeads = async () => {
       setLeads(rawLeads.map(convertLeadFromBackend));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadJobs = async () => {
+    if (!currentCompany?.id || !jobsEnabled) return;
+    try {
+      const data = await JobsAPI.getPipeline(currentCompany.id);
+      setJobs(data.jobs || []);
+    } catch {
+      setJobs([]);
     }
   };
 
@@ -281,6 +294,7 @@ const loadLeads = async () => {
   useEffect(() => {
     if (!currentCompany?.id) return;
     loadLeads();
+    loadJobs();
     refreshServiceCalls();
     loadHolidays();
     loadBlockedTimes();
@@ -358,8 +372,23 @@ const loadLeads = async () => {
   // --------------------------------------------------
   // Counts
   // --------------------------------------------------
-const counts = useMemo(
-    () => ({
+  // Set of lead IDs that have at least one job (used to remove them from Pre-Lead/Lead tabs)
+  const leadIdsWithJobs = useMemo(() => new Set(jobs.map((j) => j.leadId)), [jobs]);
+
+  const counts = useMemo(() => {
+    if (jobsEnabled) {
+      return {
+        "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead" && !leadIdsWithJobs.has(l.id)).length,
+        Leads: leads.filter((l) => !l.deletedAt && l.status === "lead" && !leadIdsWithJobs.has(l.id)).length,
+        "Booked Appt": jobs.filter((j) => j.status === "appt_set").length,
+        Sold: jobs.filter((j) => j.status === "sold").length,
+        "Not Sold": jobs.filter((j) => j.status === "not_sold").length,
+        Completed: jobs.filter((j) => j.status === "complete").length,
+        All: leads.filter((l) => !l.deletedAt && l.status !== "status_junk").length,
+        Deleted: leads.filter((l) => l.deletedAt).length,
+      };
+    }
+    return {
       "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead").length,
       Leads: leads.filter((l) => !l.deletedAt && l.status === "lead").length,
       "Booked Appt": leads.filter((l) => !l.deletedAt && l.status === "appointment_set").length,
@@ -368,55 +397,77 @@ const counts = useMemo(
       Completed: leads.filter((l) => !l.deletedAt && l.status === "complete").length,
       All: leads.filter((l) => !l.deletedAt && l.status !== "status_junk").length,
       Deleted: leads.filter((l) => l.deletedAt).length,
-    }),
-    [leads]
-  );
+    };
+  }, [leads, jobs, jobsEnabled, leadIdsWithJobs]);
   // --------------------------------------------------
   // Filtering
   // --------------------------------------------------
-const filteredLeads = useMemo(() => {
+  // Job-mode tabs — these show job cards instead of lead cards when jobs_enabled
+  const JOB_TABS = new Set(["Booked Appt", "Sold", "Not Sold", "Completed"]);
+  const JOB_STATUS_FOR_TAB = {
+    "Booked Appt": "appt_set",
+    Sold: "sold",
+    "Not Sold": "not_sold",
+    Completed: "complete",
+  };
+
+  const filteredLeads = useMemo(() => {
     const term = searchTerm.toLowerCase();
     const digits = normalizePhone(searchTerm);
 
+    // When jobs_enabled and on a job-mode tab, leads list is not rendered — skip filtering
+    if (jobsEnabled && JOB_TABS.has(activeTab)) return [];
+
     return leads.filter((lead) => {
-      // Exclude junk leads unless "Include Junk" checkbox is checked
       if (lead.status === "status_junk" && !includeJunk) return false;
-      
-      // Handle deleted leads visibility
+
       if (activeTab === "Deleted") {
-        // Deleted tab: show ONLY deleted contacts
         if (!lead.deletedAt) return false;
       } else if (searchTerm) {
-        // When searching: master can see deleted, others cannot
         if (lead.deletedAt && !isMasterAdmin) return false;
       } else {
-        // Normal tabs (not searching): EXCLUDE deleted contacts
         if (lead.deletedAt) return false;
       }
+
+      // In jobs mode, Pre-Leads and Leads tabs hide contacts that already have a job
+      const hasJob = jobsEnabled && leadIdsWithJobs.has(lead.id);
 
       const matchesTab =
         activeTab === "All" ||
         activeTab === "Deleted" ||
-        (activeTab === "Pre-Leads" && lead.status === "status_pre_lead") ||
-        (activeTab === "Leads" && lead.status === "lead") ||
-        (activeTab === "Booked Appt" && lead.status === "appointment_set") ||
-        (activeTab === "Sold" && lead.status === "sold") ||
-        (activeTab === "Not Sold" && lead.status === "not_sold") ||
-        (activeTab === "Completed" && lead.status === "complete");
+        (activeTab === "Pre-Leads" && lead.status === "status_pre_lead" && !hasJob) ||
+        (activeTab === "Leads" && lead.status === "lead" && !hasJob) ||
+        (!jobsEnabled && activeTab === "Booked Appt" && lead.status === "appointment_set") ||
+        (!jobsEnabled && activeTab === "Sold" && lead.status === "sold") ||
+        (!jobsEnabled && activeTab === "Not Sold" && lead.status === "not_sold") ||
+        (!jobsEnabled && activeTab === "Completed" && lead.status === "complete");
 
-const matchesSearch =
-  !searchTerm ||
-  `${lead.firstName || ""} ${lead.lastName || ""}`
-    .toLowerCase()
-    .includes(term) ||
-  lead.city?.toLowerCase().includes(term) ||
-  (digits && normalizePhone(lead.phone || "").includes(digits));
-
-
+      const matchesSearch =
+        !searchTerm ||
+        `${lead.firstName || ""} ${lead.lastName || ""}`.toLowerCase().includes(term) ||
+        lead.city?.toLowerCase().includes(term) ||
+        (digits && normalizePhone(lead.phone || "").includes(digits));
 
       return matchesTab && matchesSearch;
     });
-  }, [leads, activeTab, searchTerm, isMasterAdmin, includeJunk]);
+  }, [leads, activeTab, searchTerm, isMasterAdmin, includeJunk, jobsEnabled, leadIdsWithJobs]);
+
+  const filteredJobs = useMemo(() => {
+    if (!jobsEnabled || !JOB_TABS.has(activeTab)) return [];
+    const targetStatus = JOB_STATUS_FOR_TAB[activeTab];
+    const term = searchTerm.toLowerCase();
+    const digits = normalizePhone(searchTerm);
+    return jobs.filter((job) => {
+      if (job.status !== targetStatus) return false;
+      if (!searchTerm) return true;
+      return (
+        (job.contactName || "").toLowerCase().includes(term) ||
+        (job.jobName || "").toLowerCase().includes(term) ||
+        (job.contactCity || "").toLowerCase().includes(term) ||
+        (digits && normalizePhone(job.contactPhone || "").includes(digits))
+      );
+    });
+  }, [jobs, activeTab, searchTerm, jobsEnabled]);
 
   // --------------------------------------------------
   // Render
@@ -474,6 +525,25 @@ onAddLead={() => {
     />
   ) : loading ? (
     <div className="py-10 text-center text-gray-600">Loading...</div>
+  ) : jobsEnabled && JOB_TABS.has(activeTab) ? (
+    filteredJobs.length === 0 ? (
+      <div className="py-10 text-center text-gray-500">No jobs found.</div>
+    ) : (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredJobs.map((job) => {
+          const lead = leads.find((l) => l.id === job.leadId);
+          return (
+            <JobPipelineCard
+              key={job.id}
+              job={job}
+              onClick={() => {
+                if (lead) { setSelectedLead(lead); setIsNewLead(false); }
+              }}
+            />
+          );
+        })}
+      </div>
+    )
   ) : filteredLeads.length === 0 ? (
     <div className="py-10 text-center text-gray-500">No leads found.</div>
   ) : (
@@ -542,6 +612,7 @@ onSave={async (data) => {
   }
 
   await loadLeads();
+  loadJobs();
   return res.lead;
 }}
 onSaveAndExit={async (data) => {
