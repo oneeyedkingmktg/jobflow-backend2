@@ -106,6 +106,35 @@ const clean = (v) => (v === '' || v === undefined ? null : v);
 // PROPOSALS
 // ============================================================================
 
+// GET /api/bidder/proposals/by-job/:jobId — all proposals for a specific job
+router.get('/proposals/by-job/:jobId', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { jobId } = req.params;
+
+    const result = await pool.query(
+      `SELECT id, bid_name, bid_description, status, presented_date, accepted_date,
+              bid_total, created_at, updated_at, paid_at, final_paid_at
+       FROM bidder_proposals
+       WHERE job_id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)
+       ORDER BY
+         CASE status
+           WHEN 'pending'  THEN 1
+           WHEN 'accepted' THEN 2
+           ELSE 3
+         END,
+         presented_date DESC NULLS LAST,
+         created_at DESC`,
+      [jobId, companyId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /bidder/proposals/by-job error:', err);
+    res.status(500).json({ error: 'Failed to fetch proposals' });
+  }
+});
+
 // GET /api/bidder/proposals/:leadId — all proposals for a lead (selection screen)
 router.get('/proposals/:leadId', async (req, res) => {
   try {
@@ -193,7 +222,7 @@ router.post('/proposal', async (req, res) => {
     const companyId = req.user.company_id || parseInt(req.body.company_id) || null;
     const salesman = req.body.salesman || req.user.name || req.user.email || '';
     const {
-      lead_id, bid_name, bid_description, status = 'pending',
+      lead_id, job_id, bid_name, bid_description, status = 'pending',
       presented_date, accepted_date, install_crew, install_date,
       install_date_tbd = false, output_mode = 'lump_sum',
       customer_notes, internal_notes, bid_total = 0,
@@ -208,17 +237,17 @@ router.post('/proposal', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO bidder_proposals (
-        lead_id, company_id, bid_name, bid_description, status,
+        lead_id, job_id, company_id, bid_name, bid_description, status,
         presented_date, accepted_date, salesman, install_crew, install_date,
         install_date_tbd, output_mode, customer_notes, internal_notes,
         bid_total, down_payment_type, down_payment_value, down_payment_amount,
         balance_due, payment_url, include_payment_button, proposal_design_id,
         created_by_user_id
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
       ) RETURNING *`,
       [
-        lead_id, companyId, bid_name, clean(bid_description), status,
+        lead_id, job_id || null, companyId, bid_name, clean(bid_description), status,
         clean(presented_date), clean(accepted_date), salesman, clean(install_crew),
         clean(install_date), install_date_tbd, output_mode,
         clean(customer_notes), clean(internal_notes),

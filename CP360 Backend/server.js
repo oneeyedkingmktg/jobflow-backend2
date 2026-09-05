@@ -523,6 +523,7 @@ async function runMigrations() {
     `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS install_calendar_event_id TEXT`,
     `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ`,
     `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appt_set_at TIMESTAMPTZ`,
+    `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
   ];
   for (const sql of migrations) {
     try {

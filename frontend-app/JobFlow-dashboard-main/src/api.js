@@ -360,6 +360,7 @@ export const LeadsAPI = {
 export const BidderAPI = {
   // Proposals
   getProposals: (leadId) => apiRequest(`/api/bidder/proposals/${leadId}`),
+  getProposalsByJob: (jobId) => apiRequest(`/api/bidder/proposals/by-job/${jobId}`),
   getProposal: (id) => apiRequest(`/api/bidder/proposal/${id}`),
   createProposal: (data) => apiRequest('/api/bidder/proposal', { method: 'POST', body: JSON.stringify(data) }),
   updateProposal: (id, data) => apiRequest(`/api/bidder/proposal/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

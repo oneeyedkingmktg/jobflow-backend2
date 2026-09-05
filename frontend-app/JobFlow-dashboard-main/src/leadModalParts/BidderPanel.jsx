@@ -29,7 +29,8 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function BidderPanel({ lead, onClose }) {
+// job prop is optional — when provided, bids are scoped to that job
+export default function BidderPanel({ lead, job, onClose }) {
   const { user } = useAuth();
   const financialPermission = usePermission('financial_information');
   const [bids, setBids]           = useState([]);
@@ -44,7 +45,9 @@ export default function BidderPanel({ lead, onClose }) {
   async function loadBids() {
     setLoading(true);
     try {
-      const data = await BidderAPI.getProposals(lead.id);
+      const data = job
+        ? await BidderAPI.getProposalsByJob(job.id)
+        : await BidderAPI.getProposals(lead.id);
       setBids(data);
     } catch (e) {
       console.error('Failed to load bids', e);
@@ -58,6 +61,7 @@ export default function BidderPanel({ lead, onClose }) {
     try {
       const proposal = await BidderAPI.createProposal({
         lead_id: lead.id,
+        ...(job ? { job_id: job.id } : {}),
         company_id: lead.companyId,
         bid_name: `Bid ${bids.length + 1}`,
         status: 'pending',
@@ -101,7 +105,9 @@ export default function BidderPanel({ lead, onClose }) {
         <div className="bg-blue-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">Bids</h2>
-            <p className="text-blue-200 text-sm">{lead.name || lead.fullName}</p>
+            <p className="text-blue-200 text-sm">
+              {job ? job.jobName : (lead.name || lead.fullName)}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button

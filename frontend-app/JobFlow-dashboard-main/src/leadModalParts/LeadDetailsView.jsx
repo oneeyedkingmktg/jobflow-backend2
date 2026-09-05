@@ -287,8 +287,8 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Bids */}
-        {!isEstimatorOnly && bidderEnabled && bidderPermission !== 'hide' && (
+        {/* Bids — hidden when jobs enabled (bids are accessed per-job from JobsPanel) */}
+        {!isEstimatorOnly && bidderEnabled && bidderPermission !== 'hide' && !jobsEnabled && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowBidderPanel(true); }}

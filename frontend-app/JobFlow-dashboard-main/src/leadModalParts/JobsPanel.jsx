@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { JobsAPI } from "../api";
 import { useCompany } from "../CompanyContext";
+import BidderPanel from "./BidderPanel";
 
 const PROJECT_TYPES = [
   { value: "", label: "— Select Type —" },
@@ -85,6 +86,7 @@ export default function JobsPanel({ lead, onClose }) {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showJobsiteAddress, setShowJobsiteAddress] = useState(false);
+  const [bidsJob, setBidsJob] = useState(null); // job to open BidderPanel for
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -311,6 +313,20 @@ export default function JobsPanel({ lead, onClose }) {
         )}
       </div>
 
+      {/* Bids button — only on existing jobs */}
+      {editingId && (
+        <button
+          type="button"
+          onClick={() => {
+            const job = jobs.find((j) => j.id === editingId);
+            if (job) setBidsJob(job);
+          }}
+          className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
+        >
+          View / Create Bids
+        </button>
+      )}
+
       {/* Save / Cancel */}
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving}
@@ -436,6 +452,15 @@ export default function JobsPanel({ lead, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* BidderPanel opens over the JobsPanel for the selected job */}
+      {bidsJob && (
+        <BidderPanel
+          lead={lead}
+          job={bidsJob}
+          onClose={() => setBidsJob(null)}
+        />
+      )}
     </div>
   );
 }
