@@ -259,16 +259,14 @@ const handlePauseSave = (pauseFields) => {
 
 
           <div className="px-6 py-6 space-y-5">
-            {/* Status bar + appointment section hidden in jobs mode — managed per-job */}
-            {!jobsEnabled && (
-              <LeadStatusBar
-                form={form}
-                setForm={setForm}
-                onOpenNotSold={() => setShowNotSoldModal(true)}
-                onOpenApptModal={() => setShowApptModal(true)}
-                onOpenInstallModal={() => setShowDateModal("installDate")}
-              />
-            )}
+            <LeadStatusBar
+              form={form}
+              setForm={setForm}
+              jobsEnabled={jobsEnabled}
+              onOpenNotSold={() => setShowNotSoldModal(true)}
+              onOpenApptModal={() => setShowApptModal(true)}
+              onOpenInstallModal={() => setShowDateModal("installDate")}
+            />
 
             <LeadAddressBox form={form} onOpenMaps={handleOpenMaps} />
 

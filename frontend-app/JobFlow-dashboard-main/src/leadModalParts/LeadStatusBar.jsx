@@ -7,6 +7,7 @@ import { usePermission } from "../utils/usePermission";
 export default function LeadStatusBar({
   form,
   setForm,
+  jobsEnabled,
   onOpenNotSold,
   onOpenApptModal,
   onOpenInstallModal,
@@ -207,6 +208,47 @@ export default function LeadStatusBar({
       </button>
     );
   };
+
+  // Jobs mode: only pre_lead ↔ lead transitions allowed; pipeline is job-driven
+  if (jobsEnabled) {
+    const isPreLead = currentStatus === "status_pre_lead";
+    const isLead = currentStatus === "lead";
+    if (!isPreLead && !isLead) return null;
+    return (
+      <div className="flex items-center justify-between gap-3 w-full">
+        <div className="flex flex-col">
+          <div className="text-black text-[10px] uppercase font-semibold mb-1" style={{ paddingLeft: "25px" }}>
+            CONTACT STATUS
+          </div>
+          <div
+            className="rounded-2xl px-6 py-3 text-white font-semibold shadow text-base"
+            style={{ backgroundColor: STATUS_COLORS[currentStatus] }}
+          >
+            {STATUS_LABELS[currentStatus]}
+          </div>
+        </div>
+        {leadMgmtPermission === 'edit' && isPreLead && (
+          <button
+            onClick={() => setStatus("lead")}
+            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
+            style={{ backgroundColor: STATUS_COLORS["lead"] }}
+          >
+            <span className="text-[10px] uppercase opacity-80">move to</span>
+            <span className="text-sm font-semibold">{">>"} Lead</span>
+          </button>
+        )}
+        {leadMgmtPermission === 'edit' && (
+          <button
+            onClick={() => guardedSetStatus("status_junk")}
+            className="py-3 px-4 rounded-lg text-white shadow text-sm font-semibold"
+            style={{ backgroundColor: STATUS_COLORS["status_junk"] }}
+          >
+            Junk
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
