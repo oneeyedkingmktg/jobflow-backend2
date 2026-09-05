@@ -162,7 +162,7 @@ export default function JobsPanel({ lead, onClose }) {
     setError("");
   };
 
-  const handleSave = async () => {
+  const handleSave = async (afterSave) => {
     if (!form.job_name.trim()) {
       setError("Job name is required.");
       return;
@@ -188,12 +188,12 @@ export default function JobsPanel({ lead, onClose }) {
       if (editingId) {
         const res = await JobsAPI.update(editingId, payload, companyId);
         setJobs((prev) => prev.map((j) => (j.id === editingId ? res.job : j)));
-        closeCard();
       } else {
         const res = await JobsAPI.create(payload, companyId);
         setJobs((prev) => [...prev, res.job]);
         cancelAdd();
       }
+      if (afterSave) afterSave();
     } catch (err) {
       setError(err.message || "Failed to save job");
     } finally {
@@ -346,11 +346,15 @@ export default function JobsPanel({ lead, onClose }) {
         </div>
       )}
 
-      {/* Save / Cancel */}
+      {/* Save / Save & Exit / Cancel */}
       <div className="flex gap-2">
-        <button onClick={handleSave} disabled={saving}
+        <button onClick={() => handleSave()} disabled={saving}
           className="flex-1 py-2.5 bg-indigo-700 text-white rounded-lg font-semibold text-sm hover:bg-indigo-800 disabled:opacity-50 transition">
-          {saving ? "Saving…" : editingId ? "Save Changes" : "Add Project"}
+          {saving ? "Saving…" : editingId ? "Save" : "Add Project"}
+        </button>
+        <button onClick={() => handleSave(onClose)} disabled={saving}
+          className="flex-1 py-2.5 bg-green-700 text-white rounded-lg font-semibold text-sm hover:bg-green-800 disabled:opacity-50 transition">
+          {saving ? "Saving…" : "Save & Exit"}
         </button>
         <button onClick={editingId ? closeCard : cancelAdd} disabled={saving}
           className="py-2.5 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-300 disabled:opacity-50 transition">
