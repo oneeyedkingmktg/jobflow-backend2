@@ -1378,7 +1378,7 @@ const renderGHLKeys = () => {
                   setPipelines(Array.isArray(list) ? list : []);
                   if (!list.length) setPipelinesError("No pipelines found in this GHL location.");
                 } catch (e) {
-                  setPipelinesError("Failed to load pipelines. Check API key and location ID.");
+                  setPipelinesError(e.message || "Failed to load pipelines. Check API key and location ID.");
                 } finally {
                   setPipelinesLoading(false);
                 }

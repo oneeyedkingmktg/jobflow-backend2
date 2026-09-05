@@ -1636,7 +1636,11 @@ async function syncEventToCalendar(lead, company, calendarId, calendarType, cont
 // ============================================================================
 
 async function listPipelines(company) {
-  return ghlRequest(company, `/opportunities/pipelines`, { method: "GET" });
+  // locationId is a required query param for the GHL pipelines endpoint
+  return ghlRequest(company, `/opportunities/pipelines`, {
+    method: "GET",
+    params: { locationId: company.ghl_location_id },
+  });
 }
 
 async function createOpportunity(company, { contactId, pipelineId, stageId, name, monetaryValue }) {
@@ -1649,13 +1653,14 @@ async function createOpportunity(company, { contactId, pipelineId, stageId, name
     status: "open",
   };
   if (monetaryValue != null && !isNaN(monetaryValue)) body.monetaryValue = parseFloat(monetaryValue);
-  return ghlRequest(company, `/opportunities/`, { method: "POST", body: JSON.stringify(body) });
+  // Pass body as object — ghlRequest does the JSON.stringify internally
+  return ghlRequest(company, `/opportunities/`, { method: "POST", body });
 }
 
 async function updateOpportunityStage(company, opportunityId, stageId) {
   return ghlRequest(company, `/opportunities/${opportunityId}`, {
     method: "PUT",
-    body: JSON.stringify({ pipelineStageId: stageId }),
+    body: { pipelineStageId: stageId },
   });
 }
 

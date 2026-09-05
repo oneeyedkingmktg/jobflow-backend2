@@ -109,8 +109,8 @@ router.get("/pipelines", async (req, res) => {
     const result = await ghl.listPipelines(companyResult.rows[0]);
     return res.json(result);
   } catch (err) {
-    console.error("GHL pipelines error:", err);
-    return res.status(500).json({ error: "Failed to fetch GHL pipelines" });
+    console.error("GHL pipelines error:", err.message || err);
+    return res.status(500).json({ error: err.message || "Failed to fetch GHL pipelines" });
   }
 });
 
