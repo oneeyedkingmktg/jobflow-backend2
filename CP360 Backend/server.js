@@ -524,6 +524,9 @@ async function runMigrations() {
     `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ`,
     `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS appt_set_at TIMESTAMPTZ`,
     `ALTER TABLE bidder_proposals ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
+    `ALTER TABLE lead_assignments ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
+    `ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
+    `ALTER TABLE job_cost_entries ADD COLUMN IF NOT EXISTS job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL`,
   ];
   for (const sql of migrations) {
     try {

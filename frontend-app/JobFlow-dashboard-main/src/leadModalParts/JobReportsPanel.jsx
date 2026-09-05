@@ -998,7 +998,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
 // ============================================================================
 // MAIN PANEL
 // ============================================================================
-export default function JobReportsPanel({ lead, onClose }) {
+export default function JobReportsPanel({ lead, job, onClose }) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
   const companyId = user?.role === "master" ? (currentCompany?.id || currentCompany?.companyId) : null;
@@ -1045,8 +1045,12 @@ export default function JobReportsPanel({ lead, onClose }) {
           </svg>
         </button>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-base truncate">{lead.name}</div>
-          <div className="text-white/60 text-xs mt-0.5">Job Report</div>
+          <div className="font-bold text-base truncate">
+            {job ? job.jobName : lead.name}
+          </div>
+          <div className="text-white/60 text-xs mt-0.5">
+            {job ? `Project Report — ${lead.name}` : "Job Report"}
+          </div>
         </div>
       </div>
 

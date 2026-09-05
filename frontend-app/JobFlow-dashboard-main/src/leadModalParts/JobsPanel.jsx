@@ -5,8 +5,11 @@
 
 import React, { useEffect, useState } from "react";
 import { JobsAPI } from "../api";
+import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import BidderPanel from "./BidderPanel";
+import LeadTeamPanel from "./LeadTeamPanel";
+import JobReportsPanel from "./JobReportsPanel";
 
 const PROJECT_TYPES = [
   { value: "", label: "— Select Type —" },
@@ -73,6 +76,7 @@ const EMPTY_FORM = {
 };
 
 export default function JobsPanel({ lead, onClose }) {
+  const { user } = useAuth();
   const { currentCompany } = useCompany();
   const companyId = currentCompany?.id || currentCompany?.companyId || null;
 
@@ -86,7 +90,9 @@ export default function JobsPanel({ lead, onClose }) {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showJobsiteAddress, setShowJobsiteAddress] = useState(false);
-  const [bidsJob, setBidsJob] = useState(null); // job to open BidderPanel for
+  const [bidsJob, setBidsJob] = useState(null);
+  const [laborJob, setLaborJob] = useState(null);
+  const [reportJob, setReportJob] = useState(null);
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -313,18 +319,31 @@ export default function JobsPanel({ lead, onClose }) {
         )}
       </div>
 
-      {/* Bids button — only on existing jobs */}
+      {/* Project action buttons — only on existing jobs */}
       {editingId && (
-        <button
-          type="button"
-          onClick={() => {
-            const job = jobs.find((j) => j.id === editingId);
-            if (job) setBidsJob(job);
-          }}
-          className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
-        >
-          View / Create Bids
-        </button>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setBidsJob(job); }}
+            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+          >
+            View / Create Bids
+          </button>
+          <button
+            type="button"
+            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setLaborJob(job); }}
+            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+          >
+            Manage Labor
+          </button>
+          <button
+            type="button"
+            onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setReportJob(job); }}
+            className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+          >
+            Project Report
+          </button>
+        </div>
       )}
 
       {/* Save / Cancel */}
@@ -459,6 +478,26 @@ export default function JobsPanel({ lead, onClose }) {
           lead={lead}
           job={bidsJob}
           onClose={() => setBidsJob(null)}
+        />
+      )}
+
+      {/* LeadTeamPanel opens for the selected project */}
+      {laborJob && (
+        <LeadTeamPanel
+          lead={lead}
+          job={laborJob}
+          companyId={companyId}
+          currentUser={user}
+          onClose={() => setLaborJob(null)}
+        />
+      )}
+
+      {/* JobReportsPanel opens for the selected project */}
+      {reportJob && (
+        <JobReportsPanel
+          lead={lead}
+          job={reportJob}
+          onClose={() => setReportJob(null)}
         />
       )}
     </div>

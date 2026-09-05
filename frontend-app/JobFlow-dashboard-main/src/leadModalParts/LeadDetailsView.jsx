@@ -298,8 +298,8 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Manage Labor */}
-        {!isEstimatorOnly && manageLaborPermission !== 'hide' && (
+        {/* Manage Labor — hidden in jobs mode (accessed per-project) */}
+        {!isEstimatorOnly && manageLaborPermission !== 'hide' && !jobsEnabled && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowTeamPanel(true); }}
@@ -320,8 +320,8 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Job Report */}
-        {!isEstimatorOnly && jobReportPermission !== 'hide' && (
+        {/* Job Report — hidden in jobs mode (accessed per-project) */}
+        {!isEstimatorOnly && jobReportPermission !== 'hide' && !jobsEnabled && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowJobReports(true); }}

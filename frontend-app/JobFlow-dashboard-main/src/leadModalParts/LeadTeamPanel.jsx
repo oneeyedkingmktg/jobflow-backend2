@@ -29,7 +29,7 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-export default function LeadTeamPanel({ lead, companyId, currentUser, onClose }) {
+export default function LeadTeamPanel({ lead, job, companyId, currentUser, onClose }) {
   const leadId = lead?.id;
   const canClockIn = currentUser?.role === "admin" || currentUser?.role === "master";
   const cq = companyId ? `?company_id=${companyId}` : "";
@@ -322,7 +322,9 @@ export default function LeadTeamPanel({ lead, companyId, currentUser, onClose })
         <div className="bg-blue-700 text-white px-6 py-4 flex items-center justify-between shrink-0 md:rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold">Manage Labor</h2>
-            <p className="text-blue-200 text-sm mt-0.5 truncate">{lead?.name}</p>
+            <p className="text-blue-200 text-sm mt-0.5 truncate">
+              {job ? `${job.jobName} — ${lead?.name}` : lead?.name}
+            </p>
           </div>
           <button
             onClick={onClose}
