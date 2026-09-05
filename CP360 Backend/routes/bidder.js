@@ -318,15 +318,18 @@ router.put('/proposal/:id', async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // On acceptance, sync bid_total → contract_price on the job and on the lead
-    if (status === 'accepted' && bid_total != null) {
+    // On acceptance: sync bid_total → contract_price; set job status → sold
+    if (status === 'accepted') {
       const { job_id: syncJobId, lead_id: syncLeadId } = result.rows[0];
-      const syncPrice = parseFloat(bid_total);
+      const syncPrice = bid_total != null ? parseFloat(bid_total) : null;
       const syncs = [];
       if (syncJobId) {
-        syncs.push(pool.query('UPDATE jobs SET contract_price = $1 WHERE id = $2', [syncPrice, syncJobId]));
+        syncs.push(pool.query(
+          `UPDATE jobs SET contract_price = COALESCE($1, contract_price), status = 'sold' WHERE id = $2`,
+          [syncPrice, syncJobId]
+        ));
       }
-      if (syncLeadId) {
+      if (syncLeadId && syncPrice != null) {
         syncs.push(pool.query('UPDATE leads SET contract_price = $1 WHERE id = $2', [syncPrice, syncLeadId]));
       }
       await Promise.all(syncs);
