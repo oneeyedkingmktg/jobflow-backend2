@@ -33,6 +33,7 @@ const hasEstimate = form?.hasEstimate === true;
   const manageLaborPermission = usePermission('manage_labor');
   const jobReportPermission = usePermission('job_report');
   const visualizerPermission = usePermission('visualizer');
+  const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
   const bidderEnabled = currentCompany?.bidderEnabled ?? currentCompany?.bidder_enabled ?? false;
   const visualizerEnabled = (currentCompany?.visualizerEnabled ?? currentCompany?.visualizer_enabled ?? false) && visualizerPermission !== 'hide';
   const [outOfAreaActionDone, setOutOfAreaActionDone] = useState(null); // 'accepted' | 'declined'
@@ -305,8 +306,8 @@ const hasEstimate = form?.hasEstimate === true;
           </button>
         )}
 
-        {/* Jobs */}
-        {!isEstimatorOnly && (
+        {/* Jobs — only visible when multi-job pipeline is enabled */}
+        {!isEstimatorOnly && jobsEnabled && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowJobsPanel(true); }}
