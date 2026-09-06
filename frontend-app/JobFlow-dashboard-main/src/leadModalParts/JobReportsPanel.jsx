@@ -316,6 +316,10 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
   const [showLogModal, setShowLogModal] = useState(false);
 
   useEffect(() => {
+    setRows(employees.map((e) => ({ ...e, wageInput: e.effective_wage > 0 ? String(e.effective_wage) : "" })));
+  }, [employees]);
+
+  useEffect(() => {
     setLoadingUsers(true);
     JobReportsAPI.getUsers(companyId)
       .then((data) => setCompanyUsers(data.users || []))
@@ -1161,7 +1165,7 @@ export default function JobReportsPanel({ lead, job, onClose }) {
           employees={summary.labor.employees}
           canEdit={canEdit}
           onClose={() => setShowTimeEntries(false)}
-          onWageChange={() => { setShowTimeEntries(false); loadSummary(); }}
+          onWageChange={loadSummary}
         />
       )}
 
