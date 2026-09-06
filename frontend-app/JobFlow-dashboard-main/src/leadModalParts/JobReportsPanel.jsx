@@ -469,23 +469,19 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
 // ============================================================================
 // MATERIALS FORM
 // ============================================================================
+const noSpin = "appearance-none [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden";
+
 function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
-  const [materials, setMaterials] = useState([]);
-  const [library, setLibrary] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addMode, setAddMode] = useState("library");
-  const [selectedCatId, setSelectedCatId] = useState("");
-  const [selectedItemId, setSelectedItemId] = useState("");
-  const [form, setForm] = useState({
-    name: "", qty: "1", unit: "", unit_cost: "", notes: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", qty: "", unit: "", unit_cost: "", notes: "" });
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [expandedPickerCats, setExpandedPickerCats] = useState({});
-  const [expandedMatCats, setExpandedMatCats] = useState({});
+  const [materials, setMaterials]   = useState([]);
+  const [library, setLibrary]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [loadVer, setLoadVer]       = useState(0);
+  const [importing, setImporting]   = useState(false);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [addMode, setAddMode]       = useState("library");
+  const [expandedCats, setExpandedCats] = useState({});
+  const [addForm, setAddForm]       = useState({ name: "", qty: "1", unit: "", unit_cost: "" });
+  const [saving, setSaving]         = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -496,6 +492,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
       ]);
       setMaterials(mats.materials || []);
       setLibrary(Array.isArray(lib) ? lib : []);
+      setLoadVer(v => v + 1);
     } catch (err) {
       console.error("Materials load error:", err);
     } finally {
@@ -505,39 +502,55 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleLibraryItemSelect = (itemId) => {
-    setSelectedItemId(itemId);
-    if (!itemId) return;
-    const allItems = library.flatMap((c) => c.items || []);
-    const item = allItems.find((i) => String(i.id) === String(itemId));
-    if (item) {
-      setForm((f) => ({
-        ...f,
-        name: item.name,
-        unit: item.default_unit_label || "",
-        unit_cost: item.default_unit_price !== undefined ? String(item.default_unit_price) : "",
-      }));
+  const handleImportFromBid = async () => {
+    setImporting(true);
+    try {
+      const result = await JobReportsAPI.importFromBid(leadId, companyId);
+      if (!result?.imported) { alert("No items found in the accepted bid."); return; }
+      await load();
+      onUpdate();
+    } catch (err) {
+      alert(err.message || "No accepted bid found for this job.");
+    } finally {
+      setImporting(false);
     }
   };
 
-  const handleSubmit = async () => {
-    if (!form.name.trim()) return;
+  const handleBlur = async (m, field, value) => {
+    const updates = {};
+    updates[field] = field === "unit" ? value : (parseFloat(value) || 0);
+    try {
+      await JobReportsAPI.updateMaterial(leadId, m.id, updates, companyId);
+      await load();
+      onUpdate();
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Remove this material?")) return;
+    await JobReportsAPI.deleteMaterial(leadId, id, companyId);
+    setMaterials(prev => prev.filter(m => m.id !== id));
+    onUpdate();
+  };
+
+  const handleLibraryPick = (item) => {
+    setAddForm({ name: item.name, qty: "1", unit: item.default_unit_label || "", unit_cost: String(item.default_unit_price || "") });
+  };
+
+  const handleAdd = async () => {
+    if (!addForm.name.trim()) return;
     setSaving(true);
     try {
-      const payload = {
-        name: form.name.trim(),
-        qty: parseFloat(form.qty) || 1,
-        unit: form.unit || null,
-        unit_cost: parseFloat(form.unit_cost) || 0,
-        notes: form.notes || null,
-      };
-      await JobReportsAPI.addMaterial(leadId, payload, companyId);
-      setShowAddForm(false);
-      setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "" });
-      setSelectedCatId("");
-      setSelectedItemId("");
-      setAddMode("library");
-      setExpandedPickerCats({});
+      await JobReportsAPI.addMaterial(leadId, {
+        name: addForm.name.trim(),
+        qty: parseFloat(addForm.qty) || 1,
+        unit: addForm.unit || null,
+        unit_cost: parseFloat(addForm.unit_cost) || 0,
+      }, companyId);
+      setAddForm({ name: "", qty: "1", unit: "", unit_cost: "" });
+      setShowAdd(false);
       await load();
       onUpdate();
     } catch (err) {
@@ -547,274 +560,168 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Remove this material?")) return;
-    try {
-      await JobReportsAPI.deleteMaterial(leadId, id, companyId);
-      await load();
-      onUpdate();
-    } catch (err) {
-      console.error("Delete material error:", err);
-    }
-  };
-
-  const startEdit = (m) => {
-    setEditingId(m.id);
-    setEditForm({ name: m.name, qty: String(parseFloat(m.qty)), unit: m.unit || "", unit_cost: String(parseFloat(m.unit_cost)), notes: m.notes || "" });
-  };
-
-  const handleSaveEdit = async (itemId) => {
-    const qtyNum = parseFloat(editForm.qty);
-    const costNum = parseFloat(editForm.unit_cost);
-    if (isNaN(qtyNum) || qtyNum <= 0) { alert("Qty must be a number greater than 0."); return; }
-    if (isNaN(costNum) || costNum < 0) { alert("Unit cost must be a valid number."); return; }
-    setSavingEdit(true);
-    try {
-      await JobReportsAPI.updateMaterial(leadId, itemId, {
-        name: editForm.name.trim() || undefined,
-        qty: qtyNum,
-        unit: editForm.unit || undefined,
-        unit_cost: costNum,
-        notes: editForm.notes || undefined,
-      }, companyId);
-      setEditingId(null);
-      await load();
-      onUpdate();
-    } catch (err) {
-      console.error("Edit material error:", err);
-      alert(err.message || "Failed to save changes.");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const groupedMaterials = (() => {
-    const groups = {};
-    for (const m of materials) {
-      const key = m.category_name || null;
-      if (!groups[key]) groups[key] = { category: key, items: [] };
-      groups[key].items.push(m);
-    }
-    return Object.values(groups).sort((a, b) => {
-      if (!a.category && b.category) return 1;
-      if (a.category && !b.category) return -1;
-      return (a.category || "").localeCompare(b.category || "");
-    });
-  })();
-  const showCatHeaders = groupedMaterials.length > 1;
-
+  const totalCost = materials.reduce((a, m) => a + (parseFloat(m.total) || 0), 0);
+  const cols = "1fr 3.5rem 3.5rem 4.5rem 4.5rem 1.5rem";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl"
-        style={{ maxHeight: "88vh", overflowY: "auto" }}
-        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full max-w-xl rounded-2xl shadow-2xl flex flex-col"
+        style={{ maxHeight: "88vh" }}
+        onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between shrink-0">
           <h3 className="font-bold text-gray-900 text-base">Materials</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
         </div>
 
-        <div className="px-5 pb-8 pt-3 space-y-3">
-          {/* Existing entries */}
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {loading ? (
-            <div className="text-center py-4 text-gray-400 text-sm">Loading…</div>
-          ) : !showAddForm && materials.length > 0 ? (
-            <div className="space-y-2">
-              {groupedMaterials.map(({ category, items }) => {
-                const catKey = category || "__custom__";
-                const isExpanded = expandedMatCats[catKey] === true;
-                return (
-                <div key={catKey} className={showCatHeaders ? "border border-gray-200 rounded-xl overflow-hidden" : ""}>
-                  {showCatHeaders && (
+            <div className="text-center py-8 text-gray-400 text-sm">Loading…</div>
+          ) : (
+            <>
+              {/* Action bar */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleImportFromBid}
+                  disabled={importing}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-xl text-xs font-semibold hover:bg-green-100 transition disabled:opacity-50"
+                >
+                  {importing ? "Importing…" : "↓ Import from Bid"}
+                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => { setShowAdd(true); setAddMode("library"); setAddForm({ name: "", qty: "1", unit: "", unit_cost: "" }); setExpandedCats({}); }}
+                    className="ml-auto px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition"
+                  >
+                    + Add Item
+                  </button>
+                )}
+              </div>
+
+              {/* Materials table */}
+              {materials.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  {/* Header row */}
+                  <div
+                    className="grid items-center bg-gray-50 border-b border-gray-200 px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider"
+                    style={{ gridTemplateColumns: cols }}
+                  >
+                    <span>Item</span>
+                    <span className="text-center">Qty</span>
+                    <span className="text-center">Unit</span>
+                    <span className="text-right">Cost</span>
+                    <span className="text-right">Total</span>
+                    <span />
+                  </div>
+
+                  {/* Item rows — keyed on loadVer so inputs reset after server reload */}
+                  {materials.map(m => (
+                    <div
+                      key={`${m.id}_v${loadVer}`}
+                      className="grid items-center px-3 py-2.5 border-b border-gray-100 last:border-0 gap-1"
+                      style={{ gridTemplateColumns: cols }}
+                    >
+                      <span className="text-sm text-gray-800 font-medium truncate pr-1" title={m.name}>{m.name}</span>
+                      <input
+                        type="number" step="0.01" min="0.01"
+                        defaultValue={parseFloat(m.qty)}
+                        disabled={!canEdit}
+                        onBlur={e => handleBlur(m, "qty", e.target.value)}
+                        className={`w-full text-sm text-center border border-gray-200 rounded-lg px-1 py-1 focus:outline-none focus:border-blue-400 ${noSpin} disabled:bg-transparent disabled:border-transparent`}
+                      />
+                      <input
+                        type="text"
+                        defaultValue={m.unit || ""}
+                        disabled={!canEdit}
+                        placeholder="ea"
+                        onBlur={e => handleBlur(m, "unit", e.target.value)}
+                        className="w-full text-xs text-center border border-gray-200 rounded-lg px-1 py-1 focus:outline-none focus:border-blue-400 disabled:bg-transparent disabled:border-transparent"
+                      />
+                      <input
+                        type="number" step="0.01" min="0"
+                        defaultValue={parseFloat(m.unit_cost)}
+                        disabled={!canEdit}
+                        onBlur={e => handleBlur(m, "unit_cost", e.target.value)}
+                        className={`w-full text-sm text-right border border-gray-200 rounded-lg px-1 py-1 focus:outline-none focus:border-blue-400 ${noSpin} disabled:bg-transparent disabled:border-transparent`}
+                      />
+                      <span className="text-sm font-semibold text-gray-700 text-right">{fmtMoney(m.total)}</span>
+                      {canEdit ? (
+                        <button onClick={() => handleDelete(m.id)} className="text-red-300 hover:text-red-500 text-xl leading-none text-center">×</button>
+                      ) : <span />}
+                    </div>
+                  ))}
+
+                  {/* Total row */}
+                  <div className="flex justify-between items-center px-3 py-2.5 bg-gray-50 border-t border-gray-200">
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</span>
+                    <span className="text-sm font-bold text-gray-900">{fmtMoney(totalCost)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {materials.length === 0 && !showAdd && (
+                <div className="text-center py-10 space-y-2">
+                  <p className="text-gray-400 text-sm">No materials added yet.</p>
+                  <p className="text-xs text-gray-400">Import from the accepted bid or add items manually.</p>
+                </div>
+              )}
+
+              {/* Add item panel */}
+              {showAdd && canEdit && (
+                <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/40 space-y-3">
+                  {/* Mode toggle */}
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setExpandedMatCats((p) => ({ ...p, [catKey]: !isExpanded }))}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-50 text-left"
+                      onClick={() => { setAddMode("library"); setAddForm(f => ({ ...f, name: "", unit: "", unit_cost: "" })); }}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition ${addMode === "library" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}
                     >
-                      <span className={`text-gray-400 text-xs transition-transform ${isExpanded ? "rotate-90" : ""}`}>▶</span>
-                      <span className="text-sm font-semibold text-gray-700">{category || "Custom"}</span>
-                      <span className="text-xs text-gray-400 ml-auto">({items.length})</span>
+                      From Library
                     </button>
-                  )}
-                  {(!showCatHeaders || isExpanded) && (
-                  <div className="space-y-2 p-2">
-                  {items.map((m) => (
-                <div key={m.id} className="bg-gray-50 rounded-xl px-4 py-3">
-                  {editingId === m.id ? (
-                    <div className="space-y-2">
-                      <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                        placeholder="Item name"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          placeholder="Qty"
-                          type="number"
-                          min="0"
-                          value={editForm.qty}
-                          onChange={(e) => setEditForm((f) => ({ ...f, qty: e.target.value }))}
-                        />
-                        <input
-                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          placeholder="Unit"
-                          value={editForm.unit}
-                          onChange={(e) => setEditForm((f) => ({ ...f, unit: e.target.value }))}
-                        />
-                        <input
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          placeholder="Unit cost"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editForm.unit_cost}
-                          onChange={(e) => setEditForm((f) => ({ ...f, unit_cost: e.target.value }))}
-                        />
-                      </div>
-                      <input
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                        placeholder="Notes (optional)"
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
-                      />
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={() => handleSaveEdit(m.id)}
-                          disabled={savingEdit}
-                          className="flex-1 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {savingEdit ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="flex-1 py-1.5 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-900">{m.name}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {parseFloat(m.qty)} {m.unit || "ea"} ×{" "}
-                          {fmtMoney(m.unit_cost)} ={" "}
-                          <span className="font-semibold text-gray-700">{fmtMoney(m.total)}</span>
-                        </div>
-                        {m.notes && (
-                          <div className="text-xs text-gray-400 mt-0.5 italic">{m.notes}</div>
-                        )}
-                      </div>
-                      {canEdit && (
-                        <div className="flex gap-2 shrink-0 mt-0.5">
-                          <button
-                            onClick={() => startEdit(m)}
-                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(m.id)}
-                            className="text-red-400 hover:text-red-600 text-xs font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-              </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
-          ) : !showAddForm ? (
-            <p className="text-gray-400 text-sm text-center py-4">No materials added yet.</p>
-          ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setAddMode("custom")}
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition ${addMode === "custom" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}
+                    >
+                      Custom
+                    </button>
+                  </div>
 
-          {/* Add form */}
-          {showAddForm ? (
-            <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-3">
-              {/* Mode toggle */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddMode("library");
-                    setForm((f) => ({ ...f, name: "", unit: "", unit_cost: "" }));
-                    setSelectedItemId("");
-                  }}
-                  className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                    addMode === "library"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  From Library
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddMode("custom");
-                    setForm((f) => ({ ...f, name: "", unit: "", unit_cost: "" }));
-                    setSelectedCatId("");
-                    setSelectedItemId("");
-                    setExpandedPickerCats({});
-                  }}
-                  className={`flex-1 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                    addMode === "custom"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  + Custom Item
-                </button>
-              </div>
-
-              {addMode === "library" && (
-                <>
-                  {library.length === 0 ? (
-                    <div className="text-sm text-gray-500 bg-white rounded-xl border border-gray-100 px-3 py-3">
-                      No items in library yet. Add products via Settings → Bidder.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="rounded-xl border border-gray-200 overflow-hidden">
-                        {library.map((cat) => (
+                  {/* Library picker */}
+                  {addMode === "library" && (
+                    library.length === 0 ? (
+                      <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-100 px-3 py-3">
+                        No library items. Manage via Settings → Bidder.
+                      </p>
+                    ) : (
+                      <div className="rounded-xl border border-gray-200 overflow-hidden bg-white max-h-52 overflow-y-auto">
+                        {library.map(cat => (
                           <div key={cat.id} className="border-b border-gray-100 last:border-0">
                             <button
                               type="button"
-                              onClick={() => setExpandedPickerCats((p) => ({ ...p, [cat.id]: !p[cat.id] }))}
-                              className="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-50 text-left"
+                              onClick={() => setExpandedCats(p => ({ ...p, [cat.id]: !p[cat.id] }))}
+                              className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 text-left"
                             >
-                              <span className={`text-gray-400 text-xs transition-transform ${expandedPickerCats[cat.id] ? "rotate-90" : ""}`}>▶</span>
+                              <span className={`text-gray-400 text-xs transition-transform ${expandedCats[cat.id] ? "rotate-90" : ""}`}>▶</span>
                               <span className="text-sm font-semibold text-gray-700">{cat.name}</span>
                               <span className="text-xs text-gray-400 ml-auto">({cat.items?.length || 0})</span>
                             </button>
-                            {expandedPickerCats[cat.id] && (
+                            {expandedCats[cat.id] && (
                               <div className="divide-y divide-gray-50">
-                                {(cat.items || []).map((item) => (
+                                {(cat.items || []).map(item => (
                                   <button
                                     key={item.id}
                                     type="button"
-                                    onClick={() => handleLibraryItemSelect(String(item.id))}
-                                    className={`w-full text-left px-4 py-2.5 flex justify-between items-center transition ${
-                                      String(item.id) === selectedItemId
-                                        ? "bg-blue-50 text-blue-700"
-                                        : "hover:bg-gray-50 text-gray-800"
-                                    }`}
+                                    onClick={() => handleLibraryPick(item)}
+                                    className={`w-full text-left px-4 py-2.5 flex justify-between items-center transition ${addForm.name === item.name ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-800"}`}
                                   >
                                     <span className="text-sm font-medium">{item.name}</span>
-                                    <span className="text-xs text-gray-400 shrink-0 ml-2">
-                                      {item.default_unit_label || "ea"}{parseFloat(item.default_unit_price) > 0 ? ` · $${parseFloat(item.default_unit_price).toFixed(2)}` : ""}
+                                    <span className="text-xs text-gray-400 ml-2 shrink-0">
+                                      {item.default_unit_label || ""}{parseFloat(item.default_unit_price) > 0 ? ` · $${parseFloat(item.default_unit_price).toFixed(2)}` : ""}
                                     </span>
                                   </button>
                                 ))}
@@ -823,116 +730,63 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
                           </div>
                         ))}
                       </div>
-                      {selectedItemId && (
-                        <p className="text-xs text-blue-600 font-medium -mt-1">✓ {form.name} selected</p>
-                      )}
-                    </>
+                    )
                   )}
-                </>
-              )}
 
-              {/* Name */}
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Item Name</label>
-                <input
-                  type="text"
-                  placeholder={addMode === "library" ? "Auto-filled from library" : "Material name"}
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                />
-              </div>
+                  {/* Fields */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1">Item Name</label>
+                    <input
+                      type="text"
+                      value={addForm.name}
+                      onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={addMode === "library" ? "Select item above…" : "Material name"}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Qty</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={form.qty}
-                    onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Unit</label>
-                  <input
-                    type="text"
-                    placeholder="gal, bag…"
-                    value={form.unit}
-                    onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Unit Cost</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={form.unit_cost}
-                    onChange={(e) => setForm((f) => ({ ...f, unit_cost: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Qty</label>
+                      <input type="number" min="0.01" step="0.01" value={addForm.qty} onChange={e => setAddForm(f => ({ ...f, qty: e.target.value }))} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Unit</label>
+                      <input type="text" value={addForm.unit} onChange={e => setAddForm(f => ({ ...f, unit: e.target.value }))} placeholder="gal, bag…" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Cost / Unit</label>
+                      <input type="number" min="0" step="0.01" value={addForm.unit_cost} onChange={e => setAddForm(f => ({ ...f, unit_cost: e.target.value }))} placeholder="0.00" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
+                    </div>
+                  </div>
 
-              {form.qty && form.unit_cost && (
-                <div className="text-xs text-gray-500 text-right -mt-1">
-                  Total: <span className="font-semibold text-gray-700">
-                    {fmtMoney((parseFloat(form.qty) || 0) * (parseFloat(form.unit_cost) || 0))}
-                  </span>
+                  {addForm.qty && addForm.unit_cost ? (
+                    <div className="text-xs text-right text-gray-500">
+                      Total: <strong className="text-gray-700">{fmtMoney((parseFloat(addForm.qty) || 0) * (parseFloat(addForm.unit_cost) || 0))}</strong>
+                    </div>
+                  ) : null}
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setShowAdd(false); setAddForm({ name: "", qty: "1", unit: "", unit_cost: "" }); }}
+                      className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAdd}
+                      disabled={saving || !addForm.name.trim()}
+                      className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Adding…" : "Add"}
+                    </button>
+                  </div>
                 </div>
               )}
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 block mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  placeholder="Brand, color, supplier…"
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                />
-              </div>
-
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "" });
-                    setSelectedCatId("");
-                    setSelectedItemId("");
-                    setAddMode("library");
-                    setExpandedPickerCats({});
-                  }}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={saving || !form.name.trim()}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? "Adding…" : "Add Material"}
-                </button>
-              </div>
-            </div>
-          ) : canEdit ? (
-            <button
-              type="button"
-              onClick={() => setShowAddForm(true)}
-              className="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm font-semibold hover:border-blue-400 hover:text-blue-600 transition"
-            >
-              + Add Material
-            </button>
-          ) : null}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -443,6 +443,71 @@ router.delete("/:leadId/materials/:itemId", async (req, res) => {
 });
 
 // ============================================================================
+// PER-JOB: IMPORT MATERIALS FROM ACCEPTED BID
+// ============================================================================
+router.post("/:leadId/import-from-bid", async (req, res) => {
+  try {
+    const leadId = parseInt(req.params.leadId, 10);
+    const companyId = resolveCompanyId(req);
+    if (!companyId) return res.status(400).json({ error: "company_id required" });
+
+    const proposalResult = await db.query(
+      `SELECT id FROM bidder_proposals
+       WHERE lead_id = $1 AND company_id = $2 AND status = 'accepted'
+       ORDER BY accepted_date DESC NULLS LAST, updated_at DESC
+       LIMIT 1`,
+      [leadId, companyId]
+    );
+
+    if (!proposalResult.rows.length) {
+      return res.status(404).json({ error: "No accepted bid found for this job" });
+    }
+
+    const proposalId = proposalResult.rows[0].id;
+
+    const [libItems, customItems] = await Promise.all([
+      db.query(
+        `SELECT name, unit_label AS unit, unit_price AS unit_cost, quantity AS qty, line_total
+         FROM bidder_proposal_items
+         WHERE proposal_id = $1 AND is_included = true
+         ORDER BY sort_order, id`,
+        [proposalId]
+      ),
+      db.query(
+        `SELECT description AS name, NULL AS unit, price_each AS unit_cost, quantity AS qty, line_total
+         FROM bidder_custom_items
+         WHERE proposal_id = $1 AND is_subtotal = false AND is_note = false
+         ORDER BY sort_order, id`,
+        [proposalId]
+      ),
+    ]);
+
+    const allItems = [...libItems.rows, ...customItems.rows];
+    if (!allItems.length) {
+      return res.status(404).json({ error: "No items found in the accepted bid" });
+    }
+
+    const inserted = [];
+    for (const item of allItems) {
+      const qty = parseFloat(item.qty) || 1;
+      const cost = parseFloat(item.unit_cost) || 0;
+      const total = parseFloat(item.line_total) || qty * cost;
+      const r = await db.query(
+        `INSERT INTO job_cost_entries (lead_id, company_id, name, qty, unit, unit_cost, total, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [leadId, companyId, item.name, qty, item.unit || null, cost, total, req.user.id]
+      );
+      inserted.push(r.rows[0]);
+    }
+
+    res.status(201).json({ imported: inserted.length, materials: inserted });
+  } catch (err) {
+    console.error("Import from bid error:", err);
+    res.status(500).json({ error: "Failed to import from bid" });
+  }
+});
+
+// ============================================================================
 // PER-JOB: LIST INDIVIDUAL TIME ENTRIES
 // ============================================================================
 router.get("/:leadId/time-entries", async (req, res) => {

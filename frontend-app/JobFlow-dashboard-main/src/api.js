@@ -537,6 +537,9 @@ export const JobReportsAPI = {
       method: "DELETE",
     }),
 
+  importFromBid: (leadId, companyId) =>
+    apiRequest(cqUrl(`/api/job-reports/${leadId}/import-from-bid`, companyId), { method: "POST" }),
+
   getLibrary: (companyId) =>
     apiRequest(cqUrl("/api/job-reports/library", companyId)),
 
