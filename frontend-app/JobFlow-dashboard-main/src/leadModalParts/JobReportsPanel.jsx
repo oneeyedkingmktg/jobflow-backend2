@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
-import { JobReportsAPI } from "../api";
+import { JobReportsAPI, BidderAPI } from "../api";
 import { usePermission } from "../utils/usePermission";
 
 const PROJECT_TYPE_LABELS = {
@@ -471,7 +471,7 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
 // ============================================================================
 function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   const [materials, setMaterials] = useState([]);
-  const [library, setLibrary] = useState({ categories: [] });
+  const [library, setLibrary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addMode, setAddMode] = useState("library");
@@ -479,10 +479,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   const [selectedItemId, setSelectedItemId] = useState("");
   const [form, setForm] = useState({
     name: "", qty: "1", unit: "", unit_cost: "", notes: "",
-    save_to_library: false, category_id: "",
   });
-  const [newCatName, setNewCatName] = useState("");
-  const [addingCat, setAddingCat] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: "", qty: "", unit: "", unit_cost: "", notes: "" });
@@ -495,10 +492,10 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
       setLoading(true);
       const [mats, lib] = await Promise.all([
         JobReportsAPI.getMaterials(leadId, companyId),
-        JobReportsAPI.getLibrary(companyId),
+        BidderAPI.getLibrary(companyId),
       ]);
       setMaterials(mats.materials || []);
-      setLibrary(lib || { categories: [] });
+      setLibrary(Array.isArray(lib) ? lib : []);
     } catch (err) {
       console.error("Materials load error:", err);
     } finally {
@@ -511,30 +508,15 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   const handleLibraryItemSelect = (itemId) => {
     setSelectedItemId(itemId);
     if (!itemId) return;
-    const allItems = library.categories.flatMap((c) => c.items || []);
+    const allItems = library.flatMap((c) => c.items || []);
     const item = allItems.find((i) => String(i.id) === String(itemId));
     if (item) {
       setForm((f) => ({
         ...f,
         name: item.name,
-        unit: item.unit || "",
-        unit_cost: item.default_cost !== undefined ? String(item.default_cost) : "",
+        unit: item.default_unit_label || "",
+        unit_cost: item.default_unit_price !== undefined ? String(item.default_unit_price) : "",
       }));
-    }
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    setAddingCat(true);
-    try {
-      await JobReportsAPI.createCategory({ name: newCatName.trim() }, companyId);
-      setNewCatName("");
-      const lib = await JobReportsAPI.getLibrary(companyId);
-      setLibrary(lib || { categories: [] });
-    } catch (err) {
-      console.error("Add category error:", err);
-    } finally {
-      setAddingCat(false);
     }
   };
 
@@ -548,15 +530,10 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
         unit: form.unit || null,
         unit_cost: parseFloat(form.unit_cost) || 0,
         notes: form.notes || null,
-        save_to_library: form.save_to_library,
-        category_id: form.save_to_library && form.category_id ? parseInt(form.category_id) : null,
       };
-      if (addMode === "library" && selectedItemId) {
-        payload.material_item_id = parseInt(selectedItemId);
-      }
       await JobReportsAPI.addMaterial(leadId, payload, companyId);
       setShowAddForm(false);
-      setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "", save_to_library: false, category_id: "" });
+      setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "" });
       setSelectedCatId("");
       setSelectedItemId("");
       setAddMode("library");
@@ -804,31 +781,14 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
 
               {addMode === "library" && (
                 <>
-                  {library.categories.length === 0 ? (
+                  {library.length === 0 ? (
                     <div className="text-sm text-gray-500 bg-white rounded-xl border border-gray-100 px-3 py-3">
-                      <p className="mb-2">No categories yet. Add one to get started:</p>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Category name"
-                          value={newCatName}
-                          onChange={(e) => setNewCatName(e.target.value)}
-                          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCategory}
-                          disabled={addingCat || !newCatName.trim()}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
-                        >
-                          Add
-                        </button>
-                      </div>
+                      No items in library yet. Add products via Settings → Bidder.
                     </div>
                   ) : (
                     <>
                       <div className="rounded-xl border border-gray-200 overflow-hidden">
-                        {library.categories.map((cat) => (
+                        {library.map((cat) => (
                           <div key={cat.id} className="border-b border-gray-100 last:border-0">
                             <button
                               type="button"
@@ -854,7 +814,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
                                   >
                                     <span className="text-sm font-medium">{item.name}</span>
                                     <span className="text-xs text-gray-400 shrink-0 ml-2">
-                                      {item.unit || "ea"}{parseFloat(item.default_cost) > 0 ? ` · $${parseFloat(item.default_cost).toFixed(2)}` : ""}
+                                      {item.default_unit_label || "ea"}{parseFloat(item.default_unit_price) > 0 ? ` · $${parseFloat(item.default_unit_price).toFixed(2)}` : ""}
                                     </span>
                                   </button>
                                 ))}
@@ -938,58 +898,13 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
                 />
               </div>
 
-              {/* Save to library (custom mode only) */}
-              {addMode === "custom" && (
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.save_to_library}
-                      onChange={(e) => setForm((f) => ({ ...f, save_to_library: e.target.checked }))}
-                      className="rounded"
-                    />
-                    Save to materials library for future use
-                  </label>
-                  {form.save_to_library && (
-                    <div className="space-y-2 pl-6">
-                      <select
-                        value={form.category_id}
-                        onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white"
-                      >
-                        <option value="">No category (uncategorized)</option>
-                        {library.categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Or add new category…"
-                          value={newCatName}
-                          onChange={(e) => setNewCatName(e.target.value)}
-                          className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-sm bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCategory}
-                          disabled={addingCat || !newCatName.trim()}
-                          className="px-3 py-1.5 bg-gray-700 text-white rounded-xl text-xs font-semibold disabled:opacity-50"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddForm(false);
-                    setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "", save_to_library: false, category_id: "" });
+                    setForm({ name: "", qty: "1", unit: "", unit_cost: "", notes: "" });
                     setSelectedCatId("");
                     setSelectedItemId("");
                     setAddMode("library");

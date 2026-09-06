@@ -636,7 +636,9 @@ router.delete('/discount/:id', async (req, res) => {
 // GET /api/bidder/library — full library for company (with auto-seed)
 router.get('/library', async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const companyId = req.user.role === 'master'
+      ? (parseInt(req.query.company_id) || req.user.company_id)
+      : req.user.company_id;
 
     const catResult = await pool.query(
       'SELECT * FROM bidder_categories WHERE company_id = $1 ORDER BY sort_order, id',
