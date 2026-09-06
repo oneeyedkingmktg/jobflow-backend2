@@ -178,7 +178,8 @@ router.get('/proposal/:id/materials', async (req, res) => {
 
     // Fetch proposal items with library cost/coverage data
     const itemsResult = await pool.query(
-      `SELECT bpi.id, bpi.library_item_id, bpi.name AS item_name, bpi.quantity,
+      `SELECT bpi.id, bpi.library_item_id, bpi.quantity,
+              COALESCE(li.internal_name, li.name) AS lib_name,
               li.kit_price, li.sqft_per_kit, li.is_system, li.is_charge_only
        FROM bidder_proposal_items bpi
        JOIN bidder_library_items li ON li.id = bpi.library_item_id
@@ -195,7 +196,8 @@ router.get('/proposal/:id/materials', async (req, res) => {
     if (systemLibIds.length > 0) {
       const compResult = await pool.query(
         `SELECT sc.system_item_id, sc.component_item_id,
-                li.name, li.kit_price, li.sqft_per_kit, li.is_charge_only
+                COALESCE(li.internal_name, li.name) AS name,
+                li.kit_price, li.sqft_per_kit, li.is_charge_only
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
          WHERE sc.system_item_id = ANY($1)
@@ -211,15 +213,14 @@ router.get('/proposal/:id/materials', async (req, res) => {
     // Accumulate areas and sources by library_item_id
     const acc = {}; // library_item_id → { name, kit_price, sqft_per_kit, total_area, sources }
 
-    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area, source) {
+    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area) {
       if (kitPrice == null) return; // No cost data — skip
       const kp = parseFloat(kitPrice);
       const sfk = sqftPerKit ? parseFloat(sqftPerKit) : null;
       if (!acc[libItemId]) {
-        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, total_area: 0, sources: [] };
+        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, total_area: 0 };
       }
       acc[libItemId].total_area += parseFloat(area) || 0;
-      if (source && !acc[libItemId].sources.includes(source)) acc[libItemId].sources.push(source);
     }
 
     for (const item of itemsResult.rows) {
@@ -228,10 +229,10 @@ router.get('/proposal/:id/materials', async (req, res) => {
         const components = componentsBySystem[item.library_item_id] || [];
         for (const comp of components) {
           if (comp.is_charge_only) continue;
-          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity, item.item_name);
+          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity);
         }
       } else {
-        addMaterial(item.library_item_id, item.item_name, item.kit_price, item.sqft_per_kit, item.quantity, null);
+        addMaterial(item.library_item_id, item.lib_name, item.kit_price, item.sqft_per_kit, item.quantity);
       }
     }
 
@@ -260,7 +261,6 @@ router.get('/proposal/:id/materials', async (req, res) => {
       return {
         library_item_id: item.library_item_id,
         name: item.name,
-        sources: item.sources,
         total_area: item.total_area,
         sqft_per_kit: item.sqft_per_kit,
         kit_price: item.kit_price,

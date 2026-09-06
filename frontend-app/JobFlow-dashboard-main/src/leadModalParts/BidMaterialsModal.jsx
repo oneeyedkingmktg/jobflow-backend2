@@ -118,7 +118,6 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
               <thead>
                 <tr className="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   <th className="text-left py-2 pr-4">Product</th>
-                  <th className="text-left py-2 pr-4">Source</th>
                   <th className="text-right py-2 pr-4 whitespace-nowrap">Job Area</th>
                   <th className="text-right py-2 pr-4 whitespace-nowrap">Coverage</th>
                   <th className="text-right py-2 pr-4 whitespace-nowrap">Calc. Qty</th>
@@ -134,11 +133,6 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                   return (
                     <tr key={m.library_item_id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-2.5 pr-4 font-medium text-gray-800">{m.name}</td>
-                      <td className="py-2.5 pr-4 text-gray-500 text-xs">
-                        {m.sources.length > 0
-                          ? m.sources.join(', ')
-                          : <span className="italic text-gray-300">—</span>}
-                      </td>
                       <td className="py-2.5 pr-4 text-right text-gray-600 tabular-nums">
                         {m.sqft_per_kit
                           ? `${(parseFloat(m.total_area) || 0).toLocaleString()} sf`
