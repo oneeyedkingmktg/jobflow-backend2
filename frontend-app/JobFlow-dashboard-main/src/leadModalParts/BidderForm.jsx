@@ -8,6 +8,7 @@ import { BidderAPI, CompaniesAPI } from '../api';
 import { useAuth } from '../AuthContext';
 import { usePermission } from '../utils/usePermission';
 import { docId } from '../utils/printDocument';
+import BidMaterialsModal from './BidMaterialsModal';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [showItemPicker,   setShowItemPicker]   = useState(false);
   const [itemSearch,       setItemSearch]       = useState('');
   const [pickerSections,   setPickerSections]   = useState({});
-  const [showDocsModal,    setShowDocsModal]    = useState(false);
+  const [showDocsModal,      setShowDocsModal]      = useState(false);
+  const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [showExitModal,    setShowExitModal]    = useState(false);
   const [exitFn,           setExitFn]           = useState(null);
   const [company,          setCompany]          = useState(null);
@@ -1272,19 +1274,29 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       </div>
 
       {/* ── ACTION BAR ───────────────────────────────────────────────────── */}
-      <div className="border-t px-5 py-4 bg-white rounded-b-2xl flex items-center gap-2 shrink-0">
-        <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button onClick={() => handleSaveAndExit(onBack)} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
-          {saving ? 'Saving…' : 'Save & Exit'}
-        </button>
-        <button onClick={onBack} className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
-          Exit
-        </button>
+      <div className="border-t px-5 py-4 bg-white rounded-b-2xl space-y-2 shrink-0">
+        <div className="flex items-center gap-2">
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={() => handleSaveAndExit(onBack)} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+            {saving ? 'Saving…' : 'Save & Exit'}
+          </button>
+          <button onClick={onBack} className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 text-sm">
+            Exit
+          </button>
+          {canViewFinancials && (
+            <button onClick={() => setShowDocsModal(true)} className="flex-1 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
+              Create Documents
+            </button>
+          )}
+        </div>
         {canViewFinancials && (
-          <button onClick={() => setShowDocsModal(true)} className="flex-1 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 text-sm">
-            Create Documents
+          <button
+            onClick={() => setShowMaterialsModal(true)}
+            className="w-full py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm"
+          >
+            Materials / Order List
           </button>
         )}
         {saveMsg && (
@@ -1583,6 +1595,14 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MATERIALS / ORDER LIST MODAL ────────────────────────────────── */}
+      {showMaterialsModal && (
+        <BidMaterialsModal
+          proposalId={proposalId}
+          onClose={() => setShowMaterialsModal(false)}
+        />
       )}
 
       {/* ── EXIT CONFIRMATION MODAL ──────────────────────────────────────── */}

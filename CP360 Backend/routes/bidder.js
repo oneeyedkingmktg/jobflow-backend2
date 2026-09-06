@@ -164,6 +164,155 @@ router.get('/proposals/:leadId', async (req, res) => {
   }
 });
 
+// GET /api/bidder/proposal/:id/materials — compute materials / order list for a bid
+router.get('/proposal/:id/materials', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { id } = req.params;
+
+    const propCheck = await pool.query(
+      'SELECT id FROM bidder_proposals WHERE id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)',
+      [id, companyId]
+    );
+    if (!propCheck.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+
+    // Fetch proposal items with library cost/coverage data
+    const itemsResult = await pool.query(
+      `SELECT bpi.id, bpi.library_item_id, bpi.name AS item_name, bpi.quantity,
+              li.kit_price, li.sqft_per_kit, li.is_system, li.is_charge_only
+       FROM bidder_proposal_items bpi
+       JOIN bidder_library_items li ON li.id = bpi.library_item_id
+       WHERE bpi.proposal_id = $1
+         AND bpi.library_item_id IS NOT NULL
+         AND bpi.is_freeform = false
+       ORDER BY bpi.sort_order, bpi.id`,
+      [id]
+    );
+
+    // For system items, fetch all component details
+    const systemLibIds = itemsResult.rows.filter(r => r.is_system).map(r => r.library_item_id);
+    let componentsBySystem = {};
+    if (systemLibIds.length > 0) {
+      const compResult = await pool.query(
+        `SELECT sc.system_item_id, sc.component_item_id,
+                li.name, li.kit_price, li.sqft_per_kit, li.is_charge_only
+         FROM bidder_library_system_components sc
+         JOIN bidder_library_items li ON li.id = sc.component_item_id
+         WHERE sc.system_item_id = ANY($1)
+         ORDER BY sc.sort_order, sc.id`,
+        [systemLibIds]
+      );
+      compResult.rows.forEach(r => {
+        if (!componentsBySystem[r.system_item_id]) componentsBySystem[r.system_item_id] = [];
+        componentsBySystem[r.system_item_id].push(r);
+      });
+    }
+
+    // Accumulate areas and sources by library_item_id
+    const acc = {}; // library_item_id → { name, kit_price, sqft_per_kit, total_area, sources }
+
+    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area, source) {
+      if (kitPrice == null) return; // No cost data — skip
+      const kp = parseFloat(kitPrice);
+      const sfk = sqftPerKit ? parseFloat(sqftPerKit) : null;
+      if (!acc[libItemId]) {
+        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, total_area: 0, sources: [] };
+      }
+      acc[libItemId].total_area += parseFloat(area) || 0;
+      if (source && !acc[libItemId].sources.includes(source)) acc[libItemId].sources.push(source);
+    }
+
+    for (const item of itemsResult.rows) {
+      if (item.is_charge_only) continue;
+      if (item.is_system) {
+        const components = componentsBySystem[item.library_item_id] || [];
+        for (const comp of components) {
+          if (comp.is_charge_only) continue;
+          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity, item.item_name);
+        }
+      } else {
+        addMaterial(item.library_item_id, item.item_name, item.kit_price, item.sqft_per_kit, item.quantity, null);
+      }
+    }
+
+    // Load saved overrides for this proposal
+    const ovResult = await pool.query(
+      'SELECT library_item_id, order_qty, unit_cost FROM bid_material_overrides WHERE proposal_id = $1',
+      [id]
+    );
+    const overrides = {};
+    ovResult.rows.forEach(r => { overrides[r.library_item_id] = r; });
+
+    const materials = Object.values(acc).map(item => {
+      let calculated_qty = null;
+      let default_order_qty = null;
+
+      if (item.sqft_per_kit && item.total_area > 0) {
+        calculated_qty = item.total_area / item.sqft_per_kit;
+        default_order_qty = Math.max(1, Math.ceil(calculated_qty));
+      }
+
+      const ov = overrides[item.library_item_id] || {};
+      const order_qty = ov.order_qty != null ? parseFloat(ov.order_qty) : default_order_qty;
+      const unit_cost = ov.unit_cost != null ? parseFloat(ov.unit_cost) : (item.kit_price || 0);
+      const extended_cost = (order_qty || 0) * (unit_cost || 0);
+
+      return {
+        library_item_id: item.library_item_id,
+        name: item.name,
+        sources: item.sources,
+        total_area: item.total_area,
+        sqft_per_kit: item.sqft_per_kit,
+        kit_price: item.kit_price,
+        calculated_qty,
+        default_order_qty,
+        order_qty,
+        unit_cost,
+        extended_cost,
+        has_override_qty:  ov.order_qty != null,
+        has_override_cost: ov.unit_cost != null,
+      };
+    });
+
+    const total_projected_cost = materials.reduce((sum, m) => sum + (m.extended_cost || 0), 0);
+    res.json({ materials, total_projected_cost });
+  } catch (err) {
+    console.error('GET /bidder/proposal/:id/materials error:', err);
+    res.status(500).json({ error: 'Failed to generate materials list' });
+  }
+});
+
+// PUT /api/bidder/proposal/:id/materials — save order qty / unit cost overrides
+router.put('/proposal/:id/materials', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { id } = req.params;
+    const { overrides } = req.body; // [{ library_item_id, order_qty, unit_cost }]
+
+    const propCheck = await pool.query(
+      'SELECT id FROM bidder_proposals WHERE id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)',
+      [id, companyId]
+    );
+    if (!propCheck.rows.length) return res.status(404).json({ error: 'Proposal not found' });
+
+    if (!Array.isArray(overrides) || overrides.length === 0) return res.json({ ok: true });
+
+    for (const ov of overrides) {
+      await pool.query(
+        `INSERT INTO bid_material_overrides (proposal_id, library_item_id, order_qty, unit_cost, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (proposal_id, library_item_id)
+         DO UPDATE SET order_qty = EXCLUDED.order_qty, unit_cost = EXCLUDED.unit_cost, updated_at = NOW()`,
+        [id, ov.library_item_id, ov.order_qty ?? null, ov.unit_cost ?? null]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PUT /bidder/proposal/:id/materials error:', err);
+    res.status(500).json({ error: 'Failed to save material overrides' });
+  }
+});
+
 // GET /api/bidder/proposal/:id — single proposal with all child records
 router.get('/proposal/:id', async (req, res) => {
   try {

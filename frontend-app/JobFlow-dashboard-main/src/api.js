@@ -426,6 +426,10 @@ export const BidderAPI = {
   getCompanySuppliers: (companyId) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`),
   setCompanySuppliers: (companyId, supplierIds) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`, { method: 'PUT', body: JSON.stringify({ supplier_ids: supplierIds }) }),
 
+  // Materials / Order List
+  getMaterials: (id) => apiRequest(`/api/bidder/proposal/${id}/materials`),
+  saveMaterials: (id, overrides) => apiRequest(`/api/bidder/proposal/${id}/materials`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
+
   // Global supplier catalog (master-only)
   getGlobalSuppliers: () => apiRequest('/api/bidder/global-suppliers'),
   createGlobalSupplier: (data) => apiRequest('/api/bidder/global-suppliers', { method: 'POST', body: JSON.stringify(data) }),
