@@ -120,7 +120,7 @@ router.get("/", requireRole("admin", "master"), async (req, res) => {
       query = `
         SELECT id, company_id, email, name, phone, role, is_active, created_at, last_activity,
                service_calls_enabled, permissions, permission_role_id,
-               is_salesman, salesman_color, ghl_calendar_id
+               is_salesman, salesman_color, ghl_calendar_id, hourly_cost
         FROM users
         WHERE company_id = $1 AND deleted_at IS NULL
         ORDER BY created_at DESC
