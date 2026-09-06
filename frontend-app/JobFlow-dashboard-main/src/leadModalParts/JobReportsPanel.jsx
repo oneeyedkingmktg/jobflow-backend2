@@ -54,7 +54,6 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
     hours: isEdit ? String(Math.floor(totalMin / 60)) : "",
     minutes: isEdit ? String(totalMin % 60) : "",
     notes: entry?.notes || "",
-    wage: entry?.hourly_wage ? String(entry.hourly_wage) : "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -81,7 +80,6 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
           hours: h,
           minutes: m,
           notes: form.notes || null,
-          wage: form.wage !== "" ? parseFloat(form.wage) : undefined,
         }, companyId);
       } else {
         await JobReportsAPI.addManualTime(leadId, {
@@ -90,7 +88,6 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
           hours: h,
           minutes: m,
           notes: form.notes || null,
-          wage: form.wage !== "" ? parseFloat(form.wage) : undefined,
         }, companyId);
       }
       onSave();
@@ -119,12 +116,10 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
           ) : (
             <select value={form.user_id} onChange={(e) => {
               const uid = e.target.value;
-              const sel = companyUsers.find((u) => String(u.id) === uid);
               setForm((f) => ({
                 ...f,
                 user_id: uid,
                 non_employee_name: uid === NON_EMPLOYEE_SENTINEL ? f.non_employee_name : "",
-                wage: sel?.hourly_cost ? String(sel.hourly_cost) : (uid === NON_EMPLOYEE_SENTINEL ? f.wage : ""),
               }));
             }} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white">
               <option value="">Select employee…</option>
@@ -173,17 +168,6 @@ function TimeEntryFormModal({ leadId, companyId, entry, companyUsers, loadingUse
           </div>
         </div>
 
-        {/* Wage — required for non-employee (no override table), optional for real employees */}
-        {(!isEdit || editIsNonEmployee) && (
-          <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">
-              Wage / hr ($){isNonEmployee && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
-            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.wage}
-              onChange={(e) => setForm((f) => ({ ...f, wage: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" />
-          </div>
-        )}
 
         {/* Notes */}
         <div>
