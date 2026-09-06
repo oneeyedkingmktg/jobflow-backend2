@@ -310,6 +310,22 @@ async function resolveLeadFolder(leadId, { create = true } = {}) {
   return getOrCreateFolder(fullName, parentId);
 }
 
+// ------------------------------------------------------------------
+// Get or create the "Visualizer" folder under a parent.
+// Migrates old "Visualizer Images" folders by renaming them.
+// ------------------------------------------------------------------
+async function getOrCreateVisualizerFolder(parentFolderId) {
+  const viz = await findFolder("Visualizer", parentFolderId);
+  if (viz) return viz;
+
+  const vizImages = await findFolder("Visualizer Images", parentFolderId);
+  if (vizImages) {
+    return renameFolder(vizImages.id, "Visualizer");
+  }
+
+  return getOrCreateFolder("Visualizer", parentFolderId);
+}
+
 module.exports = {
   getDriveClient,
   requireOAuthDriveClient,
@@ -320,6 +336,7 @@ module.exports = {
   findFolderByPrefix,
   renameFolder,
   getOrCreateFolder,
+  getOrCreateVisualizerFolder,
   listFilesInFolder,
   uploadFileToFolder,
   resolveLeadFolder,

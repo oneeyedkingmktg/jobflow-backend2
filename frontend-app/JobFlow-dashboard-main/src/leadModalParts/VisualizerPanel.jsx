@@ -332,6 +332,8 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
   // Swatch action state per blend id
   const [swatchState, setSwatchState] = useState({});
+  // Swatch R2 URLs keyed by blend id — used to pass blend image to save-viz-to-drive
+  const swatchUrlsRef = useRef({});
 
   // Previously-generated mockups for this lead
   const [mockups, setMockups] = useState([]);
@@ -520,7 +522,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
             if (blName) {
               apiRequest('/api/visualizer/save-viz-to-drive', {
                 method: 'POST',
-                body: JSON.stringify({ visualization_id: data.id, blend_name: blName, save_as_name: blName }),
+                body: JSON.stringify({ visualization_id: data.id, blend_name: blName, save_as_name: blName, swatch_url: swatchUrlsRef.current[blendId] || null }),
               }).catch(() => {});
             }
           } else if (data.status === 'failed') {
@@ -541,18 +543,16 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
   const confirmDriveSave = async () => {
     if (!driveModal) return;
-    const { vizId, blendName } = driveModal;
+    const { vizId, blendId, blendName } = driveModal;
     const saveAsName = driveModalName.trim() || blendName || 'Session';
-    const skipBefore = savedBeforeNames.has(saveAsName);
     setDriveModal(null);
     setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: true } }));
     try {
       await apiRequest('/api/visualizer/save-viz-to-drive', {
         method: 'POST',
-        body: JSON.stringify({ visualization_id: vizId, blend_name: blendName, save_as_name: saveAsName, skip_before: skipBefore }),
+        body: JSON.stringify({ visualization_id: vizId, blend_name: blendName, save_as_name: saveAsName, swatch_url: swatchUrlsRef.current[blendId] || null }),
       });
       setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savedDrive: true } }));
-      setSavedBeforeNames(prev => new Set([...prev, saveAsName]));
     } catch (e) { setError(e.message); }
     finally { setActionState(p => ({ ...p, [vizId]: { ...p[vizId], savingDrive: false } })); }
   };
@@ -586,6 +586,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
         method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd,
       }).then(r => r.json());
       if (result.error) throw new Error(result.error);
+      if (result.swatch_url) swatchUrlsRef.current[blend.id] = result.swatch_url;
       setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saved: true } }));
     } catch (e) { setError(e.message); }
     finally { setSwatchState(p => ({ ...p, [blend.id]: { ...p[blend.id], saving: false } })); }

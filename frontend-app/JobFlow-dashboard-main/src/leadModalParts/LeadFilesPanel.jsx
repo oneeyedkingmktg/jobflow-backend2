@@ -454,11 +454,11 @@ export default function LeadFilesPanel({ leadId, onClose, jobId: initialJobId, j
                     onClick={() => rootFolderIds?.other && selectRootFolder(rootFolderIds.other, "Other")}
                   />
                   <FolderCard
-                    label="Visualizer Images"
+                    label="Visualizer"
                     sublabel="Floor renders"
                     iconColorCls="text-violet-500"
                     iconBgCls="bg-violet-50"
-                    onClick={() => rootFolderIds?.visualizer && selectRootFolder(rootFolderIds.visualizer, "Visualizer Images")}
+                    onClick={() => rootFolderIds?.visualizer && selectRootFolder(rootFolderIds.visualizer, "Visualizer")}
                   />
                 </div>
               </div>

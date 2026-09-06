@@ -12,7 +12,7 @@ const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { generateVisualization, compositeCustomBlend, compositeInternalBlend } = require('../visualizer/renderingService');
 const { getAllPrimitives, hexToRgb, getRecipe } = require('../visualizer/chipColorData');
-const { resolveLeadFolder, uploadFileToFolder, getOrCreateFolder } = require('../controllers/googleDrive');
+const { getDriveClient, resolveLeadFolder, uploadFileToFolder, getOrCreateFolder, getOrCreateVisualizerFolder } = require('../controllers/googleDrive');
 const { sendVisualizationEmail, sendSwatchEmail } = require('../services/email');
 const sharp = require('sharp');
 const axios = require('axios');
@@ -429,16 +429,8 @@ router.post('/swatch', authenticateToken, upload.single('image'), async (req, re
     await r2.send(new PutObjectCommand({ Bucket: BUCKET, Key: swatchKey, Body: finalBuf, ContentType: 'image/png' }));
     const swatchUrl = `${PUBLIC_URL}/${swatchKey}`;
 
-    // ── 6. Async Drive save → "Visualizer" subfolder ─────────────────
+    // ── 6. Save recipe to DB so it reloads on next visualizer open ───────
     if (lead_id) {
-      const label    = blend_name || sorted.map(c => c.name || c.hex).join(' / ').slice(0, 40);
-      const fileName = `${label} blend.png`;
-      resolveLeadFolder(parseInt(lead_id), { create: true })
-        .then(leadFolder => getOrCreateFolder('Visualizer', leadFolder.id))
-        .then(subFolder  => uploadFileToFolder(subFolder.id, fileName, 'image/png', finalBuf))
-        .catch(err  => { if (!err.noDrive) console.error('[Swatch] Drive save failed:', err.message); });
-
-      // Save recipe to DB so it reloads on next visualizer open
       const cleanRecipe = recipe.map(({ hex, name, code, percentage }) => ({ hex, name, code, percentage }));
       db.query(
         `INSERT INTO lead_blend_recipes (lead_id, company_id, name, recipe) VALUES ($1,$2,$3,$4)`,
@@ -502,10 +494,15 @@ router.post('/send-swatch-email', authenticateToken, async (req, res) => {
 });
 
 // POST /api/visualizer/save-viz-to-drive
-// Body: { visualization_id, blend_name, save_as_name, skip_before? }
-// Structure: Lead → Visualizer → Floor Previews → [save_as_name]/ → Before.png + [blend_name] blend.png
+// Body: { visualization_id, blend_name, save_as_name, swatch_url? }
+// Structure:
+//   Lead → Visualizer → {blend} - NN/
+//     {blend} - NN - before.png
+//     {blend} - NN - after.png
+//     {blend} - NN - blend.png   (if swatch_url provided)
+//   Lead → Visualizer → {blend} - NN - blend.png  (root copy)
 router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
-  const { visualization_id, blend_name, save_as_name, skip_before } = req.body;
+  const { visualization_id, blend_name, save_as_name, swatch_url } = req.body;
   if (!visualization_id || !save_as_name) {
     return res.status(400).json({ error: 'visualization_id and save_as_name required' });
   }
@@ -524,35 +521,57 @@ router.post('/save-viz-to-drive', authenticateToken, async (req, res) => {
     if (!viz.lead_id)             return res.status(400).json({ error: 'Visualization has no associated lead' });
     if (!viz.generated_image_url) return res.status(400).json({ error: 'Generated image not ready' });
 
-    const safeName  = save_as_name.replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
-    const safeBlend = (blend_name || 'After').replace(/[/\\:*?"<>|]/g, '-').slice(0, 80);
+    const safeBlend = (blend_name || save_as_name || 'Blend').replace(/[/\\:*?"<>|]/g, '-').slice(0, 60);
 
-    // Download only what we need
-    const toFetch = skip_before
-      ? [axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => [null, Buffer.from(r.data)])]
-      : [Promise.all([
-          viz.original_image_url
-            ? axios.get(viz.original_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data))
-            : Promise.resolve(null),
-          axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
-        ])];
+    const leadFolder = await resolveLeadFolder(viz.lead_id, { create: true });
+    const vizFolder  = await getOrCreateVisualizerFolder(leadFolder.id);
 
-    const [beforeBuf, afterBuf] = skip_before
-      ? [null, (await axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 })).data]
-      : await Promise.all([
-          viz.original_image_url
-            ? axios.get(viz.original_image_url,  { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data))
-            : Promise.resolve(null),
-          axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
-        ]);
+    // Determine counter: count subfolders starting with "{safeBlend} - "
+    const drive = await getDriveClient();
+    const listRes = await drive.files.list({
+      q: `mimeType = 'application/vnd.google-apps.folder' and name contains '${safeBlend.replace(/'/g, "\\'")}' and '${vizFolder.id}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    const matchingFolders = (listRes.data.files || []).filter(f =>
+      f.name.startsWith(`${safeBlend} - `) && /\d+$/.test(f.name)
+    );
+    const counter = String(matchingFolders.length + 1).padStart(2, '0');
+    const tag = `${safeBlend} - ${counter}`;
 
-    const leadFolder    = await resolveLeadFolder(viz.lead_id, { create: true });
-    const vizFolder     = await getOrCreateFolder('Visualizer',    leadFolder.id);
-    const previewFolder = await getOrCreateFolder('Floor Previews', vizFolder.id);
+    const subFolder = await getOrCreateFolder(tag, vizFolder.id);
 
-    const uploads = [uploadFileToFolder(previewFolder.id, `${safeBlend} blend.png`, 'image/png', Buffer.from(afterBuf))];
-    if (!skip_before && beforeBuf) {
-      uploads.push(uploadFileToFolder(previewFolder.id, `${safeName} before.png`, 'image/png', beforeBuf));
+    // Download before + after images
+    const [beforeBuf, afterBuf] = await Promise.all([
+      viz.original_image_url
+        ? axios.get(viz.original_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data))
+        : Promise.resolve(null),
+      axios.get(viz.generated_image_url, { responseType: 'arraybuffer', timeout: 30000 }).then(r => Buffer.from(r.data)),
+    ]);
+
+    // Download swatch blend image if provided
+    let swatchBuf = null;
+    if (swatch_url) {
+      try {
+        const swatchRes = await axios.get(swatch_url, { responseType: 'arraybuffer', timeout: 30000 });
+        swatchBuf = Buffer.from(swatchRes.data);
+      } catch (e) {
+        console.warn('[save-viz-to-drive] Could not download swatch:', e.message);
+      }
+    }
+
+    const uploads = [
+      uploadFileToFolder(subFolder.id, `${tag} - after.png`, 'image/png', Buffer.from(afterBuf)),
+    ];
+    if (beforeBuf) {
+      uploads.push(uploadFileToFolder(subFolder.id, `${tag} - before.png`, 'image/png', beforeBuf));
+    }
+    if (swatchBuf) {
+      uploads.push(
+        uploadFileToFolder(subFolder.id, `${tag} - blend.png`, 'image/png', swatchBuf),
+        uploadFileToFolder(vizFolder.id, `${tag} - blend.png`, 'image/png', swatchBuf)
+      );
     }
     await Promise.all(uploads);
 

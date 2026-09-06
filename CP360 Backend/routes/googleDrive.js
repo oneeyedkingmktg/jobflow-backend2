@@ -15,6 +15,7 @@ const {
   findFolderByPrefix,
   renameFolder,
   getOrCreateFolder,
+  getOrCreateVisualizerFolder,
   listFilesInFolder,
   uploadFileToFolder,
 } = require("../controllers/googleDrive");
@@ -231,7 +232,7 @@ router.get("/lead-folder-init", async (req, res) => {
       getOrCreateFolder("Before", root.id),
       getOrCreateFolder("After", root.id),
       getOrCreateFolder("Other", root.id),
-      getOrCreateFolder("Visualizer Images", root.id),
+      getOrCreateVisualizerFolder(root.id),
     ]);
 
     return res.json({ ok: true, root, before, after, other, visualizer });
