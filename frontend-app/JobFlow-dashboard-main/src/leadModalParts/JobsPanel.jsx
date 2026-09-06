@@ -10,6 +10,7 @@ import { useCompany } from "../CompanyContext";
 import BidderPanel from "./BidderPanel";
 import LeadTeamPanel from "./LeadTeamPanel";
 import JobReportsPanel from "./JobReportsPanel";
+import LeadFilesPanel from "./LeadFilesPanel";
 
 const PROJECT_TYPES = [
   { value: "", label: "— Select Type —" },
@@ -93,6 +94,7 @@ export default function JobsPanel({ lead, onClose }) {
   const [bidsJob, setBidsJob] = useState(null);
   const [laborJob, setLaborJob] = useState(null);
   const [reportJob, setReportJob] = useState(null);
+  const [filesJob, setFilesJob] = useState(null);
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -321,7 +323,7 @@ export default function JobsPanel({ lead, onClose }) {
       {/* Action buttons + save controls — layout differs for new vs existing */}
       {editingId ? (
         <>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setBidsJob(job); }}
@@ -342,6 +344,13 @@ export default function JobsPanel({ lead, onClose }) {
               className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
             >
               Project Report
+            </button>
+            <button
+              type="button"
+              onClick={() => { const job = jobs.find((j) => j.id === editingId); if (job) setFilesJob(job); }}
+              className="py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:bg-blue-700 transition text-center"
+            >
+              Files &amp; Photos
             </button>
           </div>
           <div className="flex gap-2">
@@ -530,6 +539,16 @@ export default function JobsPanel({ lead, onClose }) {
           lead={lead}
           job={reportJob}
           onClose={() => setReportJob(null)}
+        />
+      )}
+
+      {/* LeadFilesPanel opens scoped to the selected project */}
+      {filesJob && (
+        <LeadFilesPanel
+          leadId={lead.id}
+          jobId={filesJob.id}
+          jobName={filesJob.jobName}
+          onClose={() => setFilesJob(null)}
         />
       )}
     </div>

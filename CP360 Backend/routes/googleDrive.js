@@ -227,12 +227,14 @@ router.get("/lead-folder-init", async (req, res) => {
     }
 
     const root = await resolveLeadFolder(leadId, { create: true });
-    const [before, after] = await Promise.all([
+    const [before, after, other, visualizer] = await Promise.all([
       getOrCreateFolder("Before", root.id),
       getOrCreateFolder("After", root.id),
+      getOrCreateFolder("Other", root.id),
+      getOrCreateFolder("Visualizer Images", root.id),
     ]);
 
-    return res.json({ ok: true, root, before, after });
+    return res.json({ ok: true, root, before, after, other, visualizer });
   } catch (err) {
     console.error("❌ LEAD FOLDER INIT ERROR", err);
     return res.status(err.status || 500).json({ ok: false, error: err.message, needsReauth: err.needsReauth || false });
@@ -325,6 +327,38 @@ router.post("/upload-file", upload.single("file"), async (req, res) => {
       err?.message ||
       "Upload failed";
     return res.status(err.status || 500).json({ ok: false, error: googleMessage, needsReauth: err.needsReauth || false });
+  }
+});
+
+// ------------------------------------------------------------------
+// GET /google-drive/job-folder-init?leadId=X&jobId=Y
+// Get or create Before / After / Other subfolders inside a job's Drive folder.
+// Returns { jobFolder, before, after, other }.
+// ------------------------------------------------------------------
+router.get("/job-folder-init", async (req, res) => {
+  try {
+    const { leadId, jobId } = req.query;
+    if (!leadId || !jobId) return res.status(400).json({ error: "Missing leadId or jobId" });
+
+    const jobResult = await db.query(
+      `SELECT id, job_name FROM jobs WHERE id = $1`,
+      [jobId]
+    );
+    if (!jobResult.rows.length) throw Object.assign(new Error("Job not found"), { status: 404 });
+    const job = jobResult.rows[0];
+
+    const root = await resolveLeadFolder(leadId, { create: true });
+    const jobFolder = await getOrCreateFolder(job.job_name || `Job ${jobId}`, root.id);
+    const [before, after, other] = await Promise.all([
+      getOrCreateFolder("Before", jobFolder.id),
+      getOrCreateFolder("After", jobFolder.id),
+      getOrCreateFolder("Other", jobFolder.id),
+    ]);
+
+    return res.json({ ok: true, jobFolder, before, after, other });
+  } catch (err) {
+    console.error("❌ JOB FOLDER INIT ERROR", err);
+    return res.status(err.status || 500).json({ ok: false, error: err.message, needsReauth: err.needsReauth || false });
   }
 });
 

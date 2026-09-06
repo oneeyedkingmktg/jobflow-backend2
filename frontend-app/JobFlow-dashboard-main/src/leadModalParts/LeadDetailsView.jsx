@@ -346,7 +346,7 @@ const hasEstimate = form?.hasEstimate === true;
 
       {/* FILES MODAL */}
       {showFilesModal && (
-        <LeadFilesPanel leadId={form?.id} projectType={form?.projectType ?? ""} onClose={() => setShowFilesModal(false)} />
+        <LeadFilesPanel leadId={form?.id} onClose={() => setShowFilesModal(false)} />
       )}
 
       {/* BIDDER PANEL */}
