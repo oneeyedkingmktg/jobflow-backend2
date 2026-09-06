@@ -1035,7 +1035,7 @@ export default function JobReportsPanel({ lead, job, onClose }) {
     <div className="fixed inset-0 z-[220] flex flex-col md:items-center md:justify-center md:bg-black/50 md:p-6">
       <div className="flex-1 md:flex-none bg-white flex flex-col overflow-hidden md:max-w-2xl md:w-full md:max-h-[90vh] md:rounded-2xl md:shadow-2xl">
       {/* Header */}
-      <div className="bg-[#1a2e5a] text-white px-4 py-4 flex items-center gap-3 shrink-0">
+      <div className="bg-blue-600 text-white px-4 py-4 flex items-center gap-3 shrink-0">
         <button
           onClick={onClose}
           className="text-white/80 hover:text-white p-1"
@@ -1116,33 +1116,33 @@ export default function JobReportsPanel({ lead, job, onClose }) {
             </div>
 
             {/* Summary */}
-            <div className="bg-[#1a2e5a] rounded-2xl px-4 py-4 space-y-3">
-              <div className="text-[10px] text-white/50 font-semibold uppercase tracking-widest">Job Summary</div>
+            <div className="bg-blue-50 rounded-2xl border border-blue-200 px-4 py-4 space-y-3">
+              <div className="text-[10px] text-blue-500 font-semibold uppercase tracking-widest">Job Summary</div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/70">Labor Cost</span>
-                <span className="text-white font-medium">{fmtMoney(summary.labor.total_cost)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-white/70">Materials Cost</span>
-                <span className="text-white font-medium">{fmtMoney(summary.materials.total_cost)}</span>
-              </div>
-              <div className="border-t border-white/20 pt-3 flex justify-between items-center">
-                <span className="text-sm font-semibold text-white">Total Job Cost</span>
-                <span className="font-bold text-white">{fmtMoney(summary.summary.total_job_cost)}</span>
+                <span className="text-sm text-gray-600">Labor Cost</span>
+                <span className="text-gray-900 font-medium">{fmtMoney(summary.labor.total_cost)}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/70">Contract Price</span>
-                <span className="text-white font-medium">{fmtMoney(summary.summary.contract_price)}</span>
+                <span className="text-sm text-gray-600">Materials Cost</span>
+                <span className="text-gray-900 font-medium">{fmtMoney(summary.materials.total_cost)}</span>
               </div>
-              <div className="border-t border-white/20 pt-3 flex justify-between items-center">
-                <span className="text-sm font-bold text-white">Gross Profit</span>
-                <span className={`font-bold text-lg ${summary.summary.gross_profit >= 0 ? "text-green-300" : "text-red-300"}`}>
+              <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
+                <span className="text-sm font-semibold text-gray-700">Total Job Cost</span>
+                <span className="font-bold text-gray-900">{fmtMoney(summary.summary.total_job_cost)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Contract Price</span>
+                <span className="text-gray-900 font-medium">{fmtMoney(summary.summary.contract_price)}</span>
+              </div>
+              <div className="border-t border-blue-200 pt-3 flex justify-between items-center">
+                <span className="text-sm font-bold text-gray-800">Gross Profit</span>
+                <span className={`font-bold text-lg ${summary.summary.gross_profit >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {fmtMoney(summary.summary.gross_profit)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/70">Margin</span>
-                <span className={`font-semibold ${summary.summary.margin_pct >= 0 ? "text-green-300" : "text-red-300"}`}>
+                <span className="text-sm text-gray-600">Margin</span>
+                <span className={`font-semibold ${summary.summary.margin_pct >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {summary.summary.margin_pct}%
                 </span>
               </div>
