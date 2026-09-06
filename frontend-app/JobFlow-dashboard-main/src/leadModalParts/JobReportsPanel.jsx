@@ -303,7 +303,7 @@ function TimeLogModal({ leadId, companyId, companyUsers, loadingUsers, canEdit, 
 }
 
 // ============================================================================
-// TIME ENTRIES MODAL — clean aggregate view (z-[70])
+// TIME ENTRIES MODAL — aggregate tally by employee (z-[240])
 // ============================================================================
 function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWageChange }) {
   const [rows, setRows] = useState(
@@ -312,8 +312,10 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
   const [saving, setSaving] = useState({});
   const [companyUsers, setCompanyUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
+  // which row's wage is in edit mode, and the value before editing started
+  const [editingWageIdx, setEditingWageIdx] = useState(null);
+  const [wageEditOriginal, setWageEditOriginal] = useState("");
 
   useEffect(() => {
     setRows(employees.map((e) => ({ ...e, wageInput: e.effective_wage > 0 ? String(e.effective_wage) : "" })));
@@ -327,7 +329,21 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
       .finally(() => setLoadingUsers(false));
   }, [companyId]);
 
-  const handleWageBlur = async (emp, idx) => {
+  const setWageInput = (idx, val) =>
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, wageInput: val } : r)));
+
+  const startEditWage = (idx) => {
+    setWageEditOriginal(rows[idx].wageInput);
+    setEditingWageIdx(idx);
+  };
+
+  const cancelEditWage = (idx) => {
+    setWageInput(idx, wageEditOriginal);
+    setEditingWageIdx(null);
+  };
+
+  const saveWage = async (emp, idx) => {
+    setEditingWageIdx(null);
     const newWage = parseFloat(rows[idx].wageInput);
     if (isNaN(newWage) || newWage < 0) return;
     if (newWage === emp.effective_wage && emp.has_override) return;
@@ -341,9 +357,6 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
       setSaving((s) => ({ ...s, [emp.user_id]: false }));
     }
   };
-
-  const setWageInput = (idx, val) =>
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, wageInput: val } : r)));
 
   const computedTotal = rows.reduce((sum, e) => {
     const wage = parseFloat(e.wageInput) || 0;
@@ -365,32 +378,78 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
               <p className="text-gray-500 text-sm text-center py-6">No time entries for this job yet.</p>
             ) : (
               <>
-                <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-gray-400 pb-2 mb-1">
-                  <span className="col-span-1">Employee</span>
-                  <span className="text-center">Hours</span>
-                  <span className="text-center">Wage/hr</span>
-                  <span className="text-right">Subtotal</span>
+                {/* Header */}
+                <div className="flex gap-2 text-xs font-semibold text-gray-400 pb-2 mb-1">
+                  <span className="flex-1">Employee</span>
+                  <span className="w-16 text-center shrink-0">Hours</span>
+                  <span className="w-32 text-center shrink-0">Wage/hr</span>
+                  <span className="w-20 text-right shrink-0">Subtotal</span>
                 </div>
+
                 {rows.map((emp, idx) => {
                   const hrs = (parseInt(emp.total_minutes, 10) || 0) / 60;
                   const wage = parseFloat(emp.wageInput) || 0;
+                  const isEditing = editingWageIdx === idx;
+                  const isSavingWage = !!saving[emp.user_id];
                   return (
-                    <div key={emp.user_id} className="grid grid-cols-4 gap-2 items-center py-3 border-b border-gray-50">
-                      <span className="text-sm text-gray-800 font-medium truncate col-span-1">{emp.user_name}</span>
-                      <span className="text-sm text-gray-700 text-center">{fmtHours(emp.total_minutes)}</span>
-                      <div className="flex items-center justify-center">
-                        <span className="text-gray-400 text-xs mr-0.5">$</span>
-                        <input type="number" min="0" step="0.01" value={emp.wageInput} placeholder="0"
-                          onChange={(e) => canEdit && !emp.non_employee_name && setWageInput(idx, e.target.value)}
-                          onBlur={() => canEdit && !emp.non_employee_name && handleWageBlur(emp, idx)}
-                          className={`w-16 text-sm text-center border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:border-blue-400 ${(!canEdit || emp.non_employee_name) ? "bg-gray-50 text-gray-400 cursor-default" : ""}`}
-                          disabled={!canEdit || !!saving[emp.user_id] || !!emp.non_employee_name}
-                          title={emp.non_employee_name ? "Wage is fixed at entry time for non-employee labor" : !canEdit ? "View only" : undefined} />
+                    <div key={emp.user_id ?? idx} className="flex items-center gap-2 py-3 border-b border-gray-50">
+                      <span className="flex-1 text-sm text-gray-800 font-medium truncate">{emp.user_name}</span>
+                      <span className="w-16 text-sm text-gray-700 text-center shrink-0">{fmtHours(emp.total_minutes)}</span>
+
+                      {/* Wage cell */}
+                      <div className="w-32 flex items-center justify-center shrink-0">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-400 text-xs">$</span>
+                            <input
+                              type="number" min="0" step="0.01"
+                              value={emp.wageInput}
+                              onChange={(e) => setWageInput(idx, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveWage(emp, idx);
+                                if (e.key === "Escape") cancelEditWage(idx);
+                              }}
+                              autoFocus
+                              className="w-14 text-sm text-center border border-blue-400 rounded-lg px-1 py-0.5 focus:outline-none"
+                            />
+                            <button
+                              onClick={() => saveWage(emp, idx)}
+                              disabled={isSavingWage}
+                              className="text-blue-500 hover:text-blue-700 text-sm font-bold disabled:opacity-40"
+                              title="Save"
+                            >✓</button>
+                            <button
+                              onClick={() => cancelEditWage(idx)}
+                              className="text-gray-400 hover:text-gray-600 text-sm"
+                              title="Cancel"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">
+                              {isSavingWage
+                                ? <span className="text-gray-400 text-xs">Saving…</span>
+                                : emp.wageInput
+                                  ? `$${parseFloat(emp.wageInput).toFixed(2)}`
+                                  : <span className="text-gray-400">—</span>}
+                            </span>
+                            {canEdit && !emp.non_employee_name && !isSavingWage && (
+                              <button
+                                onClick={() => startEditWage(idx)}
+                                className="text-blue-400 hover:text-blue-600 text-[11px] font-semibold"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <span className="text-sm font-medium text-gray-800 text-right">{fmtMoney(hrs * wage)}</span>
+
+                      <span className="w-20 text-sm font-medium text-gray-800 text-right shrink-0">{fmtMoney(hrs * wage)}</span>
                     </div>
                   );
                 })}
+
                 <div className="flex justify-between items-center pt-3 mt-1">
                   <span className="font-semibold text-gray-700 text-sm">Total Labor Cost</span>
                   <span className="font-bold text-gray-900">{fmtMoney(computedTotal)}</span>
@@ -398,33 +457,15 @@ function TimeEntriesModal({ leadId, companyId, employees, canEdit, onClose, onWa
               </>
             )}
 
-            <div className="flex gap-2 mt-5">
-              {canEdit && (
-                <button type="button" onClick={() => setShowAddModal(true)}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">
-                  + Add Entry
-                </button>
-              )}
+            <div className="mt-5">
               <button type="button" onClick={() => setShowLogModal(true)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition">
-                View Time Log
+                className="w-full py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition">
+                View / Edit Time Log
               </button>
             </div>
           </div>
         </div>
       </div>
-
-      {showAddModal && (
-        <TimeEntryFormModal
-          leadId={leadId}
-          companyId={companyId}
-          entry={null}
-          companyUsers={companyUsers}
-          loadingUsers={loadingUsers}
-          onSave={() => { setShowAddModal(false); onWageChange(); }}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
 
       {showLogModal && (
         <TimeLogModal
