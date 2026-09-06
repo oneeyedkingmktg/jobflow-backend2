@@ -469,7 +469,7 @@ router.post("/:leadId/import-from-bid", async (req, res) => {
       db.query(
         `SELECT name, unit_label AS unit, unit_price AS unit_cost, quantity AS qty, line_total
          FROM bidder_proposal_items
-         WHERE proposal_id = $1 AND is_included = true
+         WHERE proposal_id = $1
          ORDER BY sort_order, id`,
         [proposalId]
       ),
