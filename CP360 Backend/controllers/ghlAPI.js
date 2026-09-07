@@ -522,14 +522,11 @@ async function ghlRequest(company, endpoint, options = {}) {
           data?.code === 'OPPORTUNITY_NO_DUPLICATE';
 
         if (isDuplicateOpportunity) {
-          console.log("ℹ️ [GHL DUPLICATE OPPORTUNITY - EXPECTED]", {
+          console.log("ℹ️ [GHL DUPLICATE OPPORTUNITY - reusing existing]", {
             url: url.toString(),
             existingId: data?.meta?.existingId
           });
-          const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
-          error.status = res.status;
-          error.response = data;
-          throw error;
+          return data;
         }
 
         console.error("❌ [GHL API ERROR]", {

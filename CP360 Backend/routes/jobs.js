@@ -266,16 +266,13 @@ router.post("/", async (req, res) => {
           name: job_name.trim(),
           monetaryValue: contract_price || null,
         });
-        const oppId = opp?.opportunity?.id || opp?.id;
+        const oppId = opp?.opportunity?.id || opp?.id || opp?.meta?.existingId;
         if (oppId) {
           await db.query(`UPDATE jobs SET ghl_opportunity_id = $1 WHERE id = $2`, [oppId, newJob.id]);
+          console.log(`[GHL] Linked job ${newJob.id} to opportunity ${oppId}`);
         }
       } catch (e) {
-        if (e.response?.code === 'OPPORTUNITY_NO_DUPLICATE') {
-          console.log(`[GHL] Contact already has a GHL opportunity (${e.response?.meta?.existingId}) — skipping duplicate for job ${newJob.id}`);
-        } else {
-          console.error("GHL create opportunity error:", e.message);
-        }
+        console.error("GHL create opportunity error:", e.message);
       }
     });
 
