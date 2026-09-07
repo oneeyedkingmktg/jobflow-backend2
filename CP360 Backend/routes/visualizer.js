@@ -640,7 +640,7 @@ router.get('/lead-blends', authenticateToken, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT id, name, recipe FROM lead_blend_recipes
-       WHERE lead_id=$1 AND company_id=$2 ORDER BY created_at`,
+       WHERE lead_id=$1 AND (company_id=$2 OR $2 IS NULL) ORDER BY created_at`,
       [parseInt(lead_id), req.user.company_id]
     );
     res.json({ blends: rows });
@@ -663,14 +663,14 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
   if (!Array.isArray(recipe) || !recipe.length) return res.status(400).json({ error: 'recipe must be a non-empty array' });
 
   try {
-    const companyId = req.user.company_id;
-
-    // Verify lead belongs to this company
+    // Verify lead exists; master users bypass the company_id filter (their company_id is null)
     const leadCheck = await db.query(
-      `SELECT id FROM leads WHERE id=$1 AND company_id=$2 AND deleted_at IS NULL`,
-      [lead_id, companyId]
+      `SELECT id, company_id FROM leads WHERE id=$1 AND (company_id=$2 OR $2 IS NULL) AND deleted_at IS NULL`,
+      [lead_id, req.user.company_id]
     );
     if (!leadCheck.rows.length) return res.status(404).json({ error: 'Lead not found' });
+
+    const companyId = leadCheck.rows[0].company_id;
 
     // Convert recipe: [{hex, percentage}] → [{rgb, weight}]
     const converted = recipe.map(({ hex, percentage }) => ({
@@ -706,13 +706,12 @@ router.get('/lead-mockups', authenticateToken, async (req, res) => {
   if (!lead_id) return res.status(400).json({ error: 'lead_id required' });
 
   try {
-    const companyId = req.user.company_id;
     const { rows } = await db.query(
       `SELECT id, generated_image_url, original_image_url, blend_name, completed_at, rendering_provider
        FROM visualizations
-       WHERE lead_id=$1 AND company_id=$2 AND status='complete' AND generated_image_url IS NOT NULL
+       WHERE lead_id=$1 AND (company_id=$2 OR $2 IS NULL) AND status='complete' AND generated_image_url IS NOT NULL
        ORDER BY completed_at DESC`,
-      [lead_id, companyId]
+      [lead_id, req.user.company_id]
     );
     res.json({ mockups: rows });
   } catch (err) {
