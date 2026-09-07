@@ -39,6 +39,8 @@ export default function ApptDateTimeModal({
   onRemove,
   companyId = null,
   excludeLeadId = null,
+  requireSalesman = true,
+  zClassName = "z-50",
 }) {
   const { currentCompany } = useCompany();
   const fetchCompanyId = currentCompany?.id || companyId;
@@ -178,26 +180,26 @@ export default function ApptDateTimeModal({
   const handleSave = async () => {
     if (!selectedDate) return;
 
-    // Salesman required
-    if (!selectedSalesmanId) {
-      setSalesmanError("A salesman must be assigned before saving an appointment.");
-      return;
-    }
-    setSalesmanError(null);
-
     const finalTime24 = to24Hour();
 
-    // Check salesman conflict first
-    try {
-      const salesmanCheck = await LeadsAPI.checkSalesmanConflict(selectedSalesmanId, selectedDate, finalTime24, excludeLeadId);
-      if (salesmanCheck.taken) {
-        const sName = salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || "This salesman";
-        const conflict = salesmanCheck.conflict;
-        const conflictTime = conflict?.appointment_time ? ` at ${formatTime12h(conflict.appointment_time)}` : "";
-        setSlotError(`${sName} already has an appointment${conflictTime} (${conflict?.name || "another lead"}). Must be 60+ min apart.`);
+    if (requireSalesman) {
+      if (!selectedSalesmanId) {
+        setSalesmanError("A salesman must be assigned before saving an appointment.");
         return;
       }
-    } catch { /* allow save if check fails */ }
+      setSalesmanError(null);
+
+      try {
+        const salesmanCheck = await LeadsAPI.checkSalesmanConflict(selectedSalesmanId, selectedDate, finalTime24, excludeLeadId);
+        if (salesmanCheck.taken) {
+          const sName = salespeople.find((s) => String(s.id) === String(selectedSalesmanId))?.name || "This salesman";
+          const conflict = salesmanCheck.conflict;
+          const conflictTime = conflict?.appointment_time ? ` at ${formatTime12h(conflict.appointment_time)}` : "";
+          setSlotError(`${sName} already has an appointment${conflictTime} (${conflict?.name || "another lead"}). Must be 60+ min apart.`);
+          return;
+        }
+      } catch { /* allow save if check fails */ }
+    }
 
     setSlotError(null);
     onConfirm(selectedDate, finalTime24, selectedSalesmanId ? parseInt(selectedSalesmanId, 10) : null);
@@ -358,30 +360,32 @@ export default function ApptDateTimeModal({
 
   const footerBlock = (
     <>
-      {/* Salesman picker */}
-      <div className="mt-3 mb-2">
-        <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
-          Salesman <span className="text-red-500">*</span>
-        </label>
-        <select
-          value={selectedSalesmanId}
-          onChange={(e) => { setSelectedSalesmanId(e.target.value); setSalesmanError(null); }}
-          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-        >
-          <option value="">— Select salesman —</option>
-          {salespeople.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        {salespeople.length === 0 && (
-          <p className="text-xs text-amber-600 mt-1">No salespeople set up yet. Mark a user as Salesman in User settings.</p>
-        )}
-        {salesmanError && (
-          <p className="text-xs text-red-600 mt-1">{salesmanError}</p>
-        )}
-      </div>
+      {/* Salesman picker — only when required */}
+      {requireSalesman && (
+        <div className="mt-3 mb-2">
+          <label className="block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">
+            Salesman <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={selectedSalesmanId}
+            onChange={(e) => { setSelectedSalesmanId(e.target.value); setSalesmanError(null); }}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            <option value="">— Select salesman —</option>
+            {salespeople.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {salespeople.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1">No salespeople set up yet. Mark a user as Salesman in User settings.</p>
+          )}
+          {salesmanError && (
+            <p className="text-xs text-red-600 mt-1">{salesmanError}</p>
+          )}
+        </div>
+      )}
 
       {/* Time picker */}
       <div className="mt-3 mb-2">
@@ -417,7 +421,7 @@ export default function ApptDateTimeModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={!selectedDate || !selectedSalesmanId}
+            disabled={!selectedDate || (requireSalesman && !selectedSalesmanId)}
             className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save
@@ -430,7 +434,7 @@ export default function ApptDateTimeModal({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 overflow-y-auto" onClick={onClose}>
+    <div className={`fixed inset-0 bg-black/40 ${zClassName} overflow-y-auto`} onClick={onClose}>
       <div className={`flex min-h-full items-center justify-center ${isLandscape ? "p-2" : "p-4"}`}>
         <div
           className={`bg-white rounded-lg shadow-xl w-full relative ${

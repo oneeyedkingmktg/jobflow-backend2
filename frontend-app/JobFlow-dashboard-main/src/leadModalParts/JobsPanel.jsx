@@ -11,6 +11,22 @@ import BidderPanel from "./BidderPanel";
 import LeadTeamPanel from "./LeadTeamPanel";
 import JobReportsPanel from "./JobReportsPanel";
 import LeadFilesPanel from "./LeadFilesPanel";
+import ApptDateTimeModal from "../ApptDateTimeModal";
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
+function formatTime12h(time) {
+  if (!time) return "";
+  const [h, m] = time.split(":");
+  let hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${hour}:${m} ${ampm}`;
+}
 
 const PROJECT_TYPES = [
   { value: "", label: "— Select Type —" },
@@ -95,6 +111,7 @@ export default function JobsPanel({ lead, onClose }) {
   const [laborJob, setLaborJob] = useState(null);
   const [reportJob, setReportJob] = useState(null);
   const [filesJob, setFilesJob] = useState(null);
+  const [showApptModal, setShowApptModal] = useState(false);
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -251,15 +268,29 @@ export default function JobsPanel({ lead, onClose }) {
         </div>
       </div>
 
-      {/* Appointment Date + Time */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Appointment Date</label>
-          <input type="date" value={form.appointment_date} onChange={f("appointment_date")} className={inputCls} />
-        </div>
-        <div>
-          <label className={labelCls}>Appointment Time</label>
-          <input type="time" value={form.appointment_time} onChange={f("appointment_time")} className={inputCls} />
+      {/* Appointment */}
+      <div>
+        <label className={labelCls}>Appointment</label>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 flex items-center justify-between gap-2">
+          <div className="text-sm leading-snug">
+            {form.appointment_date ? (
+              <span className="font-medium text-gray-800">
+                {formatDisplayDate(form.appointment_date)}
+                {form.appointment_time && (
+                  <span className="text-indigo-700 ml-1">• {formatTime12h(form.appointment_time)}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-gray-400 italic text-sm">No appointment set</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowApptModal(true)}
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 whitespace-nowrap shrink-0"
+          >
+            {form.appointment_date ? "Edit" : "Set Appointment"}
+          </button>
         </div>
       </div>
 
@@ -549,6 +580,24 @@ export default function JobsPanel({ lead, onClose }) {
           jobId={filesJob.id}
           jobName={filesJob.jobName}
           onClose={() => setFilesJob(null)}
+        />
+      )}
+
+      {/* Appointment date/time picker */}
+      {showApptModal && (
+        <ApptDateTimeModal
+          apptDate={form.appointment_date || null}
+          apptTime={form.appointment_time || null}
+          companyId={companyId}
+          requireSalesman={false}
+          zClassName="z-[220]"
+          onConfirm={(date, time24) => {
+            setForm((p) => ({ ...p, appointment_date: date, appointment_time: time24 }));
+          }}
+          onRemove={() => {
+            setForm((p) => ({ ...p, appointment_date: "", appointment_time: "" }));
+          }}
+          onClose={() => setShowApptModal(false)}
         />
       )}
     </div>
