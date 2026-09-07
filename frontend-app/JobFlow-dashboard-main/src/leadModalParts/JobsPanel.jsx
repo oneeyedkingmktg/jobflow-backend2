@@ -600,7 +600,7 @@ export default function JobsPanel({ lead, onClose }) {
         <BidderPanel
           lead={lead}
           job={bidsJob}
-          onClose={() => { setBidsJob(null); closeCard(); load(); }}
+          onClose={() => { setBidsJob(null); load(); }}
         />
       )}
 
