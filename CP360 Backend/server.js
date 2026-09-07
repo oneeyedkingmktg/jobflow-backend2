@@ -536,15 +536,32 @@ async function runMigrations() {
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_not_sold TEXT`,
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_complete TEXT`,
   ];
-  for (const sql of migrations) {
-    try {
-      await pool.query(sql);
-      console.log('Migration OK:', sql.slice(0, 80));
-    } catch (e) {
-      console.warn('Migration skipped:', e.message, '|', sql.slice(0, 80));
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  const { rows } = await pool.query('SELECT COALESCE(MAX(version), -1) AS last FROM schema_migrations');
+  const lastApplied = rows[0].last;
+  const pending = migrations.length - (lastApplied + 1);
+
+  if (pending === 0) {
+    console.log(`Migrations: all ${migrations.length} already applied — skipping`);
+  } else {
+    console.log(`Migrations: running ${pending} new (versions ${lastApplied + 1}–${migrations.length - 1})`);
+    for (let i = lastApplied + 1; i < migrations.length; i++) {
+      try {
+        await pool.query(migrations[i]);
+        console.log(`Migration ${i} OK:`, migrations[i].slice(0, 80));
+      } catch (e) {
+        console.warn(`Migration ${i} skipped:`, e.message.slice(0, 100));
+      }
+      await pool.query('INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING', [i]);
     }
+    console.log('Migrations complete');
   }
-  console.log('Migrations complete');
 
   // Auto-seed holidays if the table is empty
   try {
