@@ -72,6 +72,7 @@ export default function DateModal({
   onRemove,
   label = "Select Date",
   allowTentative = false,
+  zClassName = "z-50",
 }) {
   const { currentCompany: company } = useCompany();
   const today = new Date();
@@ -450,7 +451,7 @@ export default function DateModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 z-50 overflow-y-auto"
+      className={`fixed inset-0 bg-black/40 ${zClassName} overflow-y-auto`}
       onClick={onClose}
     >
       <div className={`flex min-h-full items-center justify-center ${isLandscape ? "p-2" : "p-4"}`}>

@@ -12,11 +12,18 @@ import LeadTeamPanel from "./LeadTeamPanel";
 import JobReportsPanel from "./JobReportsPanel";
 import LeadFilesPanel from "./LeadFilesPanel";
 import ApptDateTimeModal from "../ApptDateTimeModal";
+import DateModal from "../DateModal";
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
+function formatDisplayDateShort(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatTime12h(time) {
@@ -26,6 +33,21 @@ function formatTime12h(time) {
   const ampm = hour >= 12 ? "PM" : "AM";
   hour = hour % 12 || 12;
   return `${hour}:${m} ${ampm}`;
+}
+
+function daysBetween(startStr, endStr) {
+  const start = new Date(startStr + "T12:00:00");
+  const end = new Date(endStr + "T12:00:00");
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+function getMondayOfWeek(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDay();
+  if (day === 1) return dateStr;
+  const offset = day === 0 ? 1 : -(day - 1);
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().split("T")[0];
 }
 
 const PROJECT_TYPES = [
@@ -83,6 +105,8 @@ const EMPTY_FORM = {
   appointment_date: "",
   appointment_time: "",
   install_date: "",
+  install_end_date: "",
+  install_tentative: false,
   contract_price: "",
   notes: "",
   // jobsite address (prefilled from lead on add)
@@ -112,6 +136,7 @@ export default function JobsPanel({ lead, onClose }) {
   const [reportJob, setReportJob] = useState(null);
   const [filesJob, setFilesJob] = useState(null);
   const [showApptModal, setShowApptModal] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -141,6 +166,8 @@ export default function JobsPanel({ lead, onClose }) {
       appointment_date: job.appointmentDate ? job.appointmentDate.split("T")[0] : "",
       appointment_time: job.appointmentTime || "",
       install_date: job.installDate ? job.installDate.split("T")[0] : "",
+      install_end_date: job.installEndDate ? job.installEndDate.split("T")[0] : "",
+      install_tentative: job.installTentative || false,
       contract_price: job.contractPrice != null ? String(job.contractPrice) : "",
       notes: job.notes || job.description || "",
       address: job.address || "",
@@ -197,6 +224,8 @@ export default function JobsPanel({ lead, onClose }) {
         appointment_date: form.appointment_date || null,
         appointment_time: form.appointment_time || null,
         install_date: form.install_date || null,
+        install_end_date: form.install_end_date || null,
+        install_tentative: form.install_tentative || false,
         contract_price: form.contract_price ? parseFloat(form.contract_price) : null,
         notes: form.notes || null,
         address: form.address || null,
@@ -294,17 +323,39 @@ export default function JobsPanel({ lead, onClose }) {
         </div>
       </div>
 
-      {/* Install Date + Contract Price */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Install Date</label>
-          <input type="date" value={form.install_date} onChange={f("install_date")} className={inputCls} />
+      {/* Install */}
+      <div>
+        <label className={labelCls}>Install Date</label>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 flex items-center justify-between gap-2">
+          <div className="text-sm leading-snug">
+            {form.install_date ? (() => {
+              if (form.install_tentative) {
+                return <span className="font-medium text-gray-800">Week of {formatDisplayDateShort(getMondayOfWeek(form.install_date))} <span className="text-gray-400 text-xs">(Tentative)</span></span>;
+              }
+              if (form.install_end_date && form.install_end_date !== form.install_date) {
+                const days = daysBetween(form.install_date, form.install_end_date);
+                return <span className="font-medium text-gray-800">{formatDisplayDateShort(form.install_date)} – {formatDisplayDateShort(form.install_end_date)} <span className="text-indigo-700">({days} days)</span></span>;
+              }
+              return <span className="font-medium text-gray-800">{formatDisplayDate(form.install_date)}</span>;
+            })() : (
+              <span className="text-gray-400 italic text-sm">No install date set</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowInstallModal(true)}
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 whitespace-nowrap shrink-0"
+          >
+            {form.install_date ? "Edit" : "Set Install"}
+          </button>
         </div>
-        <div>
-          <label className={labelCls}>Contract Price</label>
-          <input type="number" value={form.contract_price} onChange={f("contract_price")}
-            placeholder="0" min="0" step="0.01" className={inputCls} />
-        </div>
+      </div>
+
+      {/* Contract Price */}
+      <div>
+        <label className={labelCls}>Contract Price</label>
+        <input type="number" value={form.contract_price} onChange={f("contract_price")}
+          placeholder="0" min="0" step="0.01" className={inputCls} />
       </div>
 
       {/* Notes */}
@@ -598,6 +649,35 @@ export default function JobsPanel({ lead, onClose }) {
             setForm((p) => ({ ...p, appointment_date: "", appointment_time: "" }));
           }}
           onClose={() => setShowApptModal(false)}
+        />
+      )}
+
+      {/* Install date picker */}
+      {showInstallModal && (
+        <DateModal
+          initialDate={form.install_date || null}
+          initialEndDate={form.install_end_date || null}
+          initialTentative={form.install_tentative || false}
+          initialDurationDays={
+            form.install_date && form.install_end_date
+              ? daysBetween(form.install_date, form.install_end_date)
+              : 1
+          }
+          label="Set Install Date"
+          allowTentative={true}
+          zClassName="z-[220]"
+          onConfirm={(startDate, tentative, duration, endDate) => {
+            setForm((p) => ({
+              ...p,
+              install_date: startDate,
+              install_end_date: endDate || null,
+              install_tentative: tentative,
+            }));
+          }}
+          onRemove={() => {
+            setForm((p) => ({ ...p, install_date: "", install_end_date: "", install_tentative: false }));
+          }}
+          onClose={() => setShowInstallModal(false)}
         />
       )}
     </div>
