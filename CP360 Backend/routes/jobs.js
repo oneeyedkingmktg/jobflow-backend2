@@ -271,7 +271,11 @@ router.post("/", async (req, res) => {
           await db.query(`UPDATE jobs SET ghl_opportunity_id = $1 WHERE id = $2`, [oppId, newJob.id]);
         }
       } catch (e) {
-        console.error("GHL create opportunity error:", e.message);
+        if (e.response?.code === 'OPPORTUNITY_NO_DUPLICATE') {
+          console.log(`[GHL] Contact already has a GHL opportunity (${e.response?.meta?.existingId}) — skipping duplicate for job ${newJob.id}`);
+        } else {
+          console.error("GHL create opportunity error:", e.message);
+        }
       }
     });
 
