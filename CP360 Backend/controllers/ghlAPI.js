@@ -1677,8 +1677,11 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
           title: `${contactName} - ${job.job_name} - Appointment`,
           startTime: startDt.toISOString(),
           endTime: endDt.toISOString(),
+          appointmentStatus: 'confirmed',
+          toNotify: false,
           ignoreDateRanges: true,
         };
+        console.log('[JOB APPT SYNC] Payload:', JSON.stringify(apptPayload));
         try {
           const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
             method: 'POST',
@@ -1687,24 +1690,7 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
           result.apptEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
           console.log('[JOB APPT SYNC] Created appointment event ID:', result.apptEventId);
         } catch (e) {
-          if (isCalendarConflict(e)) {
-            // Some GHL calendar types ignore ignoreDateRanges — fall back to block-slot
-            console.warn('[JOB APPT] Appointments endpoint rejected slot, falling back to block-slot');
-            try {
-              result.apptEventId = await createBlockSlot(company, {
-                locationId: company.ghl_location_id,
-                calendarId: company.ghl_appt_calendar,
-                title: `${contactName} - ${job.job_name} - Appointment`,
-                startTime: startDt.toISOString(),
-                endTime: endDt.toISOString(),
-              });
-              console.log('[JOB APPT SYNC] Created block-slot event ID:', result.apptEventId);
-            } catch (e2) {
-              console.error('[JOB APPT SYNC] Block-slot fallback also failed:', e2.message);
-            }
-          } else {
-            console.error('[JOB APPT SYNC] Failed:', e.message);
-          }
+          console.error('[JOB APPT SYNC] Failed:', e.message);
         }
       }
     }
