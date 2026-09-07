@@ -638,10 +638,12 @@ router.get('/lead-blends', authenticateToken, async (req, res) => {
   const { lead_id } = req.query;
   if (!lead_id) return res.status(400).json({ error: 'lead_id required' });
   try {
+    const isMaster = req.user.role === 'master';
     const { rows } = await db.query(
-      `SELECT id, name, recipe FROM lead_blend_recipes
-       WHERE lead_id=$1 AND (company_id=$2 OR $2 IS NULL) ORDER BY created_at`,
-      [parseInt(lead_id), req.user.company_id]
+      isMaster
+        ? `SELECT id, name, recipe FROM lead_blend_recipes WHERE lead_id=$1 ORDER BY created_at`
+        : `SELECT id, name, recipe FROM lead_blend_recipes WHERE lead_id=$1 AND company_id=$2 ORDER BY created_at`,
+      isMaster ? [parseInt(lead_id)] : [parseInt(lead_id), req.user.company_id]
     );
     res.json({ blends: rows });
   } catch (err) {
@@ -663,13 +665,14 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
   if (!Array.isArray(recipe) || !recipe.length) return res.status(400).json({ error: 'recipe must be a non-empty array' });
 
   try {
-    console.log('[apply-internal] lead_id:', lead_id, 'user.company_id:', req.user.company_id, 'user.role:', req.user.role);
-    // Verify lead exists; master users bypass the company_id filter (their company_id is null)
+    // Master role bypasses company filter — their JWT company_id is their own company, not the client's
+    const isMaster = req.user.role === 'master';
     const leadCheck = await db.query(
-      `SELECT id, company_id FROM leads WHERE id=$1 AND (company_id=$2 OR $2 IS NULL) AND deleted_at IS NULL`,
-      [lead_id, req.user.company_id]
+      isMaster
+        ? `SELECT id, company_id FROM leads WHERE id=$1 AND deleted_at IS NULL`
+        : `SELECT id, company_id FROM leads WHERE id=$1 AND company_id=$2 AND deleted_at IS NULL`,
+      isMaster ? [lead_id] : [lead_id, req.user.company_id]
     );
-    console.log('[apply-internal] leadCheck rows:', leadCheck.rows.length);
     if (!leadCheck.rows.length) return res.status(404).json({ error: 'Lead not found' });
 
     const companyId = leadCheck.rows[0].company_id;
@@ -708,12 +711,18 @@ router.get('/lead-mockups', authenticateToken, async (req, res) => {
   if (!lead_id) return res.status(400).json({ error: 'lead_id required' });
 
   try {
+    const isMaster = req.user.role === 'master';
     const { rows } = await db.query(
-      `SELECT id, generated_image_url, original_image_url, blend_name, completed_at, rendering_provider
-       FROM visualizations
-       WHERE lead_id=$1 AND (company_id=$2 OR $2 IS NULL) AND status='complete' AND generated_image_url IS NOT NULL
-       ORDER BY completed_at DESC`,
-      [lead_id, req.user.company_id]
+      isMaster
+        ? `SELECT id, generated_image_url, original_image_url, blend_name, completed_at, rendering_provider
+           FROM visualizations
+           WHERE lead_id=$1 AND status='complete' AND generated_image_url IS NOT NULL
+           ORDER BY completed_at DESC`
+        : `SELECT id, generated_image_url, original_image_url, blend_name, completed_at, rendering_provider
+           FROM visualizations
+           WHERE lead_id=$1 AND company_id=$2 AND status='complete' AND generated_image_url IS NOT NULL
+           ORDER BY completed_at DESC`,
+      isMaster ? [lead_id] : [lead_id, req.user.company_id]
     );
     res.json({ mockups: rows });
   } catch (err) {
