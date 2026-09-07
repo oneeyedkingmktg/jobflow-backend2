@@ -1674,7 +1674,10 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
       console.log('[JOB APPT] No appt calendar configured — skipping');
     } else {
       if (hadApptEvent) {
-        try { await deleteCalendarEvent(company, oldJob.ghl_appt_event_id, contactId); } catch {}
+        try {
+          const ok = await deleteBlockSlot(company, oldJob.ghl_appt_event_id);
+          if (!ok) await deleteCalendarEvent(company, oldJob.ghl_appt_event_id, contactId);
+        } catch {}
       }
       const startDt = convertToUTC(`${nd(job.appointment_date)}T${apptTime}:00`, companyTimezone);
       const endDt = new Date(startDt.getTime() + 15 * 60000);
@@ -1702,7 +1705,26 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
           result.apptEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
           console.log('[JOB APPT SYNC] Created appointment event ID:', result.apptEventId);
         } catch (e) {
-          console.error('[JOB APPT SYNC] Failed:', e.message);
+          const isSlotErr = e.status === 400 &&
+            (e.response?.message ?? '').toLowerCase().includes('slot you have selected');
+          if (isSlotErr) {
+            console.warn('[JOB APPT SYNC] Slot unavailable — falling back to block-slot');
+            try {
+              result.apptEventId = await createBlockSlot(company, {
+                locationId: company.ghl_location_id,
+                calendarId: company.ghl_appt_calendar,
+                contactId,
+                title: apptPayload.title,
+                startTime: apptPayload.startTime,
+                endTime: apptPayload.endTime,
+              });
+              console.log('[JOB APPT SYNC] Block-slot fallback created event ID:', result.apptEventId);
+            } catch (e2) {
+              console.error('[JOB APPT SYNC] Block-slot fallback also failed:', e2.message);
+            }
+          } else {
+            console.error('[JOB APPT SYNC] Failed:', e.message);
+          }
         }
       }
     }
