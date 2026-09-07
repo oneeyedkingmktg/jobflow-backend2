@@ -45,10 +45,28 @@ const toCamel = (row) => ({
   salesmanName: row.salesman_name || null,
   crewName: row.crew_name || null,
   ghlOpportunityId: row.ghl_opportunity_id,
+  ghlApptEventId: row.ghl_appt_event_id,
+  ghlInstallEventId: row.ghl_install_event_id,
   createdByUserId: row.created_by_user_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
+
+// Helper: write event IDs back to the job row after a sync
+async function persistJobEventIds(jobId, syncResult) {
+  if (syncResult.apptEventId !== undefined) {
+    await db.query(
+      `UPDATE jobs SET ghl_appt_event_id = $1 WHERE id = $2`,
+      [syncResult.apptEventId, jobId]
+    );
+  }
+  if (syncResult.installEventId !== undefined) {
+    await db.query(
+      `UPDATE jobs SET ghl_install_event_id = $1 WHERE id = $2`,
+      [syncResult.installEventId, jobId]
+    );
+  }
+}
 
 // ============================================================================
 // GET /api/jobs/pipeline — all jobs for the pipeline view (with contact info)
@@ -222,7 +240,7 @@ router.post("/", async (req, res) => {
     const newJob = result.rows[0];
     res.status(201).json({ job: toCamel(newJob) });
 
-    // GHL opportunity create — fire and forget after response sent
+    // GHL opportunity create — fire and forget
     setImmediate(async () => {
       try {
         const [companyRow, leadRow] = await Promise.all([
@@ -256,6 +274,41 @@ router.post("/", async (req, res) => {
         console.error("GHL create opportunity error:", e.message);
       }
     });
+
+    // GHL calendar sync — fire and forget
+    if (newJob.appointment_date || newJob.install_date) {
+      setImmediate(async () => {
+        try {
+          const [companyRow, leadRow] = await Promise.all([
+            db.query(`SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL`, [companyId]),
+            db.query(
+              `SELECT ghl_contact_id, full_name, first_name, last_name
+                 FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+              [lead_id]
+            ),
+          ]);
+          const company = companyRow.rows[0];
+          const lead = leadRow.rows[0];
+          if (!company || !lead?.ghl_contact_id) return;
+          if (!company.ghl_appt_calendar && !company.ghl_install_calendar) return;
+
+          const contactName = lead.full_name ||
+            `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown';
+
+          const syncResult = await ghlAPI.syncJobCalendarEvent({
+            job: newJob,
+            oldJob: null,
+            contactId: lead.ghl_contact_id,
+            contactName,
+            company,
+          });
+
+          await persistJobEventIds(newJob.id, syncResult);
+        } catch (e) {
+          console.error("GHL job calendar create error:", e.message);
+        }
+      });
+    }
   } catch (err) {
     console.error("POST /api/jobs error:", err);
     res.status(500).json({ error: "Failed to create job" });
@@ -293,6 +346,16 @@ router.put("/:id", async (req, res) => {
       primary_crew_id,
       ghl_opportunity_id,
     } = req.body;
+
+    // Capture old state before update — needed for calendar change detection
+    const oldJobResult = await db.query(
+      `SELECT appointment_date, appointment_time, install_date, install_end_date,
+              install_tentative, ghl_appt_event_id, ghl_install_event_id, lead_id
+         FROM jobs WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [id, companyId]
+    );
+    if (!oldJobResult.rows.length) return res.status(404).json({ error: "Job not found" });
+    const oldJob = oldJobResult.rows[0];
 
     const result = await db.query(
       `UPDATE jobs SET
@@ -380,6 +443,39 @@ router.put("/:id", async (req, res) => {
         }
       });
     }
+
+    // GHL calendar sync — fire and forget
+    setImmediate(async () => {
+      try {
+        const [companyRow, leadRow] = await Promise.all([
+          db.query(`SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL`, [companyId]),
+          db.query(
+            `SELECT ghl_contact_id, full_name, first_name, last_name
+               FROM leads WHERE id = $1 AND deleted_at IS NULL`,
+            [oldJob.lead_id]
+          ),
+        ]);
+        const company = companyRow.rows[0];
+        const lead = leadRow.rows[0];
+        if (!company || !lead?.ghl_contact_id) return;
+        if (!company.ghl_appt_calendar && !company.ghl_install_calendar) return;
+
+        const contactName = lead.full_name ||
+          `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unknown';
+
+        const syncResult = await ghlAPI.syncJobCalendarEvent({
+          job: updatedJob,
+          oldJob,
+          contactId: lead.ghl_contact_id,
+          contactName,
+          company,
+        });
+
+        await persistJobEventIds(updatedJob.id, syncResult);
+      } catch (e) {
+        console.error("GHL job calendar update error:", e.message);
+      }
+    });
   } catch (err) {
     console.error("PUT /api/jobs/:id error:", err);
     res.status(500).json({ error: "Failed to update job" });
@@ -396,6 +492,16 @@ router.delete("/:id", async (req, res) => {
 
     const { id } = req.params;
 
+    // Capture event IDs before deleting so we can clean up GHL
+    const jobRow = await db.query(
+      `SELECT j.ghl_appt_event_id, j.ghl_install_event_id, j.lead_id,
+              l.ghl_contact_id
+         FROM jobs j
+         JOIN leads l ON l.id = j.lead_id
+        WHERE j.id = $1 AND j.company_id = $2 AND j.deleted_at IS NULL`,
+      [id, companyId]
+    );
+
     const result = await db.query(
       `UPDATE jobs
           SET deleted_at = NOW(), updated_at = NOW()
@@ -409,6 +515,30 @@ router.delete("/:id", async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: "Job not found" });
 
     res.json({ success: true });
+
+    // GHL calendar cleanup — fire and forget
+    const jobData = jobRow.rows[0];
+    if (jobData && (jobData.ghl_appt_event_id || jobData.ghl_install_event_id)) {
+      setImmediate(async () => {
+        try {
+          const companyRow = await db.query(
+            `SELECT * FROM companies WHERE id = $1 AND deleted_at IS NULL`,
+            [companyId]
+          );
+          const company = companyRow.rows[0];
+          if (!company) return;
+
+          await ghlAPI.deleteJobCalendarEvents({
+            company,
+            apptEventId: jobData.ghl_appt_event_id,
+            installEventId: jobData.ghl_install_event_id,
+            contactId: jobData.ghl_contact_id,
+          });
+        } catch (e) {
+          console.error("GHL job calendar delete error:", e.message);
+        }
+      });
+    }
   } catch (err) {
     console.error("DELETE /api/jobs/:id error:", err);
     res.status(500).json({ error: "Failed to delete job" });

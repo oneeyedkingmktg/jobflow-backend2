@@ -1632,6 +1632,139 @@ async function syncEventToCalendar(lead, company, calendarId, calendarType, cont
 // MODULE EXPORTS
 // ----------------------------------------------------------------------------
 // ============================================================================
+// JOB CALENDAR SYNC
+// Simpler than the lead version — no estimator data, no sync guard needed.
+// Returns { apptEventId?, installEventId? } — undefined means no action taken.
+// ============================================================================
+async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, company }) {
+  const companyTimezone = company.timezone || 'America/New_York';
+  const result = {};
+
+  const nd = (d) => d ? new Date(d).toISOString().split('T')[0] : null;
+
+  // ---- APPOINTMENT ----
+  const apptTime = normalizeTimeTo24h(job.appointment_time);
+  const hasAppt = !!(job.appointment_date && apptTime && apptTime !== '00:00');
+  const hadApptEvent = !!(oldJob?.ghl_appt_event_id);
+  const apptDateChanged = !oldJob || (
+    nd(job.appointment_date) !== nd(oldJob.appointment_date) ||
+    normalizeTimeTo24h(job.appointment_time) !== normalizeTimeTo24h(oldJob.appointment_time)
+  );
+
+  if (!hasAppt && hadApptEvent) {
+    console.log('[JOB APPT] Clearing GHL event:', oldJob.ghl_appt_event_id);
+    try { await deleteCalendarEvent(company, oldJob.ghl_appt_event_id, contactId); } catch (e) {
+      console.warn('[JOB APPT DELETE] Failed:', e.message);
+    }
+    result.apptEventId = null;
+  } else if (hasAppt && apptDateChanged) {
+    if (!company.ghl_appt_calendar) {
+      console.log('[JOB APPT] No appt calendar configured — skipping');
+    } else {
+      if (hadApptEvent) {
+        try { await deleteCalendarEvent(company, oldJob.ghl_appt_event_id, contactId); } catch {}
+      }
+      try {
+        const startDt = convertToUTC(`${nd(job.appointment_date)}T${apptTime}:00`, companyTimezone);
+        const endDt = new Date(startDt.getTime() + 15 * 60000);
+        const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
+          method: 'POST',
+          body: {
+            locationId: company.ghl_location_id,
+            calendarId: company.ghl_appt_calendar,
+            contactId,
+            title: `${contactName} - ${job.job_name} - Appointment`,
+            startTime: startDt.toISOString(),
+            endTime: endDt.toISOString(),
+            ignoreDateRanges: true,
+          },
+        });
+        result.apptEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+        console.log('[JOB APPT SYNC] Created event ID:', result.apptEventId);
+      } catch (e) {
+        console.error('[JOB APPT SYNC] Failed:', e.message);
+      }
+    }
+  }
+
+  // ---- INSTALL ----
+  const hasInstall = !!job.install_date;
+  const hadInstallEvent = !!(oldJob?.ghl_install_event_id);
+  const installDateChanged = !oldJob || (
+    nd(job.install_date) !== nd(oldJob.install_date) ||
+    nd(job.install_end_date) !== nd(oldJob.install_end_date)
+  );
+
+  if (!hasInstall && hadInstallEvent) {
+    console.log('[JOB INSTALL] Clearing GHL event:', oldJob.ghl_install_event_id);
+    try {
+      const ok = await deleteBlockSlot(company, oldJob.ghl_install_event_id);
+      if (!ok) await deleteCalendarEvent(company, oldJob.ghl_install_event_id, contactId);
+    } catch (e) {
+      console.warn('[JOB INSTALL DELETE] Failed:', e.message);
+    }
+    result.installEventId = null;
+  } else if (hasInstall && installDateChanged) {
+    if (!company.ghl_install_calendar) {
+      console.log('[JOB INSTALL] No install calendar configured — skipping');
+    } else {
+      if (hadInstallEvent) {
+        try {
+          const ok = await deleteBlockSlot(company, oldJob.ghl_install_event_id);
+          if (!ok) await deleteCalendarEvent(company, oldJob.ghl_install_event_id, contactId);
+        } catch {}
+      }
+      try {
+        const dateOnly = nd(job.install_date);
+        const startDt = convertToUTC(`${dateOnly}T13:00:00`, companyTimezone);
+        const endDateOnly = job.install_end_date ? nd(job.install_end_date) : null;
+        const endDt = (endDateOnly && endDateOnly !== dateOnly)
+          ? convertToUTC(`${endDateOnly}T13:00:00`, companyTimezone)
+          : convertToUTC(`${dateOnly}T14:00:00`, companyTimezone);
+
+        let title = `${contactName} - ${job.job_name} - Install`;
+        if (job.install_tentative) title += ' - Tentative';
+
+        const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
+          method: 'POST',
+          body: {
+            locationId: company.ghl_location_id,
+            calendarId: company.ghl_install_calendar,
+            contactId,
+            title,
+            startTime: startDt.toISOString(),
+            endTime: endDt.toISOString(),
+            ignoreDateRanges: true,
+          },
+        });
+        result.installEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+        console.log('[JOB INSTALL SYNC] Created event ID:', result.installEventId);
+      } catch (e) {
+        console.error('[JOB INSTALL SYNC] Failed:', e.message);
+      }
+    }
+  }
+
+  return result;
+}
+
+async function deleteJobCalendarEvents({ company, apptEventId, installEventId, contactId }) {
+  if (apptEventId) {
+    try { await deleteCalendarEvent(company, apptEventId, contactId); } catch (e) {
+      console.warn('[JOB DELETE appt event]', e.message);
+    }
+  }
+  if (installEventId) {
+    try {
+      const ok = await deleteBlockSlot(company, installEventId);
+      if (!ok && contactId) await deleteCalendarEvent(company, installEventId, contactId);
+    } catch (e) {
+      console.warn('[JOB DELETE install event]', e.message);
+    }
+  }
+}
+
+// ============================================================================
 // GHL OPPORTUNITY / PIPELINE API
 // ============================================================================
 
@@ -1666,6 +1799,8 @@ async function updateOpportunityStage(company, opportunityId, stageId) {
 
 module.exports = {
   syncLeadCalendarEvent,
+  syncJobCalendarEvent,
+  deleteJobCalendarEvents,
   listCalendars,
   listPipelines,
   createOpportunity,
