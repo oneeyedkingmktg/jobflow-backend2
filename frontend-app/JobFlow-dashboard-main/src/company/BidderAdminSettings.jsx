@@ -373,6 +373,9 @@ export default function BidderAdminSettings({ companyId }) {
       sku: item.sku || '',
       kit_price: item.kit_price != null ? item.kit_price : '',
       sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
+      cost_override: item.cost_override ?? null,
+      coverage_override: item.coverage_override ?? null,
+      source_supplier_product_id: item.source_supplier_product_id || null,
       is_system: item.is_system || false,
       is_charge_only: item.is_charge_only || false,
       color: item.color || '',
@@ -399,6 +402,34 @@ export default function BidderAdminSettings({ companyId }) {
       await loadLibrary();
     } catch (e) {
       alert('Failed to save item');
+    }
+  }
+
+  async function handleResetCostOverride(itemId) {
+    try {
+      await BidderAPI.updateLibraryItem(itemId, {
+        ...editItemForm, kit_price: null,
+        is_charge_only: editItemForm.is_charge_only || false,
+        component_ids: editItemForm.is_system ? editSystemComponentIds : undefined,
+      }, companyId);
+      setEditItemId(null);
+      await loadLibrary();
+    } catch (e) {
+      alert('Failed to reset');
+    }
+  }
+
+  async function handleResetCoverageOverride(itemId) {
+    try {
+      await BidderAPI.updateLibraryItem(itemId, {
+        ...editItemForm, sqft_per_kit: null,
+        is_charge_only: editItemForm.is_charge_only || false,
+        component_ids: editItemForm.is_system ? editSystemComponentIds : undefined,
+      }, companyId);
+      setEditItemId(null);
+      await loadLibrary();
+    } catch (e) {
+      alert('Failed to reset');
     }
   }
 
@@ -801,8 +832,30 @@ export default function BidderAdminSettings({ companyId }) {
                         <div className="grid grid-cols-4 gap-3">
                           <div><label className={labelCls}>Supplier</label><input className={inputCls} value={editItemForm.supplier} onChange={(e) => setEditItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" /></div>
                           <div><label className={labelCls}>SKU</label><input className={inputCls} value={editItemForm.sku} onChange={(e) => setEditItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" /></div>
-                          <div><label className={labelCls}>Kit Price ($)</label><input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" /></div>
-                          <div><label className={labelCls}>SF per Kit</label><input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" /></div>
+                          <div>
+                            <label className={labelCls}>
+                              Kit Price ($)
+                              {editItemForm.source_supplier_product_id && editItemForm.cost_override != null && (
+                                <span className="ml-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Custom</span>
+                              )}
+                            </label>
+                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.kit_price} onChange={(e) => setEditItemForm((p) => ({ ...p, kit_price: e.target.value, cost_override: e.target.value !== '' ? e.target.value : null }))} placeholder="0.00" />
+                            {editItemForm.source_supplier_product_id && editItemForm.cost_override != null && (
+                              <button type="button" onClick={() => handleResetCostOverride(item.id)} className="text-xs text-blue-500 hover:underline mt-0.5">Reset to supplier value</button>
+                            )}
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              SF per Kit
+                              {editItemForm.source_supplier_product_id && editItemForm.coverage_override != null && (
+                                <span className="ml-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Custom</span>
+                              )}
+                            </label>
+                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value, coverage_override: e.target.value !== '' ? e.target.value : null }))} placeholder="0" />
+                            {editItemForm.source_supplier_product_id && editItemForm.coverage_override != null && (
+                              <button type="button" onClick={() => handleResetCoverageOverride(item.id)} className="text-xs text-blue-500 hover:underline mt-0.5">Reset to supplier value</button>
+                            )}
+                          </div>
                         </div>
                       )}
                       <div className="flex gap-2">
@@ -836,8 +889,18 @@ export default function BidderAdminSettings({ companyId }) {
                             {item.description && <span className="text-xs text-gray-500 truncate">{item.description}</span>}
                             {!item.is_charge_only && item.supplier && <span className="text-xs text-gray-400">Supplier: {item.supplier}</span>}
                             {!item.is_charge_only && item.sku && <span className="text-xs text-gray-400 font-mono">SKU: {item.sku}</span>}
-                            {!item.is_charge_only && item.kit_price != null && <span className="text-xs text-gray-400">Kit: ${parseFloat(item.kit_price).toFixed(2)}</span>}
-                            {!item.is_charge_only && item.sqft_per_kit != null && <span className="text-xs text-gray-400">{parseFloat(item.sqft_per_kit)} sf/kit</span>}
+                            {!item.is_charge_only && item.kit_price != null && (
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                Kit: ${parseFloat(item.kit_price).toFixed(2)}
+                                {item.cost_override != null && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded leading-none">Custom</span>}
+                              </span>
+                            )}
+                            {!item.is_charge_only && item.sqft_per_kit != null && (
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                {parseFloat(item.sqft_per_kit)} sf/kit
+                                {item.coverage_override != null && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded leading-none">Custom</span>}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

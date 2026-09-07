@@ -176,13 +176,20 @@ router.get('/proposal/:id/materials', async (req, res) => {
     );
     if (!propCheck.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // Fetch proposal items with library cost/coverage data
+    // Fetch proposal items — resolve effective kit_price/sqft_per_kit via supplier inheritance
     const itemsResult = await pool.query(
       `SELECT bpi.id, bpi.library_item_id, bpi.quantity,
               COALESCE(li.internal_name, li.name) AS lib_name,
-              li.kit_price, li.sqft_per_kit, li.is_system, li.is_charge_only
+              CASE WHEN li.source_supplier_product_id IS NOT NULL
+                   THEN COALESCE(li.cost_override, gsp.kit_price)
+                   ELSE li.kit_price END AS kit_price,
+              CASE WHEN li.source_supplier_product_id IS NOT NULL
+                   THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
+                   ELSE li.sqft_per_kit END AS sqft_per_kit,
+              li.is_system, li.is_charge_only
        FROM bidder_proposal_items bpi
        JOIN bidder_library_items li ON li.id = bpi.library_item_id
+       LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
        WHERE bpi.proposal_id = $1
          AND bpi.library_item_id IS NOT NULL
          AND bpi.is_freeform = false
@@ -190,16 +197,23 @@ router.get('/proposal/:id/materials', async (req, res) => {
       [id]
     );
 
-    // For system items, fetch all component details
+    // For system items, fetch component details — also resolve effective cost/coverage
     const systemLibIds = itemsResult.rows.filter(r => r.is_system).map(r => r.library_item_id);
     let componentsBySystem = {};
     if (systemLibIds.length > 0) {
       const compResult = await pool.query(
         `SELECT sc.system_item_id, sc.component_item_id,
                 COALESCE(li.internal_name, li.name) AS name,
-                li.kit_price, li.sqft_per_kit, li.is_charge_only
+                CASE WHEN li.source_supplier_product_id IS NOT NULL
+                     THEN COALESCE(li.cost_override, gsp.kit_price)
+                     ELSE li.kit_price END AS kit_price,
+                CASE WHEN li.source_supplier_product_id IS NOT NULL
+                     THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
+                     ELSE li.sqft_per_kit END AS sqft_per_kit,
+                li.is_charge_only
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
+         LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
          WHERE sc.system_item_id = ANY($1)
          ORDER BY sc.sort_order, sc.id`,
         [systemLibIds]
@@ -822,7 +836,17 @@ router.get('/library', async (req, res) => {
       [companyId]
     );
     const items = await pool.query(
-      'SELECT * FROM bidder_library_items WHERE company_id = $1 ORDER BY sort_order, id',
+      `SELECT li.*,
+         CASE WHEN li.source_supplier_product_id IS NOT NULL
+              THEN COALESCE(li.cost_override, gsp.kit_price)
+              ELSE li.kit_price END AS kit_price,
+         CASE WHEN li.source_supplier_product_id IS NOT NULL
+              THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
+              ELSE li.sqft_per_kit END AS sqft_per_kit
+       FROM bidder_library_items li
+       LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+       WHERE li.company_id = $1
+       ORDER BY li.sort_order, li.id`,
       [companyId]
     );
 
@@ -1081,17 +1105,24 @@ router.put('/library/item/:id', async (req, res) => {
       supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color, sku, internal_name, internal_description,
     } = req.body;
 
+    const kp  = clean(kit_price)    != null ? parseFloat(clean(kit_price))    : null;
+    const sfk = clean(sqft_per_kit) != null ? parseFloat(clean(sqft_per_kit)) : null;
+
     const result = await pool.query(
       `UPDATE bidder_library_items SET
         category_id = $1, name = $2, description = $3, default_unit_price = $4,
         default_unit_label = $5, is_included = $6, show_quantity = $7,
-        is_active = $8, sort_order = $9, supplier = $10, kit_price = $11, sqft_per_kit = $12,
-        is_charge_only = $13, color = $14, sku = $15, internal_name = $16, internal_description = $17
+        is_active = $8, sort_order = $9, supplier = $10,
+        is_charge_only = $13, color = $14, sku = $15, internal_name = $16, internal_description = $17,
+        kit_price       = CASE WHEN source_supplier_product_id IS NULL THEN $11 ELSE kit_price END,
+        sqft_per_kit    = CASE WHEN source_supplier_product_id IS NULL THEN $12 ELSE sqft_per_kit END,
+        cost_override     = CASE WHEN source_supplier_product_id IS NOT NULL THEN $11 ELSE cost_override END,
+        coverage_override = CASE WHEN source_supplier_product_id IS NOT NULL THEN $12 ELSE coverage_override END
        WHERE id = $18 AND company_id = $19 RETURNING *`,
       [
         category_id, name, clean(description), default_unit_price,
         clean(default_unit_label), is_included, show_quantity,
-        is_active, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null,
+        is_active, sort_order, clean(supplier), kp, sfk,
         is_charge_only ?? false, clean(color) || null,
         (is_charge_only ?? false) ? null : (clean(sku) || null),
         clean(internal_name) || null,
