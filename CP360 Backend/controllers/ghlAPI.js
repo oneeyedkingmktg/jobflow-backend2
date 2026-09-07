@@ -1681,6 +1681,9 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
           toNotify: false,
           ignoreDateRanges: true,
         };
+        if (company.ghl_appt_assigned_user) {
+          apptPayload.assignedUserId = company.ghl_appt_assigned_user;
+        }
         console.log('[JOB APPT SYNC] Payload:', JSON.stringify(apptPayload));
         try {
           const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
