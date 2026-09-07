@@ -483,11 +483,7 @@ async function ghlRequest(company, endpoint, options = {}) {
   };
 
   if (options.body) {
-    const bodyStr = JSON.stringify(options.body);
-    fetchOptions.body = bodyStr;
-    if (endpoint.includes('/calendars/events')) {
-      console.log(`🔍 [GHL REQUEST] ${method} ${endpoint} — body: ${bodyStr}`);
-    }
+    fetchOptions.body = JSON.stringify(options.body);
   }
 
   try {
