@@ -663,11 +663,13 @@ router.post('/apply-internal', authenticateToken, upload.single('image'), async 
   if (!Array.isArray(recipe) || !recipe.length) return res.status(400).json({ error: 'recipe must be a non-empty array' });
 
   try {
+    console.log('[apply-internal] lead_id:', lead_id, 'user.company_id:', req.user.company_id, 'user.role:', req.user.role);
     // Verify lead exists; master users bypass the company_id filter (their company_id is null)
     const leadCheck = await db.query(
       `SELECT id, company_id FROM leads WHERE id=$1 AND (company_id=$2 OR $2 IS NULL) AND deleted_at IS NULL`,
       [lead_id, req.user.company_id]
     );
+    console.log('[apply-internal] leadCheck rows:', leadCheck.rows.length);
     if (!leadCheck.rows.length) return res.status(404).json({ error: 'Lead not found' });
 
     const companyId = leadCheck.rows[0].company_id;
