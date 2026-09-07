@@ -517,6 +517,21 @@ async function ghlRequest(company, endpoint, options = {}) {
           return data;
         }
 
+        const isDuplicateOpportunity =
+          res.status === 400 &&
+          data?.code === 'OPPORTUNITY_NO_DUPLICATE';
+
+        if (isDuplicateOpportunity) {
+          console.log("ℹ️ [GHL DUPLICATE OPPORTUNITY - EXPECTED]", {
+            url: url.toString(),
+            existingId: data?.meta?.existingId
+          });
+          const error = new Error(`GHL API error ${res.status}: ${JSON.stringify(data)}`);
+          error.status = res.status;
+          error.response = data;
+          throw error;
+        }
+
         console.error("❌ [GHL API ERROR]", {
           status: res.status,
           url: url.toString(),
