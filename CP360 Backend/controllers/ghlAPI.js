@@ -1677,14 +1677,11 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
           title: `${contactName} - ${job.job_name} - Appointment`,
           startTime: startDt.toISOString(),
           endTime: endDt.toISOString(),
-          appointmentStatus: 'confirmed',
-          toNotify: false,
           ignoreDateRanges: true,
         };
-        if (company.ghl_appt_assigned_user) {
-          apptPayload.assignedUserId = company.ghl_appt_assigned_user;
-        }
-        console.log('[JOB APPT SYNC] Payload:', JSON.stringify(apptPayload));
+        // assignedUserId intentionally omitted — same reason as lead sync: GHL validates
+        // against user's external calendar independently of ignoreDateRanges, causing
+        // "slot unavailable" rejections even for valid future slots.
         try {
           const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
             method: 'POST',
