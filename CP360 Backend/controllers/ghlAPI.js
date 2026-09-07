@@ -1664,25 +1664,48 @@ async function syncJobCalendarEvent({ job, oldJob, contactId, contactName, compa
       if (hadApptEvent) {
         try { await deleteCalendarEvent(company, oldJob.ghl_appt_event_id, contactId); } catch {}
       }
-      try {
-        const startDt = convertToUTC(`${nd(job.appointment_date)}T${apptTime}:00`, companyTimezone);
-        const endDt = new Date(startDt.getTime() + 15 * 60000);
-        const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
-          method: 'POST',
-          body: {
-            locationId: company.ghl_location_id,
-            calendarId: company.ghl_appt_calendar,
-            contactId,
-            title: `${contactName} - ${job.job_name} - Appointment`,
-            startTime: startDt.toISOString(),
-            endTime: endDt.toISOString(),
-            ignoreDateRanges: true,
-          },
-        });
-        result.apptEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
-        console.log('[JOB APPT SYNC] Created event ID:', result.apptEventId);
-      } catch (e) {
-        console.error('[JOB APPT SYNC] Failed:', e.message);
+      const startDt = convertToUTC(`${nd(job.appointment_date)}T${apptTime}:00`, companyTimezone);
+      const endDt = new Date(startDt.getTime() + 15 * 60000);
+
+      if (startDt < new Date()) {
+        console.warn('[JOB APPT] Appointment is in the past — skipping GHL create');
+      } else {
+        const apptPayload = {
+          locationId: company.ghl_location_id,
+          calendarId: company.ghl_appt_calendar,
+          contactId,
+          title: `${contactName} - ${job.job_name} - Appointment`,
+          startTime: startDt.toISOString(),
+          endTime: endDt.toISOString(),
+          ignoreDateRanges: true,
+        };
+        try {
+          const created = await ghlCalendarRequestWithRetry(company, '/calendars/events/appointments', {
+            method: 'POST',
+            body: apptPayload,
+          });
+          result.apptEventId = created?.id || created?.event?.id || created?.appointment?.id || null;
+          console.log('[JOB APPT SYNC] Created appointment event ID:', result.apptEventId);
+        } catch (e) {
+          if (isCalendarConflict(e)) {
+            // Some GHL calendar types ignore ignoreDateRanges — fall back to block-slot
+            console.warn('[JOB APPT] Appointments endpoint rejected slot, falling back to block-slot');
+            try {
+              result.apptEventId = await createBlockSlot(company, {
+                locationId: company.ghl_location_id,
+                calendarId: company.ghl_appt_calendar,
+                title: `${contactName} - ${job.job_name} - Appointment`,
+                startTime: startDt.toISOString(),
+                endTime: endDt.toISOString(),
+              });
+              console.log('[JOB APPT SYNC] Created block-slot event ID:', result.apptEventId);
+            } catch (e2) {
+              console.error('[JOB APPT SYNC] Block-slot fallback also failed:', e2.message);
+            }
+          } else {
+            console.error('[JOB APPT SYNC] Failed:', e.message);
+          }
+        }
       }
     }
   }
