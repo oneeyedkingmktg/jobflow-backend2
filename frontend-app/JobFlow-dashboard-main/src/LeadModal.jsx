@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { useCompany } from "./CompanyContext";
 import { formatPhoneNumber } from "./utils/formatting";
-import { LeadsAPI } from "./api";
+import { LeadsAPI, JobsAPI } from "./api";
 
 function cleanDigits(v) {
   return v ? v.replace(/[^\d]/g, "") : "";
@@ -70,6 +70,7 @@ const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [showConversationModal, setShowConversationModal] = useState(false);
   const [pendingCall, setPendingCall] = useState(null);
+  const [mapsChoices, setMapsChoices] = useState(null);
 
 
   const isDirty =
@@ -158,18 +159,32 @@ const cancelDiscardChanges = () => {
     }
   };
 
-  const handleOpenMaps = () => {
-    const address = [form.address, form.city, form.state, form.zip]
+  const openMapsTo = (address) => {
+    window.open(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+      "_blank"
+    );
+  };
+
+  const handleOpenMaps = async () => {
+    const leadAddress = [form.address, form.city, form.state, form.zip]
       .filter(Boolean)
       .join(", ");
-    if (address) {
-      window.open(
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          address
-        )}`,
-        "_blank"
-      );
+    if (!leadAddress) return;
+
+    if (jobsEnabled && form.id) {
+      try {
+        const data = await JobsAPI.getAll(form.id, currentCompany?.id);
+        const jobsWithAddress = (data.jobs || []).filter(j => j.address?.trim());
+        if (jobsWithAddress.length > 0) {
+          setMapsChoices({ leadAddress, jobs: jobsWithAddress });
+          return;
+        }
+      } catch {
+        // fall through to direct open
+      }
     }
+    openMapsTo(leadAddress);
   };
 
 const handlePauseSave = (pauseFields) => {
@@ -338,6 +353,43 @@ const handlePauseSave = (pauseFields) => {
           lead={form}
           onClose={() => setShowConversationModal(false)}
         />
+      )}
+
+      {mapsChoices && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800">Which address?</h3>
+            </div>
+            <div className="px-4 py-3 space-y-2">
+              <button
+                onClick={() => { openMapsTo(mapsChoices.leadAddress); setMapsChoices(null); }}
+                className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition"
+              >
+                <div className="text-xs font-semibold text-blue-600 mb-0.5">Lead Address</div>
+                <div className="text-sm text-gray-800">{mapsChoices.leadAddress}</div>
+              </button>
+              {mapsChoices.jobs.map(job => (
+                <button
+                  key={job.id}
+                  onClick={() => { openMapsTo(job.address); setMapsChoices(null); }}
+                  className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition"
+                >
+                  <div className="text-xs font-semibold text-blue-600 mb-0.5">{job.jobName || 'Job'}</div>
+                  <div className="text-sm text-gray-800">{job.address}</div>
+                </button>
+              ))}
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100">
+              <button
+                onClick={() => setMapsChoices(null)}
+                className="w-full py-2 text-sm text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <SoftphoneWidget
