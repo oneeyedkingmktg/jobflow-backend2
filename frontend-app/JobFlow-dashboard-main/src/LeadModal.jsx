@@ -175,7 +175,12 @@ const cancelDiscardChanges = () => {
     if (jobsEnabled && form.id) {
       try {
         const data = await JobsAPI.getAll(form.id, currentCompany?.id);
-        const jobsWithAddress = (data.jobs || []).filter(j => j.address?.trim());
+        const jobsWithAddress = (data.jobs || [])
+          .filter(j => j.address?.trim())
+          .map(j => ({
+            ...j,
+            fullAddress: [j.address, j.city, j.state, j.zip].filter(Boolean).join(", "),
+          }));
         if (jobsWithAddress.length > 0) {
           setMapsChoices({ leadAddress, jobs: jobsWithAddress });
           return;
@@ -372,11 +377,11 @@ const handlePauseSave = (pauseFields) => {
               {mapsChoices.jobs.map(job => (
                 <button
                   key={job.id}
-                  onClick={() => { openMapsTo(job.address); setMapsChoices(null); }}
+                  onClick={() => { openMapsTo(job.fullAddress); setMapsChoices(null); }}
                   className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition"
                 >
                   <div className="text-xs font-semibold text-blue-600 mb-0.5">{job.jobName || 'Job'}</div>
-                  <div className="text-sm text-gray-800">{job.address}</div>
+                  <div className="text-sm text-gray-800">{job.fullAddress}</div>
                 </button>
               ))}
             </div>
