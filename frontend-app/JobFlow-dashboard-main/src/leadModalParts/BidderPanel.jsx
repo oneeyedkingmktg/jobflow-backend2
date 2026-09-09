@@ -63,7 +63,7 @@ export default function BidderPanel({ lead, job, onClose }) {
         lead_id: lead.id,
         ...(job ? { job_id: job.id } : {}),
         company_id: lead.companyId,
-        bid_name: `Bid ${bids.length + 1}`,
+        bid_name: job?.jobName || `Bid ${bids.length + 1}`,
         status: 'pending',
         salesman: user?.name || user?.email || '',
       });

@@ -1034,6 +1034,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm">{item.name}</p>
                         {item.description && <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>}
+                        {item.color && <p className="text-xs text-gray-500 mt-0.5">Color: {item.color}</p>}
                       </div>
                       <div className="text-right shrink-0">
                         {item.show_price !== false
