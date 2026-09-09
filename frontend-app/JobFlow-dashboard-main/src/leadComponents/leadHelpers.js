@@ -75,6 +75,9 @@ export const getStatusBarText = (lead) => {
     case "complete":
       return "Completed";
 
+    case "customer":
+      return "Customer";
+
     case "status_junk":
       return "Junk";
 

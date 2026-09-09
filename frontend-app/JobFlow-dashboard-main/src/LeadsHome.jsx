@@ -375,10 +375,11 @@ const loadLeads = async () => {
   const counts = useMemo(() => {
     if (jobsEnabled) {
       return {
-        // Pre-Lead/Lead show ALL contacts at those statuses regardless of whether they have jobs
+        // Contact-level tabs
         "Pre-Leads": leads.filter((l) => !l.deletedAt && l.status === "status_pre_lead").length,
         Leads: leads.filter((l) => !l.deletedAt && l.status === "lead").length,
-        // Job-stage tabs count jobs by job status
+        Customers: leads.filter((l) => !l.deletedAt && l.status === "customer").length,
+        // Project-level tabs count jobs by job status
         Pending: jobs.filter((j) => j.status === "pending").length,
         "Booked Appt": jobs.filter((j) => j.status === "appt_set").length,
         Sold: jobs.filter((j) => j.status === "sold").length,
@@ -435,6 +436,7 @@ const loadLeads = async () => {
         activeTab === "Deleted" ||
         (activeTab === "Pre-Leads" && lead.status === "status_pre_lead") ||
         (activeTab === "Leads" && lead.status === "lead") ||
+        (activeTab === "Customers" && lead.status === "customer") ||
         (!jobsEnabled && activeTab === "Booked Appt" && lead.status === "appointment_set") ||
         (!jobsEnabled && activeTab === "Sold" && lead.status === "sold") ||
         (!jobsEnabled && activeTab === "Not Sold" && lead.status === "not_sold") ||
