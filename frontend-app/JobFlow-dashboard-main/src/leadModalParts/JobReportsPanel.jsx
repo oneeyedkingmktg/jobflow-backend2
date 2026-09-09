@@ -536,7 +536,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   };
 
   const handleLibraryPick = (item) => {
-    setAddForm({ name: item.name, qty: "1", unit: item.default_unit_label || "", unit_cost: String(item.default_unit_price || "") });
+    setAddForm({ name: item.name, qty: "1", unit: item.default_unit_label || "", unit_cost: String(item.kit_price || "") });
   };
 
   const handleAdd = async () => {
@@ -721,7 +721,7 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
                                   >
                                     <span className="text-sm font-medium">{item.name}</span>
                                     <span className="text-xs text-gray-400 ml-2 shrink-0">
-                                      {item.default_unit_label || ""}{parseFloat(item.default_unit_price) > 0 ? ` · $${parseFloat(item.default_unit_price).toFixed(2)}` : ""}
+                                      {item.default_unit_label || ""}{parseFloat(item.kit_price) > 0 ? ` · $${parseFloat(item.kit_price).toFixed(2)}` : ""}
                                     </span>
                                   </button>
                                 ))}

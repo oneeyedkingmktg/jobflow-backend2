@@ -465,37 +465,105 @@ router.post("/:leadId/import-from-bid", async (req, res) => {
 
     const proposalId = proposalResult.rows[0].id;
 
-    const [libItems, customItems] = await Promise.all([
-      db.query(
-        `SELECT name, unit_label AS unit, unit_price AS unit_cost, quantity AS qty, line_total
-         FROM bidder_proposal_items
-         WHERE proposal_id = $1
-         ORDER BY sort_order, id`,
-        [proposalId]
-      ),
-      db.query(
-        `SELECT description AS name, NULL AS unit, price_each AS unit_cost, quantity AS qty, line_total
-         FROM bidder_custom_items
-         WHERE proposal_id = $1 AND is_subtotal = false AND is_note = false
-         ORDER BY sort_order, id`,
-        [proposalId]
-      ),
-    ]);
+    // Resolve materials order list using kit_price (cost), same logic as GET /bidder/proposal/:id/materials
+    const itemsResult = await db.query(
+      `SELECT bpi.id, bpi.library_item_id, bpi.quantity,
+              COALESCE(li.internal_name, li.name) AS lib_name,
+              CASE WHEN li.source_supplier_product_id IS NOT NULL
+                   THEN COALESCE(li.cost_override, gsp.kit_price)
+                   ELSE li.kit_price END AS kit_price,
+              CASE WHEN li.source_supplier_product_id IS NOT NULL
+                   THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
+                   ELSE li.sqft_per_kit END AS sqft_per_kit,
+              li.is_system, li.is_charge_only
+       FROM bidder_proposal_items bpi
+       JOIN bidder_library_items li ON li.id = bpi.library_item_id
+       LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+       WHERE bpi.proposal_id = $1
+         AND bpi.library_item_id IS NOT NULL
+         AND bpi.is_freeform = false
+       ORDER BY bpi.sort_order, bpi.id`,
+      [proposalId]
+    );
 
-    const allItems = [...libItems.rows, ...customItems.rows];
-    if (!allItems.length) {
+    const systemLibIds = itemsResult.rows.filter(r => r.is_system).map(r => r.library_item_id);
+    let componentsBySystem = {};
+    if (systemLibIds.length > 0) {
+      const compResult = await db.query(
+        `SELECT sc.system_item_id, sc.component_item_id,
+                COALESCE(li.internal_name, li.name) AS name,
+                CASE WHEN li.source_supplier_product_id IS NOT NULL
+                     THEN COALESCE(li.cost_override, gsp.kit_price)
+                     ELSE li.kit_price END AS kit_price,
+                CASE WHEN li.source_supplier_product_id IS NOT NULL
+                     THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
+                     ELSE li.sqft_per_kit END AS sqft_per_kit,
+                li.is_charge_only
+         FROM bidder_library_system_components sc
+         JOIN bidder_library_items li ON li.id = sc.component_item_id
+         LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+         WHERE sc.system_item_id = ANY($1)
+         ORDER BY sc.sort_order, sc.id`,
+        [systemLibIds]
+      );
+      compResult.rows.forEach(r => {
+        if (!componentsBySystem[r.system_item_id]) componentsBySystem[r.system_item_id] = [];
+        componentsBySystem[r.system_item_id].push(r);
+      });
+    }
+
+    const acc = {};
+    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area) {
+      if (kitPrice == null) return;
+      const kp = parseFloat(kitPrice);
+      const sfk = sqftPerKit ? parseFloat(sqftPerKit) : null;
+      if (!acc[libItemId]) {
+        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, total_area: 0 };
+      }
+      acc[libItemId].total_area += parseFloat(area) || 0;
+    }
+
+    for (const item of itemsResult.rows) {
+      if (item.is_charge_only) continue;
+      if (item.is_system) {
+        const components = componentsBySystem[item.library_item_id] || [];
+        for (const comp of components) {
+          if (comp.is_charge_only) continue;
+          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity);
+        }
+      } else {
+        addMaterial(item.library_item_id, item.lib_name, item.kit_price, item.sqft_per_kit, item.quantity);
+      }
+    }
+
+    const ovResult = await db.query(
+      'SELECT library_item_id, order_qty, unit_cost FROM bid_material_overrides WHERE proposal_id = $1',
+      [proposalId]
+    );
+    const overrides = {};
+    ovResult.rows.forEach(r => { overrides[r.library_item_id] = r; });
+
+    const materials = Object.values(acc).map(item => {
+      let default_order_qty = null;
+      if (item.sqft_per_kit && item.total_area > 0) {
+        default_order_qty = Math.max(1, Math.ceil(item.total_area / item.sqft_per_kit));
+      }
+      const ov = overrides[item.library_item_id] || {};
+      const order_qty = ov.order_qty != null ? parseFloat(ov.order_qty) : (default_order_qty ?? 1);
+      const unit_cost = ov.unit_cost != null ? parseFloat(ov.unit_cost) : (item.kit_price || 0);
+      return { name: item.name, qty: order_qty, unit: 'kit', unit_cost, total: order_qty * unit_cost };
+    });
+
+    if (!materials.length) {
       return res.status(404).json({ error: "No items found in the accepted bid" });
     }
 
     const inserted = [];
-    for (const item of allItems) {
-      const qty = parseFloat(item.qty) || 1;
-      const cost = parseFloat(item.unit_cost) || 0;
-      const total = parseFloat(item.line_total) || qty * cost;
+    for (const item of materials) {
       const r = await db.query(
         `INSERT INTO job_cost_entries (lead_id, company_id, name, qty, unit, unit_cost, total, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-        [leadId, companyId, item.name, qty, item.unit || null, cost, total, req.user.id]
+        [leadId, companyId, item.name, item.qty, item.unit, item.unit_cost, item.total, req.user.id]
       );
       inserted.push(r.rows[0]);
     }
