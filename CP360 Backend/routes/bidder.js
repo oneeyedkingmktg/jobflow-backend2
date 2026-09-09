@@ -481,7 +481,7 @@ router.put('/proposal/:id', async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // On acceptance: sync bid_total → contract_price; set job status → sold
+    // On acceptance: set job status → sold, promote contact → customer, sync contract_price
     if (status === 'accepted') {
       const { job_id: syncJobId, lead_id: syncLeadId } = result.rows[0];
       const syncPrice = bid_total != null ? parseFloat(bid_total) : null;
@@ -492,8 +492,11 @@ router.put('/proposal/:id', async (req, res) => {
           [syncPrice, syncJobId]
         ));
       }
-      if (syncLeadId && syncPrice != null) {
-        syncs.push(pool.query('UPDATE leads SET contract_price = $1 WHERE id = $2', [syncPrice, syncLeadId]));
+      if (syncLeadId) {
+        const leadSql = syncPrice != null
+          ? `UPDATE leads SET status = 'customer', contract_price = $1 WHERE id = $2 AND deleted_at IS NULL`
+          : `UPDATE leads SET status = 'customer' WHERE id = $1 AND deleted_at IS NULL`;
+        syncs.push(pool.query(leadSql, syncPrice != null ? [syncPrice, syncLeadId] : [syncLeadId]));
       }
       await Promise.all(syncs);
     }
@@ -1859,6 +1862,23 @@ router.post('/public/:id/accept', async (req, res) => {
        WHERE id = $4`,
       [signature_name.trim(), signedAt, ip, proposal.id, signedAt]
     );
+
+    // Promote job → sold and contact → customer on customer signature
+    const signSyncs = [];
+    const signPrice = proposal.bid_total ? parseFloat(proposal.bid_total) : null;
+    if (proposal.job_id) {
+      signSyncs.push(pool.query(
+        `UPDATE jobs SET status = 'sold', contract_price = COALESCE($1, contract_price) WHERE id = $2`,
+        [signPrice, proposal.job_id]
+      ));
+    }
+    if (proposal.lead_id) {
+      const leadSql = signPrice != null
+        ? `UPDATE leads SET status = 'customer', contract_price = $1 WHERE id = $2 AND deleted_at IS NULL`
+        : `UPDATE leads SET status = 'customer' WHERE id = $1 AND deleted_at IS NULL`;
+      signSyncs.push(pool.query(leadSql, signPrice != null ? [signPrice, proposal.lead_id] : [proposal.lead_id]));
+    }
+    if (signSyncs.length) await Promise.all(signSyncs);
 
     const contractorEmail = proposal.notification_emails ? proposal.notification_emails.trim() : null;
     const companyName = proposal.ghl_company_from_name || proposal.company_db_name || '';
