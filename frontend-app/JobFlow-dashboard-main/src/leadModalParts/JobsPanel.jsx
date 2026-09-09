@@ -3,7 +3,7 @@
 // Multiple jobs per lead — click card to expand/edit inline
 // ============================================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { JobsAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
@@ -116,7 +116,7 @@ const EMPTY_FORM = {
   zip: "",
 };
 
-export default function JobsPanel({ lead, onClose }) {
+export default function JobsPanel({ lead, onClose, initialJobId }) {
   const { user } = useAuth();
   const { currentCompany } = useCompany();
   const companyId = currentCompany?.id || currentCompany?.companyId || null;
@@ -138,6 +138,8 @@ export default function JobsPanel({ lead, onClose }) {
   const [showApptModal, setShowApptModal] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
+  const pendingJobIdRef = useRef(initialJobId ?? null);
+
   useEffect(() => { load(); }, [lead?.id]);
 
   const load = async () => {
@@ -152,6 +154,16 @@ export default function JobsPanel({ lead, onClose }) {
       setLoading(false);
     }
   };
+
+  // Auto-open a specific job when launched from the pipeline card
+  useEffect(() => {
+    if (!pendingJobIdRef.current || !jobs.length) return;
+    const job = jobs.find((j) => j.id === pendingJobIdRef.current);
+    if (job) {
+      openCard(job);
+      pendingJobIdRef.current = null;
+    }
+  }, [jobs]);
 
   const openCard = (job) => {
     setEditingId(job.id);

@@ -165,6 +165,7 @@ export default function LeadsHome() {
   const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
   const [selectedLead, setSelectedLead] = useState(null);
   const [isNewLead, setIsNewLead] = useState(false);
+  const [pendingJobId, setPendingJobId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [includeJunk, setIncludeJunk] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -538,7 +539,11 @@ onAddLead={() => {
               key={job.id}
               job={job}
               onClick={() => {
-                if (lead) { setSelectedLead(lead); setIsNewLead(false); }
+                if (lead) {
+                  setSelectedLead(lead);
+                  setIsNewLead(false);
+                  setPendingJobId(job.id);
+                }
               }}
             />
           );
@@ -581,6 +586,7 @@ onAddLead={() => {
 {(selectedLead || isNewLead) && !showPhoneLookup && (
   <LeadModal
           lead={selectedLead}
+          initialJobId={pendingJobId}
           onServiceCallsChange={refreshServiceCalls}
           onReinstate={isMasterAdmin && selectedLead?.deletedAt ? async (lead) => {
             if (!confirm(`Reinstate ${lead.name}? This will restore the contact in both JobFlow and GoHighLevel.`)) {
@@ -650,6 +656,7 @@ onSaveAndExit={async (data) => {
           onClose={() => {
             setSelectedLead(null);
             setIsNewLead(false);
+            setPendingJobId(null);
           }}
 
           onDelete={async (lead) => {

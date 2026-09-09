@@ -20,6 +20,7 @@ export default function LeadDetailsView({
   form,
   onEdit,
   showConversations = false,
+  initialJobId = null,
 }) {
 const hasEstimate = form?.hasEstimate === true;
   const isOutOfAreaLargeJob = form?.outOfAreaLargeJob === true;
@@ -47,6 +48,10 @@ const hasEstimate = form?.hasEstimate === true;
   const [showJobReports, setShowJobReports] = useState(false);
   const [showVisualizerPanel, setShowVisualizerPanel] = useState(false);
   const [showJobsPanel, setShowJobsPanel] = useState(false);
+
+  useEffect(() => {
+    if (initialJobId) setShowJobsPanel(true);
+  }, [initialJobId]);
 
   useEffect(() => {
     if (form?.id && !isEstimatorOnly && bidderEnabled) {
@@ -387,6 +392,7 @@ const hasEstimate = form?.hasEstimate === true;
         <JobsPanel
           lead={form}
           onClose={() => setShowJobsPanel(false)}
+          initialJobId={initialJobId}
         />
       )}
 

@@ -37,6 +37,7 @@ export default function LeadModal({
   onReinstate,
   onClose,
   onServiceCallsChange,
+  initialJobId = null,
 }) {
   const { currentCompany } = useCompany();
   const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
@@ -335,6 +336,7 @@ const handlePauseSave = (pauseFields) => {
   form={form}
   onEdit={() => setIsEditing(true)}
   showConversations={currentCompany?.showConversations || false}
+  initialJobId={initialJobId}
 />
 
             )}
