@@ -39,7 +39,7 @@ export default function LeadTabs({
     return (
       <button
         onClick={() => handleClick(t)}
-        className={`flex-shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold shadow transition
+        className={`rounded-xl px-4 py-2.5 text-sm font-semibold shadow transition
           ${isLocked
             ? "bg-gray-100 text-gray-400 border border-gray-200"
             : isActive
@@ -66,7 +66,7 @@ export default function LeadTabs({
           {label}
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+      <div className="flex flex-wrap gap-2">
         {tabs.map((t) => <Tab key={t} t={t} />)}
       </div>
     </div>
@@ -106,7 +106,7 @@ export default function LeadTabs({
     <>
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex flex-wrap gap-2">
           {[
             "Pre-Leads", "Leads", "Booked Appt", "Sold", "Not Sold", "Completed", "All",
             ...actionTabs,
