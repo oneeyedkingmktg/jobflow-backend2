@@ -52,10 +52,7 @@ function getMondayOfWeek(dateStr) {
 
 const PROJECT_TYPES = [
   { value: "", label: "— Select Type —" },
-  { value: "garage_1", label: "1 Car Garage" },
-  { value: "garage_2", label: "2 Car Garage" },
-  { value: "garage_3", label: "3 Car Garage" },
-  { value: "garage_4", label: "4+ Car Garage" },
+  { value: "garage", label: "Garage" },
   { value: "patio", label: "Patio" },
   { value: "basement", label: "Basement" },
   { value: "commercial", label: "Commercial" },
@@ -88,6 +85,7 @@ const STATUS_LABELS = {
 
 function formatProjectType(type) {
   if (!type) return null;
+  if (type.startsWith("garage_") || type === "garage") return "Garage";
   const found = PROJECT_TYPES.find((p) => p.value === type);
   return found ? found.label : type;
 }
@@ -225,6 +223,10 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
       setError("Job name is required.");
       return;
     }
+    if (!form.project_type) {
+      setError("Project type is required.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -292,7 +294,7 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
       {/* Project Type + Status */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className={labelCls}>Project Type</label>
+          <label className={labelCls}>Project Type <span className="text-red-500">*</span></label>
           <select value={form.project_type} onChange={f("project_type")} className={inputCls}>
             {PROJECT_TYPES.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>

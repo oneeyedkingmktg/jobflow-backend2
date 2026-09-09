@@ -23,7 +23,7 @@ const STATUS_LABELS = {
 
 function formatProjectType(type) {
   if (!type) return null;
-  if (type.startsWith("garage_")) return `${type.split("_")[1]} Car Garage`;
+  if (type.startsWith("garage_") || type === "garage") return "Garage";
   if (type === "patio") return "Patio";
   if (type === "basement") return "Basement";
   if (type === "commercial") return "Commercial";

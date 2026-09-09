@@ -49,10 +49,7 @@ function SourceIcon({ utmSource }) {
 
 function formatProjectType(type) {
   if (!type) return null;
-  if (type.startsWith("garage_")) {
-    const carCount = type.split("_")[1];
-    return `${carCount} Car Garage`;
-  }
+  if (type.startsWith("garage_") || type === "garage") return "Garage";
   if (type === "patio") return "Patio";
   if (type === "basement") return "Basement";
   if (type === "commercial") return "Commercial";
