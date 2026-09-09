@@ -315,7 +315,7 @@ export default function LeadTeamPanel({ lead, job, companyId, currentUser, onClo
   const totalCount = crewGroups.length + individuals.length;
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[250] flex flex-col bg-black/60 backdrop-blur-sm">
       <div className="flex flex-col bg-white w-full h-full max-w-lg mx-auto shadow-2xl md:rounded-2xl md:my-8 md:h-auto md:max-h-[90vh]">
 
         {/* HEADER */}
