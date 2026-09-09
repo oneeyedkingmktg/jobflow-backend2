@@ -412,6 +412,16 @@ router.put("/:id", async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: "Job not found" });
 
     const updatedJob = result.rows[0];
+
+    // Auto-promote contact to Customer when any job is sold or completed
+    if ((status === 'sold' || status === 'complete') && updatedJob.lead_id) {
+      await db.query(
+        `UPDATE leads SET status = 'customer', updated_at = NOW()
+         WHERE id = $1 AND status != 'customer' AND deleted_at IS NULL`,
+        [updatedJob.lead_id]
+      );
+    }
+
     res.json({ job: toCamel(updatedJob) });
 
     // GHL stage sync on status change — fire and forget

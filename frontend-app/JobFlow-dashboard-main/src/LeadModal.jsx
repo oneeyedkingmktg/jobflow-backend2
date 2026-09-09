@@ -62,6 +62,7 @@ export default function LeadModal({
   const [loadingEstimate, setLoadingEstimate] = useState(false);
 
   const [phoneWarning, setPhoneWarning] = useState(null);
+  const [buyerTypeWarning, setBuyerTypeWarning] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showDateModal, setShowDateModal] = useState(null);
   const [showApptModal, setShowApptModal] = useState(false);
@@ -99,6 +100,10 @@ const handleExitNoSave = () => {
       setPhoneWarning("Please enter a complete 10-digit phone number before saving.");
       return;
     }
+    if (!form.buyerType) {
+      setBuyerTypeWarning("Buyer Type is required.");
+      return;
+    }
     setSaving(true);
     try {
       const updated = await onSave(form);
@@ -109,6 +114,7 @@ const handleExitNoSave = () => {
       }
       setIsEditing(false);
       setPhoneWarning(null);
+      setBuyerTypeWarning(null);
     } finally {
       setSaving(false);
     }
@@ -126,6 +132,11 @@ const cancelDiscardChanges = () => {
 
   const handleSaveAndExit = async () => {
     if (saving) return;
+    if (!form.buyerType) {
+      setBuyerTypeWarning("Buyer Type is required.");
+      setIsEditing(true);
+      return;
+    }
     setSaving(true);
     try {
       const updated = await onSaveAndExit(form);
@@ -304,9 +315,10 @@ const handlePauseSave = (pauseFields) => {
             {isEditing ? (
               <LeadDetailsEdit
                 form={form}
-                onChange={(k, v) =>
-                  setForm((p) => ({ ...p, [k]: v }))
-                }
+                onChange={(k, v) => {
+                  if (k === 'buyerType') setBuyerTypeWarning(null);
+                  setForm((p) => ({ ...p, [k]: v }));
+                }}
                 onPhoneChange={(v) => {
                   setPhoneWarning(null);
                   setForm((p) => ({
@@ -316,6 +328,7 @@ const handlePauseSave = (pauseFields) => {
                 }}
                 onPhoneBlur={handlePhoneBlur}
                 phoneWarning={phoneWarning}
+                buyerTypeWarning={buyerTypeWarning}
               />
             ) : (
 <LeadDetailsView

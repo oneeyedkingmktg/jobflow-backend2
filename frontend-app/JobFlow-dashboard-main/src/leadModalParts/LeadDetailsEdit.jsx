@@ -2,7 +2,7 @@ import React from "react";
 import { usePermission } from "../utils/usePermission";
 import { useCompany } from "../CompanyContext";
 
-export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhoneBlur, phoneWarning }) {
+export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhoneBlur, phoneWarning, buyerTypeWarning }) {
   const financialPermission = usePermission('financial_information');
   const { currentCompany } = useCompany();
   const jobsEnabled = !!(currentCompany?.jobsEnabled ?? currentCompany?.jobs_enabled);
@@ -91,9 +91,9 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhone
         </div>
       </div>
 
-      {/* BUYER TYPE — UPDATED */}
+      {/* BUYER TYPE */}
       <div>
-        <label className="text-gray-500">Buyer Type</label>
+        <label className="text-gray-500">Buyer Type <span className="text-red-500">*</span></label>
         <select
           value={form.buyerType}
           onChange={(e) => onChange("buyerType", e.target.value)}
@@ -104,7 +104,13 @@ export default function LeadDetailsEdit({ form, onChange, onPhoneChange, onPhone
           <option value="Small Business">Small Business</option>
           <option value="Commercial">Commercial</option>
           <option value="Competitive Bid">Competitive Bid</option>
+          <option value="Other">Other</option>
         </select>
+        {buyerTypeWarning && (
+          <p className="mt-1 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {buyerTypeWarning}
+          </p>
+        )}
       </div>
 
 {/* COMPANY NAME - only show if not Residential */}

@@ -209,43 +209,42 @@ export default function LeadStatusBar({
     );
   };
 
-  // Jobs mode: only pre_lead ↔ lead transitions allowed; pipeline is job-driven
+  // Jobs mode: contact-level status dropdown — Pre-Lead, Lead, Customer
   if (jobsEnabled) {
-    const isPreLead = currentStatus === "status_pre_lead";
-    const isLead = currentStatus === "lead";
-    if (!isPreLead && !isLead) return null;
+    const CONTACT_STATUSES = ['status_pre_lead', 'lead', 'customer'];
+    const isLegacyStatus = !CONTACT_STATUSES.includes(currentStatus);
     return (
-      <div className="flex items-center justify-between gap-3 w-full">
-        <div className="flex flex-col">
-          <div className="text-black text-[10px] uppercase font-semibold mb-1" style={{ paddingLeft: "25px" }}>
-            CONTACT STATUS
-          </div>
-          <div
-            className="rounded-2xl px-6 py-3 text-white font-semibold shadow text-base"
-            style={{ backgroundColor: STATUS_COLORS[currentStatus] }}
-          >
-            {STATUS_LABELS[currentStatus]}
-          </div>
+      <div className="flex flex-col">
+        <div className="text-black text-[10px] uppercase font-semibold mb-1" style={{ paddingLeft: "4px" }}>
+          CONTACT STATUS
         </div>
-        {leadMgmtPermission === 'edit' && isPreLead && (
-          <button
-            onClick={() => setStatus("lead")}
-            className="flex-1 py-3 rounded-lg text-white shadow flex flex-col items-center"
-            style={{ backgroundColor: STATUS_COLORS["lead"] }}
+        <div className="relative inline-block">
+          <select
+            value={currentStatus}
+            onChange={leadMgmtPermission === 'edit' ? (e) => setStatus(e.target.value) : undefined}
+            disabled={leadMgmtPermission !== 'edit'}
+            className="appearance-none font-semibold rounded-2xl px-6 pr-12 shadow"
+            style={{
+              backgroundColor: STATUS_COLORS[currentStatus] || '#616163',
+              color: "#FFFFFF",
+              height: "48px",
+              fontSize: "1.05rem",
+              cursor: leadMgmtPermission === 'edit' ? 'pointer' : 'default',
+            }}
           >
-            <span className="text-[10px] uppercase opacity-80">move to</span>
-            <span className="text-sm font-semibold">{">>"} Lead</span>
-          </button>
-        )}
-        {leadMgmtPermission === 'edit' && (
-          <button
-            onClick={() => guardedSetStatus("status_junk")}
-            className="py-3 px-4 rounded-lg text-white shadow text-sm font-semibold"
-            style={{ backgroundColor: STATUS_COLORS["status_junk"] }}
-          >
-            Junk
-          </button>
-        )}
+            {isLegacyStatus && (
+              <option value={currentStatus} style={{ background: 'white', color: '#9ca3af' }}>
+                {STATUS_LABELS[currentStatus] || currentStatus}
+              </option>
+            )}
+            {CONTACT_STATUSES.map((s) => (
+              <option key={s} value={s} style={{ background: 'white', color: 'black' }}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white" style={{ fontSize: "14px" }}>▼</div>
+        </div>
       </div>
     );
   }
@@ -382,7 +381,7 @@ export default function LeadStatusBar({
                 cursor: leadMgmtPermission === 'edit' ? 'pointer' : 'default',
               }}
             >
-              {Object.keys(STATUS_LABELS).map((s) => (
+              {Object.keys(STATUS_LABELS).filter((s) => s !== 'customer').map((s) => (
                 <option
                   key={s}
                   value={s}

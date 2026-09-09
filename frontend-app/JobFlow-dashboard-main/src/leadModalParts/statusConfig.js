@@ -1,6 +1,7 @@
 export const STATUS_LABELS = {
   status_pre_lead: "Pre-Lead",
   lead: "Lead",
+  customer: "Customer",
   appointment_set: "Appointment Set",
   sold: "Sold",
   not_sold: "Not Sold",
@@ -9,8 +10,9 @@ export const STATUS_LABELS = {
 };
 
 export const STATUS_COLORS = {
-status_pre_lead: "#D4B483",
+  status_pre_lead: "#D4B483",
   lead: "#616163",
+  customer: "#0e7490",
   appointment_set: "#225ce5",
   sold: "#048c63",
   not_sold: "#c72020",
