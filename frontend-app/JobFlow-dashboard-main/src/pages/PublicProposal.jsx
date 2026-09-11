@@ -449,7 +449,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
               </div>
             </div>
 
-            {isPaid && <div className="no-print">{paidBadgeStyled}</div>}
+            <div className="no-print">{payBtnStyled}</div>
 
           </div>
 
@@ -551,7 +551,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             <span className="text-2xl font-black text-gray-900">{fmt(basePayAmount)}</span>
           </div>
 
-          {isPaid && <div className="no-print">{paidBadge}</div>}
+          <div className="no-print">{payBlock}</div>
 
           <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
             <p>{companyName}</p>
