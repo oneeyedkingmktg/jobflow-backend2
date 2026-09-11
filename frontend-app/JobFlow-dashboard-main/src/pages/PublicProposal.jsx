@@ -72,10 +72,16 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
     const apiBase = import.meta.env.APP_URL || import.meta.env.VITE_API_URL;
     fetch(`${apiBase}/api/bidder/public/${proposalId}`)
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setData(d))
+      .then(d => {
+        setData(d);
+        const name = d.proposal?.company_name_db || d.proposal?.ghl_company_from_name || d.proposal?.ghl_company_name || '';
+        document.title = forceView === 'invoice'
+          ? `${name} - Invoice`
+          : `${name} - Proposal`;
+      })
       .catch(() => setError('Proposal not found or no longer available.'))
       .finally(() => setLoading(false));
-  }, [proposalId]);
+  }, [proposalId, forceView]);
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -443,7 +449,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
               </div>
             </div>
 
-            <div className="no-print">{payBtnStyled}</div>
+            {isPaid && <div className="no-print">{paidBadgeStyled}</div>}
 
           </div>
 
@@ -545,7 +551,7 @@ export default function PublicProposal({ proposalId, forceView, invoiceNum = '1'
             <span className="text-2xl font-black text-gray-900">{fmt(basePayAmount)}</span>
           </div>
 
-          <div className="no-print">{payBlock}</div>
+          {isPaid && <div className="no-print">{paidBadge}</div>}
 
           <div className="pb-8 text-center text-xs text-gray-400 space-y-1">
             <p>{companyName}</p>

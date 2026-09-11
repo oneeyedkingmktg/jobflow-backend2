@@ -2,9 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Name note:** "JobFlow" was a placeholder/working name that is **no longer used**. The product is **CoatingPro360**. Do not use "JobFlow" in any user-facing text, tab titles, messages, or new code.
+
 ## Repository Overview
 
-This is **CoatingPro360 / JobFlow** — a multi-tenant SaaS platform for coating/epoxy contractors. It consists of three sub-projects:
+This is **CoatingPro360** — a multi-tenant SaaS platform for coating/epoxy contractors. It consists of three sub-projects:
 
 | Directory | Purpose |
 |---|---|

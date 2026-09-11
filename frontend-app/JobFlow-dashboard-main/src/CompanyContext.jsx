@@ -110,6 +110,11 @@ const loadCompanies = async () => {
   }
 };
 
+  // Update browser tab title when active company changes
+  useEffect(() => {
+    document.title = currentCompany?.name || "CoatingPro360";
+  }, [currentCompany]);
+
   // ============================================================================
   // Switch active company (MASTER ONLY)
   // ============================================================================

@@ -105,7 +105,7 @@ commercialPricePerSfMax: null,
       try {
         setLoading(true);
         setError("");
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("authToken");
         const response = await fetch(
           `${API_BASE_URL}/estimator/config?company_id=${company.id}`,
 
@@ -389,7 +389,7 @@ commercial_price_per_sf_max: form.commercialPricePerSfMax,
 };
 
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("authToken");
       const url = `${API_BASE_URL}/estimator/config`;
 
 
