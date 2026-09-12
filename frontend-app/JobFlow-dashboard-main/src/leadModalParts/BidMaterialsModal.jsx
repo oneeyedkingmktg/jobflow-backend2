@@ -19,11 +19,15 @@ function fmtQty(n) {
 
 const noSpin = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 
+function rowKey(m) {
+  return m.custom_item_id != null ? `custom_${m.custom_item_id}` : `lib_${m.library_item_id}`;
+}
+
 export default function BidMaterialsModal({ proposalId, onClose }) {
-  const [loading,  setLoading]  = useState(true);
+  const [loading,   setLoading]   = useState(true);
   const [materials, setMaterials] = useState([]);
-  const [saving,   setSaving]   = useState(false);
-  const [saveMsg,  setSaveMsg]  = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [saveMsg,   setSaveMsg]   = useState('');
 
   useEffect(() => { load(); }, [proposalId]);
 
@@ -32,7 +36,8 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
     setSaveMsg('');
     try {
       const data = await BidderAPI.getMaterials(proposalId);
-      setMaterials(data.materials || []);
+      const raw = data.materials || [];
+      setMaterials(raw.map(m => ({ ...m, _key: rowKey(m) })));
     } catch (e) {
       console.error('Failed to load materials', e);
     } finally {
@@ -40,9 +45,9 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
     }
   }
 
-  function updateRow(libItemId, field, rawValue) {
+  function updateRow(key, field, rawValue) {
     setMaterials(prev => prev.map(m => {
-      if (m.library_item_id !== libItemId) return m;
+      if (m._key !== key) return m;
       const next = { ...m, [field]: rawValue };
       if (field === 'order_qty') next.has_override_qty = true;
       if (field === 'unit_cost') next.has_override_cost = true;
@@ -50,15 +55,16 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
     }));
   }
 
-  async function saveOverride(libItemId) {
-    const m = materials.find(x => x.library_item_id === libItemId);
+  async function saveOverride(key) {
+    const m = materials.find(x => x._key === key);
     if (!m) return;
     setSaving(true);
     setSaveMsg('');
     try {
-      await BidderAPI.saveMaterials(proposalId, [
-        { library_item_id: libItemId, order_qty: m.order_qty, unit_cost: m.unit_cost },
-      ]);
+      const override = m.custom_item_id != null
+        ? { custom_item_id: m.custom_item_id, order_qty: m.order_qty, unit_cost: m.unit_cost }
+        : { library_item_id: m.library_item_id, order_qty: m.order_qty, unit_cost: m.unit_cost };
+      await BidderAPI.saveMaterials(proposalId, [override]);
       setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 2000);
     } catch (e) {
@@ -71,6 +77,18 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
   const total = materials.reduce((sum, m) => {
     return sum + (parseFloat(m.order_qty) || 0) * (parseFloat(m.unit_cost) || 0);
   }, 0);
+
+  function coverageLabel(m) {
+    if (!m.sqft_per_kit) return '—';
+    const qty = parseFloat(m.sqft_per_kit).toLocaleString();
+    if (m.coverage_type && m.purchase_unit) return `${qty} ${m.coverage_type}/${m.purchase_unit}`;
+    return `${qty} sf/unit`;
+  }
+
+  function areaLabel(m) {
+    if (!m.sqft_per_kit) return '—';
+    return `${(parseFloat(m.total_area) || 0).toLocaleString()} sf`;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1300] p-4">
@@ -131,17 +149,18 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                   const oq = parseFloat(m.order_qty) || 0;
                   const uc = parseFloat(m.unit_cost) || 0;
                   return (
-                    <tr key={m.library_item_id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 pr-4 font-medium text-gray-800">{m.name}</td>
+                    <tr key={m._key} className={`border-b border-gray-100 hover:bg-gray-50 ${m.is_custom ? 'bg-green-50/30' : ''}`}>
+                      <td className="py-2.5 pr-4 font-medium text-gray-800">
+                        {m.name}
+                        {m.is_custom && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Custom</span>
+                        )}
+                      </td>
                       <td className="py-2.5 pr-4 text-right text-gray-600 tabular-nums">
-                        {m.sqft_per_kit
-                          ? `${(parseFloat(m.total_area) || 0).toLocaleString()} sf`
-                          : '—'}
+                        {areaLabel(m)}
                       </td>
                       <td className="py-2.5 pr-4 text-right text-gray-500 text-xs tabular-nums whitespace-nowrap">
-                        {m.sqft_per_kit
-                          ? `${parseFloat(m.sqft_per_kit).toLocaleString()} sf/unit`
-                          : '—'}
+                        {coverageLabel(m)}
                       </td>
                       <td className="py-2.5 pr-4 text-right text-gray-400 tabular-nums">
                         {fmtQty(m.calculated_qty)}
@@ -153,8 +172,8 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                           step="1"
                           value={m.order_qty ?? ''}
                           onFocus={e => e.target.select()}
-                          onChange={e => updateRow(m.library_item_id, 'order_qty', e.target.value)}
-                          onBlur={() => saveOverride(m.library_item_id)}
+                          onChange={e => updateRow(m._key, 'order_qty', e.target.value)}
+                          onBlur={() => saveOverride(m._key)}
                           className={`w-20 text-right px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${noSpin} ${m.has_override_qty ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300'}`}
                         />
                       </td>
@@ -165,9 +184,9 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                           step="0.01"
                           value={m.unit_cost ?? ''}
                           onFocus={e => e.target.select()}
-                          onChange={e => updateRow(m.library_item_id, 'unit_cost', e.target.value)}
-                          onBlur={() => saveOverride(m.library_item_id)}
-                          className={`w-24 text-right px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${noSpin} ${m.has_override_cost ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300'}`}
+                          onChange={e => updateRow(m._key, 'unit_cost', e.target.value)}
+                          onBlur={() => saveOverride(m._key)}
+                          className={`w-24 text-right px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${noSpin} ${m.has_override_cost ? 'border-indigo-400 bg-indigo-50' : m.is_custom ? 'border-green-300 bg-green-50' : 'border-gray-300'}`}
                         />
                       </td>
                       <td className="py-2.5 text-right font-semibold text-gray-800 tabular-nums">

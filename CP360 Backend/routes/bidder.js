@@ -19,6 +19,25 @@ const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize:
 
 const PAYPAL_BASE = 'https://api-m.paypal.com';
 
+// Idempotent migration — custom item material costs table
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bid_custom_item_costs (
+        id SERIAL PRIMARY KEY,
+        proposal_id INTEGER REFERENCES bidder_proposals(id) ON DELETE CASCADE,
+        custom_item_id INTEGER REFERENCES bidder_custom_items(id) ON DELETE CASCADE,
+        order_qty NUMERIC(10,2),
+        unit_cost NUMERIC(10,2),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(proposal_id, custom_item_id)
+      )
+    `);
+  } catch (e) {
+    console.error('bid_custom_item_costs migration error:', e.message);
+  }
+})();
+
 async function getPayPalAccessToken(clientId, secret) {
   const res = await axios.post(
     `${PAYPAL_BASE}/v1/oauth2/token`,
@@ -188,7 +207,9 @@ router.get('/proposal/:id/materials', async (req, res) => {
               CASE WHEN li.source_supplier_product_id IS NOT NULL
                    THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
                    ELSE li.sqft_per_kit END AS sqft_per_kit,
-              li.is_system, li.is_charge_only
+              li.is_system, li.is_charge_only,
+              COALESCE(gsp.purchase_unit, li.purchase_unit) AS purchase_unit,
+              COALESCE(gsp.coverage_type, li.coverage_type) AS coverage_type
        FROM bidder_proposal_items bpi
        JOIN bidder_library_items li ON li.id = bpi.library_item_id
        LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
@@ -215,7 +236,9 @@ router.get('/proposal/:id/materials', async (req, res) => {
                 CASE WHEN li.source_supplier_product_id IS NOT NULL
                      THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
                      ELSE li.sqft_per_kit END AS sqft_per_kit,
-                li.is_charge_only
+                li.is_charge_only,
+                COALESCE(gsp.purchase_unit, li.purchase_unit) AS purchase_unit,
+                COALESCE(gsp.coverage_type, li.coverage_type) AS coverage_type
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
          LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
@@ -231,14 +254,14 @@ router.get('/proposal/:id/materials', async (req, res) => {
     }
 
     // Accumulate areas and sources by library_item_id
-    const acc = {}; // library_item_id → { name, kit_price, sqft_per_kit, total_area, sources }
+    const acc = {};
 
-    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area) {
-      if (kitPrice == null) return; // No cost data — skip
+    function addMaterial(libItemId, name, kitPrice, sqftPerKit, area, purchaseUnit, coverageType) {
+      if (kitPrice == null) return;
       const kp = parseFloat(kitPrice);
       const sfk = sqftPerKit ? parseFloat(sqftPerKit) : null;
       if (!acc[libItemId]) {
-        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, total_area: 0 };
+        acc[libItemId] = { library_item_id: libItemId, name, kit_price: kp, sqft_per_kit: sfk, purchase_unit: purchaseUnit || null, coverage_type: coverageType || null, total_area: 0 };
       }
       acc[libItemId].total_area += parseFloat(area) || 0;
     }
@@ -249,10 +272,10 @@ router.get('/proposal/:id/materials', async (req, res) => {
         const components = componentsBySystem[item.library_item_id] || [];
         for (const comp of components) {
           if (comp.is_charge_only) continue;
-          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity);
+          addMaterial(comp.component_item_id, comp.name, comp.kit_price, comp.sqft_per_kit, item.quantity, comp.purchase_unit, comp.coverage_type);
         }
       } else {
-        addMaterial(item.library_item_id, item.lib_name, item.kit_price, item.sqft_per_kit, item.quantity);
+        addMaterial(item.library_item_id, item.lib_name, item.kit_price, item.sqft_per_kit, item.quantity, item.purchase_unit, item.coverage_type);
       }
     }
 
@@ -280,9 +303,12 @@ router.get('/proposal/:id/materials', async (req, res) => {
 
       return {
         library_item_id: item.library_item_id,
+        custom_item_id: null,
         name: item.name,
         total_area: item.total_area,
         sqft_per_kit: item.sqft_per_kit,
+        purchase_unit: item.purchase_unit,
+        coverage_type: item.coverage_type,
         kit_price: item.kit_price,
         calculated_qty,
         default_order_qty,
@@ -294,8 +320,51 @@ router.get('/proposal/:id/materials', async (req, res) => {
       };
     });
 
-    const total_projected_cost = materials.reduce((sum, m) => sum + (m.extended_cost || 0), 0);
-    res.json({ materials, total_projected_cost });
+    // Append custom items (non-subtotal, non-note)
+    const customItemsResult = await pool.query(
+      `SELECT id, description, quantity
+       FROM bidder_custom_items
+       WHERE proposal_id = $1
+         AND (is_subtotal IS NULL OR is_subtotal = false)
+         AND (is_note IS NULL OR is_note = false)
+       ORDER BY sort_order, id`,
+      [id]
+    );
+    const customCostsResult = await pool.query(
+      'SELECT custom_item_id, order_qty, unit_cost FROM bid_custom_item_costs WHERE proposal_id = $1',
+      [id]
+    );
+    const customCosts = {};
+    customCostsResult.rows.forEach(r => { customCosts[r.custom_item_id] = r; });
+
+    const customMaterials = customItemsResult.rows.map(ci => {
+      const savedCost = customCosts[ci.id] || {};
+      const bid_qty = parseFloat(ci.quantity) || 1;
+      const order_qty = savedCost.order_qty != null ? parseFloat(savedCost.order_qty) : bid_qty;
+      const unit_cost = savedCost.unit_cost != null ? parseFloat(savedCost.unit_cost) : 0;
+      return {
+        library_item_id: null,
+        custom_item_id: ci.id,
+        name: ci.description || 'Custom Item',
+        total_area: null,
+        sqft_per_kit: null,
+        purchase_unit: null,
+        coverage_type: null,
+        kit_price: null,
+        calculated_qty: bid_qty,
+        default_order_qty: bid_qty,
+        order_qty,
+        unit_cost,
+        extended_cost: order_qty * unit_cost,
+        is_custom: true,
+        has_override_qty:  savedCost.order_qty != null,
+        has_override_cost: savedCost.unit_cost != null,
+      };
+    });
+
+    const allMaterials = [...materials, ...customMaterials];
+    const total_projected_cost = allMaterials.reduce((sum, m) => sum + (m.extended_cost || 0), 0);
+    res.json({ materials: allMaterials, total_projected_cost });
   } catch (err) {
     console.error('GET /bidder/proposal/:id/materials error:', err);
     res.status(500).json({ error: 'Failed to generate materials list' });
@@ -318,13 +387,23 @@ router.put('/proposal/:id/materials', async (req, res) => {
     if (!Array.isArray(overrides) || overrides.length === 0) return res.json({ ok: true });
 
     for (const ov of overrides) {
-      await pool.query(
-        `INSERT INTO bid_material_overrides (proposal_id, library_item_id, order_qty, unit_cost, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (proposal_id, library_item_id)
-         DO UPDATE SET order_qty = EXCLUDED.order_qty, unit_cost = EXCLUDED.unit_cost, updated_at = NOW()`,
-        [id, ov.library_item_id, ov.order_qty ?? null, ov.unit_cost ?? null]
-      );
+      if (ov.custom_item_id != null) {
+        await pool.query(
+          `INSERT INTO bid_custom_item_costs (proposal_id, custom_item_id, order_qty, unit_cost, updated_at)
+           VALUES ($1, $2, $3, $4, NOW())
+           ON CONFLICT (proposal_id, custom_item_id)
+           DO UPDATE SET order_qty = EXCLUDED.order_qty, unit_cost = EXCLUDED.unit_cost, updated_at = NOW()`,
+          [id, ov.custom_item_id, ov.order_qty ?? null, ov.unit_cost ?? null]
+        );
+      } else if (ov.library_item_id != null) {
+        await pool.query(
+          `INSERT INTO bid_material_overrides (proposal_id, library_item_id, order_qty, unit_cost, updated_at)
+           VALUES ($1, $2, $3, $4, NOW())
+           ON CONFLICT (proposal_id, library_item_id)
+           DO UPDATE SET order_qty = EXCLUDED.order_qty, unit_cost = EXCLUDED.unit_cost, updated_at = NOW()`,
+          [id, ov.library_item_id, ov.order_qty ?? null, ov.unit_cost ?? null]
+        );
+      }
     }
     res.json({ ok: true });
   } catch (err) {
