@@ -2970,6 +2970,18 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
 // DELETE /api/bidder/global-supplier-products/:id
 router.delete('/global-supplier-products/:id', requireRole('master'), async (req, res) => {
   try {
+    const { rows: libRefs } = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM bidder_library_items WHERE source_supplier_product_id = $1',
+      [req.params.id]
+    );
+    const libCount = parseInt(libRefs[0].cnt);
+    if (libCount > 0) {
+      return res.status(409).json({
+        error: `Cannot delete — this product is linked to ${libCount} company library item${libCount !== 1 ? 's' : ''}. Remove those library items before deleting the global product.`,
+        library_count: libCount,
+      });
+    }
+    await pool.query('DELETE FROM company_product_favorites WHERE global_supplier_product_id = $1', [req.params.id]);
     const { rows } = await pool.query(
       'DELETE FROM global_supplier_products WHERE id = $1 RETURNING id', [req.params.id]
     );

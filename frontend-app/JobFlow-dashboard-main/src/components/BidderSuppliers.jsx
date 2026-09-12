@@ -307,8 +307,8 @@ function SupplierRow({ supplier, categories, onEdit, onDelete }) {
     try {
       await BidderAPI.deleteSupplierProduct(id);
       await loadProducts();
-    } catch {
-      alert('Failed to delete product');
+    } catch (err) {
+      alert(err.message || 'Failed to delete product');
     }
   }
 
