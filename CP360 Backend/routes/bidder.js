@@ -2475,6 +2475,87 @@ router.delete('/global-suppliers/:id', requireRole('master'), async (req, res) =
   }
 });
 
+// ── Global Product Categories (master-only) ────────────────────────────────
+
+// GET /api/bidder/global-categories
+router.get('/global-categories', requireRole('master'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM global_product_categories ORDER BY sort_order, name'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /bidder/global-categories error:', err);
+    res.status(500).json({ error: 'Failed to load categories' });
+  }
+});
+
+// POST /api/bidder/global-categories
+router.post('/global-categories', requireRole('master'), async (req, res) => {
+  try {
+    const { name, sort_order = 0 } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const { rows } = await pool.query(
+      'INSERT INTO global_product_categories (name, sort_order) VALUES ($1,$2) RETURNING *',
+      [name.trim(), sort_order]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'A category with that name already exists' });
+    console.error('POST /bidder/global-categories error:', err);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// PUT /api/bidder/global-categories/:id
+router.put('/global-categories/:id', requireRole('master'), async (req, res) => {
+  try {
+    const { name, sort_order, is_active } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE global_product_categories
+         SET name       = COALESCE($1, name),
+             sort_order = COALESCE($2, sort_order),
+             is_active  = COALESCE($3, is_active)
+       WHERE id = $4 RETURNING *`,
+      [name?.trim() || null, sort_order ?? null, is_active ?? null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Category not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'A category with that name already exists' });
+    console.error('PUT /bidder/global-categories/:id error:', err);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// DELETE /api/bidder/global-categories/:id
+router.delete('/global-categories/:id', requireRole('master'), async (req, res) => {
+  try {
+    const { rows: [cat] } = await pool.query(
+      'SELECT * FROM global_product_categories WHERE id = $1', [req.params.id]
+    );
+    if (!cat) return res.status(404).json({ error: 'Category not found' });
+    if (cat.name === 'Uncategorized') {
+      return res.status(400).json({ error: 'The Uncategorized category cannot be deleted' });
+    }
+    const { rows: products } = await pool.query(
+      'SELECT name FROM global_supplier_products WHERE category_id = $1 ORDER BY name',
+      [req.params.id]
+    );
+    if (products.length > 0) {
+      return res.status(409).json({
+        error: 'Cannot delete — products are assigned to this category',
+        products: products.map((p) => p.name),
+      });
+    }
+    await pool.query('DELETE FROM global_product_categories WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /bidder/global-categories/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
 // ── Shared helper: push one global supplier product to all enabled companies ──
 async function pushProductToEnabledCompanies(client, supplierId, product) {
   const companies = await client.query(

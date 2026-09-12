@@ -51,15 +51,18 @@ export const apiRequest = async (endpoint, options = {}) => {
   if (!response.ok) {
     let message = "API request failed";
     let detail = null;
+    let products = null;
     try {
       const clone = response.clone();
       const json = await clone.json().catch(() => null);
       if (json?.message) message = json.message;
       if (json?.error) message = json.error;
       if (json?.detail) detail = json.detail;
+      if (json?.products) products = json.products;
     } catch (_) {}
     const err = new Error(message);
     err.detail = detail;
+    if (products) err.products = products;
     throw err;
   }
 
@@ -439,6 +442,10 @@ export const BidderAPI = {
   createSupplierProduct: (supplierId, data) => apiRequest(`/api/bidder/global-suppliers/${supplierId}/products`, { method: 'POST', body: JSON.stringify(data) }),
   updateSupplierProduct: (id, data) => apiRequest(`/api/bidder/global-supplier-products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSupplierProduct: (id) => apiRequest(`/api/bidder/global-supplier-products/${id}`, { method: 'DELETE' }),
+  getGlobalCategories: () => apiRequest('/api/bidder/global-categories'),
+  createGlobalCategory: (data) => apiRequest('/api/bidder/global-categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateGlobalCategory: (id, data) => apiRequest(`/api/bidder/global-categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGlobalCategory: (id) => apiRequest(`/api/bidder/global-categories/${id}`, { method: 'DELETE' }),
 };
 
 /* ============================================================================

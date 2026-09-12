@@ -595,17 +595,117 @@ function SupplierForm({ initial = EMPTY_SUPPLIER, onSave, onCancel, saving }) {
   );
 }
 
+// ── CategoryRow ──────────────────────────────────────────────────────────────
+function CategoryRow({ cat, onRename, onDelete, deleteError, onClearError }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(cat.name);
+  const [saving, setSaving] = useState(false);
+  const isProtected = cat.name === 'Uncategorized';
+  const hasError = deleteError?.catId === cat.id;
+
+  async function handleSave() {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === cat.name) { setEditing(false); setName(cat.name); return; }
+    setSaving(true);
+    try {
+      await onRename(cat.id, trimmed);
+      setEditing(false);
+    } catch (err) {
+      alert(err.message || 'Failed to rename category');
+      setName(cat.name);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl">
+        {editing ? (
+          <>
+            <input
+              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setEditing(false); setName(cat.name); } }}
+              autoFocus
+            />
+            <button
+              onClick={handleSave}
+              disabled={saving || !name.trim()}
+              className="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => { setEditing(false); setName(cat.name); }}
+              className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 text-sm font-medium text-gray-800">{cat.name}</span>
+            {isProtected && (
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Default</span>
+            )}
+            {!isProtected && (
+              <>
+                <button
+                  onClick={() => { setEditing(true); if (hasError) onClearError(); }}
+                  className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50"
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={() => onDelete(cat)}
+                  className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+      {hasError && (
+        <div className="mt-1 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <p className="font-semibold mb-1">
+            Cannot delete — {deleteError.products.length} product{deleteError.products.length !== 1 ? 's' : ''} assigned to this category:
+          </p>
+          <ul className="list-disc list-inside space-y-0.5 text-xs mb-2">
+            {deleteError.products.map((p) => <li key={p}>{p}</li>)}
+          </ul>
+          <p className="text-xs text-red-500 mb-2">Reassign these products to a different category before deleting.</p>
+          <button onClick={onClearError} className="text-xs text-red-600 underline hover:text-red-800">Dismiss</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 export default function BidderSuppliers() {
+  // ── Suppliers state ──
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addingSupplier, setAddingSupplier] = useState(false);
   const [editSupplierId, setEditSupplierId] = useState(null);
   const [savingSupplier, setSavingSupplier] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  // ── Categories state ──
+  const [categories, setCategories] = useState([]);
+  const [catLoading, setCatLoading] = useState(true);
+  const [addingCat, setAddingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [savingCat, setSavingCat] = useState(false);
+  const [deleteError, setDeleteError] = useState(null); // { catId, products }
 
-  async function load() {
+  useEffect(() => { loadSuppliers(); loadCategories(); }, []);
+
+  async function loadSuppliers() {
     setLoading(true);
     try {
       setSuppliers(await BidderAPI.getGlobalSuppliers());
@@ -616,12 +716,24 @@ export default function BidderSuppliers() {
     }
   }
 
+  async function loadCategories() {
+    setCatLoading(true);
+    try {
+      setCategories(await BidderAPI.getGlobalCategories());
+    } catch {
+      console.error('Failed to load categories');
+    } finally {
+      setCatLoading(false);
+    }
+  }
+
+  // ── Supplier handlers ──
   async function handleAddSupplier(form) {
     setSavingSupplier(true);
     try {
       await BidderAPI.createGlobalSupplier(form);
       setAddingSupplier(false);
-      await load();
+      await loadSuppliers();
     } catch {
       alert('Failed to save supplier');
     } finally {
@@ -634,7 +746,7 @@ export default function BidderSuppliers() {
     try {
       await BidderAPI.updateGlobalSupplier(id, form);
       setEditSupplierId(null);
-      await load();
+      await loadSuppliers();
     } catch {
       alert('Failed to update supplier');
     } finally {
@@ -646,78 +758,181 @@ export default function BidderSuppliers() {
     if (!window.confirm(`Delete supplier "${supplier.name}" and all its products? This cannot be undone.`)) return;
     try {
       await BidderAPI.deleteGlobalSupplier(supplier.id);
-      await load();
+      await loadSuppliers();
     } catch {
       alert('Failed to delete supplier');
     }
   }
 
+  // ── Category handlers ──
+  async function handleAddCategory() {
+    const name = newCatName.trim();
+    if (!name) return;
+    setSavingCat(true);
+    try {
+      await BidderAPI.createGlobalCategory({ name });
+      setNewCatName('');
+      setAddingCat(false);
+      await loadCategories();
+    } catch (err) {
+      alert(err.message || 'Failed to create category');
+    } finally {
+      setSavingCat(false);
+    }
+  }
+
+  async function handleRenameCategory(id, name) {
+    await BidderAPI.updateGlobalCategory(id, { name });
+    await loadCategories();
+  }
+
+  async function handleDeleteCategory(cat) {
+    setDeleteError(null);
+    try {
+      await BidderAPI.deleteGlobalCategory(cat.id);
+      await loadCategories();
+    } catch (err) {
+      if (err.products) {
+        setDeleteError({ catId: cat.id, products: err.products });
+      } else {
+        alert(err.message || 'Failed to delete category');
+      }
+    }
+  }
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500">Global product catalog by supplier — master account only</p>
-        </div>
-        {!addingSupplier && (
-          <button
-            onClick={() => { setAddingSupplier(true); setEditSupplierId(null); }}
-            className="px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700"
-          >
-            + Add Supplier
-          </button>
-        )}
-      </div>
+    <div className="p-6 space-y-8">
 
-      {addingSupplier && (
-        <SupplierForm
-          onSave={handleAddSupplier}
-          onCancel={() => setAddingSupplier(false)}
-          saving={savingSupplier}
-        />
-      )}
-
-      {loading ? (
-        <p className="text-sm text-gray-400">Loading suppliers…</p>
-      ) : suppliers.length === 0 && !addingSupplier ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
-          <p className="text-gray-500 mb-3">No suppliers yet.</p>
-          <button
-            onClick={() => setAddingSupplier(true)}
-            className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700"
-          >
-            Add First Supplier
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {suppliers.map((s) =>
-            editSupplierId === s.id ? (
-              <SupplierForm
-                key={s.id}
-                initial={{
-                  name: s.name,
-                  notes: s.notes || '',
-                  phone: s.phone || '',
-                  website: s.website || '',
-                  contact_name: s.contact_name || '',
-                  lead_time: s.lead_time || '',
-                  order_email: s.order_email || '',
-                }}
-                onSave={(form) => handleUpdateSupplier(s.id, form)}
-                onCancel={() => setEditSupplierId(null)}
-                saving={savingSupplier}
-              />
-            ) : (
-              <SupplierRow
-                key={s.id}
-                supplier={s}
-                onEdit={(sup) => { setEditSupplierId(sup.id); setAddingSupplier(false); }}
-                onDelete={handleDeleteSupplier}
-              />
-            )
+      {/* ══ Suppliers section ══════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-gray-800">Suppliers</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Global product catalog by supplier</p>
+          </div>
+          {!addingSupplier && (
+            <button
+              onClick={() => { setAddingSupplier(true); setEditSupplierId(null); }}
+              className="px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700"
+            >
+              + Add Supplier
+            </button>
           )}
         </div>
-      )}
+
+        {addingSupplier && (
+          <SupplierForm
+            onSave={handleAddSupplier}
+            onCancel={() => setAddingSupplier(false)}
+            saving={savingSupplier}
+          />
+        )}
+
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading suppliers…</p>
+        ) : suppliers.length === 0 && !addingSupplier ? (
+          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
+            <p className="text-gray-500 mb-3">No suppliers yet.</p>
+            <button
+              onClick={() => setAddingSupplier(true)}
+              className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700"
+            >
+              Add First Supplier
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {suppliers.map((s) =>
+              editSupplierId === s.id ? (
+                <SupplierForm
+                  key={s.id}
+                  initial={{
+                    name: s.name,
+                    notes: s.notes || '',
+                    phone: s.phone || '',
+                    website: s.website || '',
+                    contact_name: s.contact_name || '',
+                    lead_time: s.lead_time || '',
+                    order_email: s.order_email || '',
+                  }}
+                  onSave={(form) => handleUpdateSupplier(s.id, form)}
+                  onCancel={() => setEditSupplierId(null)}
+                  saving={savingSupplier}
+                />
+              ) : (
+                <SupplierRow
+                  key={s.id}
+                  supplier={s}
+                  onEdit={(sup) => { setEditSupplierId(sup.id); setAddingSupplier(false); }}
+                  onDelete={handleDeleteSupplier}
+                />
+              )
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ══ Categories section ═════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-gray-800">Categories</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Product categories assigned to global SKUs</p>
+          </div>
+          {!addingCat && (
+            <button
+              onClick={() => { setAddingCat(true); setNewCatName(''); }}
+              className="px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700"
+            >
+              + Add Category
+            </button>
+          )}
+        </div>
+
+        {catLoading ? (
+          <p className="text-sm text-gray-400">Loading categories…</p>
+        ) : (
+          <div className="space-y-2">
+            {categories.map((cat) => (
+              <CategoryRow
+                key={cat.id}
+                cat={cat}
+                onRename={handleRenameCategory}
+                onDelete={handleDeleteCategory}
+                deleteError={deleteError}
+                onClearError={() => setDeleteError(null)}
+              />
+            ))}
+          </div>
+        )}
+
+        {addingCat && (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Category name, e.g. Epoxy"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') setAddingCat(false); }}
+              autoFocus
+            />
+            <button
+              onClick={handleAddCategory}
+              disabled={savingCat || !newCatName.trim()}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingCat ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => setAddingCat(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </section>
+
     </div>
   );
 }
