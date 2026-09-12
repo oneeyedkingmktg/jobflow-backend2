@@ -20,6 +20,7 @@ const EMPTY_SYSTEM = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', component_ids: [], category_id: null,
+  spec_sheet_url: '', product_page_url: '',
 };
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
@@ -190,6 +191,14 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], categori
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
+        <div className="col-span-2">
+          <label className={labelCls}>System Spec Sheet URL</label>
+          <input className={inputCls} value={form.spec_sheet_url} onChange={(e) => set('spec_sheet_url', e.target.value)} placeholder="https://…" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>System Features URL</label>
+          <input className={inputCls} value={form.product_page_url} onChange={(e) => set('product_page_url', e.target.value)} placeholder="https://…" />
+        </div>
       </div>
 
       <div>
@@ -206,7 +215,7 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], categori
                   onChange={() => toggleComponent(p.id)}
                   className="w-4 h-4 rounded accent-purple-600"
                 />
-                <span className="text-sm text-gray-800">{p.name}</span>
+                <span className="text-sm text-gray-800">{p.internal_name || p.name}</span>
                 {p.sku && <span className="text-xs text-gray-400 font-mono">{p.sku}</span>}
                 <span className="ml-auto text-xs text-gray-500">${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
               </label>
@@ -406,6 +415,8 @@ function SupplierRow({ supplier, categories, onEdit, onDelete }) {
                             sku: p.sku || '',
                             category_id: p.category_id || null,
                             component_ids: (p.components || []).map((c) => c.component_product_id),
+                            spec_sheet_url: p.spec_sheet_url || '',
+                            product_page_url: p.product_page_url || '',
                           }}
                           availableComponents={componentOptions}
                           categories={categories}
