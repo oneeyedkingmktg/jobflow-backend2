@@ -888,7 +888,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                         <div className="flex items-center gap-1 mb-2">
                           {mvBtns(libItemId, true)}
                           <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{pi.name}</span>
-                          {libData?.source_supplier_product_id != null && (
+                          {libData && (
                             <button
                               onClick={() => setInfoModal({ type: libData.is_system ? 'system' : 'product', item: libData, catName: libCatName })}
                               className="text-gray-300 hover:text-blue-400 text-sm px-1 flex-shrink-0"
