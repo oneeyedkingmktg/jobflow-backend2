@@ -389,7 +389,7 @@ export default function BidderAdminSettings({ companyId }) {
       supplier: item.supplier || '',
       sku: item.sku || '',
       kit_price: item.kit_price != null ? item.kit_price : '',
-      sqft_per_kit: item.sqft_per_kit != null ? item.sqft_per_kit : '',
+      sqft_per_kit: item.sqft_per_kit != null ? Math.round(parseFloat(item.sqft_per_kit)) : '',
       cost_override: item.cost_override ?? null,
       coverage_override: item.coverage_override ?? null,
       source_supplier_product_id: item.source_supplier_product_id || null,
@@ -749,18 +749,22 @@ export default function BidderAdminSettings({ companyId }) {
                       <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">Supplier</span>
                     )}
                   </button>
-                  <button
-                    onClick={() => handleReorderCategory(cat.id, 'up')}
-                    disabled={library.indexOf(cat) === 0}
-                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
-                    title="Move up"
-                  >▲</button>
-                  <button
-                    onClick={() => handleReorderCategory(cat.id, 'down')}
-                    disabled={library.indexOf(cat) === library.length - 1}
-                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
-                    title="Move down"
-                  >▼</button>
+                  {isMasterUser && (
+                    <>
+                      <button
+                        onClick={() => handleReorderCategory(cat.id, 'up')}
+                        disabled={library.indexOf(cat) === 0}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                        title="Move up"
+                      >▲</button>
+                      <button
+                        onClick={() => handleReorderCategory(cat.id, 'down')}
+                        disabled={library.indexOf(cat) === library.length - 1}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                        title="Move down"
+                      >▼</button>
+                    </>
+                  )}
                   <button
                     onClick={() => { setEditCatId(cat.id); setEditCatName(cat.name); }}
                     className="text-xs text-blue-600 hover:underline px-2"
@@ -866,7 +870,7 @@ export default function BidderAdminSettings({ companyId }) {
                                 <span className="ml-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Custom</span>
                               )}
                             </label>
-                            <input className={inputCls} type="number" step="0.01" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value, coverage_override: e.target.value !== '' ? e.target.value : null }))} placeholder="0" />
+                            <input className={inputCls} type="number" step="1" min="0" value={editItemForm.sqft_per_kit} onChange={(e) => setEditItemForm((p) => ({ ...p, sqft_per_kit: e.target.value, coverage_override: e.target.value !== '' ? e.target.value : null }))} placeholder="0" />
                             {editItemForm.source_supplier_product_id && editItemForm.coverage_override != null && (
                               <button type="button" onClick={() => handleResetCoverageOverride(item.id)} className="text-xs text-blue-500 hover:underline mt-0.5">Reset to supplier value</button>
                             )}
@@ -912,7 +916,7 @@ export default function BidderAdminSettings({ companyId }) {
                             )}
                             {!item.is_charge_only && item.sqft_per_kit != null && (
                               <span className="text-xs text-gray-400 flex items-center gap-1">
-                                {parseFloat(item.sqft_per_kit)} sf/kit
+                                {Math.round(parseFloat(item.sqft_per_kit))} sf/kit
                                 {item.coverage_override != null && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded leading-none">Custom</span>}
                               </span>
                             )}
@@ -920,7 +924,7 @@ export default function BidderAdminSettings({ companyId }) {
                         )}
                       </div>
                       <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">${parseFloat(item.default_unit_price || 0).toFixed(2)} {item.default_unit_label || ''}</span>
-                      <button onClick={() => startEditItem(item)} className="text-xs text-blue-600 hover:underline px-2">Edit</button>
+                      <button onClick={() => startEditItem(item)} className="text-xs text-blue-600 hover:underline px-2">{cat.source_supplier_id ? 'View' : 'Edit'}</button>
                       <button onClick={() => handleDeleteItem(item.id)} className="text-xs text-red-500 hover:underline px-2">Del</button>
                     </div>
                   )}
@@ -1070,7 +1074,7 @@ export default function BidderAdminSettings({ companyId }) {
                                 <div><label className={labelCls}>Supplier</label><input className={inputCls} value={newItemForm.supplier} onChange={(e) => setNewItemForm((p) => ({ ...p, supplier: e.target.value }))} placeholder="e.g. Sherwin-Williams" /></div>
                                 <div><label className={labelCls}>SKU</label><input className={inputCls} value={newItemForm.sku} onChange={(e) => setNewItemForm((p) => ({ ...p, sku: e.target.value }))} placeholder="e.g. SW-1234" /></div>
                                 <div><label className={labelCls}>Kit Price ($)</label><input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.kit_price} onChange={(e) => setNewItemForm((p) => ({ ...p, kit_price: e.target.value }))} placeholder="0.00" /></div>
-                                <div><label className={labelCls}>SF per Kit</label><input className={inputCls} type="number" step="0.01" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" /></div>
+                                <div><label className={labelCls}>SF per Kit</label><input className={inputCls} type="number" step="1" min="0" value={newItemForm.sqft_per_kit} onChange={(e) => setNewItemForm((p) => ({ ...p, sqft_per_kit: e.target.value }))} placeholder="0" /></div>
                               </div>
                             )}
                             <div className="flex gap-2">

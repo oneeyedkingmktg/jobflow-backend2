@@ -1162,42 +1162,50 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                             const catProducts = activeItems.filter(i => !i.is_system && !i.is_charge_only);
                             const catCharges  = activeItems.filter(i => i.is_charge_only);
                             if (!activeItems.length) return null;
+                            const catOpen = sectionOpen(`${cat.id}-cat`);
 
                             return (
                               <div key={cat.id}>
-                                <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+                                <button onClick={() => sectionToggle(`${cat.id}-cat`)} className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100 text-left">
+                                  {secChevron(catOpen)}
+                                  {cat.name}
+                                </button>
 
-                                {catSystems.length > 0 && (
-                                  <div>
-                                    <button onClick={() => sectionToggle(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-purple-50 border-b border-gray-50">
-                                      {secChevron(sectionOpen(`${cat.id}-sys`))}
-                                      <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">⬡ Systems</span>
-                                      <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
-                                    </button>
-                                    {sectionOpen(`${cat.id}-sys`) && catSystems.map(i => itemRow(i, cat.id))}
-                                  </div>
-                                )}
+                                {catOpen && (
+                                  <>
+                                    {catSystems.length > 0 && (
+                                      <div>
+                                        <button onClick={() => sectionToggle(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-purple-50 border-b border-gray-50">
+                                          {secChevron(sectionOpen(`${cat.id}-sys`))}
+                                          <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">⬡ Systems</span>
+                                          <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
+                                        </button>
+                                        {sectionOpen(`${cat.id}-sys`) && catSystems.map(i => itemRow(i, cat.id))}
+                                      </div>
+                                    )}
 
-                                {catProducts.length > 0 && (
-                                  <div>
-                                    <button onClick={() => sectionToggle(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-50">
-                                      {secChevron(sectionOpen(`${cat.id}-prod`))}
-                                      <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">📦 Products</span>
-                                      <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
-                                    </button>
-                                    {sectionOpen(`${cat.id}-prod`) && catProducts.map(i => itemRow(i, cat.id))}
-                                  </div>
-                                )}
+                                    {catProducts.length > 0 && (
+                                      <div>
+                                        <button onClick={() => sectionToggle(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-50">
+                                          {secChevron(sectionOpen(`${cat.id}-prod`))}
+                                          <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">📦 Products</span>
+                                          <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
+                                        </button>
+                                        {sectionOpen(`${cat.id}-prod`) && catProducts.map(i => itemRow(i, cat.id))}
+                                      </div>
+                                    )}
 
-                                {catCharges.length > 0 && (
-                                  <div>
-                                    <button onClick={() => sectionToggle(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-amber-50 border-b border-gray-50">
-                                      {secChevron(sectionOpen(`${cat.id}-chg`))}
-                                      <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">⚡ Charges</span>
-                                      <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
-                                    </button>
-                                    {sectionOpen(`${cat.id}-chg`) && catCharges.map(i => itemRow(i, cat.id))}
-                                  </div>
+                                    {catCharges.length > 0 && (
+                                      <div>
+                                        <button onClick={() => sectionToggle(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-amber-50 border-b border-gray-50">
+                                          {secChevron(sectionOpen(`${cat.id}-chg`))}
+                                          <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">⚡ Charges</span>
+                                          <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
+                                        </button>
+                                        {sectionOpen(`${cat.id}-chg`) && catCharges.map(i => itemRow(i, cat.id))}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             );
