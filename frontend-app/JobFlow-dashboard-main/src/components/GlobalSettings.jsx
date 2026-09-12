@@ -9,7 +9,7 @@ import BidderSuppliers from './BidderSuppliers';
 
 const TABS = [
   { key: 'proposal-design', label: 'Proposal Design' },
-  { key: 'bidder-suppliers', label: 'Bidder Suppliers' },
+  { key: 'bidder-suppliers', label: 'Bidder' },
 ];
 
 export default function GlobalSettings({ onBack }) {

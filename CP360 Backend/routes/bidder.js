@@ -2416,11 +2416,15 @@ router.get('/global-suppliers', requireRole('master'), async (req, res) => {
 // POST /api/bidder/global-suppliers
 router.post('/global-suppliers', requireRole('master'), async (req, res) => {
   try {
-    const { name, notes = null, sort_order = 0 } = req.body;
+    const {
+      name, notes = null, sort_order = 0,
+      phone = null, website = null, contact_name = null, lead_time = null, order_email = null,
+    } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     const { rows } = await pool.query(
-      'INSERT INTO global_suppliers (name, notes, sort_order) VALUES ($1,$2,$3) RETURNING *',
-      [name.trim(), notes, sort_order]
+      `INSERT INTO global_suppliers (name, notes, sort_order, phone, website, contact_name, lead_time, order_email)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [name.trim(), notes, sort_order, phone, website, contact_name, lead_time, order_email]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -2432,15 +2436,22 @@ router.post('/global-suppliers', requireRole('master'), async (req, res) => {
 // PUT /api/bidder/global-suppliers/:id
 router.put('/global-suppliers/:id', requireRole('master'), async (req, res) => {
   try {
-    const { name, notes, is_active, sort_order } = req.body;
+    const { name, notes, is_active, sort_order, phone, website, contact_name, lead_time, order_email } = req.body;
     const { rows } = await pool.query(
       `UPDATE global_suppliers
-         SET name = COALESCE($1, name),
-             notes = $2,
-             is_active = COALESCE($3, is_active),
-             sort_order = COALESCE($4, sort_order)
-       WHERE id = $5 RETURNING *`,
-      [name?.trim() || null, notes ?? null, is_active ?? null, sort_order ?? null, req.params.id]
+         SET name         = COALESCE($1, name),
+             notes        = $2,
+             is_active    = COALESCE($3, is_active),
+             sort_order   = COALESCE($4, sort_order),
+             phone        = $5,
+             website      = $6,
+             contact_name = $7,
+             lead_time    = $8,
+             order_email  = $9
+       WHERE id = $10 RETURNING *`,
+      [name?.trim() || null, notes ?? null, is_active ?? null, sort_order ?? null,
+       phone ?? null, website ?? null, contact_name ?? null, lead_time ?? null, order_email ?? null,
+       req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Supplier not found' });
     res.json(rows[0]);

@@ -8,7 +8,7 @@ import { BidderAPI } from '../api';
 
 const UNIT_OPTIONS = ['per sqft', 'per kit', 'per gallon', 'per unit', 'flat fee', 'per hour'];
 
-const EMPTY_SUPPLIER = { name: '', notes: '' };
+const EMPTY_SUPPLIER = { name: '', notes: '', phone: '', website: '', contact_name: '', lead_time: '', order_email: '' };
 const EMPTY_PRODUCT = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
@@ -290,17 +290,40 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
           <div>
-            <span className="font-semibold text-gray-800">{supplier.name}</span>
-            {!supplier.is_active && (
-              <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-gray-800">{supplier.name}</span>
+              {!supplier.is_active && (
+                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>
+              )}
+            </div>
             {supplier.notes && (
               <p className="text-xs text-gray-500 mt-0.5 truncate">{supplier.notes}</p>
             )}
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+              {supplier.contact_name && (
+                <span className="text-xs text-gray-400">{supplier.contact_name}</span>
+              )}
+              {supplier.phone && (
+                <span className="text-xs text-gray-400">{supplier.phone}</span>
+              )}
+              {supplier.website && (
+                <a href={supplier.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs text-blue-500 hover:underline">
+                  {supplier.website.replace(/^https?:\/\//, '')}
+                </a>
+              )}
+              {supplier.order_email && (
+                <a href={`mailto:${supplier.order_email}`} onClick={(e) => e.stopPropagation()} className="text-xs text-blue-500 hover:underline">
+                  {supplier.order_email}
+                </a>
+              )}
+              {supplier.lead_time && (
+                <span className="text-xs text-gray-400">Lead time: {supplier.lead_time}</span>
+              )}
+            </div>
           </div>
         </button>
         <button onClick={() => onEdit(supplier)} className="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
-          Edit
+          View
         </button>
         <button onClick={() => onDelete(supplier)} className="text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50">
           Delete
@@ -526,13 +549,35 @@ function SupplierForm({ initial = EMPTY_SUPPLIER, onSave, onCancel, saving }) {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-      <div>
-        <label className={labelCls}>Supplier Name *</label>
-        <input className={inputCls} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Sherwin-Williams" />
-      </div>
-      <div>
-        <label className={labelCls}>Notes</label>
-        <input className={inputCls} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Optional notes" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className={labelCls}>Supplier Name *</label>
+          <input className={inputCls} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Sherwin-Williams" />
+        </div>
+        <div>
+          <label className={labelCls}>Contact Name</label>
+          <input className={inputCls} value={form.contact_name || ''} onChange={(e) => set('contact_name', e.target.value)} placeholder="e.g. John Smith" />
+        </div>
+        <div>
+          <label className={labelCls}>Phone</label>
+          <input className={inputCls} value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} placeholder="e.g. (800) 555-0100" />
+        </div>
+        <div>
+          <label className={labelCls}>Website</label>
+          <input className={inputCls} value={form.website || ''} onChange={(e) => set('website', e.target.value)} placeholder="e.g. https://sherwin-williams.com" />
+        </div>
+        <div>
+          <label className={labelCls}>Order Email</label>
+          <input className={inputCls} type="email" value={form.order_email || ''} onChange={(e) => set('order_email', e.target.value)} placeholder="e.g. orders@supplier.com" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Lead Time</label>
+          <input className={inputCls} value={form.lead_time || ''} onChange={(e) => set('lead_time', e.target.value)} placeholder="e.g. 3–5 business days" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Notes</label>
+          <input className={inputCls} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} placeholder="Optional internal notes" />
+        </div>
       </div>
       <div className="flex gap-2">
         <button
@@ -649,7 +694,15 @@ export default function BidderSuppliers() {
             editSupplierId === s.id ? (
               <SupplierForm
                 key={s.id}
-                initial={{ name: s.name, notes: s.notes || '' }}
+                initial={{
+                  name: s.name,
+                  notes: s.notes || '',
+                  phone: s.phone || '',
+                  website: s.website || '',
+                  contact_name: s.contact_name || '',
+                  lead_time: s.lead_time || '',
+                  order_email: s.order_email || '',
+                }}
                 onSave={(form) => handleUpdateSupplier(s.id, form)}
                 onCancel={() => setEditSupplierId(null)}
                 saving={savingSupplier}
