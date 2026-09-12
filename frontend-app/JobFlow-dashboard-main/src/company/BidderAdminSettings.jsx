@@ -63,6 +63,7 @@ export default function BidderAdminSettings({ companyId }) {
   // ── Supplier access (master-only) ──────────────────────────────────────────
   const [allSuppliers, setAllSuppliers] = useState([]);
   const [enabledSupplierIds, setEnabledSupplierIds] = useState([]);
+  const [supplierConfigs, setSupplierConfigs] = useState({}); // { [supplier_id]: { discount_percent, notes } }
   const [supplierLoading, setSupplierLoading] = useState(false);
   const [supplierSaving, setSupplierSaving] = useState(false);
   const [supplierMsg, setSupplierMsg] = useState('');
@@ -159,12 +160,20 @@ export default function BidderAdminSettings({ companyId }) {
   async function loadSupplierAccess() {
     setSupplierLoading(true);
     try {
-      const [all, enabled] = await Promise.all([
+      const [all, companySuppliers] = await Promise.all([
         BidderAPI.getGlobalSuppliers(),
         BidderAPI.getCompanySuppliers(companyId),
       ]);
       setAllSuppliers(all);
-      setEnabledSupplierIds(enabled);
+      setEnabledSupplierIds(companySuppliers.map((cs) => cs.supplier_id));
+      const configs = {};
+      companySuppliers.forEach((cs) => {
+        configs[cs.supplier_id] = {
+          discount_percent: cs.discount_percent ?? 0,
+          notes: cs.notes ?? '',
+        };
+      });
+      setSupplierConfigs(configs);
     } catch (e) {
       console.error('Failed to load supplier access', e);
     } finally {
@@ -176,6 +185,9 @@ export default function BidderAdminSettings({ companyId }) {
     setEnabledSupplierIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
+    if (!supplierConfigs[id]) {
+      setSupplierConfigs((prev) => ({ ...prev, [id]: { discount_percent: 0, notes: '' } }));
+    }
     setSupplierMsg('');
   }
 
@@ -183,7 +195,12 @@ export default function BidderAdminSettings({ companyId }) {
     setSupplierSaving(true);
     setSupplierMsg('');
     try {
-      await BidderAPI.setCompanySuppliers(companyId, enabledSupplierIds);
+      const supplierConfigList = enabledSupplierIds.map((id) => ({
+        supplier_id: id,
+        discount_percent: parseFloat(supplierConfigs[id]?.discount_percent) || 0,
+        notes: supplierConfigs[id]?.notes?.trim() || null,
+      }));
+      await BidderAPI.setCompanySuppliers(companyId, enabledSupplierIds, supplierConfigList);
       setSupplierMsg('Saved');
       setTimeout(() => setSupplierMsg(''), 2000);
       loadLibrary();
@@ -1439,27 +1456,95 @@ export default function BidderAdminSettings({ companyId }) {
         <div className="space-y-2">
           {activeSuppliers.map((s) => {
             const isEnabled = enabledSupplierIds.includes(s.id);
+            const cfg = supplierConfigs[s.id] || {};
+            const websiteHref = s.website
+              ? s.website.startsWith('http') ? s.website : `https://${s.website}`
+              : null;
+
             return (
-              <label
+              <div
                 key={s.id}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
-                  isEnabled ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                className={`rounded-xl border overflow-hidden transition-colors ${
+                  isEnabled ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={isEnabled}
-                  onChange={() => toggleSupplier(s.id)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium text-gray-800 text-sm">{s.name}</span>
-                  {s.notes && <p className="text-xs text-gray-500 mt-0.5">{s.notes}</p>}
-                </div>
+                {/* Header row — checkbox + name */}
+                <label className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${!isEnabled ? 'hover:bg-gray-50' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={() => toggleSupplier(s.id)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="font-medium text-gray-800 text-sm flex-1">{s.name}</span>
+                  {isEnabled && (
+                    <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium shrink-0">Active</span>
+                  )}
+                </label>
+
+                {/* Expanded section for enabled suppliers */}
                 {isEnabled && (
-                  <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-medium shrink-0">Active</span>
+                  <div className="px-4 pb-4 border-t border-blue-200 pt-3 space-y-3">
+                    {/* Read-only global supplier info */}
+                    {(s.contact_name || s.phone || websiteHref || s.order_email || s.lead_time || s.notes) && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                        {s.contact_name && <span><span className="text-gray-400">Contact:</span> {s.contact_name}</span>}
+                        {s.phone && <span><span className="text-gray-400">Phone:</span> {s.phone}</span>}
+                        {websiteHref && (
+                          <span>
+                            <span className="text-gray-400">Website:</span>{' '}
+                            <a href={websiteHref} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {s.website}
+                            </a>
+                          </span>
+                        )}
+                        {s.order_email && (
+                          <span>
+                            <span className="text-gray-400">Order Email:</span>{' '}
+                            <a href={`mailto:${s.order_email}`} className="text-blue-600 hover:underline">
+                              {s.order_email}
+                            </a>
+                          </span>
+                        )}
+                        {s.lead_time && <span><span className="text-gray-400">Lead Time:</span> {s.lead_time}</span>}
+                        {s.notes && <span className="w-full text-gray-500 italic">{s.notes}</span>}
+                      </div>
+                    )}
+
+                    {/* Editable company-specific fields */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Company Discount %</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={cfg.discount_percent ?? 0}
+                          onChange={(e) => setSupplierConfigs((prev) => ({
+                            ...prev,
+                            [s.id]: { ...prev[s.id], discount_percent: e.target.value },
+                          }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                        <input
+                          type="text"
+                          value={cfg.notes ?? ''}
+                          onChange={(e) => setSupplierConfigs((prev) => ({
+                            ...prev,
+                            [s.id]: { ...prev[s.id], notes: e.target.value },
+                          }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Internal notes for this company"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </label>
+              </div>
             );
           })}
         </div>

@@ -176,12 +176,14 @@ router.get('/proposal/:id/materials', async (req, res) => {
     );
     if (!propCheck.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // Fetch proposal items — resolve effective kit_price/sqft_per_kit via supplier inheritance
+    // Fetch proposal items — resolve effective kit_price/sqft_per_kit via supplier inheritance + company discount
     const itemsResult = await pool.query(
       `SELECT bpi.id, bpi.library_item_id, bpi.quantity,
               COALESCE(li.internal_name, li.name) AS lib_name,
               CASE WHEN li.source_supplier_product_id IS NOT NULL
-                   THEN COALESCE(li.cost_override, gsp.kit_price)
+                   THEN CASE WHEN li.cost_override IS NOT NULL THEN li.cost_override
+                             ELSE gsp.kit_price * (1 - COALESCE(csa.discount_percent, 0) / 100.0)
+                        END
                    ELSE li.kit_price END AS kit_price,
               CASE WHEN li.source_supplier_product_id IS NOT NULL
                    THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
@@ -190,11 +192,12 @@ router.get('/proposal/:id/materials', async (req, res) => {
        FROM bidder_proposal_items bpi
        JOIN bidder_library_items li ON li.id = bpi.library_item_id
        LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+       LEFT JOIN company_supplier_access csa ON csa.supplier_id = gsp.supplier_id AND csa.company_id = $2
        WHERE bpi.proposal_id = $1
          AND bpi.library_item_id IS NOT NULL
          AND bpi.is_freeform = false
        ORDER BY bpi.sort_order, bpi.id`,
-      [id]
+      [id, companyId]
     );
 
     // For system items, fetch component details — also resolve effective cost/coverage
@@ -205,7 +208,9 @@ router.get('/proposal/:id/materials', async (req, res) => {
         `SELECT sc.system_item_id, sc.component_item_id,
                 COALESCE(li.internal_name, li.name) AS name,
                 CASE WHEN li.source_supplier_product_id IS NOT NULL
-                     THEN COALESCE(li.cost_override, gsp.kit_price)
+                     THEN CASE WHEN li.cost_override IS NOT NULL THEN li.cost_override
+                               ELSE gsp.kit_price * (1 - COALESCE(csa.discount_percent, 0) / 100.0)
+                          END
                      ELSE li.kit_price END AS kit_price,
                 CASE WHEN li.source_supplier_product_id IS NOT NULL
                      THEN COALESCE(li.coverage_override, gsp.sqft_per_kit)
@@ -214,9 +219,10 @@ router.get('/proposal/:id/materials', async (req, res) => {
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
          LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+         LEFT JOIN company_supplier_access csa ON csa.supplier_id = gsp.supplier_id AND csa.company_id = $2
          WHERE sc.system_item_id = ANY($1)
          ORDER BY sc.sort_order, sc.id`,
-        [systemLibIds]
+        [systemLibIds, companyId]
       );
       compResult.rows.forEach(r => {
         if (!componentsBySystem[r.system_item_id]) componentsBySystem[r.system_item_id] = [];
@@ -2269,16 +2275,21 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
 // COMPANY SUPPLIER ACCESS (master-only)
 // ============================================================================
 
-// GET /api/bidder/company-suppliers?company_id=X — returns array of enabled supplier IDs
+// GET /api/bidder/company-suppliers?company_id=X — returns enabled suppliers with discount/notes + global info
 router.get('/company-suppliers', requireRole('master'), async (req, res) => {
   try {
     const companyId = req.query.company_id;
     if (!companyId) return res.status(400).json({ error: 'company_id required' });
     const { rows } = await pool.query(
-      'SELECT supplier_id FROM company_supplier_access WHERE company_id = $1',
+      `SELECT csa.supplier_id, csa.discount_percent, csa.notes,
+              gs.name, gs.phone, gs.website, gs.contact_name, gs.lead_time, gs.order_email
+       FROM company_supplier_access csa
+       JOIN global_suppliers gs ON gs.id = csa.supplier_id
+       WHERE csa.company_id = $1
+       ORDER BY gs.sort_order, gs.name`,
       [companyId]
     );
-    res.json(rows.map((r) => r.supplier_id));
+    res.json(rows);
   } catch (err) {
     console.error('GET /bidder/company-suppliers error:', err);
     res.status(500).json({ error: 'Failed to load supplier access' });
@@ -2292,7 +2303,7 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
   try {
     const companyId = parseInt(req.query.company_id, 10);
     if (!companyId) return res.status(400).json({ error: 'company_id required' });
-    const { supplier_ids = [] } = req.body;
+    const { supplier_ids = [], supplier_configs = [] } = req.body;
 
     // Fetch which suppliers were already enabled (to find newly added ones)
     const existing = await pool.query(
@@ -2303,12 +2314,13 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
     const newlyEnabled = supplier_ids.filter((sid) => !existingIds.has(sid));
 
     await pool.transaction(async (client) => {
-      // Replace access records
+      // Replace access records (preserving discount/notes from supplier_configs)
       await client.query('DELETE FROM company_supplier_access WHERE company_id = $1', [companyId]);
       for (const sid of supplier_ids) {
+        const cfg = supplier_configs.find((c) => c.supplier_id === sid) || {};
         await client.query(
-          'INSERT INTO company_supplier_access (company_id, supplier_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-          [companyId, sid]
+          'INSERT INTO company_supplier_access (company_id, supplier_id, discount_percent, notes) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',
+          [companyId, sid, cfg.discount_percent ?? 0, cfg.notes?.trim() || null]
         );
       }
 

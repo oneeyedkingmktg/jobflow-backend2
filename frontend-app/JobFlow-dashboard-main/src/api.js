@@ -427,7 +427,7 @@ export const BidderAPI = {
 
   // Company supplier access (master-only)
   getCompanySuppliers: (companyId) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`),
-  setCompanySuppliers: (companyId, supplierIds) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`, { method: 'PUT', body: JSON.stringify({ supplier_ids: supplierIds }) }),
+  setCompanySuppliers: (companyId, supplierIds, supplierConfigs = []) => apiRequest(`/api/bidder/company-suppliers?company_id=${companyId}`, { method: 'PUT', body: JSON.stringify({ supplier_ids: supplierIds, supplier_configs: supplierConfigs }) }),
 
   // Materials / Order List
   getMaterials: (id) => apiRequest(`/api/bidder/proposal/${id}/materials`),
