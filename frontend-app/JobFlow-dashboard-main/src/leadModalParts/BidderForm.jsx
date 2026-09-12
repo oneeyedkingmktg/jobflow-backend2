@@ -64,6 +64,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [showItemPicker,   setShowItemPicker]   = useState(false);
   const [itemSearch,       setItemSearch]       = useState('');
   const [pickerSections,   setPickerSections]   = useState({});
+  const [pickerMode,       setPickerMode]       = useState('supplier'); // 'supplier' | 'category' | 'favorites'
+  const [favorites,        setFavorites]        = useState(new Set());
   const [showDocsModal,      setShowDocsModal]      = useState(false);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [showExitModal,    setShowExitModal]    = useState(false);
@@ -92,18 +94,20 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   async function load() {
     setLoading(true);
     try {
-      const [p, lib, companyRes, settingsRes, warrantyList] = await Promise.all([
+      const [p, lib, companyRes, settingsRes, warrantyList, favIds] = await Promise.all([
         BidderAPI.getProposal(proposalId),
         BidderAPI.getLibrary(lead.companyId),
         lead.companyId ? CompaniesAPI.get(lead.companyId) : Promise.resolve(null),
         BidderAPI.getCompanySettings(lead.companyId).catch(() => null),
         BidderAPI.getWarranties(lead.companyId).catch(() => []),
+        BidderAPI.getFavorites().catch(() => []),
       ]);
       if (companyRes?.company) setCompany(companyRes.company);
       if (settingsRes) setCompanySettings(settingsRes);
 
       setProposal(p);
       setLibrary(lib);
+      setFavorites(new Set(favIds || []));
       const wList = warrantyList || [];
       setWarranties(wList);
 
@@ -238,6 +242,17 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     e.target.value = '';
     setShowItemPicker(false);
     await addFromPicker(val, nextSortOrder());
+  }
+
+  function toggleFavorite(gspId) {
+    const numId = Number(gspId);
+    if (favorites.has(numId)) {
+      setFavorites((prev) => { const n = new Set(prev); n.delete(numId); return n; });
+      BidderAPI.removeFavorite(numId).catch(() => {});
+    } else {
+      setFavorites((prev) => new Set([...prev, numId]));
+      BidderAPI.addFavorite(numId).catch(() => {});
+    }
   }
 
   // ── Move item up or down in the list ────────────────────────────────────
@@ -894,82 +909,74 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   <input
                     autoFocus
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    placeholder="Search items…"
+                    placeholder={pickerMode === 'favorites' ? 'Search favorites…' : 'Search items…'}
                     value={itemSearch}
                     onChange={e => setItemSearch(e.target.value)}
                   />
                 </div>
 
-                <div className="max-h-72 overflow-y-auto">
-                  {/* Special rows */}
-                  {!itemSearch && (
-                    <>
-                      <button
-                        onClick={() => addFromPicker('__subtotal__', nextSortOrder())}
-                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
-                      >
-                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-semibold shrink-0">Subtotal</span>
-                        <span className="text-sm text-gray-500 italic">Insert subtotal divider</span>
-                      </button>
-                      <button
-                        onClick={() => addFromPicker('__note__', nextSortOrder())}
-                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
-                      >
-                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
-                        <span className="text-sm text-gray-500 italic">Note / comment line</span>
-                      </button>
-                    </>
-                  )}
+                {/* Mode tabs */}
+                <div className="flex border-b border-gray-100 bg-gray-50 px-3 pt-1">
+                  {[
+                    { key: 'supplier', label: 'Supplier' },
+                    { key: 'category', label: 'Category' },
+                    { key: 'favorites', label: '★ Favorites' },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => { setPickerMode(tab.key); setItemSearch(''); }}
+                      className={`px-3 py-1.5 mr-1 text-xs font-semibold rounded-t-md border-b-2 transition-colors ${
+                        pickerMode === tab.key
+                          ? 'border-blue-600 text-blue-600 bg-white'
+                          : 'border-transparent text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {/* Library items by category */}
-                  {library.map(cat => {
-                    const q = itemSearch.toLowerCase();
-                    const activeItems = (cat.items || []).filter(i => i.is_active !== false);
-                    const itemBtn = (i) => (
-                      <button
-                        key={i.id}
-                        onClick={async () => {
-                          setShowItemPicker(false);
-                          setItemSearch('');
-                          await addFromPicker(`${cat.id}::${i.id}`, nextSortOrder());
-                        }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center gap-2.5 border-b border-gray-50"
-                      >
-                        {i.is_system ? (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold shrink-0">⬡ System</span>
-                        ) : i.is_charge_only ? (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">⚡ Charge</span>
-                        ) : (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
-                        )}
-                        <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
-                          {i.internal_name || i.name}
-                        </span>
-                        {i.internal_name && (
-                          <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[140px]">→ {i.name}</span>
-                        )}
-                      </button>
-                    );
-
-                    if (q) {
-                      const matched = activeItems.filter(i =>
-                        i.name.toLowerCase().includes(q) ||
-                        (i.internal_name || '').toLowerCase().includes(q) ||
-                        (i.description || '').toLowerCase().includes(q)
-                      );
-                      if (!matched.length) return null;
+                <div className="max-h-64 overflow-y-auto">
+                  {(() => {
+                    // Shared item row: div wrapper with add button + star toggle
+                    const itemRow = (i, catId) => {
+                      const isFav = i.source_supplier_product_id != null && favorites.has(Number(i.source_supplier_product_id));
                       return (
-                        <div key={cat.id}>
-                          <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
-                          {matched.map(itemBtn)}
+                        <div key={i.id} className="flex items-center border-b border-gray-50 hover:bg-blue-50">
+                          <button
+                            className="flex-1 text-left px-4 py-2.5 flex items-center gap-2.5 min-w-0"
+                            onClick={async () => {
+                              setShowItemPicker(false);
+                              setItemSearch('');
+                              await addFromPicker(`${catId}::${i.id}`, nextSortOrder());
+                            }}
+                          >
+                            {i.is_system ? (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold shrink-0">⬡ System</span>
+                            ) : i.is_charge_only ? (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold shrink-0">⚡ Charge</span>
+                            ) : (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold shrink-0">📦 Product</span>
+                            )}
+                            <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">
+                              {i.internal_name || i.name}
+                            </span>
+                            {i.internal_name && (
+                              <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[120px]">→ {i.name}</span>
+                            )}
+                          </button>
+                          {i.source_supplier_product_id != null && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleFavorite(i.source_supplier_product_id); }}
+                              className={`px-3 py-2.5 text-base leading-none shrink-0 ${isFav ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-300'}`}
+                              title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                            >
+                              ★
+                            </button>
+                          )}
                         </div>
                       );
-                    }
-
-                    const catSystems  = activeItems.filter(i => i.is_system);
-                    const catProducts = activeItems.filter(i => !i.is_system && !i.is_charge_only);
-                    const catCharges  = activeItems.filter(i => i.is_charge_only);
-                    if (!activeItems.length) return null;
+                    };
 
                     const sectionToggle = (key) => setPickerSections(p => ({ ...p, [key]: !p[key] }));
                     const sectionOpen = (key) => !!pickerSections[key];
@@ -979,58 +986,182 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       </svg>
                     );
 
-                    return (
-                      <div key={cat.id}>
-                        <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+                    // ── Supplier mode ──────────────────────────────────────────────────
+                    if (pickerMode === 'supplier') {
+                      return (
+                        <>
+                          {!itemSearch && (
+                            <>
+                              <button
+                                onClick={() => addFromPicker('__subtotal__', nextSortOrder())}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-semibold shrink-0">Subtotal</span>
+                                <span className="text-sm text-gray-500 italic">Insert subtotal divider</span>
+                              </button>
+                              <button
+                                onClick={() => addFromPicker('__note__', nextSortOrder())}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
+                                <span className="text-sm text-gray-500 italic">Note / comment line</span>
+                              </button>
+                            </>
+                          )}
 
-                        {catSystems.length > 0 && (
-                          <div>
-                            <button onClick={() => sectionToggle(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-purple-50 border-b border-gray-50">
-                              {secChevron(sectionOpen(`${cat.id}-sys`))}
-                              <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">⬡ Systems</span>
-                              <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
-                            </button>
-                            {sectionOpen(`${cat.id}-sys`) && catSystems.map(itemBtn)}
-                          </div>
-                        )}
+                          {library.map(cat => {
+                            const q = itemSearch.toLowerCase();
+                            const activeItems = (cat.items || []).filter(i => i.is_active !== false);
 
-                        {catProducts.length > 0 && (
-                          <div>
-                            <button onClick={() => sectionToggle(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-50">
-                              {secChevron(sectionOpen(`${cat.id}-prod`))}
-                              <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">📦 Products</span>
-                              <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
-                            </button>
-                            {sectionOpen(`${cat.id}-prod`) && catProducts.map(itemBtn)}
-                          </div>
-                        )}
+                            if (q) {
+                              const matched = activeItems.filter(i =>
+                                i.name.toLowerCase().includes(q) ||
+                                (i.internal_name || '').toLowerCase().includes(q) ||
+                                (i.description || '').toLowerCase().includes(q)
+                              );
+                              if (!matched.length) return null;
+                              return (
+                                <div key={cat.id}>
+                                  <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+                                  {matched.map(i => itemRow(i, cat.id))}
+                                </div>
+                              );
+                            }
 
-                        {catCharges.length > 0 && (
-                          <div>
-                            <button onClick={() => sectionToggle(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-amber-50 border-b border-gray-50">
-                              {secChevron(sectionOpen(`${cat.id}-chg`))}
-                              <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">⚡ Charges</span>
-                              <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
-                            </button>
-                            {sectionOpen(`${cat.id}-chg`) && catCharges.map(itemBtn)}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                            const catSystems  = activeItems.filter(i => i.is_system);
+                            const catProducts = activeItems.filter(i => !i.is_system && !i.is_charge_only);
+                            const catCharges  = activeItems.filter(i => i.is_charge_only);
+                            if (!activeItems.length) return null;
 
-                  {itemSearch && (() => {
-                    const q = itemSearch.toLowerCase();
-                    const anyMatch = library.some(cat =>
-                      (cat.items || []).filter(i => i.is_active !== false).some(i =>
-                        i.name.toLowerCase().includes(q) ||
-                        (i.internal_name || '').toLowerCase().includes(q) ||
-                        (i.description || '').toLowerCase().includes(q)
-                      )
-                    );
-                    return !anyMatch && (
-                      <p className="text-sm text-gray-400 italic px-4 py-4 text-center">No items match "{itemSearch}"</p>
-                    );
+                            return (
+                              <div key={cat.id}>
+                                <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">{cat.name}</div>
+
+                                {catSystems.length > 0 && (
+                                  <div>
+                                    <button onClick={() => sectionToggle(`${cat.id}-sys`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-purple-50 border-b border-gray-50">
+                                      {secChevron(sectionOpen(`${cat.id}-sys`))}
+                                      <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">⬡ Systems</span>
+                                      <span className="text-xs text-gray-400 ml-1">({catSystems.length})</span>
+                                    </button>
+                                    {sectionOpen(`${cat.id}-sys`) && catSystems.map(i => itemRow(i, cat.id))}
+                                  </div>
+                                )}
+
+                                {catProducts.length > 0 && (
+                                  <div>
+                                    <button onClick={() => sectionToggle(`${cat.id}-prod`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-50">
+                                      {secChevron(sectionOpen(`${cat.id}-prod`))}
+                                      <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">📦 Products</span>
+                                      <span className="text-xs text-gray-400 ml-1">({catProducts.length})</span>
+                                    </button>
+                                    {sectionOpen(`${cat.id}-prod`) && catProducts.map(i => itemRow(i, cat.id))}
+                                  </div>
+                                )}
+
+                                {catCharges.length > 0 && (
+                                  <div>
+                                    <button onClick={() => sectionToggle(`${cat.id}-chg`)} className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-amber-50 border-b border-gray-50">
+                                      {secChevron(sectionOpen(`${cat.id}-chg`))}
+                                      <span className="text-xs font-semibold text-amber-500 uppercase tracking-wide">⚡ Charges</span>
+                                      <span className="text-xs text-gray-400 ml-1">({catCharges.length})</span>
+                                    </button>
+                                    {sectionOpen(`${cat.id}-chg`) && catCharges.map(i => itemRow(i, cat.id))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {itemSearch && (() => {
+                            const q = itemSearch.toLowerCase();
+                            const anyMatch = library.some(cat =>
+                              (cat.items || []).filter(i => i.is_active !== false).some(i =>
+                                i.name.toLowerCase().includes(q) ||
+                                (i.internal_name || '').toLowerCase().includes(q) ||
+                                (i.description || '').toLowerCase().includes(q)
+                              )
+                            );
+                            return !anyMatch && (
+                              <p className="text-sm text-gray-400 italic px-4 py-4 text-center">No items match "{itemSearch}"</p>
+                            );
+                          })()}
+                        </>
+                      );
+                    }
+
+                    // ── Category mode ──────────────────────────────────────────────────
+                    if (pickerMode === 'category') {
+                      const q = itemSearch.toLowerCase();
+                      const allItems = library.flatMap(cat => (cat.items || []).filter(i => i.is_active !== false));
+                      const filtered = q
+                        ? allItems.filter(i =>
+                            i.name.toLowerCase().includes(q) ||
+                            (i.internal_name || '').toLowerCase().includes(q) ||
+                            (i.description || '').toLowerCase().includes(q)
+                          )
+                        : allItems;
+
+                      const groups = {};
+                      filtered.forEach(i => {
+                        const gCatId = i.global_category_id || 'uncategorized';
+                        const gCatName = i.global_category_name || 'Uncategorized';
+                        if (!groups[gCatId]) groups[gCatId] = { name: gCatName, items: [] };
+                        groups[gCatId].items.push(i);
+                      });
+
+                      const sorted = Object.entries(groups).sort(([, a], [, b]) => {
+                        if (a.name === 'Uncategorized') return 1;
+                        if (b.name === 'Uncategorized') return -1;
+                        return a.name.localeCompare(b.name);
+                      });
+
+                      if (!sorted.length) return (
+                        <p className="text-sm text-gray-400 italic px-4 py-4 text-center">
+                          {q ? `No items match "${itemSearch}"` : 'No items in library'}
+                        </p>
+                      );
+
+                      return (
+                        <>
+                          {sorted.map(([gCatId, group]) => (
+                            <div key={gCatId}>
+                              <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">
+                                {group.name}
+                              </div>
+                              {group.items.map(i => itemRow(i, i.category_id))}
+                            </div>
+                          ))}
+                        </>
+                      );
+                    }
+
+                    // ── Favorites mode ─────────────────────────────────────────────────
+                    if (pickerMode === 'favorites') {
+                      const q = itemSearch.toLowerCase();
+                      const allItems = library.flatMap(cat => (cat.items || []).filter(i => i.is_active !== false));
+                      const favItems = allItems.filter(i =>
+                        i.source_supplier_product_id != null &&
+                        favorites.has(Number(i.source_supplier_product_id)) &&
+                        (!q ||
+                          i.name.toLowerCase().includes(q) ||
+                          (i.internal_name || '').toLowerCase().includes(q))
+                      );
+
+                      if (!favItems.length) return (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm text-gray-400 italic">
+                            {q
+                              ? `No favorites match "${itemSearch}"`
+                              : 'No favorites yet — star items in Supplier or Category view'}
+                          </p>
+                        </div>
+                      );
+
+                      return <>{favItems.map(i => itemRow(i, i.category_id))}</>;
+                    }
+
+                    return null;
                   })()}
                 </div>
 

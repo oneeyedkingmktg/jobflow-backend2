@@ -846,6 +846,7 @@ router.get('/library', async (req, res) => {
     );
     const items = await pool.query(
       `SELECT li.*,
+         gpc.name AS global_category_name,
          CASE WHEN li.source_supplier_product_id IS NOT NULL
               THEN COALESCE(li.cost_override, gsp.kit_price)
               ELSE li.kit_price END AS kit_price,
@@ -854,6 +855,7 @@ router.get('/library', async (req, res) => {
               ELSE li.sqft_per_kit END AS sqft_per_kit
        FROM bidder_library_items li
        LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
+       LEFT JOIN global_product_categories gpc ON li.global_category_id = gpc.id
        WHERE li.company_id = $1
        ORDER BY li.sort_order, li.id`,
       [companyId]
@@ -2268,6 +2270,58 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
   } catch (err) {
     console.error('POST /bidder/public/:id/send-warranty-email error:', err);
     res.status(500).json({ error: 'Failed to send warranty email' });
+  }
+});
+
+// ============================================================================
+// PRODUCT FAVORITES (per company)
+// ============================================================================
+
+// GET /api/bidder/favorites — returns array of favorited global_supplier_product_ids
+router.get('/favorites', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { rows } = await pool.query(
+      'SELECT global_supplier_product_id FROM company_product_favorites WHERE company_id = $1 ORDER BY created_at',
+      [companyId]
+    );
+    res.json(rows.map((r) => r.global_supplier_product_id));
+  } catch (err) {
+    console.error('GET /bidder/favorites error:', err);
+    res.status(500).json({ error: 'Failed to load favorites' });
+  }
+});
+
+// POST /api/bidder/favorites — body: { global_supplier_product_id }
+router.post('/favorites', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { global_supplier_product_id } = req.body;
+    if (!global_supplier_product_id) return res.status(400).json({ error: 'global_supplier_product_id required' });
+    await pool.query(
+      'INSERT INTO company_product_favorites (company_id, global_supplier_product_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [companyId, global_supplier_product_id]
+    );
+    res.status(201).json({ success: true });
+  } catch (err) {
+    console.error('POST /bidder/favorites error:', err);
+    res.status(500).json({ error: 'Failed to add favorite' });
+  }
+});
+
+// DELETE /api/bidder/favorites/:gspId — remove a favorite
+router.delete('/favorites/:gspId', async (req, res) => {
+  try {
+    const companyId = req.user.company_id;
+    const { gspId } = req.params;
+    await pool.query(
+      'DELETE FROM company_product_favorites WHERE company_id = $1 AND global_supplier_product_id = $2',
+      [companyId, gspId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /bidder/favorites error:', err);
+    res.status(500).json({ error: 'Failed to remove favorite' });
   }
 });
 

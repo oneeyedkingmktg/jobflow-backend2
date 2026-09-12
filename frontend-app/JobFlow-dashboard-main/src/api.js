@@ -433,6 +433,11 @@ export const BidderAPI = {
   getMaterials: (id) => apiRequest(`/api/bidder/proposal/${id}/materials`),
   saveMaterials: (id, overrides) => apiRequest(`/api/bidder/proposal/${id}/materials`, { method: 'PUT', body: JSON.stringify({ overrides }) }),
 
+  // Product favorites (per company)
+  getFavorites: () => apiRequest('/api/bidder/favorites'),
+  addFavorite: (gspId) => apiRequest('/api/bidder/favorites', { method: 'POST', body: JSON.stringify({ global_supplier_product_id: gspId }) }),
+  removeFavorite: (gspId) => apiRequest(`/api/bidder/favorites/${gspId}`, { method: 'DELETE' }),
+
   // Global supplier catalog (master-only)
   getGlobalSuppliers: () => apiRequest('/api/bidder/global-suppliers'),
   createGlobalSupplier: (data) => apiRequest('/api/bidder/global-suppliers', { method: 'POST', body: JSON.stringify(data) }),
