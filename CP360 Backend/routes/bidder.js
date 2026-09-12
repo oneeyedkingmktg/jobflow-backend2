@@ -2957,6 +2957,32 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
          updated.available_colors, updated.product_page_url, updated.spec_sheet_url,
          updated.category_id, updated.id]
       );
+
+      // Cascade component list to company library copies of this system
+      if (updated.is_system && Array.isArray(component_ids)) {
+        const { rows: companySystemItems } = await client.query(
+          'SELECT id, company_id FROM bidder_library_items WHERE source_supplier_product_id = $1',
+          [updated.id]
+        );
+        for (const sysItem of companySystemItems) {
+          await client.query(
+            'DELETE FROM bidder_library_system_components WHERE system_item_id = $1',
+            [sysItem.id]
+          );
+          for (let i = 0; i < component_ids.length; i++) {
+            const { rows: compComp } = await client.query(
+              'SELECT id FROM bidder_library_items WHERE company_id = $1 AND source_supplier_product_id = $2 LIMIT 1',
+              [sysItem.company_id, component_ids[i]]
+            );
+            if (compComp.length > 0) {
+              await client.query(
+                'INSERT INTO bidder_library_system_components (system_item_id, component_item_id, sort_order) VALUES ($1,$2,$3)',
+                [sysItem.id, compComp[0].id, i]
+              );
+            }
+          }
+        }
+      }
     });
 
     res.json(updated);

@@ -39,6 +39,14 @@ export default function BidderAdminSettings({ companyId }) {
   // Edit system component IDs (used when editing a system item)
   const [editSystemComponentIds, setEditSystemComponentIds] = useState([]);
 
+  // Expand/collapse individual system components in the read-only component panel
+  const [expandedComponents, setExpandedComponents] = useState(new Set());
+  const toggleExpandedComponent = (id) => setExpandedComponents((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
   // Sub-section open state: keyed by `${catId}-sys`, `${catId}-prod`, `${catId}-chg`
   const [openSections, setOpenSections] = useState({});
   const toggleSection = (key) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
@@ -794,14 +802,23 @@ export default function BidderAdminSettings({ companyId }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               );
-              const renderItem = (item) => (
+              const renderItem = (item) => {
+                const isSupplierSystem = editItemId === item.id && editItemForm.is_system && !!editItemForm.source_supplier_product_id;
+                const lockedCls = `${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed`;
+                return (
                 <div key={item.id} className="px-4 py-3 border-t border-gray-100">
                   {editItemId === item.id ? (
                     <div className="space-y-3">
+                      {isSupplierSystem && (
+                        <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                          <span>🔒</span>
+                          <span>This system is managed by the global supplier catalog. Name, description, and components are locked. Only price and label can be changed.</span>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className={labelCls}>{editItemForm.is_system ? 'Proposal Name *' : 'Name *'}</label>
-                          <input className={inputCls} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
+                          <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
                         </div>
                         <div>
                           <label className={labelCls}>Default Price</label>
@@ -810,11 +827,11 @@ export default function BidderAdminSettings({ companyId }) {
                       </div>
                       <div>
                         <label className={labelCls}>Internal Name <span className="normal-case text-gray-400 font-normal">— shown in bidder picker</span></label>
-                        <input className={inputCls} value={editItemForm.internal_name} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
+                        <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.internal_name} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_name: e.target.value }))} placeholder="e.g. Low Moisture – No MVB – ¼″ Flakes" />
                       </div>
                       <div>
                         <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
-                        <input className={inputCls} value={editItemForm.internal_description || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
+                        <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.internal_description || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, internal_description: e.target.value }))} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
                       </div>
                       <div>
                         <label className={labelCls}>Unit Label</label>
@@ -822,11 +839,11 @@ export default function BidderAdminSettings({ companyId }) {
                       </div>
                       <div>
                         <label className={labelCls}>Description</label>
-                        <textarea className={`${inputCls} resize-none`} rows={2} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
+                        <textarea className={isSupplierSystem ? `${lockedCls} resize-none` : `${inputCls} resize-none`} disabled={isSupplierSystem} rows={2} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                       </div>
                       <div>
                         <label className={labelCls}>Color</label>
-                        <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                        <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                       </div>
                       {!editItemForm.is_system && (
                         <label className="flex items-center gap-3 cursor-pointer">
@@ -834,7 +851,50 @@ export default function BidderAdminSettings({ companyId }) {
                           <span className="text-sm text-gray-700 font-medium">Charge Only <span className="text-gray-400 font-normal">(service/labor — no material cost)</span></span>
                         </label>
                       )}
-                      {editItemForm.is_system ? (
+                      {editItemForm.is_system && editItemForm.source_supplier_product_id ? (
+                        /* ── Supplier system: read-only component list ── */
+                        <div>
+                          <label className={labelCls}>
+                            System Components
+                            <span className="ml-2 normal-case font-normal text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded text-[10px]">Managed by global supplier — read only</span>
+                          </label>
+                          <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                            {(item.components || []).length === 0 && (
+                              <li className="px-3 py-2 text-xs text-gray-400 italic">No components defined</li>
+                            )}
+                            {(item.components || []).map((c) => {
+                              const isExp = expandedComponents.has(c.component_item_id);
+                              const coverageStr = c.coverage_per_unit
+                                ? `${c.coverage_per_unit}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
+                                : null;
+                              return (
+                                <li key={c.component_item_id} className="text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpandedComponent(c.component_item_id)}
+                                    className="flex items-center gap-1.5 w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
+                                  >
+                                    <span className="text-gray-400 w-3 shrink-0">{isExp ? '▾' : '▸'}</span>
+                                    <span className="font-medium">{c.display_name || c.name}</span>
+                                    {c.display_name && c.display_name !== c.name && (
+                                      <span className="text-gray-400 ml-1 truncate">— {c.name}</span>
+                                    )}
+                                  </button>
+                                  {isExp && (
+                                    <div className="ml-7 pb-2 pr-3 space-y-0.5 text-gray-500">
+                                      {c.global_category_name && <div>Category: {c.global_category_name}</div>}
+                                      {coverageStr && <div>Coverage: {coverageStr}</div>}
+                                      {c.sku && <div>SKU: {c.sku}</div>}
+                                      {c.available_colors && <div>Colors: {c.available_colors}</div>}
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : editItemForm.is_system ? (
+                        /* ── Custom system: editable component checkboxes ── */
                         <div>
                           <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(check all items that make up this system)</span></label>
                           <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto">
@@ -897,11 +957,36 @@ export default function BidderAdminSettings({ companyId }) {
                         {item.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{item.internal_description}</p>}
                         {item.color && <p className="text-xs text-gray-500 mt-0.5">Color: {item.color}</p>}
                         {item.is_system ? (
-                          <ul className="mt-1 space-y-0.5">
-                            {(item.components || []).map((c) => (
-                              <li key={c.component_item_id} className="text-xs text-gray-500 flex items-center gap-1"><span className="text-gray-300">↳</span> {c.name}</li>
-                            ))}
+                          <ul className="mt-1 space-y-0">
                             {(item.components || []).length === 0 && <li className="text-xs text-gray-400 italic">No components selected</li>}
+                            {(item.components || []).map((c) => {
+                              const isExp = expandedComponents.has(c.component_item_id);
+                              const coverageStr = c.coverage_per_unit
+                                ? `${c.coverage_per_unit}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
+                                : null;
+                              return (
+                                <li key={c.component_item_id} className="text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpandedComponent(c.component_item_id)}
+                                    className="flex items-center gap-1 text-gray-500 hover:text-gray-700 w-full text-left py-0.5"
+                                  >
+                                    <span className="text-gray-300 w-3 shrink-0">{isExp ? '▾' : '▸'}</span>
+                                    <span>{c.display_name || c.name}</span>
+                                    {c.display_name && c.display_name !== c.name && (
+                                      <span className="text-gray-400 ml-0.5">({c.name})</span>
+                                    )}
+                                  </button>
+                                  {isExp && (
+                                    <div className="ml-4 pb-1 space-y-0.5 text-gray-400">
+                                      {c.global_category_name && <div>Category: {c.global_category_name}</div>}
+                                      {coverageStr && <div>Coverage: {coverageStr}</div>}
+                                      {c.sku && <div>SKU: {c.sku}</div>}
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         ) : (
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
@@ -929,7 +1014,8 @@ export default function BidderAdminSettings({ companyId }) {
                     </div>
                   )}
                 </div>
-              );
+                );
+              };
 
               return (
                 <div className="divide-y divide-gray-100">
