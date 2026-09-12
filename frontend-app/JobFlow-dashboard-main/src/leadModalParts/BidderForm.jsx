@@ -1262,14 +1262,28 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
                       return (
                         <>
-                          {sorted.map(([gCatId, group]) => (
-                            <div key={gCatId}>
-                              <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">
-                                {group.name}
+                          {sorted.map(([gCatId, group]) => {
+                            if (q) {
+                              return (
+                                <div key={gCatId}>
+                                  <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100">
+                                    {group.name}
+                                  </div>
+                                  {group.items.map(i => itemRow(i, i.category_id))}
+                                </div>
+                              );
+                            }
+                            const gOpen = sectionOpen(`gcat-${gCatId}`);
+                            return (
+                              <div key={gCatId}>
+                                <button onClick={() => sectionToggle(`gcat-${gCatId}`)} className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 border-t border-gray-100 text-left">
+                                  {secChevron(gOpen)}
+                                  {group.name}
+                                </button>
+                                {gOpen && group.items.map(i => itemRow(i, i.category_id))}
                               </div>
-                              {group.items.map(i => itemRow(i, i.category_id))}
-                            </div>
-                          ))}
+                            );
+                          })}
                         </>
                       );
                     }

@@ -547,7 +547,7 @@ function ProductRow({ p, onEdit, onDelete }) {
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
-        <button onClick={onEdit} className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50">Edit</button>
+        <button onClick={onEdit} className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50">View</button>
         <button onClick={onDelete} className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50">Delete</button>
       </div>
     </div>
@@ -585,7 +585,7 @@ function SystemRow({ p, onEdit, onDelete }) {
         )}
       </div>
       <div className="flex gap-2 shrink-0">
-        <button onClick={onEdit} className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50">Edit</button>
+        <button onClick={onEdit} className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50">View</button>
         <button onClick={onDelete} className="text-xs text-red-500 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50">Delete</button>
       </div>
     </div>
@@ -645,7 +645,7 @@ function SupplierForm({ initial = EMPTY_SUPPLIER, onSave, onCancel, saving }) {
 }
 
 // ── CategoryRow ──────────────────────────────────────────────────────────────
-function CategoryRow({ cat, onRename, onDelete, deleteError, onClearError }) {
+function CategoryRow({ cat, onRename, onDelete, onMoveUp, onMoveDown, isFirst, isLast, deleteError, onClearError }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(cat.name);
   const [saving, setSaving] = useState(false);
@@ -702,6 +702,18 @@ function CategoryRow({ cat, onRename, onDelete, deleteError, onClearError }) {
             )}
             {!isProtected && (
               <>
+                <button
+                  onClick={onMoveUp}
+                  disabled={isFirst}
+                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                  title="Move up"
+                >▲</button>
+                <button
+                  onClick={onMoveDown}
+                  disabled={isLast}
+                  className="text-gray-400 hover:text-gray-700 disabled:opacity-20 px-1 text-sm leading-none"
+                  title="Move down"
+                >▼</button>
                 <button
                   onClick={() => { setEditing(true); if (hasError) onClearError(); }}
                   className="text-xs text-blue-600 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50"
@@ -835,6 +847,23 @@ export default function BidderSuppliers() {
     await loadCategories();
   }
 
+  async function handleReorderCategory(catId, direction) {
+    const idx = categories.findIndex((c) => c.id === catId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= categories.length) return;
+    const cat = categories[idx];
+    const swap = categories[swapIdx];
+    try {
+      await Promise.all([
+        BidderAPI.updateGlobalCategory(cat.id, { name: cat.name, sort_order: swap.sort_order ?? swapIdx }),
+        BidderAPI.updateGlobalCategory(swap.id, { name: swap.name, sort_order: cat.sort_order ?? idx }),
+      ]);
+      await loadCategories();
+    } catch (e) {
+      alert('Failed to reorder categories');
+    }
+  }
+
   async function handleDeleteCategory(cat) {
     setDeleteError(null);
     try {
@@ -943,12 +972,16 @@ export default function BidderSuppliers() {
           <p className="text-sm text-gray-400">Loading categories…</p>
         ) : (
           <div className="space-y-2">
-            {categories.map((cat) => (
+            {categories.map((cat, idx) => (
               <CategoryRow
                 key={cat.id}
                 cat={cat}
                 onRename={handleRenameCategory}
                 onDelete={handleDeleteCategory}
+                onMoveUp={() => handleReorderCategory(cat.id, 'up')}
+                onMoveDown={() => handleReorderCategory(cat.id, 'down')}
+                isFirst={idx === 0}
+                isLast={idx === categories.length - 1}
                 deleteError={deleteError}
                 onClearError={() => setDeleteError(null)}
               />
