@@ -437,7 +437,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const line_total = unit_price * quantity;
     try {
       await BidderAPI.updateItem(item.id, { ...item, unit_price, quantity, line_total });
-      setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, unit_price, quantity, line_total } }));
+      setCheckedMap(prev => {
+        const cur = prev[libItemId];
+        return cur ? { ...prev, [libItemId]: { ...cur, unit_price, quantity, line_total } } : prev;
+      });
     } catch (e) { console.error('Failed to update item price', e); }
   }
 
@@ -449,7 +452,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const line_total = unit_price * quantity;
     try {
       await BidderAPI.updateItem(item.id, { ...item, quantity, line_total });
-      setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, quantity, line_total } }));
+      setCheckedMap(prev => {
+        const cur = prev[libItemId];
+        return cur ? { ...prev, [libItemId]: { ...cur, quantity, line_total } } : prev;
+      });
     } catch (e) { console.error('Failed to update item qty', e); }
   }
 
@@ -458,7 +464,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     if (!item) return;
     try {
       await BidderAPI.updateItem(item.id, { ...item, description: item._desc });
-      setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, description: item._desc } }));
+      setCheckedMap(prev => {
+        const cur = prev[libItemId];
+        return cur ? { ...prev, [libItemId]: { ...cur, description: cur._desc } } : prev;
+      });
     } catch (e) { console.error('Failed to update item desc', e); }
   }
 
@@ -467,7 +476,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     if (!item) return;
     try {
       await BidderAPI.updateItem(item.id, { ...item, color: item._color || null });
-      setCheckedMap(prev => ({ ...prev, [libItemId]: { ...item, color: item._color || null } }));
+      setCheckedMap(prev => {
+        const cur = prev[libItemId];
+        return cur ? { ...prev, [libItemId]: { ...cur, color: cur._color || null } } : prev;
+      });
     } catch (e) { console.error('Failed to update item color', e); }
   }
 
@@ -893,6 +905,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           <input className={`w-14 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
                             type="number" step="1" min="1" value={Math.round(pi._qty)}
                             disabled={isLocked}
+                            onFocus={e => e.target.select()}
                             onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _qty: e.target.value } }))}
                             onBlur={() => handleItemQtyBlur(libItemId)} />
                           {canViewFinancials && (
@@ -901,6 +914,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
                                 type="number" step="0.01" value={pi._price || ''}
                                 disabled={isLocked || !canEditFinancials}
+                                onFocus={e => e.target.select()}
                                 onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
                                 onBlur={() => handleItemPriceBlur(libItemId)} />
                               {pi.unit_label && <span className="text-gray-400 text-xs">{pi.unit_label}</span>}
@@ -958,6 +972,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                         <input className={`w-14 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="1"
                           value={Math.round(item._qty)}
                           disabled={isLocked}
+                          onFocus={e => e.target.select()}
                           onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _qty: e.target.value } : it))}
                           onBlur={() => handleCustomItemBlur(idx)} />
                         {canViewFinancials && (
@@ -966,6 +981,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                             <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
                               value={item._price || ''}
                               disabled={isLocked || !canEditFinancials}
+                              onFocus={e => e.target.select()}
                               onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
                               onBlur={() => handleCustomItemBlur(idx)} />
                             <span className="ml-auto text-sm font-semibold text-gray-700">{fmt(item.line_total)}</span>
@@ -1112,6 +1128,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               >
                                 <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
                                 <span className="text-sm text-gray-500 italic">Note / comment line</span>
+                              </button>
+                              <button
+                                onClick={() => { setShowItemPicker(false); setItemSearch(''); handleAddCustomItem(nextSortOrder()); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold shrink-0">✏️ Custom Item</span>
+                                <span className="text-sm text-gray-500 italic">Add a custom line item to this bid</span>
                               </button>
                             </>
                           )}
@@ -1283,7 +1306,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
               </div>
             ) : (
               <div className="mt-3 flex gap-3">
-                <button onClick={() => setShowItemPicker(true)} className="text-sm text-blue-600 hover:underline">+ Add Item</button>
+                <button onClick={() => setShowItemPicker(true)} className="text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ Add Item</button>
                 <button onClick={() => handleAddCustomItem()} className="text-sm text-blue-600 hover:underline">+ Custom Line</button>
                 <button onClick={() => handleAddNote()} className="text-sm text-blue-600 hover:underline">+ Note</button>
               </div>

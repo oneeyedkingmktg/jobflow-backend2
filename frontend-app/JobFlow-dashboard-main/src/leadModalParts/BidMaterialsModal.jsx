@@ -152,6 +152,7 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                           min="0"
                           step="1"
                           value={m.order_qty ?? ''}
+                          onFocus={e => e.target.select()}
                           onChange={e => updateRow(m.library_item_id, 'order_qty', e.target.value)}
                           onBlur={() => saveOverride(m.library_item_id)}
                           className={`w-20 text-right px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${noSpin} ${m.has_override_qty ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300'}`}
@@ -163,6 +164,7 @@ export default function BidMaterialsModal({ proposalId, onClose }) {
                           min="0"
                           step="0.01"
                           value={m.unit_cost ?? ''}
+                          onFocus={e => e.target.select()}
                           onChange={e => updateRow(m.library_item_id, 'unit_cost', e.target.value)}
                           onBlur={() => saveOverride(m.library_item_id)}
                           className={`w-24 text-right px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${noSpin} ${m.has_override_cost ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300'}`}
