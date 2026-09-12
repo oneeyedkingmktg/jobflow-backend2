@@ -799,15 +799,13 @@ export default function BidderAdminSettings({ companyId }) {
                         <label className={labelCls}>Unit Label</label>
                         <input className={inputCls} value={editItemForm.default_unit_label} onChange={(e) => setEditItemForm((p) => ({ ...p, default_unit_label: e.target.value }))} placeholder="per sqft" />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className={labelCls}>Description</label>
-                          <input className={inputCls} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Color</label>
-                          <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
-                        </div>
+                      <div>
+                        <label className={labelCls}>Description</label>
+                        <textarea className={`${inputCls} resize-none`} rows={2} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Color</label>
+                        <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                       </div>
                       {!editItemForm.is_system && (
                         <label className="flex items-center gap-3 cursor-pointer">

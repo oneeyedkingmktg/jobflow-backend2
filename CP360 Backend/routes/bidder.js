@@ -2349,11 +2349,15 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
             `INSERT INTO bidder_library_items
                (category_id, company_id, name, description, default_unit_price, default_unit_label,
                 color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order, source_supplier_product_id,
-                internal_name, internal_description)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+                internal_name, internal_description,
+                purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url, global_category_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id`,
             [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
              p.color, p.sku, p.kit_price, p.sqft_per_kit, p.is_charge_only, i, p.id,
-             p.internal_name || null, p.internal_description || null]
+             p.internal_name || null, p.internal_description || null,
+             p.purchase_unit || 'Kit', p.coverage_per_unit ?? null, p.coverage_type || null,
+             p.available_colors || null, p.product_page_url || null, p.spec_sheet_url || null,
+             p.category_id || null]
           );
           globalIdToLibItemId[p.id] = ins.rows[0].id;
         }
@@ -2369,11 +2373,15 @@ router.put('/company-suppliers', requireRole('master'), async (req, res) => {
           const sysItem = (await client.query(
             `INSERT INTO bidder_library_items
                (category_id, company_id, name, description, default_unit_price, default_unit_label,
-                color, sku, is_system, sort_order, source_supplier_product_id, internal_name, internal_description)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12) RETURNING id`,
+                color, sku, is_system, sort_order, source_supplier_product_id, internal_name, internal_description,
+                purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url, global_category_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
             [cat.id, companyId, p.name, p.description, p.default_unit_price, p.default_unit_label,
              p.color, p.sku, regularProducts.length + i, p.id,
-             p.internal_name || null, p.internal_description || null]
+             p.internal_name || null, p.internal_description || null,
+             p.purchase_unit || 'Kit', p.coverage_per_unit ?? null, p.coverage_type || null,
+             p.available_colors || null, p.product_page_url || null, p.spec_sheet_url || null,
+             p.category_id || null]
           )).rows[0];
 
           for (let ci = 0; ci < components.length; ci++) {
@@ -2579,12 +2587,16 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
       const sysItem = (await client.query(
         `INSERT INTO bidder_library_items
            (category_id, company_id, name, description, default_unit_price, default_unit_label,
-            color, sku, is_system, sort_order, source_supplier_product_id, internal_name, internal_description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12) RETURNING id`,
+            color, sku, is_system, sort_order, source_supplier_product_id, internal_name, internal_description,
+            purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url, global_category_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
         [co.cat_id, co.company_id, product.name, product.description,
          product.default_unit_price, product.default_unit_label,
          product.color || null, product.sku || null, sortOrder, product.id,
-         product.internal_name || null, product.internal_description || null]
+         product.internal_name || null, product.internal_description || null,
+         product.purchase_unit || 'Kit', product.coverage_per_unit ?? null, product.coverage_type || null,
+         product.available_colors || null, product.product_page_url || null, product.spec_sheet_url || null,
+         product.category_id || null]
       )).rows[0];
 
       for (let ci = 0; ci < comps.length; ci++) {
@@ -2604,14 +2616,18 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
         `INSERT INTO bidder_library_items
            (category_id, company_id, name, description, default_unit_price, default_unit_label,
             color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order, source_supplier_product_id,
-            internal_name, internal_description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+            internal_name, internal_description,
+            purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url, global_category_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [co.cat_id, co.company_id, product.name, product.description,
          product.default_unit_price, product.default_unit_label,
          product.color || null, product.sku || null,
          product.kit_price ?? null, product.sqft_per_kit ?? null,
          product.is_charge_only, sortOrder, product.id,
-         product.internal_name || null, product.internal_description || null]
+         product.internal_name || null, product.internal_description || null,
+         product.purchase_unit || 'Kit', product.coverage_per_unit ?? null, product.coverage_type || null,
+         product.available_colors || null, product.product_page_url || null, product.spec_sheet_url || null,
+         product.category_id || null]
       );
     }
   }
@@ -2661,6 +2677,8 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       color = null, sku = null, kit_price = null, sqft_per_kit = null,
       is_charge_only = false, is_system = false, component_ids = [], sort_order = 0,
       internal_name = null, internal_description = null,
+      category_id = null, purchase_unit = 'Kit', coverage_per_unit = null,
+      coverage_type = null, available_colors = null, product_page_url = null, spec_sheet_url = null,
     } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
 
@@ -2669,14 +2687,18 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       const ins = await client.query(
         `INSERT INTO global_supplier_products
            (supplier_id, name, description, default_unit_price, default_unit_label,
-            color, sku, kit_price, sqft_per_kit, is_charge_only, is_system, sort_order, internal_name, internal_description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+            color, sku, kit_price, sqft_per_kit, is_charge_only, is_system, sort_order, internal_name, internal_description,
+            category_id, purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
         [supplierId, name.trim(), description,
          parseFloat(default_unit_price) || 0, default_unit_label,
          color || null, sku || null,
          !is_system && kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
          !is_system && sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
-         is_charge_only, is_system, sort_order, internal_name || null, internal_description || null]
+         is_charge_only, is_system, sort_order, internal_name || null, internal_description || null,
+         category_id || null, purchase_unit || 'Kit',
+         coverage_per_unit !== null && coverage_per_unit !== '' ? parseFloat(coverage_per_unit) : null,
+         coverage_type || null, available_colors || null, product_page_url || null, spec_sheet_url || null]
       );
       newProduct = ins.rows[0];
 
@@ -2707,6 +2729,8 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
       name, description, default_unit_price, default_unit_label,
       color, sku, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
       component_ids, internal_name, internal_description,
+      category_id, purchase_unit, coverage_per_unit, coverage_type,
+      available_colors, product_page_url, spec_sheet_url,
     } = req.body;
 
     let updated;
@@ -2725,8 +2749,15 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
            is_active            = COALESCE($10, is_active),
            sort_order           = COALESCE($11, sort_order),
            internal_name        = $12,
-           internal_description = $13
-         WHERE id = $14 RETURNING *`,
+           internal_description = $13,
+           category_id          = COALESCE($14, category_id),
+           purchase_unit        = COALESCE($15, purchase_unit),
+           coverage_per_unit    = $16,
+           coverage_type        = $17,
+           available_colors     = $18,
+           product_page_url     = $19,
+           spec_sheet_url       = $20
+         WHERE id = $21 RETURNING *`,
         [
           name?.trim() || null, description ?? null,
           default_unit_price !== undefined ? (parseFloat(default_unit_price) || 0) : null,
@@ -2735,6 +2766,9 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
           sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
           is_charge_only ?? null, is_active ?? null, sort_order ?? null,
           internal_name ?? null, internal_description ?? null,
+          category_id || null, purchase_unit || null,
+          coverage_per_unit !== undefined && coverage_per_unit !== '' ? parseFloat(coverage_per_unit) : null,
+          coverage_type ?? null, available_colors ?? null, product_page_url ?? null, spec_sheet_url ?? null,
           req.params.id,
         ]
       );
@@ -2751,12 +2785,24 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
         }
       }
 
-      // Cascade name + internal fields to company library copies
+      // Cascade name, internal fields, and new informational fields to company library copies
       await client.query(
         `UPDATE bidder_library_items
-         SET name = $1, internal_name = $2, internal_description = $3
-         WHERE source_supplier_product_id = $4`,
-        [updated.name, updated.internal_name, updated.internal_description, updated.id]
+         SET name              = $1,
+             internal_name     = $2,
+             internal_description = $3,
+             purchase_unit     = $4,
+             coverage_per_unit = $5,
+             coverage_type     = $6,
+             available_colors  = $7,
+             product_page_url  = $8,
+             spec_sheet_url    = $9,
+             global_category_id = $10
+         WHERE source_supplier_product_id = $11`,
+        [updated.name, updated.internal_name, updated.internal_description,
+         updated.purchase_unit, updated.coverage_per_unit, updated.coverage_type,
+         updated.available_colors, updated.product_page_url, updated.spec_sheet_url,
+         updated.category_id, updated.id]
       );
     });
 

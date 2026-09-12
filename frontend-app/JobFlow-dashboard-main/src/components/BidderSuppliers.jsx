@@ -13,20 +13,23 @@ const EMPTY_PRODUCT = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
+  category_id: null, purchase_unit: 'Kit', coverage_per_unit: '', coverage_type: '',
+  available_colors: '', product_page_url: '', spec_sheet_url: '',
 };
 const EMPTY_SYSTEM = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
-  color: '', sku: '', component_ids: [],
+  color: '', sku: '', component_ids: [], category_id: null,
 };
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase mb-1';
 
 // ── ProductForm ──────────────────────────────────────────────────────────────
-function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
+function ProductForm({ initial = EMPTY_PRODUCT, categories = [], onSave, onCancel, saving }) {
   const [form, setForm] = useState(initial);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const unitLabel = form.purchase_unit?.trim() || 'Kit';
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
@@ -41,14 +44,25 @@ function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
         </div>
         <div className="col-span-2">
           <label className={labelCls}>Description <span className="normal-case text-gray-400 font-normal">— shown on proposal</span></label>
-          <input className={inputCls} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional proposal description" />
+          <textarea className={`${inputCls} resize-none`} rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Optional proposal description" />
         </div>
         <div className="col-span-2">
           <label className={labelCls}>Internal Description <span className="normal-case text-gray-400 font-normal">— internal notes only</span></label>
           <input className={inputCls} value={form.internal_description} onChange={(e) => set('internal_description', e.target.value)} placeholder="e.g. Coverage rate, mix ratio, notes for staff" />
         </div>
         <div>
-          <label className={labelCls}>Unit Price ($)</label>
+          <label className={labelCls}>Category</label>
+          <select className={inputCls} value={form.category_id || ''} onChange={(e) => set('category_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
+            <option value="">— select —</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Purchase Unit <span className="normal-case text-gray-400 font-normal">— e.g. Kit, Tube, Case</span></label>
+          <input className={inputCls} value={form.purchase_unit} onChange={(e) => set('purchase_unit', e.target.value)} placeholder="Kit" />
+        </div>
+        <div>
+          <label className={labelCls}>Unit Price ($) <span className="normal-case text-gray-400 font-normal">— proposal pricing</span></label>
           <input className={inputCls} type="number" min="0" step="0.01" value={form.default_unit_price} onChange={(e) => set('default_unit_price', e.target.value)} placeholder="0.00" />
         </div>
         <div>
@@ -72,15 +86,31 @@ function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
               <input className={inputCls} value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="e.g. SW-1234" />
             </div>
             <div>
-              <label className={labelCls}>Kit Price ($)</label>
+              <label className={labelCls}>{unitLabel} Price ($) <span className="normal-case text-gray-400 font-normal">— material cost</span></label>
               <input className={inputCls} type="number" min="0" step="0.01" value={form.kit_price} onChange={(e) => set('kit_price', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label className={labelCls}>Sqft / Kit</label>
-              <input className={inputCls} type="number" min="0" step="1" value={form.sqft_per_kit} onChange={(e) => set('sqft_per_kit', e.target.value)} placeholder="0" />
+              <label className={labelCls}>Coverage per {unitLabel}</label>
+              <input className={inputCls} type="number" min="0" step="1" value={form.coverage_per_unit} onChange={(e) => set('coverage_per_unit', e.target.value)} placeholder="e.g. 300" />
+            </div>
+            <div>
+              <label className={labelCls}>Coverage Type <span className="normal-case text-gray-400 font-normal">— e.g. Sq Ft, LF</span></label>
+              <input className={inputCls} value={form.coverage_type} onChange={(e) => set('coverage_type', e.target.value)} placeholder="Sq Ft" />
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Available Colors <span className="normal-case text-gray-400 font-normal">— informational only</span></label>
+              <input className={inputCls} value={form.available_colors} onChange={(e) => set('available_colors', e.target.value)} placeholder="e.g. Slate Gray, Beige, White" />
             </div>
           </>
         )}
+        <div className="col-span-2">
+          <label className={labelCls}>Product Page URL</label>
+          <input className={inputCls} value={form.product_page_url} onChange={(e) => set('product_page_url', e.target.value)} placeholder="https://…" />
+        </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Spec Sheet URL</label>
+          <input className={inputCls} value={form.spec_sheet_url} onChange={(e) => set('spec_sheet_url', e.target.value)} placeholder="https://…" />
+        </div>
       </div>
       <div className="flex gap-2 pt-1">
         <button
@@ -99,7 +129,7 @@ function ProductForm({ initial = EMPTY_PRODUCT, onSave, onCancel, saving }) {
 }
 
 // ── SystemForm ───────────────────────────────────────────────────────────────
-function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, onCancel, saving }) {
+function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], categories = [], onSave, onCancel, saving }) {
   const [form, setForm] = useState({ ...EMPTY_SYSTEM, ...initial });
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -153,6 +183,13 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, 
           <label className={labelCls}>SKU</label>
           <input className={inputCls} value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="e.g. SYS-001" />
         </div>
+        <div>
+          <label className={labelCls}>Category</label>
+          <select className={inputCls} value={form.category_id || ''} onChange={(e) => set('category_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
+            <option value="">— select —</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
       </div>
 
       <div>
@@ -198,7 +235,7 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], onSave, 
 }
 
 // ── SupplierRow ──────────────────────────────────────────────────────────────
-function SupplierRow({ supplier, onEdit, onDelete }) {
+function SupplierRow({ supplier, categories, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -367,9 +404,11 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                             default_unit_label: p.default_unit_label || 'per sqft',
                             color: p.color || '',
                             sku: p.sku || '',
+                            category_id: p.category_id || null,
                             component_ids: (p.components || []).map((c) => c.component_product_id),
                           }}
                           availableComponents={componentOptions}
+                          categories={categories}
                           onSave={(form) => handleUpdateProduct(p.id, form)}
                           onCancel={() => setEditProductId(null)}
                           saving={savingProduct}
@@ -388,6 +427,7 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                 {addingSystem && (
                   <SystemForm
                     availableComponents={componentOptions}
+                    categories={categories}
                     onSave={handleSaveProduct}
                     onCancel={() => setAddingSystem(false)}
                     saving={savingProduct}
@@ -438,7 +478,15 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                             kit_price: p.kit_price != null ? p.kit_price : '',
                             sqft_per_kit: p.sqft_per_kit != null ? p.sqft_per_kit : '',
                             is_charge_only: p.is_charge_only || false,
+                            category_id: p.category_id || null,
+                            purchase_unit: p.purchase_unit || 'Kit',
+                            coverage_per_unit: p.coverage_per_unit != null ? p.coverage_per_unit : '',
+                            coverage_type: p.coverage_type || '',
+                            available_colors: p.available_colors || '',
+                            product_page_url: p.product_page_url || '',
+                            spec_sheet_url: p.spec_sheet_url || '',
                           }}
+                          categories={categories}
                           onSave={(form) => handleUpdateProduct(p.id, form)}
                           onCancel={() => setEditProductId(null)}
                           saving={savingProduct}
@@ -456,6 +504,7 @@ function SupplierRow({ supplier, onEdit, onDelete }) {
                 )}
                 {addingProduct && (
                   <ProductForm
+                    categories={categories}
                     onSave={handleSaveProduct}
                     onCancel={() => setAddingProduct(false)}
                     saving={savingProduct}
@@ -863,6 +912,7 @@ export default function BidderSuppliers() {
                 <SupplierRow
                   key={s.id}
                   supplier={s}
+                  categories={categories}
                   onEdit={(sup) => { setEditSupplierId(sup.id); setAddingSupplier(false); }}
                   onDelete={handleDeleteSupplier}
                 />
