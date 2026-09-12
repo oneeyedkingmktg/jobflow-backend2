@@ -866,9 +866,17 @@ router.get('/library', async (req, res) => {
     let componentsBySystem = {};
     if (systemIds.length > 0) {
       const compRows = await pool.query(
-        `SELECT sc.system_item_id, sc.component_item_id, li.name, li.default_unit_price, li.default_unit_label
+        `SELECT sc.system_item_id, sc.component_item_id,
+                COALESCE(li.internal_name, li.name) AS display_name,
+                li.name, li.description, li.sku,
+                li.purchase_unit, li.coverage_per_unit, li.coverage_type,
+                li.available_colors, li.product_page_url, li.spec_sheet_url,
+                li.global_category_id, gpc.name AS global_category_name,
+                li.source_supplier_product_id, li.category_id,
+                li.default_unit_price, li.default_unit_label
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
+         LEFT JOIN global_product_categories gpc ON li.global_category_id = gpc.id
          WHERE sc.system_item_id = ANY($1)
          ORDER BY sc.sort_order, sc.id`,
         [systemIds]

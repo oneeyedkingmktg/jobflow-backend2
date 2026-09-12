@@ -27,6 +27,91 @@ const STATUS_OPTIONS = [
   { value: 'accepted', label: 'Accepted' },
 ];
 
+// ── Product Info Modal Content ────────────────────────────────────────────────
+
+function ProductInfoBody({ item, catName }) {
+  const urlHref = (url) => url?.startsWith('http') ? url : `https://${url}`;
+  const coverageStr = item.coverage_per_unit
+    ? `${item.coverage_per_unit}${item.coverage_type ? ' ' + item.coverage_type : ''} per ${item.purchase_unit || 'Kit'}`
+    : null;
+
+  const fields = [
+    ['Supplier',      catName],
+    ['Category',      item.global_category_name],
+    ['SKU',           item.sku],
+    ['Purchase Unit', item.purchase_unit || (item.source_supplier_product_id ? 'Kit' : null)],
+    ['Coverage',      coverageStr],
+    ['Colors',        item.available_colors],
+  ];
+
+  return (
+    <div className="px-5 py-3">
+      <p className="font-semibold text-gray-900 text-sm">{item.internal_name || item.display_name || item.name}</p>
+      {item.internal_name && <p className="text-xs text-gray-400 mb-1">({item.name})</p>}
+      {item.description && <p className="text-sm text-gray-600 mt-1 mb-3">{item.description}</p>}
+      <div className="mt-2">
+        {fields.map(([label, value]) => value ? (
+          <div key={label} className="flex gap-3 py-1.5 border-b border-gray-50">
+            <span className="text-xs text-gray-400 w-28 shrink-0">{label}</span>
+            <span className="text-xs text-gray-800 flex-1">{value}</span>
+          </div>
+        ) : null)}
+        {item.product_page_url && (
+          <div className="flex gap-3 py-1.5 border-b border-gray-50">
+            <span className="text-xs text-gray-400 w-28 shrink-0">Product Page</span>
+            <a href={urlHref(item.product_page_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex-1 truncate">{item.product_page_url}</a>
+          </div>
+        )}
+        {item.spec_sheet_url && (
+          <div className="flex gap-3 py-1.5 border-b border-gray-50">
+            <span className="text-xs text-gray-400 w-28 shrink-0">Spec Sheet</span>
+            <a href={urlHref(item.spec_sheet_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex-1 truncate">{item.spec_sheet_url}</a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SystemInfoBody({ item, catName, library }) {
+  const [expanded, setExpanded] = useState({});
+  return (
+    <div className="px-5 py-3">
+      <p className="font-semibold text-gray-900 text-sm">{item.name}</p>
+      {item.description && <p className="text-sm text-gray-600 mt-1 mb-3">{item.description}</p>}
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-3 mb-2">Components</p>
+      {!(item.components || []).length ? (
+        <p className="text-sm text-gray-400 italic">No components attached</p>
+      ) : (
+        <div className="space-y-2">
+          {(item.components || []).map((comp, idx) => {
+            const compCatName = library?.find(c => c.id === comp.category_id)?.name;
+            const isOpen = !!expanded[idx];
+            return (
+              <div key={idx} className="border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50"
+                  onClick={() => setExpanded(prev => ({ ...prev, [idx]: !isOpen }))}
+                >
+                  <svg className={`w-3 h-3 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span className="text-sm text-gray-800 font-medium flex-1">{comp.display_name || comp.name}</span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-gray-100">
+                    <ProductInfoBody item={comp} catName={compCatName} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function BidderForm({ proposalId, lead, onBack, onClose }) {
@@ -66,6 +151,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   const [pickerSections,   setPickerSections]   = useState({});
   const [pickerMode,       setPickerMode]       = useState('supplier'); // 'supplier' | 'category' | 'favorites'
   const [favorites,        setFavorites]        = useState(new Set());
+  const [infoModal,        setInfoModal]        = useState(null); // null | { type: 'product'|'system', item, catName }
   const [showDocsModal,      setShowDocsModal]      = useState(false);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [showExitModal,    setShowExitModal]    = useState(false);
@@ -783,11 +869,22 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   if (item._type === 'library') {
                     const libItemId = item._libItemId;
                     const pi = checkedMap[libItemId];
+                    const libData = library.flatMap(c => c.items || []).find(i => i.id === libItemId);
+                    const libCatName = library.find(c => c.id === libData?.category_id)?.name;
                     return (
                       <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
                         <div className="flex items-center gap-1 mb-2">
                           {mvBtns(libItemId, true)}
                           <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{pi.name}</span>
+                          {libData?.source_supplier_product_id != null && (
+                            <button
+                              onClick={() => setInfoModal({ type: libData.is_system ? 'system' : 'product', item: libData, catName: libCatName })}
+                              className="text-gray-300 hover:text-blue-400 text-sm px-1 flex-shrink-0"
+                              title={libData.is_system ? 'System info' : 'Product info'}
+                            >
+                              ⓘ
+                            </button>
+                          )}
                           {!isLocked && (
                             <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0">×</button>
                           )}
@@ -938,9 +1035,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
                 <div className="max-h-64 overflow-y-auto">
                   {(() => {
-                    // Shared item row: div wrapper with add button + star toggle
+                    // Shared item row: div wrapper with add button + info icon + star toggle
                     const itemRow = (i, catId) => {
                       const isFav = i.source_supplier_product_id != null && favorites.has(Number(i.source_supplier_product_id));
+                      const pickerCatName = library.find(c => c.id === i.category_id)?.name;
                       return (
                         <div key={i.id} className="flex items-center border-b border-gray-50 hover:bg-blue-50">
                           <button
@@ -965,6 +1063,15 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               <span className="text-xs text-gray-400 shrink-0 ml-1 hidden sm:block truncate max-w-[120px]">→ {i.name}</span>
                             )}
                           </button>
+                          {i.source_supplier_product_id != null && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setInfoModal({ type: i.is_system ? 'system' : 'product', item: i, catName: pickerCatName }); }}
+                              className="px-1.5 py-2.5 text-gray-200 hover:text-blue-400 text-sm leading-none shrink-0"
+                              title={i.is_system ? 'System info' : 'Product info'}
+                            >
+                              ⓘ
+                            </button>
+                          )}
                           {i.source_supplier_product_id != null && (
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleFavorite(i.source_supplier_product_id); }}
@@ -1764,6 +1871,31 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                 Cancel — keep editing
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product / System info modal */}
+      {infoModal && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[1200] flex items-center justify-center p-4"
+          onClick={() => setInfoModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-base">
+                {infoModal.type === 'system' ? 'System Info' : 'Product Info'}
+              </h3>
+              <button onClick={() => setInfoModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            {infoModal.type === 'system' ? (
+              <SystemInfoBody item={infoModal.item} catName={infoModal.catName} library={library} />
+            ) : (
+              <ProductInfoBody item={infoModal.item} catName={infoModal.catName} />
+            )}
           </div>
         </div>
       )}
