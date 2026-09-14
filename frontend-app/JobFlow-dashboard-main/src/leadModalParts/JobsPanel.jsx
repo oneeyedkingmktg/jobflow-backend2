@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useEffect, useRef, useState } from "react";
-import { JobsAPI } from "../api";
+import { JobsAPI, BidderAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import { useCompany } from "../CompanyContext";
 import BidderPanel from "./BidderPanel";
@@ -137,6 +137,8 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
   const [showInstallModal, setShowInstallModal] = useState(false);
 
   const pendingJobIdRef = useRef(initialJobId ?? null);
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
 
   useEffect(() => { load(); }, [lead?.id]);
 
@@ -276,6 +278,45 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
     }
   };
 
+  const handleBidsClose = async () => {
+    const closingJob = bidsJob;
+    setBidsJob(null);
+    if (closingJob) {
+      try {
+        const bids = await BidderAPI.getProposalsByJob(closingJob.id);
+        const accepted = bids.find((b) => b.status === "accepted");
+        const newPrice = accepted ? String(accepted.bid_total) : "";
+        setForm((prev) => ({ ...prev, contract_price: newPrice }));
+        const cf = formRef.current;
+        if (cf.job_name) {
+          const updated = await JobsAPI.update(closingJob.id, {
+            lead_id: lead.id,
+            job_name: cf.job_name.trim(),
+            project_type: cf.project_type || null,
+            status: cf.status,
+            appointment_date: cf.appointment_date || null,
+            appointment_time: cf.appointment_time || null,
+            install_date: cf.install_date || null,
+            install_end_date: cf.install_end_date || null,
+            install_tentative: cf.install_tentative || false,
+            contract_price: accepted ? parseFloat(accepted.bid_total) : null,
+            notes: cf.notes || null,
+            address: cf.address || null,
+            city: cf.city || null,
+            state: cf.state || null,
+            zip: cf.zip || null,
+          }, companyId);
+          if (updated?.job) {
+            setJobs((prev) => prev.map((j) => j.id === closingJob.id ? updated.job : j));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync contract price from bids", e);
+      }
+    }
+    load();
+  };
+
   const f = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
   const inputCls = "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500";
@@ -369,7 +410,7 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
       <div>
         <label className={labelCls}>Contract Price</label>
         <input type="number" value={form.contract_price} onChange={f("contract_price")}
-          placeholder="0" min="0" step="0.01" className={inputCls} />
+          placeholder="Pending" min="0" step="0.01" className={inputCls} />
       </div>
 
       {/* Notes */}
@@ -614,7 +655,7 @@ export default function JobsPanel({ lead, onClose, initialJobId }) {
         <BidderPanel
           lead={lead}
           job={bidsJob}
-          onClose={() => { setBidsJob(null); load(); }}
+          onClose={handleBidsClose}
         />
       )}
 
