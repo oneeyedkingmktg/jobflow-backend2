@@ -529,7 +529,6 @@ function MaterialsForm({ leadId, companyId, canEdit, onClose, onUpdate }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Remove this material?")) return;
     await JobReportsAPI.deleteMaterial(leadId, id, companyId);
     setMaterials(prev => prev.filter(m => m.id !== id));
     onUpdate();
