@@ -1317,6 +1317,7 @@ router.put('/company-settings', async (req, res) => {
       email_from_name, email_from_email, notification_emails,
       proposal_top_text, invoice_top_text,
       proposal_domain, logo_url, default_warranty, primary_color, accent_color,
+      bidder_default_show_price, bidder_default_show_qty,
     } = req.body;
 
     const result = await pool.query(
@@ -1328,8 +1329,9 @@ router.put('/company-settings', async (req, res) => {
           terms_and_conditions, system_notes, email_from_name, email_from_email,
           notification_emails,
           proposal_top_text, invoice_top_text, proposal_domain, logo_url,
-          default_warranty, primary_color, accent_color, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
+          default_warranty, primary_color, accent_color,
+          bidder_default_show_price, bidder_default_show_qty, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
        ON CONFLICT (company_id) DO UPDATE SET
          stripe_publishable_key = EXCLUDED.stripe_publishable_key,
          stripe_secret_key = COALESCE(EXCLUDED.stripe_secret_key, bidder_company_settings.stripe_secret_key),
@@ -1352,6 +1354,8 @@ router.put('/company-settings', async (req, res) => {
          default_warranty = EXCLUDED.default_warranty,
          primary_color = EXCLUDED.primary_color,
          accent_color = EXCLUDED.accent_color,
+         bidder_default_show_price = EXCLUDED.bidder_default_show_price,
+         bidder_default_show_qty = EXCLUDED.bidder_default_show_qty,
          updated_at = NOW()
        RETURNING *`,
       [
@@ -1370,6 +1374,7 @@ router.put('/company-settings', async (req, res) => {
         clean(proposal_top_text), clean(invoice_top_text),
         clean(proposal_domain), clean(logo_url),
         clean(default_warranty), clean(primary_color), clean(accent_color),
+        bidder_default_show_price ?? true, bidder_default_show_qty ?? true,
       ]
     );
 

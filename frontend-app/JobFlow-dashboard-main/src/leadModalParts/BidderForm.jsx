@@ -303,10 +303,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     try {
       const lineTotal = parseFloat(libItem.default_unit_price) || 0;
       const alreadyOnBid = Object.values(checkedMap).some(pi => Number(pi.library_item_id) === Number(libItem.id));
+      const defaultShowPrice = companySettings?.bidder_default_show_price ?? true;
+      const defaultShowQty   = companySettings?.bidder_default_show_qty   ?? true;
       if (alreadyOnBid) {
         const newItem = await BidderAPI.createCustomItem({
           proposal_id: proposalId, description: libItem.name, quantity: 1,
           price_each: parseFloat(libItem.default_unit_price) || 0, line_total: lineTotal, sort_order: sortOrder,
+          show_price: defaultShowPrice, show_quantity: defaultShowQty,
         });
         setCustomItems(prev => [...prev, { ...newItem, _desc: libItem.name, _qty: 1, _price: parseFloat(libItem.default_unit_price) || 0 }]);
         return;
@@ -317,6 +320,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         unit_label: libItem.default_unit_label, quantity: 1, line_total: lineTotal,
         is_included: libItem.is_included, is_optional: false, breakout_price: false, sort_order: sortOrder,
         color: libItem.color || null,
+        show_price: defaultShowPrice, show_quantity: defaultShowQty,
       });
       setCheckedMap(prev => ({ ...prev, [libItem.id]: { ...newItem, _price: newItem.unit_price, _desc: newItem.description || '', _qty: 1, _color: newItem.color || '' } }));
     } catch (e) { alert('Failed to add item'); }
@@ -486,8 +490,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
   // ── Custom items ──────────────────────────────────────────────────────────
   async function handleAddCustomItem(sortOrder = null) {
     const so = sortOrder !== null ? sortOrder : nextSortOrder();
+    const defaultShowPrice = companySettings?.bidder_default_show_price ?? true;
+    const defaultShowQty   = companySettings?.bidder_default_show_qty   ?? true;
     try {
-      const newItem = await BidderAPI.createCustomItem({ proposal_id: proposalId, description: 'Item', quantity: 1, price_each: 0, line_total: 0, sort_order: so });
+      const newItem = await BidderAPI.createCustomItem({ proposal_id: proposalId, description: 'Item', quantity: 1, price_each: 0, line_total: 0, sort_order: so, show_price: defaultShowPrice, show_quantity: defaultShowQty });
       setCustomItems(prev => [...prev, { ...newItem, _desc: newItem.description, _qty: 1, _price: 0 }]);
     } catch (e) { alert('Failed to add item'); }
   }
@@ -887,7 +893,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
                         <div className="flex items-center gap-1 mb-2">
                           {mvBtns(libItemId, true)}
-                          <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{pi.name}</span>
+                          <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{libData?.internal_name || pi.name}</span>
                           {libData && (
                             <button
                               onClick={() => setInfoModal({ type: libData.is_system ? 'system' : 'product', item: libData, catName: libCatName })}
@@ -923,20 +929,25 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           )}
                         </div>
                         {!isLocked && (
-                          <div className="mt-2 flex gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={pi.show_price !== false}
-                                onChange={e => handleItemToggle(String(libItemId), 'show_price', e.target.checked)}
-                                className="accent-blue-600 w-4 h-4" />
-                              <span className="text-xs text-gray-500">Show price</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={pi.show_quantity !== false}
-                                onChange={e => handleItemToggle(String(libItemId), 'show_quantity', e.target.checked)}
-                                className="accent-blue-600 w-4 h-4" />
-                              <span className="text-xs text-gray-500">Show qty</span>
-                            </label>
-                          </div>
+                          <>
+                            <div className="mt-2 flex gap-4">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={pi.show_price !== false}
+                                  onChange={e => handleItemToggle(String(libItemId), 'show_price', e.target.checked)}
+                                  className="accent-blue-600 w-4 h-4" />
+                                <span className="text-xs text-gray-500">Show price</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={pi.show_quantity !== false}
+                                  onChange={e => handleItemToggle(String(libItemId), 'show_quantity', e.target.checked)}
+                                  className="accent-blue-600 w-4 h-4" />
+                                <span className="text-xs text-gray-500">Show qty</span>
+                              </label>
+                            </div>
+                            {libData?.internal_name && (
+                              <p className="text-xs text-gray-400 mt-1">Proposal name: <span className="text-gray-600">{pi.name}</span></p>
+                            )}
+                          </>
                         )}
                         <div className="mt-1 flex gap-2">
                           <input className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 bg-white"

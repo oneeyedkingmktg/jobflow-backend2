@@ -135,6 +135,8 @@ export default function BidderAdminSettings({ companyId }) {
         logo_url: data.logo_url || '',
         primary_color: data.primary_color || '',
         accent_color: data.accent_color || '',
+        bidder_default_show_price: data.bidder_default_show_price ?? true,
+        bidder_default_show_qty: data.bidder_default_show_qty ?? true,
       });
     } catch (e) {
       console.error('Failed to load settings', e);
@@ -707,6 +709,36 @@ export default function BidderAdminSettings({ companyId }) {
             {importing ? 'Importing…' : 'Upload CSV'}
             <input type="file" accept=".csv,text/csv" onChange={handleImportCSV} className="sr-only" />
           </label>
+        </div>
+
+        {/* Bidder item defaults */}
+        <div className="flex items-center gap-6 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-auto">Default Settings for Bidder</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settingsForm.bidder_default_show_price ?? true}
+              onChange={e => setSettingsForm(p => ({ ...p, bidder_default_show_price: e.target.checked }))}
+              className="accent-blue-600 w-4 h-4"
+            />
+            <span className="text-xs text-gray-700 font-medium">Show Price</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settingsForm.bidder_default_show_qty ?? true}
+              onChange={e => setSettingsForm(p => ({ ...p, bidder_default_show_qty: e.target.checked }))}
+              className="accent-blue-600 w-4 h-4"
+            />
+            <span className="text-xs text-gray-700 font-medium">Show Qty</span>
+          </label>
+          <button
+            onClick={handleSaveSettings}
+            disabled={settingsSaving}
+            className="text-xs font-semibold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            {settingsSaving ? 'Saving…' : 'Save'}
+          </button>
         </div>
 
         {/* Import result */}
