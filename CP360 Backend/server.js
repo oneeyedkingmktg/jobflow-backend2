@@ -199,8 +199,6 @@ async function runMigrations() {
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_top_text TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS invoice_top_text TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS proposal_domain TEXT`,
-    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_price BOOLEAN DEFAULT true`,
-    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_qty BOOLEAN DEFAULT true`,
     `CREATE TABLE IF NOT EXISTS conversation_updates (
       contact_id TEXT PRIMARY KEY,
       company_id INTEGER,
@@ -537,6 +535,8 @@ async function runMigrations() {
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_sold TEXT`,
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_not_sold TEXT`,
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_complete TEXT`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_price BOOLEAN DEFAULT true`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_qty BOOLEAN DEFAULT true`,
   ];
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
