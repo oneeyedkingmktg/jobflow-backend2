@@ -311,6 +311,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
   // Photo & results
   const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
   const fileRef = useRef();
   const [results, setResults] = useState({});
   const [actionState, setActionState] = useState({});
@@ -361,6 +362,13 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
     apiRequest('/api/visualizer/primitives').then(d => setPrimitives(d.colors || [])).catch(() => {});
     apiRequest('/api/visualizer/company-blends').then(d => setCompanyBlends(d.blends || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!photoFile) { setPhotoPreviewUrl(null); return; }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
 
   useEffect(() => {
     if (!selectedLibColor) { setLibRecipe([]); return; }
@@ -991,14 +999,23 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     {selectedBlendIds.size} blend{selectedBlendIds.size !== 1 ? 's' : ''} selected: {sessionBlends.filter(b => selectedBlendIds.has(b.id)).map(b => b.name).join(', ')}
                   </p>
                 </div>
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition"
-                >
-                  {photoFile
-                    ? <p className="text-sm font-semibold text-gray-700">{photoFile.name}</p>
-                    : <><p className="text-sm font-semibold text-gray-500">Tap to select photo</p><p className="text-xs text-gray-400 mt-1">JPG or PNG • Up to 20MB</p></>}
-                </div>
+                {photoPreviewUrl ? (
+                  <div className="relative rounded-xl overflow-hidden border border-gray-200 cursor-pointer group" onClick={() => fileRef.current?.click()}>
+                    <img src={photoPreviewUrl} alt="Selected floor" className="w-full max-h-56 object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
+                      <p className="text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition bg-black/60 px-3 py-1 rounded-full">Tap to change photo</p>
+                    </div>
+                    <p className="text-xs text-gray-400 px-2 py-1 bg-gray-50 truncate">{photoFile.name}</p>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition"
+                  >
+                    <p className="text-sm font-semibold text-gray-500">Tap to select photo</p>
+                    <p className="text-xs text-gray-400 mt-1">JPG or PNG • Up to 20MB</p>
+                  </div>
+                )}
                 <input ref={fileRef} type="file" accept="image/*,.heic" className="hidden" onChange={e => setPhotoFile(e.target.files[0] || null)} />
                 {error && <p className="text-xs text-red-500">{error}</p>}
                 <button
@@ -1082,10 +1099,16 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                 })}
 
                 <button
+                  onClick={() => { setResults({}); setView('build'); }}
+                  className="w-full py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition border border-blue-200"
+                >
+                  Show a Different Blend for This Space
+                </button>
+                <button
                   onClick={() => { setResults({}); setPhotoFile(null); setView('build'); }}
                   className="w-full py-2 text-xs text-gray-400 bg-gray-50 rounded-xl hover:bg-gray-100 transition"
                 >
-                  Start Over
+                  Start Over (New Photo)
                 </button>
               </div>
             )}
