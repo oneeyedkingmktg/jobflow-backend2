@@ -537,6 +537,9 @@ async function runMigrations() {
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS ghl_stage_complete TEXT`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_price BOOLEAN DEFAULT true`,
     `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_qty BOOLEAN DEFAULT true`,
+    // Re-appended: first two attempts landed at already-applied indices due to mid-array insertion
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_price BOOLEAN DEFAULT true`,
+    `ALTER TABLE bidder_company_settings ADD COLUMN IF NOT EXISTS bidder_default_show_qty BOOLEAN DEFAULT true`,
   ];
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
