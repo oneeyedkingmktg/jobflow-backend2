@@ -636,12 +636,14 @@ router.post('/item', async (req, res) => {
       `INSERT INTO bidder_proposal_items (
         proposal_id, library_item_id, category_name, name, description,
         unit_price, unit_label, quantity, line_total, is_included,
-        is_optional, is_freeform, breakout_price, sort_order, color
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+        is_optional, is_freeform, breakout_price, sort_order, color,
+        show_price, show_quantity
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
       [
         proposal_id, clean(library_item_id), clean(category_name), name, clean(description),
         unit_price, clean(unit_label), clean(quantity), line_total, is_included,
         is_optional, is_freeform, breakout_price, sort_order, clean(color) || null,
+        show_price ?? true, show_quantity ?? true,
       ]
     );
 
@@ -715,7 +717,7 @@ router.delete('/item/:id', async (req, res) => {
 router.post('/custom-item', async (req, res) => {
   try {
     const companyId = req.user.company_id;
-    const { proposal_id, description, quantity = 1, price_each = 0, line_total = 0, sort_order = 0, is_subtotal = false, is_note = false } = req.body;
+    const { proposal_id, description, quantity = 1, price_each = 0, line_total = 0, sort_order = 0, is_subtotal = false, is_note = false, show_price = true, show_quantity = true } = req.body;
 
     const check = await pool.query(
       'SELECT id FROM bidder_proposals WHERE id = $1 AND ($2::integer IS NULL OR company_id = $2::integer)',
@@ -723,23 +725,11 @@ router.post('/custom-item', async (req, res) => {
     );
     if (!check.rows.length) return res.status(404).json({ error: 'Proposal not found' });
 
-    // is_note and show_price/show_quantity columns require a migration — use fallback if not yet applied
-    let result;
-    try {
-      result = await pool.query(
-        `INSERT INTO bidder_custom_items (proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note]
-      );
-    } catch (e) {
-      if (e.message && e.message.includes('column') && e.message.includes('does not exist')) {
-        result = await pool.query(
-          `INSERT INTO bidder_custom_items (proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-          [proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal]
-        );
-      } else { throw e; }
-    }
+    const result = await pool.query(
+      `INSERT INTO bidder_custom_items (proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note, show_price, show_quantity)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [proposal_id, description, quantity, price_each, line_total, sort_order, is_subtotal, is_note, show_price, show_quantity]
+    );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
