@@ -11,6 +11,7 @@
 
 const sharp  = require('sharp');
 const axios  = require('axios');
+const { normalizeImage } = require('./imageNormalizer');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { r2, BUCKET, PUBLIC_URL } = require('../config/r2');
 const openAIProvider         = require('./providers/openAIProvider');
@@ -29,23 +30,10 @@ const SIZES = [
   { w: 1024, h: 1024, label: '1024x1024' },
 ];
 
-async function preprocessImage(inputBuffer) {
-  let workingBuffer = inputBuffer;
-
-  if (!workingBuffer || workingBuffer.length === 0) {
-    throw Object.assign(new Error('No image data received. Please try uploading again.'), { userInput: true });
-  }
-
-  // Detect HEIC/HEIF by ftyp box + brand — sharp cannot reliably decode these
-  if (workingBuffer.length >= 12 && workingBuffer.slice(4, 8).toString('ascii') === 'ftyp') {
-    const brand = workingBuffer.slice(8, 12).toString('ascii').toLowerCase();
-    if (brand.startsWith('hei') || brand.startsWith('hev') || brand === 'mif1') {
-      throw Object.assign(
-        new Error('Your photo is in HEIC format, which is not supported. On iPhone, go to Settings → Camera → Formats → Most Compatible to shoot in JPEG instead, then retake the photo.'),
-        { userInput: true }
-      );
-    }
-  }
+async function preprocessImage(rawBuffer, mimetype) {
+  // Normalize first: HEIC conversion, EXIF rotation, 2048px resize, JPEG encode, logging.
+  // After this the buffer is always a correctly-oriented JPEG with no metadata.
+  const { buffer: workingBuffer } = await normalizeImage(rawBuffer, mimetype);
 
   let meta;
   try {
@@ -58,12 +46,9 @@ async function preprocessImage(inputBuffer) {
     );
   }
 
-  let imgW = meta.width  || 1;
-  let imgH = meta.height || 1;
-  // EXIF orientations 5–8 are 90°/270° rotations — swap to get true display dimensions
-  // (sharp.metadata() returns raw pixel dims, not display dims)
-  if (meta.orientation >= 5 && meta.orientation <= 8) [imgW, imgH] = [imgH, imgW];
-  const ratio = imgW / imgH;
+  // normalizeImage already applied .rotate() so orientation is 1 (or absent) —
+  // no dimension-swap needed; metadata width/height are the true display dimensions.
+  const ratio = (meta.width || 1) / (meta.height || 1);
 
   // Match output to input orientation — portrait in → portrait out, landscape in → landscape out
   let target;
@@ -71,22 +56,13 @@ async function preprocessImage(inputBuffer) {
   else if (ratio < 1.0) target = SIZES[1]; // portrait   → 1024×1536
   else                  target = SIZES[2]; // square     → 1024×1024
 
-  const make = (w, h) =>
-    sharp(workingBuffer)
-      .rotate()
-      .resize(w, h, { fit: 'cover', position: 'centre' })
-      .ensureAlpha()
-      .png({ compressionLevel: 9 })
-      .toBuffer();
+  const buf = await sharp(workingBuffer)
+    .rotate()
+    .resize(target.w, target.h, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 87 })
+    .toBuffer();
 
-  let buf = await make(target.w, target.h);
-  // If PNG is still too large (>20MB OpenAI limit), halve dimensions keeping same ratio
-  let finalSize = target.label;
-  if (buf.length > 18 * 1024 * 1024) {
-    buf = await make(Math.round(target.w * 0.67), Math.round(target.h * 0.67));
-    // ratio is preserved so the same OpenAI size label is still correct
-  }
-  return { buffer: buf, size: finalSize };
+  return { buffer: buf, size: target.label };
 }
 
 async function uploadToR2(key, buffer, contentType = 'image/png') {
@@ -132,7 +108,7 @@ async function runCompositingPipeline({
   isLeader = false, followers = [],
 }) {
   // 1. Preprocess
-  const { buffer: processedBuffer } = await preprocessImage(rawImageBuffer);
+  const { buffer: processedBuffer } = await preprocessImage(rawImageBuffer, null);
 
   // 2. Pre-flight checks
   const preflightFail = await runPreflightChecks(processedBuffer);
@@ -149,8 +125,8 @@ async function runCompositingPipeline({
 
   // 3. Store original (shared across leader + all followers)
   const { width, height } = await sharp(processedBuffer).metadata();
-  const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
-  const originalUrl = await uploadToR2(originalKey, processedBuffer);
+  const originalKey = `visualizer/originals/${companyId}/${uuid()}.jpg`;
+  const originalUrl = await uploadToR2(originalKey, processedBuffer, 'image/jpeg');
   // Only update leader's record here — followers get originalUrl set in compositeOneColor
   await db.query(
     `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
@@ -210,10 +186,10 @@ async function runCompositingPipeline({
 // ── OpenAI fallback pipeline ──────────────────────────────────────────────────
 
 async function runOpenAIPipeline({ visualizationId, rawImageBuffer, chipColor, companyId }) {
-  const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
+  const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer, null);
 
-  const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
-  const originalUrl = await uploadToR2(originalKey, processedBuffer);
+  const originalKey = `visualizer/originals/${companyId}/${uuid()}.jpg`;
+  const originalUrl = await uploadToR2(originalKey, processedBuffer, 'image/jpeg');
   await db.query(
     `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
     [originalKey, originalUrl, visualizationId]
@@ -315,10 +291,10 @@ async function compositeInternalBlend({ leadId, companyId, recipe, rawRecipe, ra
 
   setImmediate(async () => {
     try {
-      const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer);
+      const { buffer: processedBuffer, size } = await preprocessImage(rawImageBuffer, null);
 
-      const originalKey = `visualizer/originals/${companyId}/${uuid()}.png`;
-      const originalUrl = await uploadToR2(originalKey, processedBuffer);
+      const originalKey = `visualizer/originals/${companyId}/${uuid()}.jpg`;
+      const originalUrl = await uploadToR2(originalKey, processedBuffer, 'image/jpeg');
       await db.query(
         `UPDATE visualizations SET original_image_key=$1, original_image_url=$2 WHERE id=$3`,
         [originalKey, originalUrl, visualizationId]

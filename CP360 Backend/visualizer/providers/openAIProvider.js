@@ -40,7 +40,7 @@ async function generate({ imageBuffer, chipColor, size }) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const { toFile } = require('openai');
-  const imageFile = await toFile(imageBuffer, 'floor.png', { type: 'image/png' });
+  const imageFile = await toFile(imageBuffer, 'floor.jpg', { type: 'image/jpeg' });
 
   const response = await client.images.edit({
     model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
@@ -85,7 +85,7 @@ async function generateFromRecipe({ imageBuffer, recipe, size }) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const { toFile } = require('openai');
-  const imageFile = await toFile(imageBuffer, 'floor.png', { type: 'image/png' });
+  const imageFile = await toFile(imageBuffer, 'floor.jpg', { type: 'image/jpeg' });
 
   const response = await client.images.edit({
     model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
