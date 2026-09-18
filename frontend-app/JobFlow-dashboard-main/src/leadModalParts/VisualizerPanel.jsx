@@ -365,6 +365,13 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
 
   useEffect(() => {
     if (!photoFile) { setPhotoPreviewUrl(null); return; }
+    // HEIC/HEIF files can't be rendered by most browsers — skip object URL to avoid broken image
+    const name = photoFile.name.toLowerCase();
+    const type = (photoFile.type || '').toLowerCase();
+    if (name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic') || type.includes('heif')) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
     const url = URL.createObjectURL(photoFile);
     setPhotoPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
@@ -1007,13 +1014,22 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                     </div>
                     <p className="text-xs text-gray-400 px-2 py-1 bg-gray-50 truncate">{photoFile.name}</p>
                   </div>
+                ) : photoFile ? (
+                  <div
+                    onClick={() => fileRef.current?.click()}
+                    className="border-2 border-solid border-green-300 bg-green-50 rounded-xl p-6 text-center cursor-pointer hover:border-green-400 transition"
+                  >
+                    <p className="text-2xl mb-1">📷</p>
+                    <p className="text-sm font-semibold text-green-700 truncate px-2">{photoFile.name}</p>
+                    <p className="text-xs text-green-500 mt-0.5">Photo ready • Tap to change</p>
+                  </div>
                 ) : (
                   <div
                     onClick={() => fileRef.current?.click()}
                     className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition"
                   >
                     <p className="text-sm font-semibold text-gray-500">Tap to select photo</p>
-                    <p className="text-xs text-gray-400 mt-1">JPG or PNG • Up to 20MB</p>
+                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, or HEIC • Up to 20MB</p>
                   </div>
                 )}
                 <input ref={fileRef} type="file" accept="image/*,.heic" className="hidden" onChange={e => setPhotoFile(e.target.files[0] || null)} />
