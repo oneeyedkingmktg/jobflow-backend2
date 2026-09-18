@@ -312,6 +312,7 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   // Photo & results
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+  const [photoConverting, setPhotoConverting] = useState(false);
   const fileRef = useRef();
   const [results, setResults] = useState({});
   const [actionState, setActionState] = useState({});
@@ -364,17 +365,42 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
   }, []);
 
   useEffect(() => {
-    if (!photoFile) { setPhotoPreviewUrl(null); return; }
-    // HEIC/HEIF files can't be rendered by most browsers — skip object URL to avoid broken image
+    if (!photoFile) { setPhotoPreviewUrl(null); setPhotoConverting(false); return; }
+
     const name = photoFile.name.toLowerCase();
     const type = (photoFile.type || '').toLowerCase();
-    if (name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic') || type.includes('heif')) {
-      setPhotoPreviewUrl(null);
-      return;
+    const isHeic = name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic') || type.includes('heif');
+
+    if (!isHeic) {
+      const url = URL.createObjectURL(photoFile);
+      setPhotoPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-    const url = URL.createObjectURL(photoFile);
-    setPhotoPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
+
+    // HEIC: convert to JPEG in the browser so we can show a thumbnail
+    let cancelled = false;
+    let objectUrl = null;
+    setPhotoConverting(true);
+    setPhotoPreviewUrl(null);
+
+    import('heic2any').then(({ default: heic2any }) =>
+      heic2any({ blob: photoFile, toType: 'image/jpeg', quality: 0.8 })
+    ).then(result => {
+      if (cancelled) return;
+      // heic2any returns a Blob or Blob[] for multi-image HEIC (e.g. Live Photos)
+      const blob = Array.isArray(result) ? result[0] : result;
+      objectUrl = URL.createObjectURL(blob);
+      setPhotoPreviewUrl(objectUrl);
+      setPhotoConverting(false);
+    }).catch(() => {
+      if (!cancelled) setPhotoConverting(false);
+      // Preview not available — fail silently; upload still works
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [photoFile]);
 
   useEffect(() => {
@@ -1013,6 +1039,14 @@ export default function VisualizerPanel({ lead, canEdit, onClose }) {
                       <p className="text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition bg-black/60 px-3 py-1 rounded-full">Tap to change photo</p>
                     </div>
                     <p className="text-xs text-gray-400 px-2 py-1 bg-gray-50 truncate">{photoFile.name}</p>
+                  </div>
+                ) : photoConverting ? (
+                  <div className="border-2 border-dashed border-blue-300 bg-blue-50 rounded-xl p-8 text-center">
+                    <div className="flex justify-center mb-2">
+                      <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                    <p className="text-sm text-blue-600 font-medium">Converting photo…</p>
+                    <p className="text-xs text-blue-400 mt-0.5 truncate px-2">{photoFile?.name}</p>
                   </div>
                 ) : photoFile ? (
                   <div
