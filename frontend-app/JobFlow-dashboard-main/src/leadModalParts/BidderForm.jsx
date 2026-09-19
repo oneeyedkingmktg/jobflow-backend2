@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
 function ProductInfoBody({ item, catName }) {
   const urlHref = (url) => url?.startsWith('http') ? url : `https://${url}`;
   const coverageStr = item.coverage_per_unit
-    ? `${item.coverage_per_unit}${item.coverage_type ? ' ' + item.coverage_type : ''} per ${item.purchase_unit || 'Kit'}`
+    ? `${Math.round(parseFloat(item.coverage_per_unit))}${item.coverage_type ? ' ' + item.coverage_type : ''} per ${item.purchase_unit || 'Kit'}`
     : null;
 
   const fields = [
@@ -117,7 +117,7 @@ function LibraryItemInfoBody({ item, catName, library }) {
   const urlHref = (url) => url?.startsWith('http') ? url : `https://${url}`;
 
   const coverageStr = item.coverage_per_unit
-    ? `${item.coverage_per_unit}${item.coverage_type ? ' ' + item.coverage_type : ''} per ${item.purchase_unit || 'Kit'}`
+    ? `${Math.round(parseFloat(item.coverage_per_unit))}${item.coverage_type ? ' ' + item.coverage_type : ''} per ${item.purchase_unit || 'Kit'}`
     : null;
 
   const baseFields = [

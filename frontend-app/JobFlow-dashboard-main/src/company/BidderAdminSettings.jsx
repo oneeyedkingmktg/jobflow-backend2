@@ -911,7 +911,7 @@ export default function BidderAdminSettings({ companyId }) {
                             {(item.components || []).map((c) => {
                               const isExp = expandedComponents.has(c.component_item_id);
                               const coverageStr = c.coverage_per_unit
-                                ? `${c.coverage_per_unit}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
+                                ? `${Math.round(parseFloat(c.coverage_per_unit))}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
                                 : null;
                               return (
                                 <li key={c.component_item_id} className="text-xs">
@@ -1009,7 +1009,7 @@ export default function BidderAdminSettings({ companyId }) {
                             {(item.components || []).map((c) => {
                               const isExp = expandedComponents.has(c.component_item_id);
                               const coverageStr = c.coverage_per_unit
-                                ? `${c.coverage_per_unit}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
+                                ? `${Math.round(parseFloat(c.coverage_per_unit))}${c.coverage_type ? ' ' + c.coverage_type : ''} per ${c.purchase_unit || 'Kit'}`
                                 : null;
                               return (
                                 <li key={c.component_item_id} className="text-xs">
