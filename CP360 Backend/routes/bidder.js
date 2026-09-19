@@ -2360,33 +2360,33 @@ router.post('/public/:id/send-warranty-email', async (req, res) => {
 });
 
 // ============================================================================
-// PRODUCT FAVORITES (per company)
+// PRODUCT FAVORITES (per user, any library item)
 // ============================================================================
 
-// GET /api/bidder/favorites — returns array of favorited global_supplier_product_ids
+// GET /api/bidder/favorites — returns array of favorited library_item_ids for the current user
 router.get('/favorites', async (req, res) => {
   try {
-    const companyId = req.user.company_id;
+    const userId = req.user.id;
     const { rows } = await pool.query(
-      'SELECT global_supplier_product_id FROM company_product_favorites WHERE company_id = $1 ORDER BY created_at',
-      [companyId]
+      'SELECT library_item_id FROM user_library_favorites WHERE user_id = $1 ORDER BY created_at',
+      [userId]
     );
-    res.json(rows.map((r) => r.global_supplier_product_id));
+    res.json(rows.map((r) => r.library_item_id));
   } catch (err) {
     console.error('GET /bidder/favorites error:', err);
     res.status(500).json({ error: 'Failed to load favorites' });
   }
 });
 
-// POST /api/bidder/favorites — body: { global_supplier_product_id }
+// POST /api/bidder/favorites — body: { library_item_id }
 router.post('/favorites', async (req, res) => {
   try {
-    const companyId = req.user.company_id;
-    const { global_supplier_product_id } = req.body;
-    if (!global_supplier_product_id) return res.status(400).json({ error: 'global_supplier_product_id required' });
+    const userId = req.user.id;
+    const { library_item_id } = req.body;
+    if (!library_item_id) return res.status(400).json({ error: 'library_item_id required' });
     await pool.query(
-      'INSERT INTO company_product_favorites (company_id, global_supplier_product_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-      [companyId, global_supplier_product_id]
+      'INSERT INTO user_library_favorites (user_id, library_item_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [userId, library_item_id]
     );
     res.status(201).json({ success: true });
   } catch (err) {
@@ -2395,14 +2395,14 @@ router.post('/favorites', async (req, res) => {
   }
 });
 
-// DELETE /api/bidder/favorites/:gspId — remove a favorite
-router.delete('/favorites/:gspId', async (req, res) => {
+// DELETE /api/bidder/favorites/:itemId — remove a favorite
+router.delete('/favorites/:itemId', async (req, res) => {
   try {
-    const companyId = req.user.company_id;
-    const { gspId } = req.params;
+    const userId = req.user.id;
+    const { itemId } = req.params;
     await pool.query(
-      'DELETE FROM company_product_favorites WHERE company_id = $1 AND global_supplier_product_id = $2',
-      [companyId, gspId]
+      'DELETE FROM user_library_favorites WHERE user_id = $1 AND library_item_id = $2',
+      [userId, itemId]
     );
     res.json({ success: true });
   } catch (err) {

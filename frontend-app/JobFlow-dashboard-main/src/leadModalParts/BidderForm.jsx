@@ -315,10 +315,10 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       // Library items (non-freeform only)
       const map = {};
       (p.items || []).filter(item => !item.is_freeform && item.library_item_id).forEach((item) => {
-        map[item.library_item_id] = { ...item, _price: item.unit_price, _desc: item.description || '', _qty: item.quantity || 1, _color: item.color || '' };
+        map[item.library_item_id] = { ...item, _price: parseFloat(item.unit_price || 0).toFixed(2), _desc: item.description || '', _qty: item.quantity || 1, _color: item.color || '' };
       });
       setCheckedMap(map);
-      setCustomItems((p.customItems || []).map(i => ({ ...i, _desc: i.description, _qty: i.quantity, _price: i.price_each, _note: i.subtotal_note || '' })));
+      setCustomItems((p.customItems || []).map(i => ({ ...i, _desc: i.description, _qty: i.quantity, _price: parseFloat(i.price_each || 0).toFixed(2), _note: i.subtotal_note || '' })));
       setDiscounts((p.discounts || []).map(d => ({ ...d, _desc: d.description, _val: d.discount_value, _type: d.discount_type, _date: d.if_accepted_by ? d.if_accepted_by.slice(0,10) : '' })));
       const schedules = p.paymentSchedules || [];
       if (schedules.length === 0) {
@@ -407,7 +407,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
           price_each: parseFloat(libItem.default_unit_price) || 0, line_total: lineTotal, sort_order: sortOrder,
           show_price: defaultShowPrice, show_quantity: defaultShowQty,
         });
-        setCustomItems(prev => [...prev, { ...newItem, _desc: dupDesc, _qty: 1, _price: parseFloat(libItem.default_unit_price) || 0 }]);
+        setCustomItems(prev => [...prev, { ...newItem, _desc: dupDesc, _qty: 1, _price: parseFloat(libItem.default_unit_price || 0).toFixed(2) }]);
         return;
       }
       const newItem = await BidderAPI.createItem({
@@ -418,7 +418,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         color: libItem.color || null,
         show_price: defaultShowPrice, show_quantity: defaultShowQty,
       });
-      setCheckedMap(prev => ({ ...prev, [libItem.id]: { ...newItem, _price: newItem.unit_price, _desc: newItem.description || '', _qty: 1, _color: newItem.color || '' } }));
+      setCheckedMap(prev => ({ ...prev, [libItem.id]: { ...newItem, _price: parseFloat(newItem.unit_price || 0).toFixed(2), _desc: newItem.description || '', _qty: 1, _color: newItem.color || '' } }));
     } catch (e) { alert('Failed to add item'); }
   }
 
@@ -430,8 +430,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     await addFromPicker(val, nextSortOrder());
   }
 
-  function toggleFavorite(gspId) {
-    const numId = Number(gspId);
+  function toggleFavorite(libItemId) {
+    const numId = Number(libItemId);
     if (favorites.has(numId)) {
       setFavorites((prev) => { const n = new Set(prev); n.delete(numId); return n; });
       BidderAPI.removeFavorite(numId).catch(() => {});
@@ -539,7 +539,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
       await BidderAPI.updateItem(item.id, { ...item, unit_price, quantity, line_total });
       setCheckedMap(prev => {
         const cur = prev[libItemId];
-        return cur ? { ...prev, [libItemId]: { ...cur, unit_price, quantity, line_total } } : prev;
+        return cur ? { ...prev, [libItemId]: { ...cur, unit_price, quantity, line_total, _price: unit_price.toFixed(2) } } : prev;
       });
     } catch (e) { console.error('Failed to update item price', e); }
   }
@@ -590,7 +590,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const defaultShowQty   = companySettings?.bidder_default_show_qty   ?? true;
     try {
       const newItem = await BidderAPI.createCustomItem({ proposal_id: proposalId, description: 'Item', quantity: 1, price_each: 0, line_total: 0, sort_order: so, show_price: defaultShowPrice, show_quantity: defaultShowQty });
-      setCustomItems(prev => [...prev, { ...newItem, _desc: newItem.description, _qty: 1, _price: 0 }]);
+      setCustomItems(prev => [...prev, { ...newItem, _desc: newItem.description, _qty: 1, _price: '0.00' }]);
     } catch (e) { alert('Failed to add item'); }
   }
 
@@ -599,7 +599,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const so = sortOrder !== null ? sortOrder : nextSortOrder();
     try {
       const newItem = await BidderAPI.createCustomItem({ proposal_id: proposalId, description: 'Subtotal', quantity: 1, price_each: 0, line_total: 0, is_subtotal: true, sort_order: so });
-      setCustomItems(prev => [...prev, { ...newItem, is_subtotal: true, _desc: 'Subtotal', _qty: 1, _price: 0 }]);
+      setCustomItems(prev => [...prev, { ...newItem, is_subtotal: true, _desc: 'Subtotal', _qty: 1, _price: '0.00' }]);
     } catch (e) { alert('Failed to add subtotal'); }
   }
 
@@ -608,7 +608,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
     const so = sortOrder !== null ? sortOrder : nextSortOrder();
     try {
       const newItem = await BidderAPI.createCustomItem({ proposal_id: proposalId, description: '', quantity: 1, price_each: 0, line_total: 0, is_note: true, sort_order: so });
-      setCustomItems(prev => [...prev, { ...newItem, is_note: true, _desc: '', _qty: 1, _price: 0 }]);
+      setCustomItems(prev => [...prev, { ...newItem, is_note: true, _desc: '', _qty: 1, _price: '0.00' }]);
     } catch (e) { alert('Failed to add note'); }
   }
 
@@ -625,7 +625,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
         show_quantity: item.show_quantity ?? true,
         subtotal_note: item._note || null,
       });
-      setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity, price_each, line_total, description: item._desc } : it));
+      setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity, price_each, line_total, description: item._desc, _price: price_each.toFixed(2) } : it));
     } catch (e) { console.error('Custom item save error', e); }
   }
 
@@ -1013,8 +1013,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           {canViewFinancials && (
                             <>
                               <span className="text-gray-400 text-xs">× $</span>
-                              <input className={`w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right ${noSpin}`}
-                                type="number" step="0.01" value={pi._price || ''}
+                              <input className="w-24 px-2 py-1 border border-blue-300 rounded text-sm text-right"
+                                type="text" inputMode="decimal" value={pi._price ?? ''}
                                 disabled={isLocked || !canEditFinancials}
                                 onFocus={e => e.target.select()}
                                 onChange={e => setCheckedMap(prev => ({ ...prev, [libItemId]: { ...pi, _price: e.target.value } }))}
@@ -1086,8 +1086,8 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                         {canViewFinancials && (
                           <>
                             <span className="text-gray-400 text-xs">× $</span>
-                            <input className={`w-24 px-2 py-1 border rounded text-sm text-right ${noSpin}`} type="number" step="0.01"
-                              value={item._price || ''}
+                            <input className="w-24 px-2 py-1 border rounded text-sm text-right"
+                              type="text" inputMode="decimal" value={item._price ?? ''}
                               disabled={isLocked || !canEditFinancials}
                               onFocus={e => e.target.select()}
                               onChange={e => setCustomItems(prev => prev.map((it, i) => i === idx ? { ...it, _price: e.target.value } : it))}
@@ -1161,7 +1161,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   {(() => {
                     // Shared item row: div wrapper with add button + info icon + star toggle
                     const itemRow = (i, catId) => {
-                      const isFav = i.source_supplier_product_id != null && favorites.has(Number(i.source_supplier_product_id));
+                      const isFav = favorites.has(Number(i.id));
                       const pickerCatName = library.find(c => c.id === i.category_id)?.name;
                       return (
                         <div key={i.id} className="flex items-center border-b border-gray-50 hover:bg-blue-50">
@@ -1194,15 +1194,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                           >
                             Details
                           </button>
-                          {i.source_supplier_product_id != null && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleFavorite(i.source_supplier_product_id); }}
-                              className={`px-3 py-2.5 text-base leading-none shrink-0 ${isFav ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-300'}`}
-                              title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                            >
-                              ★
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(i.id); }}
+                            className={`px-3 py-2.5 text-base leading-none shrink-0 ${isFav ? 'text-yellow-400' : 'text-gray-200 hover:text-yellow-300'}`}
+                            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                          >
+                            ★
+                          </button>
                         </div>
                       );
                     };
@@ -1399,8 +1397,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       const q = itemSearch.toLowerCase();
                       const allItems = library.flatMap(cat => (cat.items || []).filter(i => i.is_active !== false));
                       const favItems = allItems.filter(i =>
-                        i.source_supplier_product_id != null &&
-                        favorites.has(Number(i.source_supplier_product_id)) &&
+                        favorites.has(Number(i.id)) &&
                         (!q ||
                           i.name.toLowerCase().includes(q) ||
                           (i.internal_name || '').toLowerCase().includes(q))
