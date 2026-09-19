@@ -48,9 +48,15 @@ function ProductInfoBody({ item, catName }) {
     <div className="px-5 py-3">
       <p className="font-semibold text-gray-900 text-sm">{item.internal_name || item.display_name || item.name}</p>
       {item.internal_name && <p className="text-xs text-gray-400 mb-1">({item.name})</p>}
-      {item.description && <p className="text-sm text-gray-600 mt-1 mb-3">{item.description}</p>}
+      {item.description && <p className="text-sm text-gray-600 mt-1 mb-2">{item.description}</p>}
+      {item.supplier && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mt-2 mb-1">
+          <p className="text-xs font-semibold text-blue-600 mb-0.5">Supplier</p>
+          <p className="text-xs text-blue-900">{item.supplier}</p>
+        </div>
+      )}
       <div className="mt-2">
-        {fields.map(([label, value]) => value ? (
+        {fields.filter(([label]) => label !== 'Supplier').map(([label, value]) => value ? (
           <div key={label} className="flex gap-3 py-1.5 border-b border-gray-50">
             <span className="text-xs text-gray-400 w-28 shrink-0">{label}</span>
             <span className="text-xs text-gray-800 flex-1">{value}</span>
@@ -144,6 +150,12 @@ function LibraryItemInfoBody({ item, catName, library }) {
       {item.description && (
         <p className="text-sm text-gray-600 mt-1 mb-2">{item.description}</p>
       )}
+      {item.supplier && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mt-2 mb-1">
+          <p className="text-xs font-semibold text-blue-600 mb-0.5">Supplier</p>
+          <p className="text-xs text-blue-900">{item.supplier}</p>
+        </div>
+      )}
       {item.internal_description && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2 mb-2">
           <p className="text-xs font-semibold text-amber-700 mb-0.5">Internal Notes</p>
@@ -151,7 +163,7 @@ function LibraryItemInfoBody({ item, catName, library }) {
         </div>
       )}
       <div className="mt-1">
-        {[...baseFields, ...catalogFields].map(([label, value]) => value ? (
+        {[...baseFields, ...catalogFields.filter(([label]) => label !== 'Supplier')].map(([label, value]) => value ? (
           <div key={label} className="flex gap-3 py-1.5 border-b border-gray-50">
             <span className="text-xs text-gray-400 w-28 shrink-0">{label}</span>
             <span className="text-xs text-gray-800 flex-1">{value}</span>
