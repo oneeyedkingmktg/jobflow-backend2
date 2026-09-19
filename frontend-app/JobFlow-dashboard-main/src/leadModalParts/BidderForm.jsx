@@ -132,7 +132,7 @@ function LibraryItemInfoBody({ item, catName, library }) {
     ['Price', item.default_unit_price != null ? `$${parseFloat(item.default_unit_price || 0).toFixed(2)}${item.default_unit_label ? ' ' + item.default_unit_label : ''}` : null],
   ];
   const catalogFields = [
-    ['Category', item.global_category_name || (!item.source_supplier_product_id ? catName : null)],
+    ['Category', item.global_categories?.length > 0 ? item.global_categories.map(c => c.name).join(', ') : (!item.source_supplier_product_id ? catName : null)],
     ['Supplier', item.supplier],
     ['SKU', item.sku],
     ['Coverage', coverageStr],
@@ -1358,10 +1358,13 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
 
                       const groups = {};
                       filtered.forEach(i => {
-                        const gCatId = i.global_category_id || 'uncategorized';
-                        const gCatName = i.global_category_name || 'Uncategorized';
-                        if (!groups[gCatId]) groups[gCatId] = { name: gCatName, items: [] };
-                        groups[gCatId].items.push(i);
+                        const cats = i.global_categories?.length > 0
+                          ? i.global_categories
+                          : [{ id: 'uncategorized', name: 'Uncategorized' }];
+                        cats.forEach(cat => {
+                          if (!groups[cat.id]) groups[cat.id] = { name: cat.name, items: [] };
+                          if (!groups[cat.id].items.some(x => x.id === i.id)) groups[cat.id].items.push(i);
+                        });
                       });
 
                       const sorted = Object.entries(groups).sort(([, a], [, b]) => {

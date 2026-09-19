@@ -915,7 +915,13 @@ router.get('/library', async (req, res) => {
     );
     const items = await pool.query(
       `SELECT li.*,
-         gpc.name AS global_category_name,
+         COALESCE(
+           (SELECT json_agg(json_build_object('id', gpc.id, 'name', gpc.name) ORDER BY gpc.sort_order, gpc.name)
+            FROM bidder_library_item_categories blic
+            JOIN global_product_categories gpc ON blic.global_category_id = gpc.id
+            WHERE blic.library_item_id = li.id),
+           '[]'::json
+         ) AS global_categories,
          CASE WHEN li.source_supplier_product_id IS NOT NULL
               THEN COALESCE(li.cost_override, gsp.kit_price)
               ELSE li.kit_price END AS kit_price,
@@ -924,7 +930,6 @@ router.get('/library', async (req, res) => {
               ELSE li.sqft_per_kit END AS sqft_per_kit
        FROM bidder_library_items li
        LEFT JOIN global_supplier_products gsp ON li.source_supplier_product_id = gsp.id
-       LEFT JOIN global_product_categories gpc ON li.global_category_id = gpc.id
        WHERE li.company_id = $1
        ORDER BY li.sort_order, li.id`,
       [companyId]
@@ -937,15 +942,20 @@ router.get('/library', async (req, res) => {
       const compRows = await pool.query(
         `SELECT sc.system_item_id, sc.component_item_id,
                 COALESCE(li.internal_name, li.name) AS display_name,
-                li.name, li.description, li.sku,
+                li.name, li.description, li.sku, li.supplier,
                 li.purchase_unit, li.coverage_per_unit, li.coverage_type,
                 li.available_colors, li.product_page_url, li.spec_sheet_url,
-                li.global_category_id, gpc.name AS global_category_name,
-                li.source_supplier_product_id, li.category_id,
-                li.default_unit_price, li.default_unit_label
+                li.global_category_id, li.source_supplier_product_id, li.category_id,
+                li.default_unit_price, li.default_unit_label,
+                COALESCE(
+                  (SELECT json_agg(json_build_object('id', gpc.id, 'name', gpc.name) ORDER BY gpc.sort_order, gpc.name)
+                   FROM bidder_library_item_categories blic
+                   JOIN global_product_categories gpc ON blic.global_category_id = gpc.id
+                   WHERE blic.library_item_id = li.id),
+                  '[]'::json
+                ) AS global_categories
          FROM bidder_library_system_components sc
          JOIN bidder_library_items li ON li.id = sc.component_item_id
-         LEFT JOIN global_product_categories gpc ON li.global_category_id = gpc.id
          WHERE sc.system_item_id = ANY($1)
          ORDER BY sc.sort_order, sc.id`,
         [systemIds]
@@ -1150,8 +1160,10 @@ router.post('/library/item', async (req, res) => {
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
       supplier, kit_price, sqft_per_kit, is_system = false, component_ids = [],
       is_charge_only = false, color, sku, internal_name, internal_description,
-      global_category_id,
+      global_category_ids = [],
     } = req.body;
+
+    const primaryCatId = global_category_ids.length ? parseInt(global_category_ids[0], 10) : null;
 
     // Verify category belongs to this company
     const check = await pool.query(
@@ -1163,10 +1175,17 @@ router.post('/library/item', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color, sku, internal_name, internal_description, global_category_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null), clean(internal_name) || null, clean(internal_description) || null, global_category_id ? parseInt(global_category_id, 10) : null]
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null), clean(internal_name) || null, clean(internal_description) || null, primaryCatId]
     );
 
     const newItem = result.rows[0];
+
+    for (const cid of global_category_ids) {
+      await pool.query(
+        'INSERT INTO bidder_library_item_categories (library_item_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [newItem.id, parseInt(cid, 10)]
+      );
+    }
 
     if (is_system && component_ids.length > 0) {
       for (let i = 0; i < component_ids.length; i++) {
@@ -1177,7 +1196,7 @@ router.post('/library/item', async (req, res) => {
       }
     }
 
-    res.status(201).json({ ...newItem, components: [] });
+    res.status(201).json({ ...newItem, components: [], global_categories: [] });
   } catch (err) {
     console.error('POST /bidder/library/item error:', err);
     res.status(500).json({ error: 'Failed to create library item' });
@@ -1192,9 +1211,10 @@ router.put('/library/item/:id', async (req, res) => {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
       supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color, sku, internal_name, internal_description,
-      global_category_id,
+      global_category_ids = [],
     } = req.body;
 
+    const primaryCatId = global_category_ids.length ? parseInt(global_category_ids[0], 10) : null;
     const kp  = clean(kit_price)    != null ? parseFloat(clean(kit_price))    : null;
     const sfk = clean(sqft_per_kit) != null ? parseFloat(clean(sqft_per_kit)) : null;
 
@@ -1219,12 +1239,20 @@ router.put('/library/item/:id', async (req, res) => {
         clean(internal_name) || null,
         clean(internal_description) || null,
         req.params.id, companyId,
-        global_category_id ? parseInt(global_category_id, 10) : null,
+        primaryCatId,
       ]
     );
 
     if (!result.rows.length) return res.status(404).json({ error: 'Library item not found' });
     const updated = result.rows[0];
+
+    await pool.query('DELETE FROM bidder_library_item_categories WHERE library_item_id = $1', [updated.id]);
+    for (const cid of global_category_ids) {
+      await pool.query(
+        'INSERT INTO bidder_library_item_categories (library_item_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [updated.id, parseInt(cid, 10)]
+      );
+    }
 
     if (updated.is_system && Array.isArray(component_ids)) {
       await pool.query('DELETE FROM bidder_library_system_components WHERE system_item_id = $1', [updated.id]);

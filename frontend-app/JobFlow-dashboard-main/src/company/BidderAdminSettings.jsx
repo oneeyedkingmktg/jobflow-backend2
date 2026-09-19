@@ -8,6 +8,48 @@ import { BidderAPI, CompaniesAPI } from '../api';
 import { useAuth } from '../AuthContext';
 
 
+function CategoryMultiSelect({ categories, selectedIds, onChange, inputCls }) {
+  const [open, setOpen] = useState(false);
+  const selectedNames = categories.filter(c => selectedIds.includes(c.id)).map(c => c.name);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(p => !p)}
+        className={`${inputCls} flex items-center justify-between w-full text-left`}
+      >
+        <span className="text-sm truncate flex-1 min-w-0">
+          {selectedNames.length ? selectedNames.join(', ') : '— select —'}
+        </span>
+        <svg className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {categories.map(c => (
+            <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(c.id)}
+                onChange={() => {
+                  const next = selectedIds.includes(c.id)
+                    ? selectedIds.filter(id => id !== c.id)
+                    : [...selectedIds, c.id];
+                  onChange(next);
+                }}
+                className="accent-blue-600 w-4 h-4 shrink-0"
+              />
+              <span className="text-sm text-gray-700">{c.name}</span>
+            </label>
+          ))}
+          {!categories.length && <p className="px-3 py-2 text-sm text-gray-400 italic">No categories yet</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BidderAdminSettings({ companyId }) {
   const { user, isMaster } = useAuth();
   const isMasterUser = typeof isMaster === 'function' ? isMaster() : Boolean(isMaster);
@@ -320,13 +362,13 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddItem(catId) {
     setNewSystemCatId(null);
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', internal_name: '', internal_description: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '', sku: '', global_category_id: null });
+    setNewItemForm({ name: '', internal_name: '', internal_description: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '', sku: '', global_category_ids: [] });
   }
 
   function startAddSystem(catId) {
     setNewItemCatId(null);
     setNewSystemCatId(catId);
-    setNewSystemForm({ name: '', internal_name: '', internal_description: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [], global_category_id: null });
+    setNewSystemForm({ name: '', internal_name: '', internal_description: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [], global_category_ids: [] });
   }
 
   async function handleAddSystem(catId) {
@@ -343,7 +385,7 @@ export default function BidderAdminSettings({ companyId }) {
         color: newSystemForm.color || null,
         is_system: true,
         component_ids: newSystemForm.componentIds,
-        global_category_id: newSystemForm.global_category_id || null,
+        global_category_ids: newSystemForm.global_category_ids || [],
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
       }, companyId);
       setNewSystemCatId(null);
@@ -379,7 +421,7 @@ export default function BidderAdminSettings({ companyId }) {
         sku: newItemForm.is_charge_only ? null : (newItemForm.sku || null),
         kit_price: newItemForm.is_charge_only ? null : (newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null),
         sqft_per_kit: newItemForm.is_charge_only ? null : (newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null),
-        global_category_id: newItemForm.global_category_id || null,
+        global_category_ids: newItemForm.global_category_ids || [],
       }, companyId);
       setNewItemCatId(null);
       await loadLibrary();
@@ -412,7 +454,7 @@ export default function BidderAdminSettings({ companyId }) {
       is_system: item.is_system || false,
       is_charge_only: item.is_charge_only || false,
       color: item.color || '',
-      global_category_id: item.global_category_id || null,
+      global_category_ids: (item.global_categories || []).map(c => c.id),
     });
     setEditSystemComponentIds((item.components || []).map((c) => c.component_item_id));
   }
@@ -885,11 +927,13 @@ export default function BidderAdminSettings({ companyId }) {
                         <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                       </div>
                       <div>
-                        <label className={labelCls}>Category <span className="normal-case text-gray-400 font-normal">— used in bidder Category filter</span></label>
-                        <select className={inputCls} value={editItemForm.global_category_id || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
-                          <option value="">— select —</option>
-                          {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <label className={labelCls}>Categories <span className="normal-case text-gray-400 font-normal">— used in bidder Category filter</span></label>
+                        <CategoryMultiSelect
+                          categories={globalCategories}
+                          selectedIds={editItemForm.global_category_ids || []}
+                          onChange={(ids) => setEditItemForm(p => ({ ...p, global_category_ids: ids }))}
+                          inputCls={inputCls}
+                        />
                       </div>
                       {!editItemForm.is_system && (
                         <label className="flex items-center gap-3 cursor-pointer">
@@ -1002,7 +1046,7 @@ export default function BidderAdminSettings({ companyId }) {
                         {item.internal_name && <p className="text-xs text-purple-600 mt-0.5">Proposal: {item.name}</p>}
                         {item.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{item.internal_description}</p>}
                         {item.color && <p className="text-xs text-gray-500 mt-0.5">Color: {item.color}</p>}
-                        {item.global_category_name && <p className="text-xs text-blue-500 mt-0.5">Category: {item.global_category_name}</p>}
+                        {item.global_categories?.length > 0 && <p className="text-xs text-blue-500 mt-0.5">Categories: {item.global_categories.map(c => c.name).join(', ')}</p>}
                         {item.is_system ? (
                           <ul className="mt-1 space-y-0">
                             {(item.components || []).length === 0 && <li className="text-xs text-gray-400 italic">No components selected</li>}
@@ -1117,11 +1161,13 @@ export default function BidderAdminSettings({ companyId }) {
                                 <input className={inputCls} value={newSystemForm.color} onChange={(e) => setNewSystemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                               </div>
                               <div>
-                                <label className={labelCls}>Category</label>
-                                <select className={inputCls} value={newSystemForm.global_category_id || ''} onChange={(e) => setNewSystemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
-                                  <option value="">— select —</option>
-                                  {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <label className={labelCls}>Categories</label>
+                                <CategoryMultiSelect
+                                  categories={globalCategories}
+                                  selectedIds={newSystemForm.global_category_ids || []}
+                                  onChange={(ids) => setNewSystemForm(p => ({ ...p, global_category_ids: ids }))}
+                                  inputCls={inputCls}
+                                />
                               </div>
                             </div>
                             <div>
@@ -1205,11 +1251,13 @@ export default function BidderAdminSettings({ companyId }) {
                                 <input className={inputCls} value={newItemForm.color} onChange={(e) => setNewItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                               </div>
                               <div>
-                                <label className={labelCls}>Category</label>
-                                <select className={inputCls} value={newItemForm.global_category_id || ''} onChange={(e) => setNewItemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
-                                  <option value="">— select —</option>
-                                  {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
+                                <label className={labelCls}>Categories</label>
+                                <CategoryMultiSelect
+                                  categories={globalCategories}
+                                  selectedIds={newItemForm.global_category_ids || []}
+                                  onChange={(ids) => setNewItemForm(p => ({ ...p, global_category_ids: ids }))}
+                                  inputCls={inputCls}
+                                />
                               </div>
                             </div>
                             <label className="flex items-center gap-3 cursor-pointer">
