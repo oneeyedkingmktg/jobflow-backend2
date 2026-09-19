@@ -2745,7 +2745,7 @@ router.delete('/global-categories/:id', requireRole('master'), async (req, res) 
 });
 
 // ── Shared helper: push one global supplier product to all enabled companies ──
-async function pushProductToEnabledCompanies(client, supplierId, product) {
+async function pushProductToEnabledCompanies(client, supplierId, product, categoryIds = []) {
   const companies = await client.query(
     `SELECT csa.company_id, bc.id AS cat_id
      FROM company_supplier_access csa
@@ -2791,14 +2791,20 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
           );
         }
       }
+      for (const catId of categoryIds) {
+        await client.query(
+          'INSERT INTO bidder_library_item_categories (library_item_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [sysItem.id, catId]
+        );
+      }
     } else {
-      await client.query(
+      const regItem = (await client.query(
         `INSERT INTO bidder_library_items
            (category_id, company_id, name, description, default_unit_price, default_unit_label,
             color, sku, kit_price, sqft_per_kit, is_charge_only, sort_order, source_supplier_product_id,
             internal_name, internal_description,
             purchase_unit, coverage_per_unit, coverage_type, available_colors, product_page_url, spec_sheet_url, global_category_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id`,
         [co.cat_id, co.company_id, product.name, product.description,
          product.default_unit_price, product.default_unit_label,
          product.color || null, product.sku || null,
@@ -2808,7 +2814,13 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
          product.purchase_unit || 'Kit', product.coverage_per_unit ?? null, product.coverage_type || null,
          product.available_colors || null, product.product_page_url || null, product.spec_sheet_url || null,
          product.category_id || null]
-      );
+      )).rows[0];
+      for (const catId of categoryIds) {
+        await client.query(
+          'INSERT INTO bidder_library_item_categories (library_item_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [regItem.id, catId]
+        );
+      }
     }
   }
 }
@@ -2817,7 +2829,16 @@ async function pushProductToEnabledCompanies(client, supplierId, product) {
 router.get('/global-suppliers/:supplierId/products', requireRole('master'), async (req, res) => {
   try {
     const products = (await pool.query(
-      'SELECT * FROM global_supplier_products WHERE supplier_id = $1 ORDER BY is_system, sort_order, name',
+      `SELECT gsp.*,
+        COALESCE((
+          SELECT json_agg(json_build_object('id', gpc.id, 'name', gpc.name))
+          FROM global_supplier_product_categories gspc
+          JOIN global_product_categories gpc ON gpc.id = gspc.global_category_id
+          WHERE gspc.global_supplier_product_id = gsp.id
+        ), '[]'::json) AS global_categories
+       FROM global_supplier_products gsp
+       WHERE gsp.supplier_id = $1
+       ORDER BY gsp.is_system, gsp.sort_order, gsp.name`,
       [req.params.supplierId]
     )).rows;
 
@@ -2857,10 +2878,11 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       color = null, sku = null, kit_price = null, sqft_per_kit = null,
       is_charge_only = false, is_system = false, component_ids = [], sort_order = 0,
       internal_name = null, internal_description = null,
-      category_id = null, purchase_unit = 'Kit', coverage_per_unit = null,
+      category_ids = [], purchase_unit = 'Kit', coverage_per_unit = null,
       coverage_type = null, available_colors = null, product_page_url = null, spec_sheet_url = null,
     } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const primaryCatId = Array.isArray(category_ids) && category_ids.length > 0 ? category_ids[0] : null;
 
     let newProduct;
     await pool.transaction(async (client) => {
@@ -2876,11 +2898,18 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
          !is_system && kit_price !== null && kit_price !== '' ? parseFloat(kit_price) : null,
          !is_system && sqft_per_kit !== null && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
          is_charge_only, is_system, sort_order, internal_name || null, internal_description || null,
-         category_id || null, purchase_unit || 'Kit',
+         primaryCatId, purchase_unit || 'Kit',
          coverage_per_unit !== null && coverage_per_unit !== '' ? parseFloat(coverage_per_unit) : null,
          coverage_type || null, available_colors || null, product_page_url || null, spec_sheet_url || null]
       );
       newProduct = ins.rows[0];
+
+      for (const catId of (Array.isArray(category_ids) ? category_ids : [])) {
+        await client.query(
+          'INSERT INTO global_supplier_product_categories (global_supplier_product_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [newProduct.id, catId]
+        );
+      }
 
       if (is_system && component_ids.length > 0) {
         for (let i = 0; i < component_ids.length; i++) {
@@ -2892,7 +2921,7 @@ router.post('/global-suppliers/:supplierId/products', requireRole('master'), asy
       }
 
       // Push to all companies that have this supplier enabled
-      await pushProductToEnabledCompanies(client, supplierId, newProduct);
+      await pushProductToEnabledCompanies(client, supplierId, newProduct, Array.isArray(category_ids) ? category_ids : []);
     });
 
     res.status(201).json(newProduct);
@@ -2909,9 +2938,10 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
       name, description, default_unit_price, default_unit_label,
       color, sku, kit_price, sqft_per_kit, is_charge_only, is_active, sort_order,
       component_ids, internal_name, internal_description,
-      category_id, purchase_unit, coverage_per_unit, coverage_type,
+      category_ids, purchase_unit, coverage_per_unit, coverage_type,
       available_colors, product_page_url, spec_sheet_url,
     } = req.body;
+    const primaryCatId = Array.isArray(category_ids) && category_ids.length > 0 ? category_ids[0] : undefined;
 
     let updated;
     await pool.transaction(async (client) => {
@@ -2946,7 +2976,7 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
           sqft_per_kit !== undefined && sqft_per_kit !== '' ? parseFloat(sqft_per_kit) : null,
           is_charge_only ?? null, is_active ?? null, sort_order ?? null,
           internal_name ?? null, internal_description ?? null,
-          category_id || null, purchase_unit || null,
+          primaryCatId !== undefined ? (primaryCatId || null) : null, purchase_unit || null,
           coverage_per_unit !== undefined && coverage_per_unit !== '' ? parseFloat(coverage_per_unit) : null,
           coverage_type ?? null, available_colors ?? null, product_page_url ?? null, spec_sheet_url ?? null,
           req.params.id,
@@ -2954,6 +2984,17 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
       );
       if (!res2.rows.length) throw Object.assign(new Error('not found'), { status: 404 });
       updated = res2.rows[0];
+
+      // Update global supplier product categories junction table
+      if (Array.isArray(category_ids)) {
+        await client.query('DELETE FROM global_supplier_product_categories WHERE global_supplier_product_id = $1', [updated.id]);
+        for (const catId of category_ids) {
+          await client.query(
+            'INSERT INTO global_supplier_product_categories (global_supplier_product_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+            [updated.id, catId]
+          );
+        }
+      }
 
       if (updated.is_system && Array.isArray(component_ids)) {
         await client.query('DELETE FROM global_supplier_system_components WHERE system_product_id = $1', [updated.id]);
@@ -2984,6 +3025,23 @@ router.put('/global-supplier-products/:id', requireRole('master'), async (req, r
          updated.available_colors, updated.product_page_url, updated.spec_sheet_url,
          updated.category_id, updated.id]
       );
+
+      // Cascade category assignments to company library item categories junction table
+      if (Array.isArray(category_ids)) {
+        const { rows: libItems } = await client.query(
+          'SELECT id FROM bidder_library_items WHERE source_supplier_product_id = $1',
+          [updated.id]
+        );
+        for (const li of libItems) {
+          await client.query('DELETE FROM bidder_library_item_categories WHERE library_item_id = $1', [li.id]);
+          for (const catId of category_ids) {
+            await client.query(
+              'INSERT INTO bidder_library_item_categories (library_item_id, global_category_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+              [li.id, catId]
+            );
+          }
+        }
+      }
 
       // Cascade component list to company library copies of this system
       if (updated.is_system && Array.isArray(component_ids)) {

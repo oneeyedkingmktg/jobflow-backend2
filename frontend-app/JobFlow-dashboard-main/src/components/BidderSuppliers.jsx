@@ -13,18 +13,55 @@ const EMPTY_PRODUCT = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
   color: '', sku: '', kit_price: '', sqft_per_kit: '', is_charge_only: false,
-  category_id: null, purchase_unit: 'Kit', coverage_per_unit: '', coverage_type: '',
+  category_ids: [], purchase_unit: 'Kit', coverage_per_unit: '', coverage_type: '',
   available_colors: '', product_page_url: '', spec_sheet_url: '',
 };
 const EMPTY_SYSTEM = {
   name: '', internal_name: '', internal_description: '', description: '',
   default_unit_price: '', default_unit_label: 'per sqft',
-  color: '', sku: '', component_ids: [], category_id: null,
+  color: '', sku: '', component_ids: [], category_ids: [],
   spec_sheet_url: '', product_page_url: '',
 };
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300';
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase mb-1';
+
+function CategoryMultiSelect({ categories, selectedIds, onChange }) {
+  const [open, setOpen] = useState(false);
+  const selectedNames = categories.filter((c) => selectedIds.includes(c.id)).map((c) => c.name);
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((p) => !p)}
+        className={`${inputCls} flex items-center justify-between text-left`}>
+        <span className="text-sm truncate flex-1 min-w-0">
+          {selectedNames.length ? selectedNames.join(', ') : '— select —'}
+        </span>
+        <svg className={`w-4 h-4 ml-2 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {categories.map((c) => (
+            <label key={c.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer select-none">
+              <input type="checkbox" checked={selectedIds.includes(c.id)}
+                onChange={() => {
+                  const next = selectedIds.includes(c.id)
+                    ? selectedIds.filter((id) => id !== c.id)
+                    : [...selectedIds, c.id];
+                  onChange(next);
+                }}
+                className="accent-blue-600 w-4 h-4 shrink-0" />
+              <span className="text-sm text-gray-700">{c.name}</span>
+            </label>
+          ))}
+          {!categories.length && <p className="px-3 py-2 text-sm text-gray-400 italic">No categories yet</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── ProductForm ──────────────────────────────────────────────────────────────
 function ProductForm({ initial = EMPTY_PRODUCT, categories = [], onSave, onCancel, saving }) {
@@ -53,10 +90,7 @@ function ProductForm({ initial = EMPTY_PRODUCT, categories = [], onSave, onCance
         </div>
         <div>
           <label className={labelCls}>Category</label>
-          <select className={inputCls} value={form.category_id || ''} onChange={(e) => set('category_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
-            <option value="">— select —</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <CategoryMultiSelect categories={categories} selectedIds={form.category_ids || []} onChange={(ids) => set('category_ids', ids)} />
         </div>
         <div>
           <label className={labelCls}>Purchase Unit <span className="normal-case text-gray-400 font-normal">— e.g. Kit, Tube, Case</span></label>
@@ -186,10 +220,7 @@ function SystemForm({ initial = EMPTY_SYSTEM, availableComponents = [], categori
         </div>
         <div>
           <label className={labelCls}>Category</label>
-          <select className={inputCls} value={form.category_id || ''} onChange={(e) => set('category_id', e.target.value ? parseInt(e.target.value, 10) : null)}>
-            <option value="">— select —</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <CategoryMultiSelect categories={categories} selectedIds={form.category_ids || []} onChange={(ids) => set('category_ids', ids)} />
         </div>
         <div className="col-span-2">
           <label className={labelCls}>System Spec Sheet URL</label>
@@ -413,7 +444,7 @@ function SupplierRow({ supplier, categories, onEdit, onDelete }) {
                             default_unit_label: p.default_unit_label || 'per sqft',
                             color: p.color || '',
                             sku: p.sku || '',
-                            category_id: p.category_id || null,
+                            category_ids: (p.global_categories || []).map((c) => c.id),
                             component_ids: (p.components || []).map((c) => c.component_product_id),
                             spec_sheet_url: p.spec_sheet_url || '',
                             product_page_url: p.product_page_url || '',
@@ -489,7 +520,7 @@ function SupplierRow({ supplier, categories, onEdit, onDelete }) {
                             kit_price: p.kit_price != null ? p.kit_price : '',
                             sqft_per_kit: p.sqft_per_kit != null ? p.sqft_per_kit : '',
                             is_charge_only: p.is_charge_only || false,
-                            category_id: p.category_id || null,
+                            category_ids: (p.global_categories || []).map((c) => c.id),
                             purchase_unit: p.purchase_unit || 'Kit',
                             coverage_per_unit: p.coverage_per_unit != null ? p.coverage_per_unit : '',
                             coverage_type: p.coverage_type || '',
@@ -551,6 +582,9 @@ function ProductRow({ p, onEdit, onDelete }) {
         {p.internal_name && <p className="text-xs text-blue-600 mt-0.5">Proposal name: {p.name}</p>}
         {p.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{p.internal_description}</p>}
         {!p.internal_description && p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
+        {p.global_categories?.length > 0 && (
+          <p className="text-xs text-blue-500 mt-0.5">Categories: {p.global_categories.map((c) => c.name).join(', ')}</p>
+        )}
         <div className="flex gap-3 mt-1 text-xs text-gray-500 flex-wrap">
           <span>${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
           {p.kit_price != null && <span>Kit: ${parseFloat(p.kit_price).toFixed(2)}</span>}
@@ -582,6 +616,9 @@ function SystemRow({ p, onEdit, onDelete }) {
         )}
         {p.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{p.internal_description}</p>}
         {!p.internal_description && p.description && <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>}
+        {p.global_categories?.length > 0 && (
+          <p className="text-xs text-blue-500 mt-0.5">Categories: {p.global_categories.map((c) => c.name).join(', ')}</p>
+        )}
         <div className="flex gap-3 mt-1 text-xs text-gray-500">
           <span>${parseFloat(p.default_unit_price || 0).toFixed(2)} {p.default_unit_label}</span>
         </div>
