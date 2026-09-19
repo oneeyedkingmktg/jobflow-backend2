@@ -983,7 +983,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                   if (item._type === 'library') {
                     const libItemId = item._libItemId;
                     const pi = checkedMap[libItemId];
-                    const libData = library.flatMap(c => c.items || []).find(i => i.id === libItemId);
+                    const libData = library.flatMap(c => c.items || []).find(i => String(i.id) === String(libItemId));
                     const libCatName = library.find(c => c.id === libData?.category_id)?.name;
                     return (
                       <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
