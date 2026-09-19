@@ -79,12 +79,16 @@ export default function BidderAdminSettings({ companyId }) {
   // ── Active section ─────────────────────────────────────────────────────────
   const [section, setSection] = useState('library');
 
+  // ── Global categories (for item/system category assignment) ───────────────
+  const [globalCategories, setGlobalCategories] = useState([]);
+
   // ── Load ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     loadLibrary();
     loadSettings();
     loadDesigns();
     loadWarranties();
+    BidderAPI.getGlobalCategories().then(data => setGlobalCategories(data)).catch(() => {});
     if (companyId) {
       CompaniesAPI.get(companyId).then(res => {
         const c = res?.company;
@@ -316,13 +320,13 @@ export default function BidderAdminSettings({ companyId }) {
   function startAddItem(catId) {
     setNewSystemCatId(null);
     setNewItemCatId(catId);
-    setNewItemForm({ name: '', internal_name: '', internal_description: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '', sku: '' });
+    setNewItemForm({ name: '', internal_name: '', internal_description: '', default_unit_price: '', default_unit_label: 'per sqft', description: '', is_included: false, show_quantity: false, supplier: '', kit_price: '', sqft_per_kit: '', is_charge_only: false, color: '', sku: '', global_category_id: null });
   }
 
   function startAddSystem(catId) {
     setNewItemCatId(null);
     setNewSystemCatId(catId);
-    setNewSystemForm({ name: '', internal_name: '', internal_description: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [] });
+    setNewSystemForm({ name: '', internal_name: '', internal_description: '', description: '', default_unit_price: '', default_unit_label: '', color: '', componentIds: [], global_category_id: null });
   }
 
   async function handleAddSystem(catId) {
@@ -339,6 +343,7 @@ export default function BidderAdminSettings({ companyId }) {
         color: newSystemForm.color || null,
         is_system: true,
         component_ids: newSystemForm.componentIds,
+        global_category_id: newSystemForm.global_category_id || null,
         sort_order: library.find((c) => c.id === catId)?.items?.length || 0,
       }, companyId);
       setNewSystemCatId(null);
@@ -374,6 +379,7 @@ export default function BidderAdminSettings({ companyId }) {
         sku: newItemForm.is_charge_only ? null : (newItemForm.sku || null),
         kit_price: newItemForm.is_charge_only ? null : (newItemForm.kit_price !== '' ? parseFloat(newItemForm.kit_price) : null),
         sqft_per_kit: newItemForm.is_charge_only ? null : (newItemForm.sqft_per_kit !== '' ? parseFloat(newItemForm.sqft_per_kit) : null),
+        global_category_id: newItemForm.global_category_id || null,
       }, companyId);
       setNewItemCatId(null);
       await loadLibrary();
@@ -406,6 +412,7 @@ export default function BidderAdminSettings({ companyId }) {
       is_system: item.is_system || false,
       is_charge_only: item.is_charge_only || false,
       color: item.color || '',
+      global_category_id: item.global_category_id || null,
     });
     setEditSystemComponentIds((item.components || []).map((c) => c.component_item_id));
   }
@@ -877,6 +884,13 @@ export default function BidderAdminSettings({ companyId }) {
                         <label className={labelCls}>Color</label>
                         <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                       </div>
+                      <div>
+                        <label className={labelCls}>Category <span className="normal-case text-gray-400 font-normal">— used in bidder Category filter</span></label>
+                        <select className={inputCls} value={editItemForm.global_category_id || ''} onChange={(e) => setEditItemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
+                          <option value="">— select —</option>
+                          {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
                       {!editItemForm.is_system && (
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input type="checkbox" checked={editItemForm.is_charge_only || false} onChange={(e) => setEditItemForm((p) => ({ ...p, is_charge_only: e.target.checked }))} className="w-4 h-4" />
@@ -988,6 +1002,7 @@ export default function BidderAdminSettings({ companyId }) {
                         {item.internal_name && <p className="text-xs text-purple-600 mt-0.5">Proposal: {item.name}</p>}
                         {item.internal_description && <p className="text-xs text-gray-400 italic mt-0.5">{item.internal_description}</p>}
                         {item.color && <p className="text-xs text-gray-500 mt-0.5">Color: {item.color}</p>}
+                        {item.global_category_name && <p className="text-xs text-blue-500 mt-0.5">Category: {item.global_category_name}</p>}
                         {item.is_system ? (
                           <ul className="mt-1 space-y-0">
                             {(item.components || []).length === 0 && <li className="text-xs text-gray-400 italic">No components selected</li>}
@@ -1101,6 +1116,13 @@ export default function BidderAdminSettings({ companyId }) {
                                 <label className={labelCls}>Color</label>
                                 <input className={inputCls} value={newSystemForm.color} onChange={(e) => setNewSystemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                               </div>
+                              <div>
+                                <label className={labelCls}>Category</label>
+                                <select className={inputCls} value={newSystemForm.global_category_id || ''} onChange={(e) => setNewSystemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
+                                  <option value="">— select —</option>
+                                  {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                              </div>
                             </div>
                             <div>
                               <label className={labelCls}>Components <span className="text-gray-400 font-normal normal-case">(select all items that make up this system)</span></label>
@@ -1181,6 +1203,13 @@ export default function BidderAdminSettings({ companyId }) {
                               <div>
                                 <label className={labelCls}>Color</label>
                                 <input className={inputCls} value={newItemForm.color} onChange={(e) => setNewItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                              </div>
+                              <div>
+                                <label className={labelCls}>Category</label>
+                                <select className={inputCls} value={newItemForm.global_category_id || ''} onChange={(e) => setNewItemForm((p) => ({ ...p, global_category_id: e.target.value ? parseInt(e.target.value, 10) : null }))}>
+                                  <option value="">— select —</option>
+                                  {globalCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
                               </div>
                             </div>
                             <label className="flex items-center gap-3 cursor-pointer">

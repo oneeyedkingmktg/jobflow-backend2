@@ -1150,6 +1150,7 @@ router.post('/library/item', async (req, res) => {
       default_unit_label, is_included = false, show_quantity = false, sort_order = 0,
       supplier, kit_price, sqft_per_kit, is_system = false, component_ids = [],
       is_charge_only = false, color, sku, internal_name, internal_description,
+      global_category_id,
     } = req.body;
 
     // Verify category belongs to this company
@@ -1160,9 +1161,9 @@ router.post('/library/item', async (req, res) => {
     if (!check.rows.length) return res.status(404).json({ error: 'Category not found' });
 
     const result = await pool.query(
-      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color, sku, internal_name, internal_description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
-      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null), clean(internal_name) || null, clean(internal_description) || null]
+      `INSERT INTO bidder_library_items (category_id, company_id, name, description, default_unit_price, default_unit_label, is_included, show_quantity, sort_order, supplier, kit_price, sqft_per_kit, is_system, is_charge_only, color, sku, internal_name, internal_description, global_category_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+      [category_id, companyId, name, clean(description), default_unit_price, clean(default_unit_label), is_included, show_quantity, sort_order, clean(supplier), clean(kit_price) || null, clean(sqft_per_kit) || null, is_system, is_charge_only, clean(color) || null, is_charge_only ? null : (clean(sku) || null), clean(internal_name) || null, clean(internal_description) || null, global_category_id ? parseInt(global_category_id, 10) : null]
     );
 
     const newItem = result.rows[0];
@@ -1191,6 +1192,7 @@ router.put('/library/item/:id', async (req, res) => {
       category_id, name, description, default_unit_price,
       default_unit_label, is_included, show_quantity, is_active, sort_order,
       supplier, kit_price, sqft_per_kit, is_system, component_ids, is_charge_only, color, sku, internal_name, internal_description,
+      global_category_id,
     } = req.body;
 
     const kp  = clean(kit_price)    != null ? parseFloat(clean(kit_price))    : null;
@@ -1202,6 +1204,7 @@ router.put('/library/item/:id', async (req, res) => {
         default_unit_label = $5, is_included = $6, show_quantity = $7,
         is_active = $8, sort_order = $9, supplier = $10,
         is_charge_only = $13, color = $14, sku = $15, internal_name = $16, internal_description = $17,
+        global_category_id = $20,
         kit_price       = CASE WHEN source_supplier_product_id IS NULL THEN $11 ELSE kit_price END,
         sqft_per_kit    = CASE WHEN source_supplier_product_id IS NULL THEN $12 ELSE sqft_per_kit END,
         cost_override     = CASE WHEN source_supplier_product_id IS NOT NULL THEN $11 ELSE cost_override END,
@@ -1216,6 +1219,7 @@ router.put('/library/item/:id', async (req, res) => {
         clean(internal_name) || null,
         clean(internal_description) || null,
         req.params.id, companyId,
+        global_category_id ? parseInt(global_category_id, 10) : null,
       ]
     );
 
