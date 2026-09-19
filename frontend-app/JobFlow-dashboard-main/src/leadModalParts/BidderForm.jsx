@@ -1217,32 +1217,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                     if (pickerMode === 'supplier') {
                       return (
                         <>
-                          {!itemSearch && (
-                            <>
-                              <button
-                                onClick={() => addFromPicker('__subtotal__', nextSortOrder())}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
-                              >
-                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-semibold shrink-0">Subtotal</span>
-                                <span className="text-sm text-gray-500 italic">Insert subtotal divider</span>
-                              </button>
-                              <button
-                                onClick={() => addFromPicker('__note__', nextSortOrder())}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
-                              >
-                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
-                                <span className="text-sm text-gray-500 italic">Note / comment line</span>
-                              </button>
-                              <button
-                                onClick={() => { setShowItemPicker(false); setItemSearch(''); handleAddCustomItem(nextSortOrder()); }}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
-                              >
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold shrink-0">✏️ Custom Item</span>
-                                <span className="text-sm text-gray-500 italic">Add a custom line item to this bid</span>
-                              </button>
-                            </>
-                          )}
-
                           {library.map(cat => {
                             const q = itemSearch.toLowerCase();
                             const activeItems = (cat.items || []).filter(i => i.is_active !== false);
@@ -1314,6 +1288,32 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               </div>
                             );
                           })}
+
+                          {!itemSearch && (
+                            <>
+                              <button
+                                onClick={() => addFromPicker('__subtotal__', nextSortOrder())}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-semibold shrink-0">Subtotal</span>
+                                <span className="text-sm text-gray-500 italic">Insert subtotal divider</span>
+                              </button>
+                              <button
+                                onClick={() => addFromPicker('__note__', nextSortOrder())}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-semibold shrink-0">📝 Note</span>
+                                <span className="text-sm text-gray-500 italic">Note / comment line</span>
+                              </button>
+                              <button
+                                onClick={() => { setShowItemPicker(false); setItemSearch(''); handleAddCustomItem(nextSortOrder()); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2.5 border-b border-gray-100"
+                              >
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold shrink-0">✏️ Custom Item</span>
+                                <span className="text-sm text-gray-500 italic">Add a custom line item to this bid</span>
+                              </button>
+                            </>
+                          )}
 
                           {itemSearch && (() => {
                             const q = itemSearch.toLowerCase();
