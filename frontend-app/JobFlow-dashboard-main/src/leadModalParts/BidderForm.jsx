@@ -1001,7 +1001,6 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                       <div key={`lib-${libItemId}`} className="border border-blue-200 rounded-lg bg-blue-50 px-3 py-3">
                         <div className="flex items-center gap-1 mb-2">
                           {mvBtns(libItemId, true)}
-                          <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{libData?.internal_name || pi.name}</span>
                           {libData && (
                             <button
                               onClick={() => setInfoModal({ type: 'library', item: libData, catName: libCatName })}
@@ -1011,6 +1010,7 @@ export default function BidderForm({ proposalId, lead, onBack, onClose }) {
                               Details
                             </button>
                           )}
+                          <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 ml-1">{libData?.internal_name || pi.name}</span>
                           {!isLocked && (
                             <button onClick={() => handleDeleteLibItem(libItemId)} className="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0">×</button>
                           )}
