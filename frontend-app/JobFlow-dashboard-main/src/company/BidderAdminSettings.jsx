@@ -844,13 +844,13 @@ export default function BidderAdminSettings({ companyId }) {
                       {isSupplierSystem && (
                         <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
                           <span>🔒</span>
-                          <span>This system is managed by the global supplier catalog. Name, description, and components are locked. Only price and label can be changed.</span>
+                          <span>This system is from the global supplier catalog. Internal Name and Internal Description are locked. All other fields can be customized.</span>
                         </div>
                       )}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className={labelCls}>{editItemForm.is_system ? 'Proposal Name *' : 'Name *'}</label>
-                          <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
+                          <input className={inputCls} value={editItemForm.name} onChange={(e) => setEditItemForm((p) => ({ ...p, name: e.target.value }))} />
                         </div>
                         <div>
                           <label className={labelCls}>Default Price</label>
@@ -871,11 +871,11 @@ export default function BidderAdminSettings({ companyId }) {
                       </div>
                       <div>
                         <label className={labelCls}>Description</label>
-                        <textarea className={isSupplierSystem ? `${lockedCls} resize-none` : `${inputCls} resize-none`} disabled={isSupplierSystem} rows={2} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
+                        <textarea className={`${inputCls} resize-none`} rows={2} value={editItemForm.description} onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))} placeholder="Optional default description" />
                       </div>
                       <div>
                         <label className={labelCls}>Color</label>
-                        <input className={isSupplierSystem ? lockedCls : inputCls} disabled={isSupplierSystem} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
+                        <input className={inputCls} value={editItemForm.color} onChange={(e) => setEditItemForm((p) => ({ ...p, color: e.target.value }))} placeholder="e.g. Slate Gray, Beige" />
                       </div>
                       {!editItemForm.is_system && (
                         <label className="flex items-center gap-3 cursor-pointer">
